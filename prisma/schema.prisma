@@ -1,0 +1,301 @@
+// 5인이 공유하는 유일한 계약 파일이다.
+// 변경 절차는 CLAUDE.md의 "공유 파일" 절을 따른다. 브랜치에서 고치지 않는다.
+
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+enum TypeCode {
+  INDEPENDENT_LOW_INCOME // 독립거주-저소득형 / 개과 / 여우
+  HEALTH_EMOTION // 건강·정서취약형 / 고양잇과 / 고양이
+  FAMILY_LIVING // 가족동거형 / 곰과 / 곰
+}
+
+enum Adjective {
+  QUIET // 조용한
+  WARM // 다정한
+  DILIGENT // 부지런한
+  EASYGOING // 느긋한
+}
+
+enum MissionScope {
+  DAILY
+  STAGE
+}
+
+enum Slot {
+  HAT
+  SCARF
+  BACKGROUND
+}
+
+enum Rarity {
+  COMMON
+  RARE
+  EPIC
+  LEGENDARY
+}
+
+enum EffectType {
+  NONE
+  SEED
+  SHARD
+  AFFINITY
+}
+
+enum ChatRole {
+  USER
+  ASSISTANT
+}
+
+model User {
+  id         String @id @default(cuid())
+  cognitoSub String @unique
+
+  // 진단 완료 시 표시명(형용사 + 동물)으로 자동 세팅한다.
+  // 이후 유저가 프로필에서 변경할 수 있다. 유니크 제약을 두지 않는다.
+  nickname String @default("")
+
+  // typeCode는 종족(과)을 결정하며 재진단 외에는 변경되지 않는다.
+  typeCode  TypeCode?
+  adjective Adjective?
+
+  level          Int @default(1)
+  exp            Int @default(0)
+  evolutionStage Int @default(1) // 1~3
+
+  seeds      Int @default(0)
+  starShards Int @default(0)
+  affinity   Int @default(0)
+
+  // 친밀도 일일 지급 상한(100) 계산용. 접속 시점에 날짜를 비교해 리셋한다.
+  affinityToday     Int       @default(0)
+  affinityTodayDate DateTime?
+
+  activePetSkinId String?
+  activePetSkin   PetSkin? @relation("ActiveSkin", fields: [activePetSkinId], references: [id])
+
+  heroPity   Int @default(0)
+  legendPity Int @default(0)
+
+  streakCount    Int       @default(0)
+  lastStreakDate DateTime?
+
+  lastMissionResetAt DateTime?
+  lastIdleClaimAt    DateTime?
+
+  attendanceTotal Int @default(0) // 누적 출석일. dayIndex 계산에 사용
+
+  createdAt DateTime @default(now())
+
+  missions     UserMission[]
+  petSkins     UserPetSkin[]
+  cosmetics    UserCosmetic[]
+  gachaPulls   GachaPull[]
+  posts        Post[]
+  comments     Comment[]
+  likes        PostLike[]
+  chatMessages ChatMessage[]
+  attendance   AttendanceClaim[]
+  diagnosis    DiagnosisSession[]
+}
+
+model DiagnosisSession {
+  id          String    @id @default(cuid())
+  userId      String
+  answers     Json // [{ questionCode, choiceCode, axis, weight }]
+  typeCode    TypeCode
+  adjective   Adjective
+  reasonText  String? // LLM이 생성한 근거 3줄
+  completedAt DateTime  @default(now())
+
+  user User @relation(fields: [userId], references: [id])
+
+  @@index([userId, completedAt])
+}
+
+model Mission {
+  id             String       @id @default(cuid())
+  code           String       @unique
+  scope          MissionScope
+  typeCode       TypeCode? // STAGE일 때만 사용
+  stage          Int? // 1~3
+  title          String
+  description    String
+  rewardSeeds    Int          @default(0)
+  rewardShards   Int          @default(0)
+  rewardAffinity Int          @default(0)
+  requiresPhoto  Boolean      @default(false)
+  order          Int          @default(0)
+
+  userMissions UserMission[]
+}
+
+model UserMission {
+  id          String   @id @default(cuid())
+  userId      String
+  missionId   String
+  resetKey    String // DAILY는 "2026-08-20", STAGE는 "STAGE"
+  completedAt DateTime @default(now())
+  photoKey    String? // S3 object key
+
+  user    User    @relation(fields: [userId], references: [id])
+  mission Mission @relation(fields: [missionId], references: [id])
+
+  @@unique([userId, missionId, resetKey])
+  @@index([userId, resetKey])
+}
+
+model PetSkin {
+  id       String   @id @default(cuid())
+  name     String   @unique // 여우 / 고양이 / 곰 / 늑대 / 삵 / 판다. 시드 upsert 키
+  typeCode TypeCode // 기본 펫 매칭용. 캐릭터 구매 제한에는 쓰지 않는다
+
+  isDefault  Boolean @default(false)
+  stageCount Int     @default(1) // 기본 펫은 3, 친밀도 캐릭터는 1
+
+  effectType EffectType @default(NONE)
+  effectPct  Int        @default(0) // 15 = +15%
+
+  priceAffinity Int? // 친밀도 구매가. 기본 펫은 null
+  imageKeyBase  String // S3 prefix. stageCount가 3이면 뒤에 -1 -2 -3을 붙인다
+
+  owners      UserPetSkin[]
+  activeUsers User[]        @relation("ActiveSkin")
+}
+
+model UserPetSkin {
+  id         String   @id @default(cuid())
+  userId     String
+  petSkinId  String
+  acquiredAt DateTime @default(now())
+
+  user    User    @relation(fields: [userId], references: [id])
+  petSkin PetSkin @relation(fields: [petSkinId], references: [id])
+
+  @@unique([userId, petSkinId])
+}
+
+model CosmeticItem {
+  id     String @id @default(cuid())
+  name   String @unique // 시드 upsert 키
+  slot   Slot
+  rarity Rarity
+
+  tribeColor TypeCode // 컬러 계열. 3컬러를 TypeCode로 표현한다
+
+  // true면 친밀도 전용 상점 아이템이며 가챠 추첨 풀에서 제외한다.
+  affinityOnly  Boolean @default(false)
+  priceAffinity Int?
+
+  imageKey String
+
+  owners UserCosmetic[]
+  pulls  GachaPull[]
+}
+
+model UserCosmetic {
+  id         String   @id @default(cuid())
+  userId     String
+  itemId     String
+  equipped   Boolean  @default(false)
+  acquiredAt DateTime @default(now())
+
+  user User         @relation(fields: [userId], references: [id])
+  item CosmeticItem @relation(fields: [itemId], references: [id])
+
+  @@unique([userId, itemId])
+}
+
+model GachaPull {
+  id       String   @id @default(cuid())
+  userId   String
+  itemId   String
+  rarity   Rarity
+  wasPity  Boolean  @default(false)
+  pulledAt DateTime @default(now())
+
+  // 이미 보유한 아이템이 나온 경우. UserCosmetic은 만들지 않고 별조각을 환급한다.
+  wasDuplicate Boolean @default(false)
+  refundShards Int     @default(0)
+
+  user User         @relation(fields: [userId], references: [id])
+  item CosmeticItem @relation(fields: [itemId], references: [id])
+
+  @@index([userId, pulledAt])
+}
+
+model AttendanceClaim {
+  id        String   @id @default(cuid())
+  userId    String
+  claimDate DateTime @db.Date
+  dayIndex  Int // 1~7. (attendanceTotal - 1) % 7 + 1
+
+  user User @relation(fields: [userId], references: [id])
+
+  @@unique([userId, claimDate])
+}
+
+model Post {
+  id String @id @default(cuid())
+
+  // 작성 시점의 갤러리를 그대로 보관한다. 재진단으로 유형이 바뀌어도 글은 이동하지 않는다.
+  galleryType TypeCode
+
+  userId       String
+  title        String
+  body         String
+  imageKey     String?
+  likeCount    Int       @default(0)
+  commentCount Int       @default(0)
+  createdAt    DateTime  @default(now())
+  deletedAt    DateTime?
+
+  user     User       @relation(fields: [userId], references: [id])
+  comments Comment[]
+  likes    PostLike[]
+
+  @@index([galleryType, createdAt])
+}
+
+model Comment {
+  id        String    @id @default(cuid())
+  postId    String
+  userId    String
+  body      String
+  createdAt DateTime  @default(now())
+  deletedAt DateTime?
+
+  post Post @relation(fields: [postId], references: [id])
+  user User @relation(fields: [userId], references: [id])
+
+  @@index([postId, createdAt])
+}
+
+model PostLike {
+  id     String @id @default(cuid())
+  postId String
+  userId String
+
+  post Post @relation(fields: [postId], references: [id])
+  user User @relation(fields: [userId], references: [id])
+
+  @@unique([postId, userId])
+}
+
+model ChatMessage {
+  id        String   @id @default(cuid())
+  userId    String
+  role      ChatRole
+  content   String
+  createdAt DateTime @default(now())
+
+  user User @relation(fields: [userId], references: [id])
+
+  @@index([userId, createdAt])
+}
