@@ -37,6 +37,8 @@
 | `lib/auth.ts` | E | `getCurrentUser()` — 모든 API의 첫 줄 |
 | `lib/reward.ts` | C | `calculateReward()` — 재화 증감의 유일한 경로 |
 | `lib/types.ts` | A | TypeCode, Adjective, 표시명 매핑 상수 |
+| `app/layout.tsx` | E | 전역 레이아웃, 하단 탭 내비게이션 |
+| `app/globals.css` | E | 전역 스타일·색 토큰 |
 | `.env.example` | E | 환경변수 키 목록 |
 
 Claude는 이 파일들을 **요청받지 않은 상태로 수정하지 않는다.** 수정이 필요해 보이면 먼저 사용자에게 알린다.

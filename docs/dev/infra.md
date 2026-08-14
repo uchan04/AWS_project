@@ -26,7 +26,12 @@
 2. GitHub 레포 연결 (아래 "GitHub 레포 연결" 참고) + Amplify Hosting 배포. Amplify 환경변수에 `.env.example`의 키 전부 등록
 3. Cognito 사용자 풀 (이메일+비밀번호, 인증 코드 비활성) → `lib/auth.ts`의 TODO를 `aws-jwt-verify`로 구현
 
+4. `app/layout.tsx`에 하단 탭 내비게이션(미션 / 펫 / 커뮤니티 / 챗봇 / 진단 결과)을 넣고 동결한다. 5인이 각자 자기 탭을 추가하면 이 파일에서 충돌한다. **경로는 아직 없어도 링크를 먼저 박아두고**, 각 담당이 자기 폴더에 `page.tsx`를 만들면 자동으로 연결된다
+5. 미인증 처리 규칙을 정해 전원에게 알린다. `getCurrentUser()`가 throw했을 때 API는 401 + `{ error: { code: "UNAUTHORIZED" } }`, 화면은 `/login`으로 리다이렉트. 각자 다르게 처리하면 화면마다 동작이 달라진다
+
 ## GitHub 레포 연결
+
+원격은 이미 등록되어 있다(`origin` = `https://github.com/uchan04/AWS_project.git`). 레포는 비어 있으므로 아래 "경우 2"에 해당한다.
 
 로컬 저장소는 이미 초기화되어 있고 첫 커밋(`chore: 프로젝트 초기 설정`)이 들어가 있다. 원격만 붙이면 된다.
 
