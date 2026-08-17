@@ -41,5 +41,6 @@ RDS가 아직 없으면 `DATABASE_URL`을 로컬 Postgres로 가리켜도 된다
 | `npm run build` | 빌드. **커밋 전에 통과하는지 확인한다** |
 | `npm run db:seed` | 미션·아이템 시드 |
 | `npm run check:reward` | `calculateReward()` 자체 체크. reward 로직을 고쳤으면 돌린다 |
+| `npm run check:diagnosis` | 유형 판정 스냅샷 체크 18개. 문항 weight나 판정 규칙을 고쳤으면 돌린다 |
 
 `npx prisma migrate dev`는 스키마 담당 1인만 실행한다. `migrate reset`은 절대 실행하지 않는다.

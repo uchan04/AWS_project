@@ -6,13 +6,16 @@
 **이 문서의 4~7장은 확정된 실행 스펙이다.** 값을 새로 정하지 말고 그대로 옮겨 구현한다. 값을 바꿔야 할 이유를 발견하면 먼저 사용자에게 알린다.
 
 ## 현재 상태
-- 완료: 없음
-- 진행 중: 1단계 (미션 콘텐츠, 판정 로직)
-- 미착수: 진단 화면, Bedrock 호출 2종, 결과 화면, 재진단
+- 완료: **1단계 전부** — 미션 41개, 6문항 정의, 판정 함수, 스냅샷 체크 18개
+- 진행 중: 없음. 2단계는 `DATABASE_URL` 공유(E) 후 착수
+- 미착수: 진단 화면, 완료 API, 결과 화면, Bedrock 호출 2종, 재진단
 
 ## 구현한 파일
 - `lib/types.ts` — 종족·형용사 매핑, 기본 닉네임, 성장 곡선 상수 (골격 완료)
-- `prisma/seed/missions.ts` — 일일 5개 완료, 단계 미션 1개(형식 예시). 36개 미작성
+- `prisma/seed/missions.ts` — 미션 41개 완료. 일일 5 + 단계 36(유형 3 × 단계 3 × 4). 보상·사진 배치는 `stageMission()`이 강제하므로 개별 미션에서 값을 덮어쓰지 않는다
+- `lib/diagnosis/questions.ts` — 6문항·선택지·axis·weight의 서버 원본. `CHOICE_INDEX`로 코드 → 문항·선택지 조회
+- `lib/diagnosis/classify.ts` — `classify()` + `resolveAnswers()`. 순수 함수, LLM·DB 없음. `resolveAnswers()`가 검증과 축·가중치 채우기를 함께 하므로 완료 API는 이걸 재사용해 `DiagnosisSession.answers`를 저장한다
+- `scripts/check-diagnosis.ts` — `npm run check:diagnosis`. 시나리오 18개 + 이상 입력 5개. 전부 통과
 
 ---
 
@@ -20,12 +23,12 @@
 
 DB가 아직 없다(`DATABASE_URL` 미공유). 그래서 **DB가 필요 없는 것부터 한다.** 미션 콘텐츠와 판정 로직은 순수 파일·순수 함수라 지금 당장 끝낼 수 있고, 마침 이 둘이 팀에서 가장 급한 항목이다.
 
-### 1단계 — DB 없이 (8/15)
+### 1단계 — DB 없이 (8/15) — **완료**
 
-1. **미션 콘텐츠 36개** (`prisma/seed/missions.ts`) — 최우선. B의 미션 시스템과 C의 펫이 이 데이터를 기다린다. 규칙은 7장
-2. **6문항 정의** (`lib/diagnosis/questions.ts`) — 4장 표를 그대로 옮긴다
-3. **판정 함수** (`lib/diagnosis/classify.ts`) — 5장 계약대로. 순수 함수, LLM 없음
-4. **스냅샷 테스트 18개** (`scripts/check-diagnosis.ts`) — 6장 표를 그대로 옮긴다
+1. ~~미션 콘텐츠 36개~~ (`prisma/seed/missions.ts`)
+2. ~~6문항 정의~~ (`lib/diagnosis/questions.ts`)
+3. ~~판정 함수~~ (`lib/diagnosis/classify.ts`)
+4. ~~스냅샷 테스트 18개~~ (`scripts/check-diagnosis.ts`)
 
 ### 2단계 — DB 연결 후 (8/16)
 
@@ -225,12 +228,13 @@ Q1은 `Q1_` 접두사를, Q2~Q6은 각 문항 접두사를 생략해 적었다. 
 
 H3과 I3은 Q1·Q2·Q3이 같고 Q5만 다르다(`Q5_OK` → `Q5_DEBT`). 동점 경계가 정확히 어디서 뒤집히는지 확인하는 쌍이므로 둘 다 남긴다.
 
-추가로 이상 입력 4개도 함께 검증한다. 모두 throw해야 한다.
+추가로 이상 입력 5개도 함께 검증한다. 모두 throw해야 한다.
 
 1. 문항 5개만 보낸 경우 (Q6 누락)
 2. 존재하지 않는 `choiceCode` (`"Q2_UNKNOWN"`)
 3. Q3이 두 번 들어온 경우
 4. 빈 배열
+5. `questionCode`와 `choiceCode`가 어긋난 경우 (`{ questionCode: "Q1", choiceCode: "Q2_HEAVY" }`) — 구현 중 추가. 선택지가 실제로 속한 문항을 기준으로 보므로, 어긋난 요청은 조작으로 간주해 거부한다
 
 `package.json`에 `"check:diagnosis": "tsx scripts/check-diagnosis.ts"`를 추가한다.
 
@@ -325,7 +329,12 @@ H3과 I3은 Q1·Q2·Q3이 같고 Q5만 다르다(`Q5_OK` → `Q5_DEBT`). 동점 
 ---
 
 ## 9. 다음 할 일
-1. `prisma/seed/missions.ts`에 단계 미션 36개 작성 (7장)
-2. `lib/diagnosis/questions.ts` (4장)
-3. `lib/diagnosis/classify.ts` (5장)
-4. `scripts/check-diagnosis.ts` (6장) + `package.json`에 `check:diagnosis` 추가
+
+DB 없이 할 수 있는 일은 다 끝났다. 아래는 전부 `DATABASE_URL`이 공유된 뒤다(E 대기).
+
+1. 미션 41개 시드 반영 확인 — `npm run db:seed` 후 `Mission` 41행. B·C가 이 데이터를 기다린다
+2. `app/diagnosis/page.tsx` 6문항 화면 + 진행률 바 (8장). 선택지 버튼만으로 동작
+3. `POST /api/diagnosis/complete` (8장). 검증·축 채우기는 `resolveAnswers()`를 재사용한다
+4. `app/diagnosis/result/page.tsx` 결과 화면 + `PATCH /api/diagnosis/nickname`
+
+대기 중에 먼저 할 수 있는 것: 2번 화면을 완료 API 호출 없이(`console.log`로 답변 확인) 만들어 두면 DB가 열린 날 API만 붙이면 된다.
