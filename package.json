@@ -10,7 +10,8 @@
     "postinstall": "prisma generate",
     "db:push": "prisma migrate deploy && prisma generate",
     "db:seed": "tsx prisma/seed.ts",
-    "check:reward": "tsx scripts/check-reward.ts"
+    "check:reward": "tsx scripts/check-reward.ts",
+    "check:diagnosis": "tsx scripts/check-diagnosis.ts"
   },
   "prisma": {
     "seed": "tsx prisma/seed.ts"
