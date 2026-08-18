@@ -4,9 +4,10 @@
 명세는 `SPEC.md` 7·8절, 규칙은 `CLAUDE.md`.
 
 ## 현재 상태
-- 완료: 갤러리 목록 화면(탭 2개: 전체/나의 종족), 상세 오버레이, 좋아요 토글, 댓글 작성, 친밀도 지급 헬퍼
+- 완료: 갤러리 목록 화면, 상세 오버레이, 좋아요 토글, 댓글 작성, 글쓰기 모달, 본인 글 삭제, 친밀도 지급 헬퍼
 - 진행 중: 없음
-- 미착수: 글쓰기 모달 + API(LLM 주제 추천 3가지 이상), 본인 글·댓글 삭제, 챗봇
+- 미착수: 본인 댓글 삭제, LLM 주제 추천 실제 연동, 이미지 업로드, 챗봇
+- 보류(다음 세션 이전 필요 조건): 전체 탭 글쓰기(스키마에 ALL 값 없음), LLM 주제 추천(`BEDROCK_MODEL_ID` 없음), 글쓰기 시 일일 미션(`DAILY_COMMUNITY_POST`) 완료 처리(B와 협의 필요) — 셋 다 아래 "결정한 것과 이유"에 근거 남김
 
 ## 구현한 파일
 - `app/community/page.tsx` — 목록 화면. 서버 컴포넌트, `searchParams`의 `tab`으로 갤러리 결정
@@ -22,9 +23,16 @@
 - `app/api/community/posts/[id]/like/route.ts` — POST. `PostLike` 토글 + `Post.likeCount`를 `$transaction`으로 함께 갱신. `@@unique([postId, userId])` 충돌(P2002)은 동시 클릭으로 보고 현재 값을 그대로 반환
 - `app/api/community/posts/[id]/comments/route.ts` — POST. `Comment` 생성 + `Post.commentCount` 증가를 `$transaction`으로 묶고, 성공 후에만 `grantAffinity` 호출. 응답에 `granted` 포함
 
+- `app/community/_components/WriteModal.tsx` — 글쓰기 버튼 + 모달을 한 컴포넌트로 통합(트리거가 이번 세션에 새로 생기는 것이라 지시된 파일 목록에도 이 컴포넌트만 있고 별도 트리거 컴포넌트는 없었음). `gallery` prop이 `"ALL"`이면 버튼을 비활성화하고 "전체 커뮤니티 글쓰기는 준비 중이에요" 안내만 노출, 종족 갤러리일 때만 모달이 동작. `_lib/gallery.ts`의 `canWriteToGallery()`로 판단(클라이언트 쪽은 UX용 차단이고, 실제 차단은 서버가 함)
+
 ## 수정한 파일
+- `app/community/_lib/gallery.ts` — `canWriteToGallery(gallery): gallery is TypeCode` 추가. 전체 탭 글쓰기 차단 로직을 여기 한 곳에 모음(스키마에 ALL이 생기면 이 함수만 고치면 됨)
 - `app/community/_components/PostCard.tsx` — 카드를 `<button onClick>`으로 바꿔 클릭 시 상세를 열도록 함
-- `app/community/page.tsx` — 게시글 그리드 렌더링을 `PostCard` 직접 매핑에서 `PostList`로 교체
+- `app/community/_components/PostList.tsx` — 삭제 완료(`onDeleted`) 시 모달을 닫고 `useRouter().refresh()`로 서버 컴포넌트 데이터를 다시 가져와 목록을 갱신
+- `app/community/_components/PostDetailModal.tsx` — `isOwn`일 때만 "삭제" 버튼 노출, 삭제 성공 시 `onDeleted` 콜백 호출
+- `app/community/page.tsx` — 헤더에 `WriteModal` 배치(전체/종족 탭 공통, 내부에서 분기)
+- `app/api/community/posts/route.ts` — POST 추가(글쓰기)
+- `app/api/community/posts/[id]/route.ts` — DELETE 추가(본인 글 소프트 삭제), GET 응답에 `isOwn` 추가
 
 ## 삭제한 파일
 - `app/community/[type]/page.tsx` — URL로 다른 종족 갤러리에 접근 가능했던 예전 동적 라우트. 팀 디자인 시안 반영으로 갤러리 탭이 "전체/나의 종족" 2개로 바뀌면서 제거
@@ -43,11 +51,19 @@
 - 친밀도 지급 순서를 반드시 지킴: 날짜 리셋(로컬 계산, DB는 아직 안 건드림) → `calculateReward()`로 배율 적용 → `capAffinity()`로 상한 적용 → `granted > 0`일 때만 `User.affinity`/`affinityToday`/`affinityTodayDate`를 한 번에 갱신. 순서를 바꾸면 상한 100을 넘음
 - 좋아요는 친밀도 지급 대상이 아님(SPEC.md 8절에 명시)
 - 좋아요·댓글 API의 종족 갤러리 접근 차단은 지난 세션의 `canAccessGallery()`를 그대로 재사용(새로 안 만듦)
+- **전체 탭 글쓰기는 보류.** `Post.galleryType`이 `TypeCode` enum이라 `ALL` 값을 저장할 수 없음. 클라이언트(`WriteModal`)와 서버(POST 라우트) 양쪽에서 `canWriteToGallery()`로 막음 — 버튼만 비활성화하면 API 직접 호출로 뚫리기 때문에 서버 차단이 필수
+- **LLM 주제 추천은 보류.** `BEDROCK_MODEL_ID`가 비어 있어 구현 불가. `WriteModal`에 비활성 영역만 두고 `// TODO: Bedrock 주제 추천 — BEDROCK_MODEL_ID 확보 후 구현 (SPEC 8절)` 주석만 남김. 가짜 추천 문구는 하드코딩하지 않음
+- **일일 미션(`DAILY_COMMUNITY_POST`) 완료 처리는 보류.** `UserMission`은 B의 도메인이라 직접 만들지 않음. 작성 API에 `// TODO: DAILY_COMMUNITY_POST 완료 처리 — 담당 B와 협의 중` 주석만 남김
+- 삭제는 소프트 삭제(`deletedAt`)이며 친밀도를 회수하지 않는다. `affinityToday`가 이미 누적돼 있어 삭제 후 재작성으로 하루 상한을 넘길 수 없음
+- 글쓰기 API는 `galleryType`을 요청 바디로 받되, `canAccessGallery(galleryType, user.typeCode)`로 본인 종족과 다르면 차단 → `canWriteToGallery(galleryType)`로 `ALL`을 차단하는 순서로 검증(먼저 소속 확인, 그다음 쓰기 가능 여부)
+- 삭제 후 화면 갱신은 페이지 새로고침이 아니라 `next/navigation`의 `useRouter().refresh()`로 처리. 서버 컴포넌트(`page.tsx`)의 데이터만 다시 가져오고 모달이 닫히는 클라이언트 상태는 유지됨
 
 ## 막힌 것
 - 없음 (로컬 DB가 `prisma migrate`로 관리되지 않고 있던 것을 발견해 베이스라인 마이그레이션(`prisma/migrations/00000000000000_init`)을 만들어 해결. 기존 시드 데이터(미션 41개, 펫스킨 6개)는 유지됨. 스키마 담당과 공유 필요)
 
 ## 다음 할 일
-- 글쓰기 모달 + API, LLM 주제 추천 3가지 이상 (친밀도 20은 `grantAffinity(user, POST_AFFINITY)`로 지급)
-- 본인 글·댓글 삭제
+- 본인 댓글 삭제
+- LLM 주제 추천 3가지 이상 연동 — `BEDROCK_MODEL_ID` 확보되면 `WriteModal`의 TODO 자리에 구현
+- 전체 탭 글쓰기 — 스키마에 ALL(또는 공용 게시판) 개념이 추가되면 `_lib/gallery.ts`의 `canWriteToGallery()`만 고치면 됨
+- `DAILY_COMMUNITY_POST` 일일 미션 완료 처리 — B와 담당 경계 협의 필요
 - 챗봇 화면 + Bedrock 스트리밍 응답, 1턴당 `grantAffinity(user, CHAT_TURN_AFFINITY)` 호출
