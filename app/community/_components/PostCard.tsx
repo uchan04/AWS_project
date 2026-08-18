@@ -2,11 +2,23 @@ import { TRIBE, authorLabel } from "@/lib/types"
 import type { GalleryPost } from "../_lib/gallery"
 import { timeAgo } from "../_lib/format"
 
-export function PostCard({ post, showTribeBadge }: { post: GalleryPost; showTribeBadge: boolean }) {
+export function PostCard({
+  post,
+  showTribeBadge,
+  onClick,
+}: {
+  post: GalleryPost
+  showTribeBadge: boolean
+  onClick: () => void
+}) {
   const tribe = post.user.typeCode ? TRIBE[post.user.typeCode] : null
 
   return (
-    <div className="flex flex-col gap-3 rounded-2xl border border-neutral-200 bg-white p-5 transition hover:border-neutral-300 hover:shadow-sm">
+    <button
+      type="button"
+      onClick={onClick}
+      className="flex w-full flex-col gap-3 rounded-2xl border border-neutral-200 bg-white p-5 text-left transition hover:border-neutral-300 hover:shadow-sm"
+    >
       <div className="flex items-start justify-between gap-2">
         <div>
           <p className="text-sm font-semibold text-neutral-900">
@@ -34,6 +46,6 @@ export function PostCard({ post, showTribeBadge }: { post: GalleryPost; showTrib
         <span>좋아요 {post.likeCount}</span>
         <span>댓글 {post.commentCount}</span>
       </div>
-    </div>
+    </button>
   )
 }

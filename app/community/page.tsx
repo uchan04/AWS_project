@@ -1,7 +1,7 @@
 import { getCurrentUser } from "@/lib/auth"
 import { TRIBE } from "@/lib/types"
 import { GalleryTabs } from "./_components/GalleryTabs"
-import { PostCard } from "./_components/PostCard"
+import { PostList } from "./_components/PostList"
 import { resolveGallery, listGalleryPosts } from "./_lib/gallery"
 
 export default async function CommunityPage(props: PageProps<"/community">) {
@@ -32,11 +32,7 @@ export default async function CommunityPage(props: PageProps<"/community">) {
           첫 번째 이야기를 들려주세요.
         </p>
       ) : (
-        <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
-          {posts.map((post) => (
-            <PostCard key={post.id} post={post} showTribeBadge={gallery === "ALL"} />
-          ))}
-        </div>
+        <PostList posts={posts} showTribeBadge={gallery === "ALL"} />
       )}
     </main>
   )
