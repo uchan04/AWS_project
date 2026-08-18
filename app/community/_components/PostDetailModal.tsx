@@ -22,6 +22,7 @@ type DetailPost = {
   likeCount: number
   commentCount: number
   likedByMe: boolean
+  isOwn: boolean
   user: DetailUser
 }
 
@@ -29,7 +30,15 @@ function authorText(user: DetailUser): string {
   return user.typeCode ? authorLabel(user.nickname, user.typeCode) : user.nickname
 }
 
-export function PostDetailModal({ postId, onClose }: { postId: string; onClose: () => void }) {
+export function PostDetailModal({
+  postId,
+  onClose,
+  onDeleted,
+}: {
+  postId: string
+  onClose: () => void
+  onDeleted: () => void
+}) {
   const [post, setPost] = useState<DetailPost | null>(null)
   const [comments, setComments] = useState<DetailComment[]>([])
   const [loading, setLoading] = useState(true)
@@ -38,6 +47,7 @@ export function PostDetailModal({ postId, onClose }: { postId: string; onClose: 
   const [commentBody, setCommentBody] = useState("")
   const [commentPending, setCommentPending] = useState(false)
   const [affinityNotice, setAffinityNotice] = useState<string | null>(null)
+  const [deletePending, setDeletePending] = useState(false)
 
   useEffect(() => {
     let ignore = false
@@ -77,6 +87,22 @@ export function PostDetailModal({ postId, onClose }: { postId: string; onClose: 
       setPost((prev) => (prev ? { ...prev, likedByMe: json.data.liked, likeCount: json.data.likeCount } : prev))
     } finally {
       setLikePending(false)
+    }
+  }
+
+  async function handleDelete() {
+    if (!post || deletePending) return
+    setDeletePending(true)
+    try {
+      const res = await fetch(`/api/community/posts/${postId}`, { method: "DELETE" })
+      const json = await res.json()
+      if (json.error) {
+        setError(json.error.message)
+        return
+      }
+      onDeleted()
+    } finally {
+      setDeletePending(false)
     }
   }
 
@@ -131,13 +157,25 @@ export function PostDetailModal({ postId, onClose }: { postId: string; onClose: 
                 <p className="text-sm font-semibold text-neutral-900">{authorText(post.user)}</p>
                 <p className="text-xs text-neutral-400">{timeAgo(new Date(post.createdAt))}</p>
               </div>
-              <button
-                type="button"
-                onClick={onClose}
-                className="flex h-9 w-9 items-center justify-center rounded-full bg-neutral-100 text-neutral-500 hover:bg-neutral-200"
-              >
-                ✕
-              </button>
+              <div className="flex items-center gap-2">
+                {post.isOwn && (
+                  <button
+                    type="button"
+                    onClick={handleDelete}
+                    disabled={deletePending}
+                    className="rounded-lg border border-neutral-300 px-3 py-1.5 text-xs text-neutral-500 hover:bg-neutral-50 disabled:opacity-60"
+                  >
+                    삭제
+                  </button>
+                )}
+                <button
+                  type="button"
+                  onClick={onClose}
+                  className="flex h-9 w-9 items-center justify-center rounded-full bg-neutral-100 text-neutral-500 hover:bg-neutral-200"
+                >
+                  ✕
+                </button>
+              </div>
             </div>
 
             <div className="flex-1 overflow-y-auto px-7 py-6">

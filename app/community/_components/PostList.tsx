@@ -1,6 +1,7 @@
 "use client"
 
 import { useState } from "react"
+import { useRouter } from "next/navigation"
 import { PostCard } from "./PostCard"
 import { PostDetailModal } from "./PostDetailModal"
 import type { GalleryPost } from "../_lib/gallery"
@@ -11,7 +12,13 @@ import type { GalleryPost } from "../_lib/gallery"
  * "목록 페이지에서 useState로 selectedPostId를 들고" 요구를 만족하려면 구조상 불가피하다.
  */
 export function PostList({ posts, showTribeBadge }: { posts: GalleryPost[]; showTribeBadge: boolean }) {
+  const router = useRouter()
   const [selectedPostId, setSelectedPostId] = useState<string | null>(null)
+
+  function handleDeleted() {
+    setSelectedPostId(null)
+    router.refresh()
+  }
 
   return (
     <>
@@ -26,7 +33,13 @@ export function PostList({ posts, showTribeBadge }: { posts: GalleryPost[]; show
         ))}
       </div>
 
-      {selectedPostId && <PostDetailModal postId={selectedPostId} onClose={() => setSelectedPostId(null)} />}
+      {selectedPostId && (
+        <PostDetailModal
+          postId={selectedPostId}
+          onClose={() => setSelectedPostId(null)}
+          onDeleted={handleDeleted}
+        />
+      )}
     </>
   )
 }

@@ -21,6 +21,14 @@ export function canAccessGallery(gallery: GalleryTab, myTypeCode: TypeCode | nul
   return gallery === "ALL" || gallery === myTypeCode
 }
 
+/**
+ * 전체 탭은 글쓰기 대상이 없다 — Post.galleryType이 TypeCode enum이라 ALL 값을 저장할 수 없다.
+ * 스키마에 공용 게시판 개념이 생기면 이 함수만 고치면 된다.
+ */
+export function canWriteToGallery(gallery: GalleryTab): gallery is TypeCode {
+  return gallery !== "ALL"
+}
+
 function galleryTypeFilter(gallery: GalleryTab) {
   return gallery === "ALL" ? {} : { galleryType: gallery }
 }
