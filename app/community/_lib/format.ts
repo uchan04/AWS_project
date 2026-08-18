@@ -1,9 +1,12 @@
-/** 게시글 목록·상세에 쓰는 날짜 표시. "방금 전" 같은 상대 시각은 쓰지 않는다(고정 20개라 신선도 표시가 필요 없다). */
-export function formatPostDate(date: Date): string {
-  return new Intl.DateTimeFormat("ko-KR", {
-    month: "numeric",
-    day: "numeric",
-    hour: "2-digit",
-    minute: "2-digit",
-  }).format(date)
+const MINUTE = 60_000
+const HOUR = 60 * MINUTE
+const DAY = 24 * HOUR
+
+/** 게시글 카드용 상대 시각 표기. */
+export function timeAgo(date: Date): string {
+  const diff = Date.now() - date.getTime()
+  if (diff < MINUTE) return "방금"
+  if (diff < HOUR) return `${Math.floor(diff / MINUTE)}분 전`
+  if (diff < DAY) return `${Math.floor(diff / HOUR)}시간 전`
+  return `${Math.floor(diff / DAY)}일 전`
 }

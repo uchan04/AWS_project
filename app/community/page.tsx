@@ -1,10 +1,43 @@
-import { redirect } from "next/navigation"
 import { getCurrentUser } from "@/lib/auth"
+import { TRIBE } from "@/lib/types"
+import { GalleryTabs } from "./_components/GalleryTabs"
+import { PostCard } from "./_components/PostCard"
+import { resolveGallery, listGalleryPosts } from "./_lib/gallery"
 
-const DEFAULT_GALLERY = "INDEPENDENT_LOW_INCOME"
+export default async function CommunityPage(props: PageProps<"/community">) {
+  const searchParams = await props.searchParams
+  const tab = typeof searchParams.tab === "string" ? searchParams.tab : undefined
 
-/** 커뮤니티 진입점. 본인 종족 갤러리로 보낸다. 진단 전이면 기본 갤러리를 보여준다. */
-export default async function CommunityPage() {
   const user = await getCurrentUser()
-  redirect(`/community/${user.typeCode ?? DEFAULT_GALLERY}`)
+  const gallery = resolveGallery(tab, user.typeCode)
+  const posts = await listGalleryPosts(gallery)
+
+  return (
+    <main className="mx-auto flex max-w-3xl flex-col gap-6 p-4 sm:p-6">
+      <div>
+        <h1 className="text-xl font-bold text-neutral-900">커뮤니티</h1>
+        <p className="mt-1 text-sm text-neutral-500">
+          {gallery === "ALL"
+            ? "모든 종족이 함께하는 열린 공간이에요"
+            : `${TRIBE[gallery].animal} 종족 전용 공간이에요 · 나만 볼 수 있어요`}
+        </p>
+      </div>
+
+      <GalleryTabs active={gallery} myTypeCode={user.typeCode} />
+
+      {posts.length === 0 ? (
+        <p className="py-24 text-center text-sm leading-relaxed text-neutral-500">
+          아직 글이 없어요.
+          <br />
+          첫 번째 이야기를 들려주세요.
+        </p>
+      ) : (
+        <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
+          {posts.map((post) => (
+            <PostCard key={post.id} post={post} showTribeBadge={gallery === "ALL"} />
+          ))}
+        </div>
+      )}
+    </main>
+  )
 }
