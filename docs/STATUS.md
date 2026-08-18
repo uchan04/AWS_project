@@ -2,7 +2,7 @@
 
 **모든 세션은 이 문서부터 읽는다.** 그다음 아래 "지금 읽어야 할 문서"만 읽고 시작한다.
 
-최종 갱신: 2026-08-17
+최종 갱신: 2026-08-18
 현재 단계: **D1 — 인프라 착수 (8/14 목표가 8/15로 하루 지연)**
 
 팀원 인수인계용 단일 문서는 [`docs/인수인계.md`](인수인계.md)에 있다. 새로 합류하거나 노션으로 공유할 때는 그 문서를 쓴다.
@@ -34,15 +34,16 @@
 | A | 진단 + 미션 콘텐츠 | 1단계 완료 (미션 41개, 6문항, 판정 함수, 체크 18개) | 화면·API는 `DATABASE_URL` 대기 |
 | B | 미션 시스템 + 사진 업로드 | 미착수 | 일일 미션 5개로 선행 개발 가능 |
 | C | 펫 + 가챠 | `lib/reward.ts` 골격 완료 | 8/16 오전까지 확정 필요 |
-| D | 커뮤니티 + 챗봇 | 미착수 | |
+| D | 커뮤니티 + 챗봇 | 갤러리 목록 화면 완료 | 상세·글쓰기·댓글·좋아요 다음 |
 | E | 인프라 + 인증 | 프로젝트 생성·스키마·auth 스텁 완료 | RDS·Amplify·Cognito 남음 |
 
 ## 전체 차단 사항
 
 지금 프로젝트를 멈춰 세우는 것만 적는다. 해결되면 즉시 지운다.
 
-1. **RDS 없음** — `DATABASE_URL`이 비어 있어 `prisma migrate dev`를 아직 실행하지 못했다. `prisma/migrations/`가 없다. E 담당. A·B·C·D의 화면·API가 전부 여기서 막혀 있다
-2. **`lib/auth.ts`가 스텁** — `DEV_AUTH_BYPASS=true`로만 동작한다. 실제 Cognito 검증 필요. E 담당
+1. **`lib/auth.ts`가 스텁** — `DEV_AUTH_BYPASS=true`로만 동작한다. 실제 Cognito 검증 필요. E 담당
+
+해결됨: 로컬 `DATABASE_URL`은 채워져 있었으나 `prisma/migrations/`가 없어 `migrate status`가 "관리되지 않는 DB"로 잡혔다(기존 시드 데이터가 있어 `migrate dev`가 리셋을 요구). D가 8/18에 `prisma migrate diff`로 베이스라인 SQL을 만들고 `migrate resolve --applied`로 데이터 손실 없이 마이그레이션 이력을 만들었다(`00000000000000_init`). 이제 A·B·C·D 모두 `git pull && npx prisma migrate deploy && npx prisma generate`만 실행하면 된다. RDS(배포용)는 아직 별개로 E 확인 필요.
 
 GitHub 원격은 해결됐다 — https://github.com/uchan04/AWS_project
 
