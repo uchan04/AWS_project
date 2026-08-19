@@ -3,249 +3,466 @@
 세션이 초기화되면 `docs/STATUS.md` 다음에 이 문서를 읽는다. 작업을 끝낼 때마다 이 문서와 `docs/STATUS.md`를 갱신하고 `docs:` 커밋으로 남긴다.
 명세는 `SPEC.md` 2·3·4절, 규칙은 `CLAUDE.md`.
 
-**이 문서의 4~7장은 확정된 실행 스펙이다.** 값을 새로 정하지 말고 그대로 옮겨 구현한다. 값을 바꿔야 할 이유를 발견하면 먼저 사용자에게 알린다.
+**이 문서의 4~9장은 확정된 실행 스펙이다.** 값을 새로 정하지 말고 그대로 옮겨 구현한다. 값을 바꿔야 할 이유를 발견하면 먼저 사용자에게 알린다.
+
+**브랜치 규칙 (2026-08-19 변경).** A 담당분은 `feat/diagnosis`에 커밋한다. `main`에 직접 커밋하지 않고 PR로만 올린다. `prisma/schema.prisma` 변경분도 이 브랜치에 담고, 머지 여부와 `prisma migrate dev` 실행은 팀이 결정한다.
 
 ## 현재 상태
-- 완료: **1단계 전부** — 미션 41개, 6문항 정의, 판정 함수, 스냅샷 체크 18개
-- 진행 중: 없음. 2단계는 `DATABASE_URL` 공유(E) 후 착수
-- 미착수: 진단 화면, 완료 API, 결과 화면, Bedrock 호출 2종, 재진단
+- 완료: 미션 41개, 지표 14개 정의, 12문항 + 형용사 문항, `classify()`·`classifySub()`, 무손실 조기 종료, 스냅샷 체크
+- 진행 중: 진단 화면, 홈 화면
+- 미착수: 완료 API, 결과 화면, Bedrock 호출 2종, 재진단, 관리자 교차표
 
 ## 구현한 파일
-- `lib/types.ts` — 종족·형용사 매핑, 기본 닉네임, 성장 곡선 상수 (골격 완료)
-- `prisma/seed/missions.ts` — 미션 41개 완료. 일일 5 + 단계 36(유형 3 × 단계 3 × 4). 보상·사진 배치는 `stageMission()`이 강제하므로 개별 미션에서 값을 덮어쓰지 않는다
-- `lib/diagnosis/questions.ts` — 6문항·선택지·axis·weight의 서버 원본. `CHOICE_INDEX`로 코드 → 문항·선택지 조회
-- `lib/diagnosis/classify.ts` — `classify()` + `resolveAnswers()`. 순수 함수, LLM·DB 없음. `resolveAnswers()`가 검증과 축·가중치 채우기를 함께 하므로 완료 API는 이걸 재사용해 `DiagnosisSession.answers`를 저장한다
-- `scripts/check-diagnosis.ts` — `npm run check:diagnosis`. 시나리오 18개 + 이상 입력 5개. 전부 통과
+- `lib/types.ts` — 종족·동물·색, 형용사 매핑, 기본 닉네임, 성장 곡선 상수
+- `prisma/seed/missions.ts` — 미션 41개. 일일 5 + 단계 36(유형 3 × 단계 3 × 4). 보상·사진 배치는 `stageMission()`이 강제한다
+- `lib/diagnosis/questions.ts` — 12문항 + 형용사 문항의 서버 원본. 선택지가 어떤 지표를 켜는지도 여기 있다
+- `lib/diagnosis/indicators.ts` — 답변 → 지표 14개. 대분류·세부유형이 전부 이 결과만 본다
+- `lib/diagnosis/classify.ts` — `classify()`(3대분류) + `classifySub()`(8세부유형). 순수 함수, LLM·DB 없음
+- `lib/diagnosis/adaptive.ts` — `possibleTypes()` / `canDecide()` / `nextQuestion()`. 무손실 조기 종료
+- `scripts/check-diagnosis.ts` — `npm run check:diagnosis`
 
 ---
 
 ## 1. 작업 순서
 
-DB가 아직 없다(`DATABASE_URL` 미공유). 그래서 **DB가 필요 없는 것부터 한다.** 미션 콘텐츠와 판정 로직은 순수 파일·순수 함수라 지금 당장 끝낼 수 있고, 마침 이 둘이 팀에서 가장 급한 항목이다.
+DB가 아직 없다(`DATABASE_URL` 미공유). **DB가 필요 없는 것부터 한다.**
 
-### 1단계 — DB 없이 (8/15) — **완료**
+### 1단계 — DB 없이 — **완료**
 
-1. ~~미션 콘텐츠 36개~~ (`prisma/seed/missions.ts`)
-2. ~~6문항 정의~~ (`lib/diagnosis/questions.ts`)
-3. ~~판정 함수~~ (`lib/diagnosis/classify.ts`)
-4. ~~스냅샷 테스트 18개~~ (`scripts/check-diagnosis.ts`)
+1. ~~미션 콘텐츠 36개~~
+2. ~~지표·문항·판정~~ (2026-08-19 지표 기반으로 재작성)
+3. ~~조기 종료~~
+4. ~~스냅샷 체크~~
 
-### 2단계 — DB 연결 후 (8/16)
+### 2단계 — DB 없이 계속
 
-5. 진단 화면 6문항 + 진행률 바 — 선택지 버튼만으로 LLM 없이 동작 (8장)
-6. 진단 완료 API (8장)
-7. 결과 화면 — 종족·컬러·기본 닉네임 + 닉네임 즉시 변경
+5. 진단 화면 — 선택지 버튼 + 진행률, `nextQuestion()`으로 문항 순서 결정
+6. 홈 화면 — 종족·펫·오늘 미션 진입점 (담당 A로 확정, 2026-08-19)
+7. 결과 화면 — 종족·색·기본 닉네임
 
-### 3단계 — Bedrock 확인 후 (8/17)
+### 3단계 — DB 연결 후
 
-8. 자유 입력 → 선택지 코드 변환 (tool use, 실패 시 버튼 폴백)
-9. 판정 근거 3줄 요약 → `DiagnosisSession.reasonText`
-10. 질문 문장 다듬기 + 다음 문항 프리페치 — **A 담당분 중 가장 먼저 자를 항목**
+8. 진단 완료 API, 닉네임 PATCH
+9. 관리자 교차표 (대분류 × 세부유형)
 
-### 4단계 (8/18)
+### 4단계 — Bedrock 확인 후
 
-11. 재진단 — 8장의 완료 API를 그대로 재사용한다
+10. 자유 입력 → 선택지 코드 변환 (tool use, 실패 시 버튼 폴백)
+11. 판정 근거 3줄 요약 → `DiagnosisSession.reasonText`
+12. 질문 문장 다듬기 — **A 담당분 중 가장 먼저 자를 항목**
 
 ---
 
 ## 2. 결정한 것과 이유
 
-- 판정은 100% 코드. LLM은 질문 문장 다듬기와 자유 입력 enum 변환만 담당
-- 형용사는 6번 문항 4지선다에 1:1 매핑. `lib/types.ts`의 `ADJECTIVE_BY_CHOICE` 상수 테이블
-- 진단 로직은 `lib/diagnosis/` 하위에 새로 만든다. `lib/types.ts`는 4명이 import하는 공유 파일이라 문항·판정 코드까지 넣으면 충돌 위험이 커진다
+- 판정은 100% 코드. LLM은 문장 다듬기와 자유 입력 enum 변환만 담당한다
+- **답변 → 지표 14개 → 판정** 순서로 한 단계를 끼웠다. 대분류와 세부유형이 같은 지표를 보므로 규칙을 고칠 때 한 곳만 고친다
+- **대분류(3)와 세부유형(8)은 각각 독립으로 판정하고 둘 다 저장한다.** 세부유형에서 대분류를 고정 매핑으로 뽑으면, 미취업빈곤형처럼 주거 상황에 따라 갈려야 하는 유형이 한 집단에 몰려 미션 배정이 틀린다. 관리자 화면은 "대분류 × 세부유형" 교차표로 보므로 8개가 3집단으로 쪼개진 모습은 그대로 보인다
+- **경계선지능청년은 8유형에서 제외했다.** IQ 71~84는 자기보고로 측정할 수 없고, 묻는 것 자체가 낙인이다
+- 문항은 **직설적으로 묻지 않는다.** 소득·고립·우울을 그대로 묻는 문장은 쓰지 않는다. 판정은 코드가 하므로 문장을 은유로 바꿔도 정확도가 흔들리지 않는다
+- 우울은 PHQ-9을 쓰지 않는다. PHQ-9 9번 문항이 자살 사고를 묻고, 이 프로젝트에는 위기 대응 절차가 없다. **PHQ-2 근사(2문항 합 3점 이상)** 로 대체한다
+- 형용사는 마지막 문항 4지선다에 1:1 매핑. `lib/types.ts`의 `ADJECTIVE_BY_CHOICE` 상수 테이블
+- 진단 로직은 `lib/diagnosis/` 하위. `lib/types.ts`는 4명이 import하는 공유 파일이라 문항·판정 코드를 넣지 않는다
 - 화면은 선택지 버튼만으로 먼저 완성한다. Bedrock이 늦어져도 진단 플로우 전체가 동작해야 한다
-- 스냅샷 테스트는 테스트 프레임워크 없이 `scripts/check-reward.ts`와 같은 방식(`node:assert`)으로 만든다
-- **6장의 기대값을 먼저 확정한 뒤 판정 함수를 구현한다.** 순서를 뒤집으면 구현 결과를 그대로 기대값으로 박게 되고, 테스트가 아무것도 검증하지 않는다. 이 테스트가 발표에서 제시할 정확도 근거다
+- **6·7장의 기대값을 먼저 확정한 뒤 판정 함수를 구현한다.** 순서를 뒤집으면 구현 결과를 그대로 기대값으로 박게 되고, 테스트가 아무것도 검증하지 않는다. 이 테스트가 발표에서 제시할 정확도 근거다
 
 ## 3. 막힌 것
-- `DATABASE_URL` 미공유 (E 대기). 1단계 작업에는 영향 없음
-- Bedrock 연결 확인 미완 (E 대기). 3단계에서 필요
+- `DATABASE_URL` 미공유 (E 대기). 화면 작업에는 영향 없음
+- Bedrock 연결 확인 미완 (E 대기). 4단계에서 필요
+- `prisma/seed/items.ts`의 펫 3종이 아직 옛 동물 매핑이다. **C 담당 파일이라 내가 못 고친다.** 요청 대기
+- Google 로그인 전용 결정이 `SPEC.md` 10절("소셜 로그인은 쓰지 않는다")과 `CLAUDE.md` 8절과 충돌한다. 둘 다 공유 문서라 임의로 안 고친다
 
 ---
 
-## 4. 문항 스펙 (확정)
+## 4. 지표 스펙 (확정)
 
-축은 `housing` / `health` / `employment` 3개. Q6은 형용사 전용이라 축이 없다.
+지표는 전부 boolean이다. 문항의 선택지가 지표를 켠다. 판정 함수는 지표만 본다.
 
-`weight`는 **그 답변이 해당 축의 어려움을 얼마나 강하게 나타내는가**다. 0 = 신호 없음, 1 = 약한 신호, 2 = 강한 신호.
-
-### Q1 — 지금 누구와 함께 살고 있나요? (housing)
-
-| 선택지 코드 | 표시 문구 | weight | 비고 |
+| # | 코드 | 뜻 | 출처 문항 |
 |---|---|---|---|
-| `Q1_FAMILY` | 가족과 함께 살아요 | 0 | **이 답이면 `FAMILY_LIVING` 확정** |
-| `Q1_ALONE` | 혼자 살아요 | 2 | |
-| `Q1_SHARE` | 친구나 룸메이트와 살아요 | 1 | 비가족 동거는 1인 가구 계열로 취급한다 |
-| `Q1_OTHER` | 그 외예요 | 1 | |
+| ① | `ALONE` | 1인 가구 (가족과 동거하지 않음) | Q1 |
+| ② | `HOUSING_UNSTABLE` | 주거 불안정 (월세·공과금 부담, 퇴거 위험) | Q2 |
+| ③ | `MENTAL_UNMET` | 정신건강 진료 미충족 | Q6 |
+| ④ | `PHYSICAL_UNMET` | 신체건강 진료 미충족 | Q6 |
+| ⑤ | `DEPRESSED` | 우울 (PHQ-2 근사 3점 이상) | Q3 + Q4 |
+| ⑥ | `ACTIVITY_LIMIT` | 건강으로 인한 활동 제약 | Q7 |
+| ⑦ | `BURNOUT` | 소진 경험 | Q5 |
+| ⑧ | `LOW_INCOME` | 저소득 | Q8 |
+| ⑨ | `DEBT` | 개인부채 | Q9 |
+| ⑩ | `COLLEGE` | 대학 진학 | Q11 |
+| ⑪ | `JOBLESS` | 미취업 (실업자 또는 비경제활동자) | Q10 |
+| ⑫ | `AFTERCARE` | 자립준비 (보호종료) | Q11 |
+| ⑬ | `MIGRANT` | 지역 이주 | Q11 |
+| ⑭ | `CAREGIVER` | 가족 돌봄 (주 돌봄자) | Q12 |
 
-### Q2 — 요즘 하루하루 기분은 어떤가요? (health)
+⑩ `COLLEGE`는 판정에 쓰지 않는다. 관리자 통계·발표 자료용으로만 저장한다.
 
-| 선택지 코드 | 표시 문구 | weight |
+### 파생 점수
+
+```
+health = ③ + ④ + ⑤ + ⑥ + ⑦        (0~5)
+econ   = ② + ⑧ + ⑨ + ⑪            (0~4)
+```
+
+`DEPRESSED`는 Q3·Q4의 PHQ 점수 합이 **3 이상**일 때 켜진다. PHQ-2의 표준 컷오프다.
+
+---
+
+## 5. 문항 스펙 (확정)
+
+12문항 + 형용사 문항 1개. 실제로 사용자가 보는 것은 조기 종료 때문에 더 적다. 시나리오 20개 실측 **평균 9.7개, 최대 13개**(8장).
+
+**문장 기준.** 소득·고립·우울을 그대로 묻지 않는다. 아래는 금지 예시다.
+
+- ✗ "현재 소득은 어느 정도인가요?" / ✗ "지난 30일간 집 밖에 나간 적이 없나요?" / ✗ "우울증 진단을 받았나요?"
+
+### Q1 — 지금 집 현관을 열면, 누가 있나요?
+
+| 선택지 코드 | 표시 문구 | 켜는 지표 |
 |---|---|---|
-| `Q2_HEAVY` | 대체로 가라앉아 있어요 | 2 |
-| `Q2_UPDOWN` | 좋을 때도 있고 아닐 때도 있어요 | 1 |
-| `Q2_FLAT` | 특별한 감정 변화가 없어요 | 1 |
-| `Q2_OK` | 대체로 괜찮아요 | 0 |
+| `Q1_FAMILY` | 가족이 있어요 | — |
+| `Q1_ALONE` | 저 혼자예요 | ① |
+| `Q1_SHARE` | 친구나 룸메이트가 있어요 | ① |
+| `Q1_OTHER` | 그 외예요 | ① |
 
-### Q3 — 몸 상태나 병원은 어떤가요? (health)
+비가족 동거는 1인 가구 계열로 취급한다.
 
-| 선택지 코드 | 표시 문구 | weight |
+### Q2 — 지금 사는 곳을 떠올리면 마음이 어떤가요?
+
+| 선택지 코드 | 표시 문구 | 켜는 지표 |
 |---|---|---|
-| `Q3_EXHAUSTED` | 늘 지쳐 있고 회복이 안 돼요 | 2 |
-| `Q3_NEED_CARE` | 가봐야 할 것 같은데 못 가고 있어요 | 2 |
-| `Q3_SOMETIMES` | 가끔 힘들지만 넘길 수 있어요 | 1 |
-| `Q3_FINE` | 특별히 불편한 건 없어요 | 0 |
+| `Q2_RISK` | 다음 달에도 여기 있을 수 있을지 모르겠어요 | ② |
+| `Q2_BILL` | 고지서나 월세 날짜가 마음에 걸려요 | ② |
+| `Q2_TIGHT` | 좁지만 지낼 만해요 | — |
+| `Q2_SAFE` | 여기 있으면 마음이 놓여요 | — |
 
-### Q4 — 요즘 일이나 구직은 어떤가요? (employment)
+### Q3 — 예전에 좋아했던 것들은 요즘 어떤가요? (PHQ)
 
-| 선택지 코드 | 표시 문구 | weight |
+| 선택지 코드 | 표시 문구 | PHQ |
 |---|---|---|
-| `Q4_NONE` | 일하지 않고 구직도 쉬고 있어요 | 2 |
-| `Q4_SEEKING` | 구직 중이에요 | 1 |
-| `Q4_PART` | 아르바이트나 단기 일을 해요 | 1 |
-| `Q4_WORKING` | 일정하게 일하고 있어요 | 0 |
+| `Q3_NONE` | 뭘 해도 재미가 없어요 | 2 |
+| `Q3_LESS` | 예전만큼은 아니에요 | 1 |
+| `Q3_MIXED` | 그때그때 달라요 | 1 |
+| `Q3_SAME` | 여전히 좋아요 | 0 |
 
-### Q5 — 돈 문제는 어떤가요? (employment)
+### Q4 — 아침에 눈을 떴을 때 하루가 어떻게 느껴지나요? (PHQ)
 
-| 선택지 코드 | 표시 문구 | weight |
+| 선택지 코드 | 표시 문구 | PHQ |
 |---|---|---|
-| `Q5_DEBT` | 갚아야 할 돈이 부담돼요 | 2 |
-| `Q5_TIGHT` | 생활비가 빠듯해요 | 1 |
-| `Q5_UNSURE` | 생각하고 싶지 않아요 | 1 |
-| `Q5_OK` | 크게 걱정은 없어요 | 0 |
+| `Q4_HEAVY` | 다시 눈을 감고 싶어요 | 2 |
+| `Q4_DRAG` | 무겁지만 일단 일어나요 | 1 |
+| `Q4_FLAT` | 특별한 느낌이 없어요 | 1 |
+| `Q4_OK` | 대체로 괜찮아요 | 0 |
 
-### Q6 — 어떤 때가 가장 편한가요? (형용사, 축 없음)
+### Q5 — 쉬고 난 다음 날, 몸과 마음이 돌아오나요?
 
-`SPEC.md` 2절에 고정되어 있다. weight 없음.
+| 선택지 코드 | 표시 문구 | 켜는 지표 |
+|---|---|---|
+| `Q5_EMPTY` | 자도 자도 바닥이에요 | ⑦ |
+| `Q5_HALF` | 절반쯤만 돌아와요 | ⑦ |
+| `Q5_MOST` | 대체로 돌아와요 | — |
+| `Q5_FULL` | 잘 돌아와요 | — |
+
+### Q6 — 가봐야 하는데 못 간 곳이 있나요?
+
+| 선택지 코드 | 표시 문구 | 켜는 지표 |
+|---|---|---|
+| `Q6_MENTAL` | 마음을 털어놓을 곳을 못 찾았어요 | ③ |
+| `Q6_BODY` | 몸이 안 좋은데 병원을 못 갔어요 | ④ |
+| `Q6_BOTH` | 둘 다 미루고 있어요 | ③ ④ |
+| `Q6_NONE` | 지금은 없어요 | — |
+
+### Q7 — 몸 상태 때문에 하려던 일을 접은 적이 있나요?
+
+| 선택지 코드 | 표시 문구 | 켜는 지표 |
+|---|---|---|
+| `Q7_OFTEN` | 자주 그래요 | ⑥ |
+| `Q7_SOME` | 가끔 그래요 | — |
+| `Q7_RARE` | 거의 없어요 | — |
+| `Q7_NONE` | 없어요 | — |
+
+`Q7_SOME`은 지표를 켜지 않는다. "가끔"까지 활동 제약으로 잡으면 `health`가 과대해져 건강·정서취약형 비율이 논문의 12%를 크게 넘는다.
+
+### Q8 — 이번 달 통장을 볼 때 마음이 어떤가요?
+
+| 선택지 코드 | 표시 문구 | 켜는 지표 |
+|---|---|---|
+| `Q8_FEAR` | 월말이 오는 게 겁나요 | ⑧ |
+| `Q8_JUST` | 아끼면 겨우 맞아요 | ⑧ |
+| `Q8_FINE` | 크게 신경 쓰지 않아요 | — |
+| `Q8_ROOM` | 여유가 좀 있어요 | — |
+
+### Q9 — 갚아야 할 것이 마음에 걸리나요?
+
+| 선택지 코드 | 표시 문구 | 켜는 지표 |
+|---|---|---|
+| `Q9_HEAVY` | 생각하면 잠이 안 와요 | ⑨ |
+| `Q9_SOME` | 조금 있어요 | ⑨ |
+| `Q9_UNSURE` | 생각하고 싶지 않아요 | ⑨ |
+| `Q9_NONE` | 없어요 | — |
+
+`Q9_UNSURE`도 ⑨를 켠다. 회피는 부채 없음보다 부채 있음에 가깝고, 잘못 켰을 때 피해가 작은 방향이다(경제 미션이 배정될 뿐이다).
+
+### Q10 — 요즘 하루는 어떻게 채워지나요?
+
+| 선택지 코드 | 표시 문구 | 켜는 지표 |
+|---|---|---|
+| `Q10_EMPTY` | 딱히 정해진 게 없어요 | ⑪ |
+| `Q10_SEEK` | 일자리를 찾아보고 있어요 | ⑪ |
+| `Q10_SHORT` | 짧게라도 일하고 있어요 | — |
+| `Q10_FIXED` | 정해진 곳에 나가요 | — |
+
+### Q11 — 스무 살 무렵, 어디에서 나와 지금까지 왔나요?
+
+| 선택지 코드 | 표시 문구 | 켜는 지표 |
+|---|---|---|
+| `Q11_COLLEGE` | 대학을 다니다 왔어요 | ⑩ |
+| `Q11_AFTERCARE` | 시설이나 위탁가정에서 나왔어요 | ⑫ |
+| `Q11_MIGRANT` | 살던 지역을 떠나 혼자 왔어요 | ⑬ |
+| `Q11_STAY` | 쭉 살던 곳에 있어요 | — |
+
+한 문항이 ⑩⑫⑬을 나눠 잡는다. 세 사건이 동시에 해당되는 경우를 포기하는 대신 문항 2개를 아꼈다. 세부유형 판정에는 충분하다.
+
+### Q12 — 집에서 당신이 챙겨야 하는 사람이 있나요?
+
+| 선택지 코드 | 표시 문구 | 켜는 지표 |
+|---|---|---|
+| `Q12_MAIN` | 제가 없으면 안 되는 사람이 있어요 | ⑭ |
+| `Q12_HELP` | 조금 거들어요 | — |
+| `Q12_NONE` | 없어요 | — |
+
+가족돌봄청년은 주 돌봄자를 말한다. `Q12_HELP`는 켜지 않는다.
+
+### Q13 — 어떤 때가 가장 편한가요? (형용사, 지표 없음)
+
+`SPEC.md` 2절에 문구가 고정되어 있다.
 
 | 선택지 코드 | 표시 문구 | 형용사 |
 |---|---|---|
-| `Q6_NIGHT_ALONE` | 밤에 혼자 있는 시간이 가장 편해요 | 조용한 |
-| `Q6_WITH_CLOSE` | 마음 맞는 사람과 있을 때가 편해요 | 다정한 |
-| `Q6_ON_PLAN` | 계획대로 하루가 굴러가면 편해요 | 부지런한 |
-| `Q6_NO_RUSH` | 서두르지 않고 흐르는 대로가 편해요 | 느긋한 |
+| `Q13_NIGHT_ALONE` | 밤에 혼자 있는 시간이 가장 편해요 | 조용한 |
+| `Q13_WITH_CLOSE` | 마음 맞는 사람과 있을 때가 편해요 | 다정한 |
+| `Q13_ON_PLAN` | 계획대로 하루가 굴러가면 편해요 | 부지런한 |
+| `Q13_NO_RUSH` | 서두르지 않고 흐르는 대로가 편해요 | 느긋한 |
+
+Q13은 조기 종료 대상이 아니다. 형용사가 없으면 닉네임을 만들 수 없으므로 **항상 마지막에 묻는다.**
 
 ---
 
-## 5. 판정 함수 계약 (확정)
+## 6. 대분류 판정 규칙 (확정)
 
-`lib/diagnosis/classify.ts`
+사용자에게 보이는 3유형이다. **유형 이름은 화면에 절대 쓰지 않는다.** 동물과 종족만 보여준다.
+
+| `TypeCode` | 동물 | 종족 | 색 | 논문 비율 |
+|---|---|---|---|---|
+| `HEALTH_EMOTION` | 여우 | 개과 | `#F59E0B` 앰버 오렌지 | 12.13% |
+| `INDEPENDENT_LOW_INCOME` | 고양이 | 고양잇과 | `#38BDF8` 스카이 블루 | 16.75% |
+| `FAMILY_LIVING` | 곰 | 곰과 | `#34D399` 에메랄드 그린 | 71.12% |
+
+색은 `lib/types.ts`의 `TRIBE` 한 곳에만 있다. 파스텔 톤으로 바꾸기로 하면 hex 3개만 교체한다(대안값을 그 파일 주석에 적어 둔다).
+
+```
+1. health >= 3                        → HEALTH_EMOTION
+2. !ALONE                             → FAMILY_LIVING
+3. health >= 2 && health >= econ      → HEALTH_EMOTION
+4. 그 외                               → INDEPENDENT_LOW_INCOME
+```
+
+위에서부터 평가하고 처음 걸리는 곳에서 멈춘다. 네 가지를 명시한다.
+
+- **규칙 1이 가족 동거보다 앞이다.** 가족과 살아도 건강 지표 5개 중 3개가 켜졌으면 건강·정서취약형이다. 이전 버전은 Q1 하나로 가족 동거를 확정했는데, 그러면 가족과 사는 심한 우울 사용자가 가장 낮은 강도의 미션을 못 받는다
+- **동점(`health === econ`)이면 `HEALTH_EMOTION`이다.** 건강·정서 문제는 방치했을 때 위험이 크고, 이 유형의 미션이 더 낮은 강도에서 시작하므로 잘못 판정했을 때 피해가 적다
+- **지표가 전부 꺼지면 `ALONE` 여부로 갈린다.** 가족과 살면 곰, 아니면 고양이다. 1인 가구 자체가 독립거주형의 핵심 특성(92%)이다
+- `econ`은 규칙 3의 비교에만 쓴다. 단독으로 유형을 결정하는 분기를 추가하지 않는다
+
+---
+
+## 7. 세부유형 판정 규칙 (확정)
+
+관리자 전용이다. 8개. **화면에 이 이름을 노출하지 않는다.**
+
+```
+1. AFTERCARE                                       → AFTERCARE_YOUTH      자립준비청년
+2. CAREGIVER                                       → FAMILY_CAREGIVER     가족돌봄청년
+3. MIGRANT                                         → MIGRANT_YOUTH        지역이주청년
+4. health >= 3                                     → HEALTH_FRAGILE       건강취약형
+5. ALONE && DEBT && (LOW_INCOME || HOUSING_UNSTABLE) → DEBT_INDEPENDENT    독립생계채무형
+6. DEBT && (LOW_INCOME || HOUSING_UNSTABLE)         → FINANCIAL_FRAGILE    금융취약청년
+7. JOBLESS && LOW_INCOME                           → JOBLESS_POOR         미취업빈곤형
+8. 그 외                                            → FAMILY_DEPENDENT     가족의존형
+```
+
+- **사실 유형(⑫⑬⑭)을 맨 앞에 둔다.** 자립준비청년·가족돌봄청년은 외부 지원 제도가 따로 있어서, 관리자가 연계할 때 이 사실이 다른 취약성보다 먼저다
+- 규칙 5와 6은 `ALONE`으로만 갈린다. 혼자 살면서 빚이 있는 쪽이 독립생계채무형이다
+- 기본값이 `FAMILY_DEPENDENT`인 이유는 이 집단이 논문에서 가장 크고(71%), 아무 지표도 켜지지 않은 사용자가 실제로 여기에 가깝기 때문이다
+
+대분류와 세부유형은 **서로를 참조하지 않는다.** 둘 다 지표만 본다. 관리자 화면은 교차표로 본다.
+
+---
+
+## 8. 무손실 조기 종료 (확정)
+
+`lib/diagnosis/adaptive.ts`
+
+지표가 monotone하므로 미답 문항이 만들 수 있는 `(ALONE, health, econ)` 조합을 전부 열거해도 상태가 60개를 넘지 않는다. 그래서 **가능한 유형 집합을 정확히 계산한다.** 근사·휴리스틱이 아니다.
 
 ```ts
-export type Axis = "housing" | "health" | "employment"
-export type AxisScores = Record<Axis, number>
-
-/** 클라이언트가 보내는 답변. 코드만 받는다. */
-export type Answer = { questionCode: string; choiceCode: string }
-
-export type DiagnosisResult = {
-  typeCode: TypeCode
-  adjective: Adjective
-  axisScores: AxisScores
-}
-
-export function classify(answers: Answer[]): DiagnosisResult
+export function possibleTypes(answers: Answer[]): TypeCode[]
+export function canDecide(answers: Answer[]): boolean          // possibleTypes().length === 1
+export function nextQuestion(answers: Answer[]): Question | null
 ```
 
-### 축 점수
+- `nextQuestion()`은 미답 문항 중 **최악의 경우 남는 유형 수가 가장 적은** 문항을 고른다. 동점이면 문항 번호 순. 결정적이다
+- 대분류가 확정되면 남은 대분류 문항(Q1~Q10)을 건너뛴다
+- **Q11·Q12·Q13은 확정 후에도 반드시 묻는다** (`TAIL_QUESTION_CODES`). Q11·Q12는 대분류에 전혀 영향이 없지만 세부유형 8개 중 3개(자립준비·가족돌봄·지역이주)가 여기에만 달려 있어서, 건너뛰면 관리자 통계에서 그 3개가 사라진다. Q13은 없으면 닉네임을 만들 수 없다
+- Q13에 답하면 `nextQuestion()`은 `null`을 반환한다. 그때 완료 API를 호출한다
 
-```
-housing    = Q1 선택지의 weight
-health     = Q2 weight + Q3 weight
-employment = Q4 weight + Q5 weight
-```
+**실측 문항 수.** 시나리오 20개를 실제 화면 흐름대로 돌린 결과 평균 9.7개, 최대 13개다. 13문항 전부를 묻는 경우도 있다(대분류 신호가 어중간하면 Q1~Q10을 다 봐야 갈린다). 3개는 항상 묻는 꼬리 문항이므로 조기 종료가 줄이는 것은 Q1~Q10 중 평균 3.3개다. 이 숫자는 `npm run check:diagnosis`가 매번 출력한다.
 
-### 판정 규칙
+**정확도 손실이 0인 근거:** 조기 종료로 얻은 결과는 미답 문항을 어떻게 채워도 같은 유형이 나올 때만 확정된다. 9장에서 시나리오마다 "전체 문항 결과 == 조기 종료 결과"를 단정한다.
 
-```
-1. Q1 === "Q1_FAMILY"                        → FAMILY_LIVING
-2. health >= 2 && health >= employment        → HEALTH_EMOTION
-3. 그 외                                      → INDEPENDENT_LOW_INCOME
-```
+단, 조기 종료는 **대분류만** 무손실이다. 세부유형은 답하지 않은 Q1~Q10의 지표를 `false`로 두고 계산하므로, 조기 종료한 사용자의 세부유형은 정확도가 떨어진다(건강취약형·독립생계채무형 등이 과소 집계된다). 관리자 통계용이므로 받아들인다. **이 사실을 교차표 화면에 명시한다.**
 
-규칙은 위에서부터 순서대로 평가하고 처음 걸리는 곳에서 멈춘다. 세 가지를 명시한다.
+---
 
-- **가족 동거는 다른 축을 보지 않고 확정한다.** health와 employment가 아무리 높아도 규칙 1이 이긴다
-- **동점(`health === employment`)이면 `HEALTH_EMOTION`이다.** 건강·정서 문제는 방치했을 때 위험이 크고, 이 유형의 미션이 더 낮은 강도에서 시작하므로 잘못 판정했을 때 피해가 적은 방향이다
-- **모든 답이 약한 경우(전부 0)의 기본값은 `INDEPENDENT_LOW_INCOME`이다.** 1인 가구 자체가 이 유형의 핵심 특성(92%)이다. 기본값을 정하지 않으면 판정 함수에 미정의 경로가 생겨 스냅샷 테스트를 쓸 수 없다
+## 9. 스냅샷 시나리오 (확정)
 
-`employment`는 규칙 2의 비교에만 쓰인다. 단독으로 유형을 결정하는 분기를 추가하지 않는다.
+`scripts/check-diagnosis.ts`. **기대값은 손으로 확정한 것이다. 구현 결과에 맞춰 기대값을 고치지 않는다.**
+
+각 행은 12문항 전부에 답한 경우다. Q13은 형용사만 결정하므로 표에서 뺐다.
+
+| # | 답변 (문항: 선택지 접미사) | health | econ | 대분류 | 세부유형 | 검증 목적 |
+|---|---|---|---|---|---|---|
+| A1 | Q1 FAMILY, Q11 AFTERCARE, 나머지 무신호 | 0 | 0 | FAMILY_LIVING | AFTERCARE_YOUTH | 사실 유형이 최우선 |
+| A2 | Q1 ALONE, Q11 AFTERCARE, Q8 FEAR, Q9 HEAVY | 0 | 2 | INDEPENDENT_LOW_INCOME | AFTERCARE_YOUTH | 자립준비가 채무보다 앞 |
+| C1 | Q1 FAMILY, Q12 MAIN, 나머지 무신호 | 0 | 0 | FAMILY_LIVING | FAMILY_CAREGIVER | 돌봄 |
+| C2 | Q1 FAMILY, Q12 MAIN, Q3 NONE, Q4 HEAVY, Q5 EMPTY, Q6 BOTH | 4 | 0 | HEALTH_EMOTION | FAMILY_CAREGIVER | 대분류·세부가 독립임을 보이는 행 |
+| M1 | Q1 ALONE, Q11 MIGRANT, Q8 JUST | 0 | 1 | INDEPENDENT_LOW_INCOME | MIGRANT_YOUTH | 이주 |
+| H1 | Q1 ALONE, Q3 NONE, Q4 HEAVY, Q6 BOTH, Q5 EMPTY, Q7 OFTEN | 5 | 0 | HEALTH_EMOTION | HEALTH_FRAGILE | 건강 최대 |
+| H2 | Q1 FAMILY, Q3 NONE, Q4 HEAVY, Q5 EMPTY, Q7 SOME | 2 | 0 | FAMILY_LIVING | FAMILY_DEPENDENT | **health 2는 규칙 1 미달. 가족이 이긴다** |
+| H3 | Q1 FAMILY, Q3 NONE, Q4 HEAVY, Q5 EMPTY, Q7 OFTEN | 3 | 0 | HEALTH_EMOTION | HEALTH_FRAGILE | **health 3에서 가족을 이긴다. H2와 경계쌍** |
+| H4 | Q1 ALONE, Q3 LESS, Q4 DRAG, Q5 HALF, Q8 FEAR, Q9 HEAVY, Q10 EMPTY | 1 | 3 | INDEPENDENT_LOW_INCOME | DEBT_INDEPENDENT | PHQ 2점은 우울 미달 |
+| H5 | Q1 ALONE, Q3 NONE, Q4 DRAG, Q5 HALF | 2 | 0 | HEALTH_EMOTION | FAMILY_DEPENDENT | **PHQ 3점에서 우울이 켜진다. H4와 경계쌍** |
+| H6 | Q1 ALONE, Q3 NONE, Q4 HEAVY, Q6 MENTAL, Q8 FEAR, Q9 HEAVY | 2 | 2 | HEALTH_EMOTION | DEBT_INDEPENDENT | **동점은 HEALTH** |
+| I1 | Q1 ALONE, Q3 NONE, Q4 HEAVY, Q6 MENTAL, Q8 FEAR, Q9 HEAVY, Q10 EMPTY | 2 | 3 | INDEPENDENT_LOW_INCOME | DEBT_INDEPENDENT | **econ이 1 크면 뒤집힌다. H6과 경계쌍** |
+| I2 | Q1 ALONE, Q8 FEAR, Q9 HEAVY, Q2 RISK, Q10 EMPTY | 0 | 4 | INDEPENDENT_LOW_INCOME | DEBT_INDEPENDENT | 경제 최대 |
+| I3 | Q1 ALONE, 전부 무신호 | 0 | 0 | INDEPENDENT_LOW_INCOME | FAMILY_DEPENDENT | **전부 0 + 혼자 → 고양이** |
+| F1 | Q1 FAMILY, 전부 무신호 | 0 | 0 | FAMILY_LIVING | FAMILY_DEPENDENT | **전부 0 + 가족 → 곰** |
+| F2 | Q1 FAMILY, Q8 FEAR, Q9 HEAVY | 0 | 2 | FAMILY_LIVING | FINANCIAL_FRAGILE | 동거 + 빚 → 금융취약 |
+| F3 | Q1 FAMILY, Q8 FEAR, Q10 EMPTY | 0 | 2 | FAMILY_LIVING | JOBLESS_POOR | 빚 없이 미취업 + 저소득 |
+| F4 | Q1 FAMILY, Q10 EMPTY | 0 | 1 | FAMILY_LIVING | FAMILY_DEPENDENT | 미취업만이면 기본값 |
+| J1 | Q1 ALONE, Q10 EMPTY, Q8 FEAR | 0 | 2 | INDEPENDENT_LOW_INCOME | JOBLESS_POOR | 혼자 + 미취업빈곤 |
+| B1 | Q1 SHARE, Q7 SOME, Q5 MOST, Q3 MIXED, Q4 FLAT, Q12 HELP | 0 | 0 | INDEPENDENT_LOW_INCOME | FAMILY_DEPENDENT | **중간 답변은 지표를 켜지 않는다. 비가족 동거는 1인 가구 계열** |
+
+경계쌍 3개를 명시한다. 이 쌍이 규칙의 임계값을 고정한다.
+
+- **H2 / H3** — Q7만 다르다(`SOME` → `OFTEN`). `health` 3이 가족 동거를 이기는 지점
+- **H4 / H5** — Q3만 다르다(`LESS` → `NONE`). PHQ 3점이 우울을 켜는 지점
+- **H6 / I1** — Q10만 다르다(무응답 → `EMPTY`). `econ`이 `health`를 넘는 지점
+
+### 조기 종료 검증
+
+시나리오 20개 전부에 대해 아래를 단정한다.
+
+1. 답변을 하나씩 누적하며 `canDecide()`가 처음 true가 된 시점의 `classify()` 결과 == 12문항 전체의 `classify()` 결과
+2. `possibleTypes()`의 길이는 답변이 늘어날 때 절대 증가하지 않는다
+3. 답변 0개일 때 `possibleTypes()`는 3개 전부를 반환한다
+
+### 이상 입력
+
+모두 throw한다.
+
+1. 존재하지 않는 `choiceCode`
+2. 같은 `questionCode`가 두 번
+3. `questionCode`와 `choiceCode`가 어긋난 경우 — 조작으로 간주해 거부한다
+4. Q13(형용사) 누락 상태로 `classify()` 호출
+
+지표 문항은 일부만 와도 된다(조기 종료 때문이다). **Q13은 반드시 있어야 한다.**
 
 ### 신뢰 경계 — 중요
 
-**서버는 `choiceCode`만 신뢰하고, `axis`와 `weight`는 서버의 문항 테이블에서 조회한다.** 클라이언트가 보낸 weight를 그대로 쓰면 사용자가 요청을 조작해 원하는 유형을 만들 수 있다.
+**서버는 `choiceCode`만 신뢰하고, 지표는 서버의 문항 테이블에서 조회한다.** 클라이언트가 보낸 지표를 그대로 쓰면 사용자가 요청을 조작해 원하는 유형을 만들 수 있다.
 
-검증 규칙:
+---
 
-- Q1~Q6이 **모두** 있어야 한다. 하나라도 없으면 판정하지 않는다
-- 문항 테이블에 없는 `choiceCode`가 오면 판정하지 않는다
-- 같은 `questionCode`가 두 번 오면 판정하지 않는다
-- 판정하지 않는 경우 `classify()`는 throw하고, API는 `fail("INVALID_ANSWER", "진단 답변이 올바르지 않습니다", 400)`으로 응답한다
+## 10. 화면·API 계약
 
-### DB 저장 형태
+### 화면
 
-`DiagnosisSession.answers`에는 서버가 축·가중치를 채워 넣은 형태로 저장한다. Q6은 축이 없으므로 `axis: null`, `weight: 0`이다.
+`app/diagnosis/page.tsx` **한 장**으로 만든다. 문항별 라우트를 만들지 않는다.
 
-```json
-[
-  { "questionCode": "Q1", "choiceCode": "Q1_ALONE",      "axis": "housing",    "weight": 2 },
-  { "questionCode": "Q2", "choiceCode": "Q2_HEAVY",      "axis": "health",     "weight": 2 },
-  { "questionCode": "Q3", "choiceCode": "Q3_EXHAUSTED",  "axis": "health",     "weight": 2 },
-  { "questionCode": "Q4", "choiceCode": "Q4_WORKING",    "axis": "employment", "weight": 0 },
-  { "questionCode": "Q5", "choiceCode": "Q5_OK",         "axis": "employment", "weight": 0 },
-  { "questionCode": "Q6", "choiceCode": "Q6_NIGHT_ALONE","axis": null,         "weight": 0 }
-]
+- 진행 상태는 클라이언트 컴포넌트 state에 둔다
+- 다음 문항은 `nextQuestion(answers)`로 정한다. 문항마다 서버를 부르지 않는다
+- 진행률은 문항 수로 계산하지 않는다(조기 종료 때문에 총 문항 수가 사용자마다 다르다). `3 - possibleTypes().length`를 쓰거나 "거의 다 왔어요" 같은 문구로 대체한다
+- `nextQuestion()`이 `null`이면 완료 API를 한 번 호출한다
+- 결과는 `app/diagnosis/result/page.tsx`
+
+### `POST /api/diagnosis/complete`
+
+```ts
+// 요청
+{ answers: [{ questionCode: "Q1", choiceCode: "Q1_ALONE" }, ...] }
+
+// 성공
+{ data: { typeCode, adjective, nickname, family, animal, colorHex } }
+```
+
+응답에 `subTypeCode`와 지표를 넣지 않는다. 클라이언트가 알 필요가 없고, 내부 유형명이 브라우저로 나가면 낙인 위험이 생긴다.
+
+처리 순서:
+
+1. `const user = await getCurrentUser()`
+2. `classify(answers)` — 실패 시 `fail("INVALID_ANSWER", "진단 답변이 올바르지 않습니다", 400)`
+3. `classifySub(answers)`, `resolveIndicators(answers)`
+4. `defaultNickname(typeCode, adjective)`로 닉네임 생성
+5. `User` 갱신 — `typeCode`, `subTypeCode`, `adjective`, `nickname`, `activePetSkinId`. **레벨·경험치·재화·아이템·streak은 건드리지 않는다** (재진단에서 같은 코드가 돌기 때문이다)
+6. 기본 펫 지정 — `prisma.petSkin.findFirst({ where: { typeCode, isDefault: true } })`의 id를 `activePetSkinId`에 넣고, `UserPetSkin`을 `upsert`로 보유 처리한다
+7. `DiagnosisSession` 생성 — `answers`와 `indicators` 저장
+8. 5·6·7을 하나의 `prisma.$transaction`으로 묶는다
+
+**재진단은 이 엔드포인트를 그대로 다시 호출한다.** `DiagnosisSession`은 매번 새 행이 쌓이므로 이력이 남는다.
+
+### `PATCH /api/diagnosis/nickname`
+
+```ts
+{ nickname: "밤바다" }  →  { data: { nickname } }
+```
+
+`isValidNickname()`으로 검증한다(2~12자). 실패 시 `fail("INVALID_NICKNAME", "닉네임은 2~12자로 입력해 주세요", 400)`.
+
+### 스키마 변경 요청분 (`feat/diagnosis` 브랜치)
+
+`prisma/schema.prisma`는 전원 합의 파일이다. 아래를 브랜치에 담아 PR로 올린다.
+
+```prisma
+enum SubTypeCode {
+  AFTERCARE_YOUTH
+  FAMILY_CAREGIVER
+  MIGRANT_YOUTH
+  HEALTH_FRAGILE
+  DEBT_INDEPENDENT
+  FINANCIAL_FRAGILE
+  JOBLESS_POOR
+  FAMILY_DEPENDENT
+}
+
+model User {
+  subTypeCode SubTypeCode?   // 관리자 전용. 화면에 노출하지 않는다
+}
+
+model DiagnosisSession {
+  subTypeCode SubTypeCode?
+  indicators  Json?          // 지표 14개
+}
 ```
 
 ---
 
-## 6. 스냅샷 시나리오 18개 (확정)
-
-`scripts/check-diagnosis.ts`. **아래 기대값은 손으로 확정한 것이다. 구현 결과에 맞춰 기대값을 고치지 않는다.** 어긋나면 판정 함수가 틀린 것이다.
-
-Q1은 `Q1_` 접두사를, Q2~Q6은 각 문항 접두사를 생략해 적었다. 예: `F1`의 Q1은 `Q1_FAMILY`.
-
-| # | Q1 | Q2 | Q3 | Q4 | Q5 | Q6 | health | emp | 기대 유형 | 기대 형용사 | 검증 목적 |
-|---|---|---|---|---|---|---|---|---|---|---|---|
-| F1 | FAMILY | HEAVY | EXHAUSTED | NONE | DEBT | NIGHT_ALONE | 4 | 4 | FAMILY_LIVING | QUIET | 가족 확정이 다른 축을 이긴다 |
-| F2 | FAMILY | OK | FINE | WORKING | OK | ON_PLAN | 0 | 0 | FAMILY_LIVING | DILIGENT | 가족 + 신호 없음 |
-| F3 | FAMILY | UPDOWN | SOMETIMES | SEEKING | TIGHT | WITH_CLOSE | 2 | 2 | FAMILY_LIVING | WARM | 가족 + 중간 신호 |
-| F4 | FAMILY | FLAT | NEED_CARE | PART | UNSURE | NO_RUSH | 3 | 2 | FAMILY_LIVING | EASYGOING | 가족 + health 우세 |
-| F5 | FAMILY | HEAVY | FINE | NONE | OK | NIGHT_ALONE | 2 | 2 | FAMILY_LIVING | QUIET | 가족 + 동점 |
-| F6 | FAMILY | OK | EXHAUSTED | WORKING | DEBT | ON_PLAN | 2 | 2 | FAMILY_LIVING | DILIGENT | 가족 + 혼합 |
-| H1 | ALONE | HEAVY | EXHAUSTED | WORKING | OK | NIGHT_ALONE | 4 | 0 | HEALTH_EMOTION | QUIET | health 단독 우세 |
-| H2 | ALONE | UPDOWN | SOMETIMES | SEEKING | OK | WITH_CLOSE | 2 | 1 | HEALTH_EMOTION | WARM | 임계값 health=2 |
-| H3 | SHARE | HEAVY | FINE | NONE | OK | ON_PLAN | 2 | 2 | HEALTH_EMOTION | DILIGENT | **동점은 HEALTH** |
-| H4 | ALONE | FLAT | NEED_CARE | PART | TIGHT | NO_RUSH | 3 | 2 | HEALTH_EMOTION | EASYGOING | health가 1 높음 |
-| H5 | OTHER | HEAVY | EXHAUSTED | NONE | DEBT | NIGHT_ALONE | 4 | 4 | HEALTH_EMOTION | QUIET | 둘 다 최대, 동점 |
-| H6 | ALONE | UPDOWN | NEED_CARE | WORKING | UNSURE | WITH_CLOSE | 3 | 1 | HEALTH_EMOTION | WARM | 비가족 + health 우세 |
-| I1 | ALONE | OK | FINE | NONE | DEBT | ON_PLAN | 0 | 4 | INDEPENDENT_LOW_INCOME | DILIGENT | 경제 단독 우세 |
-| I2 | ALONE | UPDOWN | FINE | NONE | TIGHT | NIGHT_ALONE | 1 | 3 | INDEPENDENT_LOW_INCOME | QUIET | health가 임계값 미달 |
-| I3 | SHARE | HEAVY | FINE | NONE | DEBT | NO_RUSH | 2 | 4 | INDEPENDENT_LOW_INCOME | EASYGOING | **H3과 경계쌍. emp가 더 크면 INDEPENDENT** |
-| I4 | ALONE | OK | FINE | WORKING | OK | WITH_CLOSE | 0 | 0 | INDEPENDENT_LOW_INCOME | WARM | **전부 0 → 기본값** |
-| I5 | OTHER | FLAT | SOMETIMES | NONE | DEBT | ON_PLAN | 2 | 4 | INDEPENDENT_LOW_INCOME | DILIGENT | 임계값 충족했지만 emp 우세 |
-| I6 | ALONE | UPDOWN | SOMETIMES | SEEKING | DEBT | WITH_CLOSE | 2 | 3 | INDEPENDENT_LOW_INCOME | WARM | emp가 1 높음 |
-
-H3과 I3은 Q1·Q2·Q3이 같고 Q5만 다르다(`Q5_OK` → `Q5_DEBT`). 동점 경계가 정확히 어디서 뒤집히는지 확인하는 쌍이므로 둘 다 남긴다.
-
-추가로 이상 입력 5개도 함께 검증한다. 모두 throw해야 한다.
-
-1. 문항 5개만 보낸 경우 (Q6 누락)
-2. 존재하지 않는 `choiceCode` (`"Q2_UNKNOWN"`)
-3. Q3이 두 번 들어온 경우
-4. 빈 배열
-5. `questionCode`와 `choiceCode`가 어긋난 경우 (`{ questionCode: "Q1", choiceCode: "Q2_HEAVY" }`) — 구현 중 추가. 선택지가 실제로 속한 문항을 기준으로 보므로, 어긋난 요청은 조작으로 간주해 거부한다
-
-`package.json`에 `"check:diagnosis": "tsx scripts/check-diagnosis.ts"`를 추가한다.
-
----
-
-## 7. 미션 콘텐츠 스펙 (확정)
+## 11. 미션 콘텐츠 스펙 (확정)
 
 ### 개수와 코드
 
 - 단계 미션은 유형당 12개 = 3단계 × 4개. 총 36개
-- `code` 규칙: `{TYPE_CODE}_S{단계}_{1~4}` — 예: `HEALTH_EMOTION_S1_1`, `FAMILY_LIVING_S3_4`
+- `code` 규칙: `{TYPE_CODE}_S{단계}_{1~4}`
 - `order`는 단계 안에서 1~4
 - `typeCode`와 `stage`를 반드시 채운다 (`scope: "STAGE"`)
 
@@ -257,84 +474,32 @@ H3과 I3은 Q1·Q2·Q3이 같고 Q5만 다르다(`Q5_OK` → `Q5_DEBT`). 동점 
 | 2단계 | 35 | 0 | false |
 | 3단계 | 60 | 5 | 4개 중 2개만 true |
 
-`rewardAffinity`는 단계 미션에 넣지 않는다. 친밀도는 챗봇·커뮤니티(D)와 일일 미션에서만 나온다.
+보상은 바뀔 수 있다. `prisma/seed/missions.ts`의 `SEEDS_BY_STAGE` 3개 숫자만 고치고 `npm run db:seed`를 다시 돌리면 된다(`code` upsert).
 
-3단계 4개 중 사진 미션 2개는 `order` 3, 4에 배치한다. 사진 미션은 3단계에만 둔다.
+`rewardAffinity`는 단계 미션에 넣지 않는다.
 
 ### 단계 설계
 
 - 1단계: 집 안에서, 침대에서 손만 움직여도 되는 수준
-- 2단계: 집 주변으로 나가는 것 (현관 밖, 편의점, 동네 한 바퀴)
-- 3단계: 사람과 접촉하는 것 (인사, 짧은 대화, 사진으로 남기기)
+- 2단계: 집 주변으로 나가는 것
+- 3단계: 사람과 접촉하는 것
 
 ### 문구 기준
 
-타겟 특성상 문구 톤이 기능만큼 중요하다.
-
 - 명령·강요 표현을 쓰지 않는다. "~하세요"보다 "~해봐요", "~해도 좋아요"
-- 실패해도 부담이 없게 쓴다. "1분만", "한 번만", "안 되면 내일 해도 괜찮아요"
+- 실패해도 부담이 없게 쓴다. "1분만", "안 되면 내일 해도 괜찮아요"
 - `title`은 12자 이내, `description`은 한 문장
-- 근거는 연구보고서 PDF의 유형별 특성을 따른다. 유형별로 결이 달라야 한다
-  - `INDEPENDENT_LOW_INCOME` (여우): 혼자 사는 생활 관리, 지출·일 관련 부담이 낮은 것
-  - `HEALTH_EMOTION` (고양이): 몸과 기분 회복이 먼저. 강도를 가장 낮게
-  - `FAMILY_LIVING` (곰): 가족과의 접촉이 자연스러운 소재. 집 안에서 사람과 마주치는 것부터
+- 유형별로 결이 달라야 한다
+  - `HEALTH_EMOTION` (여우): 몸과 기분 회복이 먼저. 강도를 가장 낮게
+  - `INDEPENDENT_LOW_INCOME` (고양이): 혼자 사는 생활 관리, 지출·일 관련 부담이 낮은 것
+  - `FAMILY_LIVING` (곰): 가족과의 접촉이 자연스러운 소재
 
 ---
 
-## 8. 화면·API 계약 (확정)
+## 12. 다음 할 일
 
-### 화면
-
-`app/diagnosis/page.tsx` **한 장**으로 만든다. 문항별 라우트를 만들지 않는다.
-
-- 진행 상태(현재 문항 번호, 지금까지의 답변)는 클라이언트 컴포넌트 state에 둔다
-- 진행률 바는 `현재 문항 / 6`
-- 6번 문항에 답하면 그때 한 번만 완료 API를 호출한다. 문항마다 서버를 부르지 않는다
-- 결과는 `app/diagnosis/result/page.tsx`
-
-### `POST /api/diagnosis/complete`
-
-```ts
-// 요청
-{ answers: [{ questionCode: "Q1", choiceCode: "Q1_ALONE" }, ...6개] }
-
-// 성공
-{ data: { typeCode, adjective, nickname, family, animal, colorHex } }
-```
-
-처리 순서:
-
-1. `const user = await getCurrentUser()`
-2. `classify(answers)` — 실패 시 `fail("INVALID_ANSWER", "진단 답변이 올바르지 않습니다", 400)`
-3. `defaultNickname(typeCode, adjective)`로 닉네임 생성
-4. `User` 갱신 — `typeCode`, `adjective`, `nickname`, `activePetSkinId`. **레벨·경험치·재화·아이템·streak은 건드리지 않는다** (재진단에서 같은 코드가 돌기 때문이다)
-5. 기본 펫 지정 — `prisma.petSkin.findFirst({ where: { typeCode, isDefault: true } })`의 id를 `activePetSkinId`에 넣고, `UserPetSkin`을 `upsert`로 보유 처리한다 (`@@unique([userId, petSkinId])`)
-6. `DiagnosisSession` 생성 — 5장의 JSON 형태로 `answers` 저장
-7. 4·5·6을 하나의 `prisma.$transaction`으로 묶는다. 중간에 실패하면 유형만 바뀌고 펫이 안 바뀌는 상태가 남는다
-
-**재진단은 이 엔드포인트를 그대로 다시 호출한다.** 별도 API를 만들지 않는다. `DiagnosisSession`은 매번 새 행이 쌓이므로 이력이 남고, `Post.galleryType`은 글마다 저장돼 있어 과거 글은 이동하지 않는다.
-
-### `PATCH /api/diagnosis/nickname`
-
-```ts
-// 요청
-{ nickname: "밤바다" }
-
-// 성공
-{ data: { nickname } }
-```
-
-`isValidNickname()`으로 검증한다(2~12자, `lib/types.ts`). 실패 시 `fail("INVALID_NICKNAME", "닉네임은 2~12자로 입력해 주세요", 400)`. 유니크 검사는 하지 않는다.
-
----
-
-## 9. 다음 할 일
-
-DB 없이 할 수 있는 일은 다 끝났다. 아래는 전부 `DATABASE_URL`이 공유된 뒤다(E 대기).
-
-1. 미션 41개 시드 반영 확인 — `npm run db:seed` 후 `Mission` 41행. B·C가 이 데이터를 기다린다
-2. `app/diagnosis/page.tsx` 6문항 화면 + 진행률 바 (8장). 선택지 버튼만으로 동작
-3. `POST /api/diagnosis/complete` (8장). 검증·축 채우기는 `resolveAnswers()`를 재사용한다
-4. `app/diagnosis/result/page.tsx` 결과 화면 + `PATCH /api/diagnosis/nickname`
-
-대기 중에 먼저 할 수 있는 것: 2번 화면을 완료 API 호출 없이(`console.log`로 답변 확인) 만들어 두면 DB가 열린 날 API만 붙이면 된다.
+1. `app/diagnosis/page.tsx` — 선택지 버튼 화면. `nextQuestion()`으로 진행, 완료 API 없이 `console.log`까지
+2. `app/page.tsx` 홈 화면 — 종족·펫·오늘 미션 진입점
+3. `app/diagnosis/result/page.tsx` 결과 화면
+4. C에게 `prisma/seed/items.ts` 동물 매핑 교체 요청 (여우 → `HEALTH_EMOTION`, 고양이 → `INDEPENDENT_LOW_INCOME`, 치장 "라벤더" 3종 이름 변경)
+5. `DATABASE_URL` 공유 후 완료 API·닉네임 PATCH·관리자 교차표
