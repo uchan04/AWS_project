@@ -31,23 +31,32 @@
 
 | 담당 | 범위 | 상태 | 비고 |
 |---|---|---|---|
-| A | 진단 + 미션 콘텐츠 + 홈 | 미션 41개, 13문항 + 판정 함수, 조기 종료, 화면 3장 + Figma 값·구성 반영, 진단 API 3종(완료·조회·닉네임) + 화면 연결 완료 | **2차 마이그레이션 전까지 API가 런타임 500**(차단 2). 홈 실데이터는 B·C API 대기 |
+| A | 진단 + 미션 콘텐츠 + 홈 | 미션 41개, 13문항 + 판정 함수, 조기 종료, 화면 3장 + Figma 값·구성 반영, 진단 API 3종(완료·조회·닉네임) + 화면 연결 완료 | 2차 마이그레이션 완료, API 정상 동작. 홈 실데이터는 B·C API 대기 |
 | B | 미션 시스템 + 사진 업로드 | 미착수 | `DATABASE_URL`·S3 버킷 확보됨, 착수 가능 |
-| C | 펫 + 가챠 | `lib/reward.ts` 골격 완료 | 착수 가능. `prisma/seed/items.ts` 동물 매핑 수정이 먼저 |
-| D | 커뮤니티 + 챗봇 | 구현 중 (`feat/community`에 커뮤니티·챗봇 대량 커밋) | 브랜치에 중복 init 마이그레이션 있음. 아래 차단 사항 참고 |
-| E | 인프라 + 인증 | RDS·Cognito·S3+CloudFront·CloudWatch+SNS·Bedrock·auth 실검증·하단 탭 내비 완료 | Amplify GitHub 연동만 남음(브라우저 수동 단계) |
+| C | 펫 + 가챠 | `lib/reward.ts` 골격 완료 | 착수 가능. `prisma/seed/items.ts` 동물 매핑 수정이 먼저 (차단 1) |
+| D | 커뮤니티 + 챗봇 | 구현 중 (`feat/community`에 커뮤니티·챗봇 대량 커밋) | 브랜치에 중복 init 마이그레이션 있음 (차단 4) |
+| E | 인프라 + 인증 | RDS·Cognito·S3+CloudFront·CloudWatch+SNS·Bedrock·auth 실검증·하단 탭 내비 완료, PR #1 머지 + 2차 마이그레이션 + auth 빌드 수정 + 색 토큰 정리 완료 | Amplify GitHub 연동만 남음(브라우저 수동 단계) |
 
 ## 전체 차단 사항
 
 지금 프로젝트를 멈춰 세우는 것만 적는다. 해결되면 즉시 지운다.
 
-인프라 차단은 해소됐다(RDS·Cognito·S3·Bedrock 완료). `.env`의 `DATABASE_URL`·`COGNITO_*`·`S3_BUCKET`·`CLOUDFRONT_DOMAIN`·`BEDROCK_MODEL_ID`는 E에게 개별 공유받는다. 남은 것은 아래 5개다.
+인프라 차단은 해소됐다(RDS·Cognito·S3·Bedrock 완료). `.env`의 `DATABASE_URL`·`COGNITO_*`·`S3_BUCKET`·`CLOUDFRONT_DOMAIN`·`BEDROCK_MODEL_ID`는 E에게 개별 공유받는다.
 
-1. **`prisma/seed/items.ts` 동물 매핑이 옛 값** — 여우↔고양이가 뒤바뀌었고 치장 "라벤더" 3종 이름이 색과 안 맞는다. **`npm run db:seed`보다 먼저 고쳐야 한다.** 안 고치면 뒤바뀐 매핑이 DB에 들어간다. C 담당 파일이라 A가 못 고친다
-2. **`SubTypeCode` 2차 마이그레이션 필요** — 초기 마이그레이션(`20260819061857_init`)에 A의 `SubTypeCode` enum과 `subTypeCode`·`indicators` 컬럼이 빠졌다. **지금 A의 진단 API 3종이 `P2022: The column User.subTypeCode does not exist`로 전부 500이다.** Prisma가 모델의 모든 컬럼을 select하므로 `getCurrentUser()`의 upsert부터 죽는다. A의 PR 머지 후 E가 `migrate dev`를 한 번 더 돌려야 한다(DDL은 `docs/dev/diagnosis.md` 13장). 나머지는 `git pull && npx prisma migrate deploy && npx prisma generate`
-3. **`lib/auth.ts`가 빈 `COGNITO_USER_POOL_ID`로 빌드를 깬다** — 모듈 로드 시점에 `CognitoJwtVerifier.create()`를 불러서, API 라우트를 가진 사람 전원이 `Invalid Cognito User Pool ID`로 `npm run build`에 실패한다. E가 `getCurrentUser()` 안으로 옮기거나 실제 Pool ID·Client ID를 공유해야 한다. 그때까지 각자 `.env`에 형식만 맞는 더미 값을 넣어 우회한다
-4. **`feat/community`에 중복 init 마이그레이션** — D 브랜치에 `prisma/migrations/00000000000000_init/`이 있고 `main`에는 `20260819061857_init/`이 있다. 머지하면 init이 두 개가 되어 `migrate deploy`가 깨진다(`CLAUDE.md` 5절). D가 자기 브랜치의 `prisma/migrations/`를 지우고 main 것을 받아야 한다
-5. **종족 색이 두 곳에 다르게 정의됨** — `app/globals.css`(E)의 `--color-canine/feline/ursine`은 `#d97706`/`#8b5cf6`/`#6b8f71`이고, `styles/tokens.css`·`lib/types.ts`(A)는 `#E8956A`/`#6A95C8`/`#7AAE82`다. `#8b5cf6`은 결정 1에서 버린 옛 "라벤더 퍼플"이다. E가 `globals.css`의 세 줄을 지우는 쪽으로 정리해야 한다
+~~2. `SubTypeCode` 2차 마이그레이션~~ — 해소(2026-08-19). `migrate dev --name add_subtype` 실행 완료. **나머지 4인은 `git pull && npx prisma migrate deploy && npx prisma generate`**
+~~3. `lib/auth.ts` 빈 Pool ID로 빌드 깨짐~~ — 해소(2026-08-19). `CognitoJwtVerifier.create()`를 `getCurrentUser()` 안으로 지연 생성하도록 수정. `.env`에 더미 값 우회 넣었던 사람은 지워도 된다
+~~5. 종족 색 이중 정의~~ — 해소(2026-08-19). `app/globals.css`의 `--color-canine/feline/ursine` 세 줄 삭제. 이제 `styles/tokens.css`·`lib/types.ts`(A)가 유일한 출처
+
+남은 것은 아래 2개다.
+
+1. **`prisma/seed/items.ts` 동물 매핑이 옛 값** — 여우↔고양이가 뒤바뀌었고 치장 "라벤더" 3종 이름이 색과 안 맞는다. **`npm run db:seed`보다 먼저 고쳐야 한다.** 안 고치면 뒤바뀐 매핑이 DB에 들어간다. C 담당 파일이라 다른 사람이 못 고친다
+4. **`feat/community`에 중복 init 마이그레이션** — D 브랜치에 `prisma/migrations/00000000000000_init/`이 있고 `main`에는 `20260819061857_init/`·`20260819080703_add_subtype/`이 있다. 머지하면 init이 두 개가 되어 `migrate deploy`가 깨진다(`CLAUDE.md` 5절). D가 자기 브랜치의 `prisma/migrations/`를 지우고 main 것을 받아야 한다
+
+**BottomNav 수정**: "진단결과" 탭이 `/diagnosis`(문항 화면)를 가리키던 버그를 `/diagnosis/result`(결과 화면)로 고쳤다(2026-08-19, E)
+
+**미확정 — 팀 전체 결정 필요**:
+- "결정 변경" 4번(Cognito Google 로그인만)이 `SPEC.md` 10절·`CLAUDE.md` 8절과 충돌한다. 사용자 확인 대기 중이며, 지금 Cognito는 이메일+비밀번호로 이미 구축돼 있다. 방향이 바뀌면 E가 재작업해야 한다
+- "결정 변경" 5번(셀프 머지 금지, main은 PR로만)이 `CLAUDE.md` 4절·`업무분담.md`의 기존 셀프 머지 규칙과 충돌한다. 두 문서가 아직 안 바뀌었다. E는 이 규칙 변경을 인지하기 전에 공유 파일들을 `main`에 직접 push했다(과거 관행대로) — 팀 전체가 어느 쪽으로 갈지 정해야 한다
 
 **남은 수동 단계**: Amplify Hosting ↔ GitHub 연동. GitHub App 설치는 브라우저 OAuth 동의가 필요해 계정 소유자가 직접 눌러야 한다. 절차는 `docs/dev/infra.md` 참고
 
