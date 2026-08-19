@@ -8,8 +8,8 @@
 **브랜치 규칙 (2026-08-19 변경).** A 담당분은 `feat/diagnosis`에 커밋한다. `main`에 직접 커밋하지 않고 PR로만 올린다. `prisma/schema.prisma` 변경분도 이 브랜치에 담고, 머지 여부와 `prisma migrate dev` 실행은 팀이 결정한다.
 
 ## 현재 상태
-- 완료: 미션 41개, 지표 14개 정의, 12문항 + 형용사 문항, `classify()`·`classifySub()`, 무손실 조기 종료, 스냅샷 체크
-- 진행 중: 진단 화면, 홈 화면
+- 완료: 미션 41개, 지표 14개 정의, 12문항 + 형용사 문항, `classify()`·`classifySub()`, 무손실 조기 종료, 스냅샷 체크, 진단 화면
+- 진행 중: 홈 화면
 - 미착수: 완료 API, 결과 화면, Bedrock 호출 2종, 재진단, 관리자 교차표
 
 ## 구현한 파일
@@ -20,6 +20,7 @@
 - `lib/diagnosis/classify.ts` — `classify()`(3대분류) + `classifySub()`(8세부유형). 순수 함수, LLM·DB 없음
 - `lib/diagnosis/adaptive.ts` — `possibleTypes()` / `canDecide()` / `nextQuestion()`. 무손실 조기 종료
 - `scripts/check-diagnosis.ts` — `npm run check:diagnosis`
+- `app/diagnosis/page.tsx` — 진단 화면 한 장. 클라이언트 컴포넌트. 답변은 state에만 있고 문항마다 서버를 부르지 않는다. 진행 문구는 `canDecide()`로 갈린다(확정 전 "n번째 질문이에요", 확정 후 "거의 다 왔어요"). 완료 시점은 아직 `console.log`
 
 ---
 
@@ -36,7 +37,7 @@ DB가 아직 없다(`DATABASE_URL` 미공유). **DB가 필요 없는 것부터 �
 
 ### 2단계 — DB 없이 계속
 
-5. 진단 화면 — 선택지 버튼 + 진행률, `nextQuestion()`으로 문항 순서 결정
+5. ~~진단 화면~~ — 완료. 브라우저에서 첫 선택지만 계속 누르는 흐름을 실제로 돌려 9문항 후 종료를 확인했다
 6. 홈 화면 — 종족·펫·오늘 미션 진입점 (담당 A로 확정, 2026-08-19)
 7. 결과 화면 — 종족·색·기본 닉네임
 
@@ -498,8 +499,8 @@ model DiagnosisSession {
 
 ## 12. 다음 할 일
 
-1. `app/diagnosis/page.tsx` — 선택지 버튼 화면. `nextQuestion()`으로 진행, 완료 API 없이 `console.log`까지
-2. `app/page.tsx` 홈 화면 — 종족·펫·오늘 미션 진입점
-3. `app/diagnosis/result/page.tsx` 결과 화면
+1. `app/page.tsx` 홈 화면 — 종족·펫·오늘 미션 진입점
+2. `app/diagnosis/result/page.tsx` 결과 화면
+3. 진단 화면의 `console.log`를 완료 API 호출로 교체하고 결과 화면으로 이동
 4. C에게 `prisma/seed/items.ts` 동물 매핑 교체 요청 (여우 → `HEALTH_EMOTION`, 고양이 → `INDEPENDENT_LOW_INCOME`, 치장 "라벤더" 3종 이름 변경)
 5. `DATABASE_URL` 공유 후 완료 API·닉네임 PATCH·관리자 교차표
