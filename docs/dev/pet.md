@@ -50,7 +50,7 @@
 
 `git show 7b0bcd0` 로 제거한 내용 전체를 되돌려 볼 수 있다. `docs/인수인계.md`는 가챠 서술을 그대로 남겨 뒀다.
 
-**주의**: D가 `feat/community`에 올린 마이그레이션에는 `GachaPull`·`heroPity`가 아직 들어 있다. 그 마이그레이션은 폐기 대상이다 (`docs/STATUS.md` "통합 시 주의" 참고).
+**주의**: D가 `feat/community`에 올린 마이그레이션(`18640a7`)에는 `GachaPull` 테이블과 `heroPity`·`legendPity` 컬럼이 아직 들어 있다. 8/19에 **폐기 확정**했다 — 실행 절차와 D가 로컬에서 할 일은 `docs/STATUS.md` "D 마이그레이션 폐기" 절에 있다. 가챠를 재구현할 때도 그 마이그레이션을 되살리는 게 아니라 스키마부터 다시 넣고 새 마이그레이션을 만든다.
 
 ## TypeCode ↔ 종족 매핑 + 컬러명 변경 (`6fecded`, 컬러명은 후속 커밋)
 
