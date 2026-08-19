@@ -52,17 +52,29 @@
 
 **주의**: D가 `feat/community`에 올린 마이그레이션에는 `GachaPull`·`heroPity`가 아직 들어 있다. 그 마이그레이션은 폐기 대상이다 (`docs/STATUS.md` "통합 시 주의" 참고).
 
-## TypeCode ↔ 종족 매핑 변경 (`6fecded`)
+## TypeCode ↔ 종족 매핑 + 컬러명 변경 (`6fecded`, 컬러명은 후속 커밋)
 
 A의 `feat/diagnosis`에서 매핑이 맞바뀌었고 8/19 팀 확인으로 의도된 변경이다.
+컬러 이름·hex는 A의 `58f86f2`(Figma 팔레트)에서 세 계열 전부 바뀌었다.
 
-| TypeCode | 과 | 동물 | 컬러 |
-|---|---|---|---|
-| `HEALTH_EMOTION` | 개과 | 여우 | 앰버 오렌지 |
-| `INDEPENDENT_LOW_INCOME` | 고양잇과 | 고양이 | 라벤더 퍼플 |
-| `FAMILY_LIVING` | 곰과 | 곰 | 세이지 그린 |
+| TypeCode | 과 | 동물 | 컬러 | 이전 컬러명 |
+|---|---|---|---|---|
+| `HEALTH_EMOTION` | 개과 | 여우 | 노을 주황 `#E8956A` | 앰버 오렌지 `#F59E0B` |
+| `INDEPENDENT_LOW_INCOME` | 고양잇과 | 고양이 | 새벽 파랑 `#6A95C8` | 라벤더 퍼플 `#A78BFA` |
+| `FAMILY_LIVING` | 곰과 | 곰 | 이끼 초록 `#7AAE82` | 세이지 그린 `#84A98C` |
 
-`prisma/seed/items.ts`는 이 새 매핑으로 맞춰 놨다. **`main`의 `SPEC.md` 2절 표와 `lib/types.ts`는 아직 옛 매핑이라 A 브랜치가 머지되기 전까지 서로 어긋난다.** 펫 화면에서 종족·컬러를 표시할 때는 `lib/types.ts`를 쓰되, A 머지 후 값이 뒤바뀌지 않는지 반드시 다시 확인한다.
+출처는 A의 `lib/types.ts` `TRIBE`와 `styles/tokens.css` `[data-tribe]`이고 둘이 일치한다.
+`prisma/seed/items.ts`는 매핑·치장 이름·`imageKey`를 이 표로 맞춰 놨다.
+
+- 치장 9종 이름: 앰버/라벤더/세이지 → 노을/새벽/이끼. `imageKey`도 `amber|lavender|sage` → `sunset|dawn|moss`로 바꿨다 (이미지가 아직 없어 지금이 바꿀 수 있는 마지막 시점이다)
+- 밤별 3종은 3컬러 밖의 별도 색이라 그대로 둔다
+- **`upsert`가 `name`을 유니크 키로 쓴다.** 시드를 한 번 돌린 뒤 이름을 바꾸면 옛 이름 행이 남고 새 행이 추가된다. 이름 변경은 첫 `npm run db:seed` 전에 끝내야 하고, 지금은 `DATABASE_URL`이 없어 아직 아무도 시드를 돌리지 않았으므로 안전하다
+
+**아직 어긋나 있는 것 (A 담당, 머지 시 정리 필요):**
+- `main`의 `lib/types.ts` — 옛 매핑 + 옛 컬러명. A 브랜치에는 새 값이 있으니 머지되면 해소된다
+- `SPEC.md` 2절 표 — **A 브랜치에서도 안 고쳐져 있다.** 옛 매핑 + 옛 컬러명 그대로다. A가 머지할 때 위 표로 갱신해야 한다
+
+펫 화면에서 종족·컬러를 표시할 때는 `lib/types.ts`를 쓰되, A 머지 후 값이 뒤바뀌지 않는지 반드시 다시 확인한다. A의 `TRIBE`에는 `emoji` 필드가 추가돼 있어, 머지 후에는 `PetView.tsx`의 `ANIMAL_EMOJI`와 중복된다 — 그때 `TRIBE.emoji`로 합친다.
 
 ## 검증한 것
 - `lib/reward.ts`를 `SPEC.md` 6절, `CLAUDE.md` 1절과 한 줄씩 대조함
