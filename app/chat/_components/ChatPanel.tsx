@@ -40,6 +40,8 @@ export function ChatPanel({
   const [infoOpen, setInfoOpen] = useState(false)
   const [input, setInput] = useState("")
   const [sending, setSending] = useState(false)
+  const [streaming, setStreaming] = useState(false)
+  const [streamingText, setStreamingText] = useState("")
   const listEndRef = useRef<HTMLDivElement>(null)
 
   const accentColor = typeCode ? TRIBE[typeCode].colorHex : NEUTRAL_COLOR
@@ -72,11 +74,51 @@ export function ChatPanel({
 
   useEffect(() => {
     listEndRef.current?.scrollIntoView({ block: "end" })
-  }, [messages])
+  }, [messages, streaming, streamingText])
+
+  async function streamAssistantReply() {
+    if (!bedrockConfigured) return
+
+    setStreaming(true)
+    setStreamingText("")
+    try {
+      const res = await fetch("/api/chat/stream", { method: "POST" })
+
+      if (!res.ok || !res.body) {
+        const json = await res.json().catch(() => null)
+        setError(json?.error?.message ?? "AI 응답을 가져오지 못했어요")
+        return
+      }
+
+      const reader = res.body.getReader()
+      const decoder = new TextDecoder()
+      let full = ""
+      while (true) {
+        const { value, done } = await reader.read()
+        if (done) break
+        full += decoder.decode(value, { stream: true })
+        setStreamingText(full)
+      }
+
+      // 끝까지 정상 수신됐을 때만 화면에 반영한다. 중간에 끊긴 응답은 버린다 —
+      // 서버도 같은 조건(스트림 정상 종료)에서만 저장하므로 화면과 DB 상태가 어긋나지 않는다.
+      if (full.trim()) {
+        setMessages((prev) => [
+          ...prev,
+          { id: `stream-${Date.now()}`, role: "ASSISTANT", content: full, createdAt: new Date().toISOString() },
+        ])
+      }
+    } catch {
+      setError("AI 응답을 가져오지 못했어요")
+    } finally {
+      setStreaming(false)
+      setStreamingText("")
+    }
+  }
 
   async function sendMessage(content: string) {
     const trimmed = content.trim()
-    if (!trimmed || sending || !typeCode) return
+    if (!trimmed || sending || streaming || !typeCode) return
 
     setSending(true)
     setError(null)
@@ -98,6 +140,8 @@ export function ChatPanel({
     } finally {
       setSending(false)
     }
+
+    streamAssistantReply()
   }
 
   function handleKeyDown(e: React.KeyboardEvent<HTMLTextAreaElement>) {
@@ -213,6 +257,31 @@ export function ChatPanel({
                   </div>
                 )
               )}
+              {streaming && (
+                <div className="flex items-start gap-2">
+                  <div className="h-7 w-7 shrink-0 rounded-full bg-neutral-200" />
+                  <div className="max-w-[75%] rounded-2xl rounded-tl-sm bg-neutral-100 px-4 py-2.5 text-sm text-neutral-800">
+                    {streamingText ? (
+                      streamingText
+                    ) : (
+                      <div className="flex gap-1 py-1">
+                        <span
+                          className="h-1.5 w-1.5 animate-bounce rounded-full bg-neutral-400"
+                          style={{ animationDelay: "0ms" }}
+                        />
+                        <span
+                          className="h-1.5 w-1.5 animate-bounce rounded-full bg-neutral-400"
+                          style={{ animationDelay: "150ms" }}
+                        />
+                        <span
+                          className="h-1.5 w-1.5 animate-bounce rounded-full bg-neutral-400"
+                          style={{ animationDelay: "300ms" }}
+                        />
+                      </div>
+                    )}
+                  </div>
+                </div>
+              )}
               <div ref={listEndRef} />
             </div>
           )}
@@ -244,7 +313,7 @@ export function ChatPanel({
               <button
                 type="button"
                 onClick={() => sendMessage(input)}
-                disabled={sending || !input.trim()}
+                disabled={sending || streaming || !input.trim()}
                 className="flex h-10 w-10 shrink-0 items-center justify-center rounded-full text-white transition disabled:opacity-40"
                 style={{ backgroundColor: accentColor }}
                 aria-label="전송"
