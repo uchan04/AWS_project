@@ -4,10 +4,10 @@
 명세는 `SPEC.md` 7·8절, 규칙은 `CLAUDE.md`.
 
 ## 현재 상태
-- 완료: 갤러리 목록 화면, 상세 오버레이, 좋아요 토글, 댓글 작성, 글쓰기 모달, 본인 글 삭제, 친밀도 지급 헬퍼
+- 완료: 갤러리 목록 화면, 상세 오버레이, 좋아요 토글, 댓글 작성, 글쓰기 모달, 본인 글 삭제, 친밀도 지급 헬퍼, 챗봇 시스템 프롬프트, 챗봇 메시지 저장 API(GET/POST, 친밀도 지급까지)
 - 진행 중: 없음
-- 미착수: 본인 댓글 삭제, LLM 주제 추천 실제 연동, 이미지 업로드, 챗봇
-- 보류(다음 세션 이전 필요 조건): 전체 탭 글쓰기(스키마에 ALL 값 없음), LLM 주제 추천(`BEDROCK_MODEL_ID` 없음), 글쓰기 시 일일 미션(`DAILY_COMMUNITY_POST`) 완료 처리(B와 협의 필요) — 셋 다 아래 "결정한 것과 이유"에 근거 남김
+- 미착수: 본인 댓글 삭제, 챗봇 화면(UI), Bedrock 실제 호출·스트리밍, LLM 주제 추천 실제 연동, 이미지 업로드
+- 보류(다음 세션 이전 필요 조건): 전체 탭 글쓰기(스키마에 ALL 값 없음), LLM 주제 추천(`BEDROCK_MODEL_ID` 없음), Bedrock 챗봇 응답 생성(`BEDROCK_MODEL_ID` 없음), 글쓰기 시 일일 미션(`DAILY_COMMUNITY_POST`) 완료 처리(B와 협의 필요) — 전부 아래 "결정한 것과 이유"에 근거 남김
 
 ## 구현한 파일
 - `app/community/page.tsx` — 목록 화면. 서버 컴포넌트, `searchParams`의 `tab`으로 갤러리 결정
@@ -34,6 +34,9 @@
 - `app/api/community/posts/route.ts` — POST 추가(글쓰기)
 - `app/api/community/posts/[id]/route.ts` — DELETE 추가(본인 글 소프트 삭제), GET 응답에 `isOwn` 추가
 
+- `app/chat/_lib/systemPrompt.ts` — 챗봇 "마음 친구" 시스템 프롬프트. 공통 원칙(조언·해결책·진단·평가 금지, 유형명 노출 금지, 자해·죽음 언급 시 안전 예외) + 유형별 페르소나 레이어. `buildSystemPrompt(typeCode, nickname)`을 `app/api/chat/messages/route.ts`가 참조
+- `app/api/chat/messages/route.ts` — GET(대화 이력 조회, `createdAt asc`) + POST(사용자 메시지 저장 + 친밀도 지급). 진단 전(`typeCode` 없음)이면 400 `DIAGNOSIS_REQUIRED`
+
 ## 삭제한 파일
 - `app/community/[type]/page.tsx` — URL로 다른 종족 갤러리에 접근 가능했던 예전 동적 라우트. 팀 디자인 시안 반영으로 갤러리 탭이 "전체/나의 종족" 2개로 바뀌면서 제거
 
@@ -57,6 +60,9 @@
 - 삭제는 소프트 삭제(`deletedAt`)이며 친밀도를 회수하지 않는다. `affinityToday`가 이미 누적돼 있어 삭제 후 재작성으로 하루 상한을 넘길 수 없음
 - 글쓰기 API는 `galleryType`을 요청 바디로 받되, `canAccessGallery(galleryType, user.typeCode)`로 본인 종족과 다르면 차단 → `canWriteToGallery(galleryType)`로 `ALL`을 차단하는 순서로 검증(먼저 소속 확인, 그다음 쓰기 가능 여부)
 - 삭제 후 화면 갱신은 페이지 새로고침이 아니라 `next/navigation`의 `useRouter().refresh()`로 처리. 서버 컴포넌트(`page.tsx`)의 데이터만 다시 가져오고 모달이 닫히는 클라이언트 상태는 유지됨
+- **챗봇 메시지 API는 실제 Bedrock 호출 없이 "사용자 메시지 저장" 부분만 이번 세션에 완성.** `POST`가 `buildSystemPrompt()`로 시스템 프롬프트를 실제로 만들어두지만(파일이 아무데도 안 쓰이는 죽은 코드가 되지 않도록), 호출부는 `// TODO: Bedrock 호출...` 주석만 남기고 실제 모델 호출·스트리밍·`ChatRole.ASSISTANT` 저장은 하지 않음. 가짜 어시스턴트 응답을 지어내지 않음(하드코딩 금지 원칙과 동일)
+- **친밀도 지급 시점 판단: "1턴"을 사용자가 메시지를 보낸 시점으로 본다.** Bedrock 응답이 아직 없으므로 사용자 발화 저장 직후 `grantAffinity(user, CHAT_TURN_AFFINITY)`를 호출한다. **주의: 나중에 Bedrock 어시스턴트 응답 저장 로직을 추가할 때 그 자리에서 다시 지급하면 안 된다** — 지급은 이 POST 핸들러 한 곳에서만 일어나야 한다(이중 지급 방지)
+- 챗봇도 진단(`typeCode`)이 있어야 페르소나를 만들 수 있어서, 진단 전 유저가 메시지를 보내면 400 `DIAGNOSIS_REQUIRED`로 막는다
 
 ## 막힌 것
 - 없음 (로컬 DB가 `prisma migrate`로 관리되지 않고 있던 것을 발견해 베이스라인 마이그레이션(`prisma/migrations/00000000000000_init`)을 만들어 해결. 기존 시드 데이터(미션 41개, 펫스킨 6개)는 유지됨. 스키마 담당과 공유 필요)
@@ -66,4 +72,5 @@
 - LLM 주제 추천 3가지 이상 연동 — `BEDROCK_MODEL_ID` 확보되면 `WriteModal`의 TODO 자리에 구현
 - 전체 탭 글쓰기 — 스키마에 ALL(또는 공용 게시판) 개념이 추가되면 `_lib/gallery.ts`의 `canWriteToGallery()`만 고치면 됨
 - `DAILY_COMMUNITY_POST` 일일 미션 완료 처리 — B와 담당 경계 협의 필요
-- 챗봇 화면 + Bedrock 스트리밍 응답, 1턴당 `grantAffinity(user, CHAT_TURN_AFFINITY)` 호출
+- 챗봇 화면(UI) — `app/api/chat/messages`의 GET/POST를 그대로 씀
+- Bedrock 실제 호출 + 스트리밍 — `BEDROCK_MODEL_ID` 확보되면 `app/api/chat/messages/route.ts`의 TODO 자리에 구현. 친밀도 지급은 이미 그 자리에서 끝났으니 새로 추가하지 말 것
