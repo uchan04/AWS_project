@@ -2,9 +2,11 @@ import { getCurrentUserWithSkin } from "@/lib/auth"
 import { cappedStage } from "@/lib/pet"
 import { TRIBE } from "@/lib/types"
 import PetView, { type PetState } from "./_components/PetView"
+import "@/styles/tokens.css"
+import "./pet.css"
 
 // 소유자: C. 펫 화면. (SPEC.md 5절)
-// 아직 RDS가 없어 DB 접근이 실패한다. 그 경우 화면을 죽이지 않고 안내를 띄운다.
+// DB나 인증이 실패해도 화면을 죽이지 않고 안내를 띄운다.
 
 // 유저별 데이터를 읽으므로 정적 프리렌더 대상이 아니다.
 // 이걸 빼면 빌드 시점에 DB 미연결 안내 화면이 정적으로 굳어 DB가 붙은 뒤에도 그대로 나온다.
@@ -34,8 +36,9 @@ export default async function PetPage() {
       seeds: user.seeds,
       animal: skin?.name ?? tribe.animal,
       family: tribe.family,
-      colorHex: tribe.colorHex,
+      colorName: tribe.colorName,
       skinName: skin?.name ?? tribe.animal,
+      typeCode: user.typeCode ?? null,
       stageCount,
       effectLabel:
         skin && skin.effectType !== "NONE" && skin.effectPct > 0
@@ -45,14 +48,14 @@ export default async function PetPage() {
   } catch (error) {
     console.error("[/pet]", error)
     return (
-      <main className="mx-auto flex w-full max-w-md flex-1 flex-col gap-3 px-5 py-8">
-        <h1 className="text-lg font-semibold">펫</h1>
-        <p className="text-sm text-neutral-600">
-          아직 데이터베이스가 연결되지 않아 펫 정보를 불러올 수 없습니다.
-        </p>
-        <p className="text-xs text-neutral-500">
-          `DATABASE_URL`과 마이그레이션이 준비되면 이 화면이 정상 동작합니다. (E 담당)
-        </p>
+      <main className="hm hm--canvas">
+        <div className="hm__col hm-pet">
+          <h1 className="hm-card__title">펫</h1>
+          <div className="hm-card">
+            <p className="hm__lede">펫 정보를 불러오지 못했어요.</p>
+            <p className="hm__note">잠시 후 다시 들어와 주세요.</p>
+          </div>
+        </div>
       </main>
     )
   }

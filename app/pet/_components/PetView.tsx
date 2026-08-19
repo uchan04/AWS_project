@@ -1,11 +1,21 @@
 "use client"
 
 import { useState } from "react"
+import type { TypeCode } from "@prisma/client"
 import { expProgress } from "@/lib/pet"
-import { expToNextLevel } from "@/lib/types"
+import { SEED_TO_EXP, TRIBE, expToNextLevel } from "@/lib/types"
+import "@/styles/tokens.css"
+import "../pet.css"
 
 // 소유자: C. 펫 화면 본체. (SPEC.md 5절)
-// 이미지 9장이 아직 없어 동물 이모지를 단계별 크기로 대체한다.
+//
+// 스타일은 design.md가 정한다. Hallmark · editorial / soft.
+// - 종족색은 data-tribe로만 넣는다. style={{ backgroundColor }}를 쓰지 않는다
+// - 색 면적은 종족 원판 1개 + 희석된 면 1개까지. 그래서 경험치 바와 CTA는 accent를 쓴다
+// - Primary CTA는 화면에 하나뿐이다. 나머지 씨앗 버튼은 ghost다
+//
+// 이미지 9장이 아직 없어 동물 이모지를 원판 자리에 쓴다. 장식이므로 aria-hidden을 붙이고
+// 종족·동물 이름은 옆에 글자로 따로 쓴다.
 // imageKey 규칙은 prisma/seed/items.ts에 고정해 뒀으니 이미지가 나오면 <img>로 교체한다.
 
 export type PetState = {
@@ -15,23 +25,25 @@ export type PetState = {
   seeds: number
   animal: string
   family: string
-  colorHex: string
+  colorName: string
   skinName: string
   stageCount: number
   effectLabel: string | null
+  // 진단 전이면 null이다. data-tribe를 붙이지 않아 --tribe가 accent로 남는다
+  typeCode: TypeCode | null
 }
 
-const ANIMAL_EMOJI: Record<string, string> = {
-  여우: "🦊",
-  고양이: "🐱",
-  곰: "🐻",
+// 친밀도 전용 캐릭터 3종. 기본 3종은 TRIBE가 정본이라 여기 적지 않는다.
+const AFFINITY_EMOJI: Record<string, string> = {
   늑대: "🐺",
   삵: "🐆",
   판다: "🐼",
 }
 
-// 진화 단계별 크기. CSS transform 수준으로만 한다 (SPEC.md 5절)
-const STAGE_SCALE = ["text-6xl", "text-7xl", "text-8xl"]
+const ANIMAL_EMOJI: Record<string, string> = {
+  ...Object.fromEntries(Object.values(TRIBE).map((tribe) => [tribe.animal, tribe.emoji])),
+  ...AFFINITY_EMOJI,
+}
 
 export default function PetView({ initial }: { initial: PetState }) {
   const [pet, setPet] = useState(initial)
@@ -42,7 +54,8 @@ export default function PetView({ initial }: { initial: PetState }) {
   const need = expToNextLevel(pet.level)
   const progress = expProgress(pet.level, pet.exp)
   const emoji = ANIMAL_EMOJI[pet.animal] ?? "🐾"
-  const scale = STAGE_SCALE[Math.min(pet.evolutionStage, STAGE_SCALE.length) - 1]
+  // 단일 형태(친밀도 캐릭터)는 단계 크기를 쓰지 않는다
+  const stage = pet.stageCount > 1 ? Math.min(pet.evolutionStage, 3) : 2
 
   async function feed(seeds: number) {
     if (pending || seeds < 1 || seeds > pet.seeds) return
@@ -84,86 +97,91 @@ export default function PetView({ initial }: { initial: PetState }) {
   }
 
   return (
-    <main className="mx-auto flex w-full max-w-md flex-1 flex-col gap-6 px-5 py-8">
-      <header className="flex items-baseline justify-between">
-        <h1 className="text-lg font-semibold">{pet.skinName}</h1>
-        <span className="text-sm text-neutral-500">{pet.family}</span>
-      </header>
-
-      <section
-        className="flex flex-col items-center gap-4 rounded-2xl py-10"
-        style={{ backgroundColor: `${pet.colorHex}1a` }}
-      >
-        <div className={`${scale} transition-transform duration-500`} aria-hidden>
-          {emoji}
+    <main className="hm hm--canvas" data-tribe={pet.typeCode ?? undefined}>
+      <div className="hm__col hm-pet">
+        <div className="hm-status">
+          <h1 className="hm-card__title">{pet.skinName}</h1>
+          <span className="hm__note">{pet.family}</span>
         </div>
-        <p className="text-sm text-neutral-600">
-          {pet.stageCount > 1 ? `${pet.evolutionStage}단계` : "단일 형태"}
-          {pet.effectLabel ? ` · ${pet.effectLabel}` : ""}
-        </p>
-      </section>
 
-      <section className="flex flex-col gap-2">
-        <div className="flex items-baseline justify-between text-sm">
-          <span className="font-medium">Lv. {pet.level}</span>
-          <span className="text-neutral-500">
-            {pet.exp} / {need}
+        <div className="hm-plate hm-plate--hero hm-pet__plate" data-stage={stage}>
+          <span className="hm-plate__disc hm-float" aria-hidden="true">
+            {emoji}
           </span>
+          <span className="hm-plate__animal">{pet.animal}</span>
+          <span className="hm-plate__caption">
+            {pet.stageCount > 1 ? `${pet.evolutionStage}단계` : "단일 형태"} · {pet.colorName}
+          </span>
+          {pet.effectLabel ? <span className="hm-pill">{pet.effectLabel}</span> : null}
         </div>
-        <div
-          className="h-3 w-full overflow-hidden rounded-full bg-neutral-200"
-          role="progressbar"
-          aria-valuemin={0}
-          aria-valuemax={need}
-          aria-valuenow={pet.exp}
-        >
+
+        <div className="hm-card">
+          <div className="hm-status">
+            <span className="hm-row__label">Lv. {pet.level}</span>
+            <span className="hm__note">
+              경험치 {pet.exp} / {need}
+            </span>
+          </div>
           <div
-            className="h-full rounded-full transition-[width] duration-500"
-            style={{ width: `${progress * 100}%`, backgroundColor: pet.colorHex }}
-          />
-        </div>
-      </section>
-
-      <section className="flex flex-col gap-3">
-        <div className="flex items-baseline justify-between text-sm">
-          <span className="text-neutral-600">가진 씨앗</span>
-          <span className="font-medium">{pet.seeds}개</span>
-        </div>
-
-        <div className="flex gap-2">
-          {[10, 100].map((amount) => (
-            <button
-              key={amount}
-              type="button"
-              onClick={() => feed(amount)}
-              disabled={pending || pet.seeds < amount}
-              className="flex-1 rounded-xl border border-neutral-300 py-3 text-sm font-medium disabled:opacity-40"
-            >
-              씨앗 {amount}
-            </button>
-          ))}
-          <button
-            type="button"
-            onClick={() => feed(pet.seeds)}
-            disabled={pending || pet.seeds < 1}
-            className="flex-1 rounded-xl py-3 text-sm font-medium text-white disabled:opacity-40"
-            style={{ backgroundColor: pet.colorHex }}
+            className="hm-bar"
+            role="progressbar"
+            aria-label="다음 레벨까지 경험치"
+            aria-valuemin={0}
+            aria-valuemax={need}
+            aria-valuenow={pet.exp}
           >
-            전부 넣기
-          </button>
+            <div className="hm-bar__fill" style={{ width: `${progress * 100}%` }} />
+          </div>
         </div>
 
-        <p className="text-xs text-neutral-500">씨앗 1개가 경험치 1이 된다.</p>
-        {error ? <p className="text-sm text-red-600">{error}</p> : null}
-      </section>
+        <div className="hm-card">
+          <div className="hm-status">
+            <span className="hm-row__label">가진 씨앗</span>
+            <span className="hm__note">{pet.seeds}개</span>
+          </div>
+
+          <div className="hm-pet__acts">
+            {[10, 100].map((amount) => (
+              <button
+                key={amount}
+                type="button"
+                onClick={() => feed(amount)}
+                disabled={pending || pet.seeds < amount}
+                aria-disabled={pending || pet.seeds < amount}
+                className="hm-btn hm-btn--ghost"
+              >
+                씨앗 {amount}
+              </button>
+            ))}
+            <button
+              type="button"
+              onClick={() => feed(pet.seeds)}
+              disabled={pending || pet.seeds < 1}
+              aria-disabled={pending || pet.seeds < 1}
+              className="hm-btn"
+            >
+              전부 넣기
+            </button>
+          </div>
+
+          <p className="hm__note">씨앗 1개는 경험치 {SEED_TO_EXP}이 돼요.</p>
+
+          {error ? (
+            <p className="hm-field__help hm-field__help--error" role="alert">
+              <span aria-hidden="true">⚠ </span>
+              {error}
+            </p>
+          ) : null}
+        </div>
+      </div>
 
       {evolvedTo ? (
-        <div className="fixed inset-0 z-50 flex flex-col items-center justify-center gap-4 bg-white/95">
-          <div className="animate-bounce text-8xl" aria-hidden>
+        <div className="hm-pet__evolve" role="status">
+          <span className="hm-plate__disc hm-bounce" aria-hidden="true">
             {emoji}
-          </div>
-          <p className="text-xl font-semibold">{evolvedTo}단계로 진화했어요</p>
-          <p className="text-sm text-neutral-500">{pet.skinName}가 한 단계 자랐습니다</p>
+          </span>
+          <p className="hm-pet__evolve-title">{evolvedTo}단계로 진화했어요</p>
+          <p className="hm__note">{pet.skinName}가 한 단계 자랐습니다</p>
         </div>
       ) : null}
     </main>
