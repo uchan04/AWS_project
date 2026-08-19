@@ -33,7 +33,7 @@
 |---|---|---|---|
 | A | 진단 + 미션 콘텐츠 + 홈 | 미션 41개, 13문항 + 판정 함수, 조기 종료, 화면 3장 + Figma 값·구성 반영, 진단 API 3종(완료·조회·닉네임) + 화면 연결 완료 | 2차 마이그레이션 완료, API 정상 동작. 홈 실데이터는 B·C API 대기 |
 | B | 미션 시스템 + 사진 업로드 | 미착수 | `DATABASE_URL`·S3 버킷 확보됨, 착수 가능 |
-| C | 펫 + 가챠 | `lib/reward.ts` 골격 완료 | 착수 가능. `prisma/seed/items.ts` 동물 매핑 수정이 먼저 (차단 1) |
+| C | 펫 | `lib/reward.ts`, 성장 계산, 펫 화면 + 씨앗 투입 API 완료. `origin/main` 머지 완료, 화면을 `design.md` 시스템으로 옮김 | 가챠는 삭제 결정(2026-08-19). RDS에 테이블이 남아 DROP 마이그레이션 필요(차단 6). 공유 DB 재시드도 남았다(차단 1) |
 | D | 커뮤니티 + 챗봇 | 구현 중 (`feat/community`에 커뮤니티·챗봇 대량 커밋) | 브랜치에 중복 init 마이그레이션 있음 (차단 4) |
 | E | 인프라 + 인증 | RDS·Cognito·S3+CloudFront·CloudWatch+SNS·Bedrock·auth 실검증·하단 탭 내비 완료, PR #1 머지 + 2차 마이그레이션 + auth 빌드 수정 + 색 토큰 정리 완료 | Amplify GitHub 연동만 남음(브라우저 수동 단계) |
 
@@ -47,12 +47,21 @@
 ~~3. `lib/auth.ts` 빈 Pool ID로 빌드 깨짐~~ — 해소(2026-08-19). `CognitoJwtVerifier.create()`를 `getCurrentUser()` 안으로 지연 생성하도록 수정. `.env`에 더미 값 우회 넣었던 사람은 지워도 된다
 ~~5. 종족 색 이중 정의~~ — 해소(2026-08-19). `app/globals.css`의 `--color-canine/feline/ursine` 세 줄 삭제. 이제 `styles/tokens.css`·`lib/types.ts`(A)가 유일한 출처
 
-남은 것은 아래 2개다.
+남은 것은 아래 4개다.
 
-1. **`prisma/seed/items.ts` 동물 매핑이 옛 값** — 여우↔고양이가 뒤바뀌었고 치장 "라벤더" 3종 이름이 색과 안 맞는다. **`npm run db:seed`보다 먼저 고쳐야 한다.** 안 고치면 뒤바뀐 매핑이 DB에 들어간다. C 담당 파일이라 다른 사람이 못 고친다
+1. **공유 DB에 옛 동물 매핑이 이미 들어가 있다** — 시드 *파일*은 `22d30fa`(C)에서 고쳤다. 그런데 그보다 먼저 옛 파일로 `db:seed`가 돌아서 **RDS의 데이터가 옛 값이다.** 2026-08-19 C가 실 DB를 읽어 확인한 결과:
+   - `PetSkin` 6행 중 4행의 `typeCode`가 뒤바뀜 (여우·늑대 ↔ 고양이·삵). 곰·판다는 정상
+   - `CosmeticItem`은 12행이고 그중 9행이 옛 이름(앰버·라벤더·세이지). 고아 행은 없다
+   - 유저 `밤바다` 1명이 `typeCode=INDEPENDENT_LOW_INCOME`인데 활성 펫이 **여우**다. 재시드하면 여우가 `HEALTH_EMOTION`이 되어 유형↔펫이 어긋난다. 고양이로 재지정이 필요하다(`User.activePetSkinId` + `UserPetSkin`). 진행도는 전부 0이라 손실 없음
+
+   고친 시드를 한 번 더 돌리면 펫 6종은 `upsert`가 교정하고 치장 9종은 `renameLegacyCosmetics()`가 이름을 이관한다(실행 후 `CosmeticItem`이 12행인지 확인). **공유 DB 쓰기라 실행 승인 대기 중.**
 4. **`feat/community`에 중복 init 마이그레이션** — D 브랜치에 `prisma/migrations/00000000000000_init/`이 있고 `main`에는 `20260819061857_init/`·`20260819080703_add_subtype/`이 있다. 머지하면 init이 두 개가 되어 `migrate deploy`가 깨진다(`CLAUDE.md` 5절). D가 자기 브랜치의 `prisma/migrations/`를 지우고 main 것을 받아야 한다
+6. **가챠 삭제 결정에 따른 스키마 드리프트** — 가챠는 삭제로 결정했다(2026-08-19). `schema.prisma`에서는 `7b0bcd0`에 제거했고 `feat/pet`에 그 상태로 머지했다. 그런데 **RDS에는 `GachaPull` 테이블(0행)과 `User.heroPity`·`legendPity` 컬럼이 아직 있다.** 다음 `migrate dev`를 실행하는 사람이 의도치 않은 DROP 마이그레이션을 자동 생성하게 된다. `CLAUDE.md` 5절대로 마이그레이션은 스키마 담당 1인(E)만 만든다 — **E가 DROP 마이그레이션 1개를 만들어야 한다.** C는 만들지 않았다
+7. **`npm run db:seed`가 지금 그대로는 실패한다** — `tsx`는 `.env`를 자동으로 읽지 않아 `DATABASE_URL not found`로 죽는다. `npx prisma db seed`(Prisma CLI가 `.env`를 읽는다)나 `tsx --env-file=.env`로 돌려야 한다. `package.json`·`prisma/seed.ts`는 E 소유라 C가 고치지 않았다
 
 **BottomNav 수정**: "진단결과" 탭이 `/diagnosis`(문항 화면)를 가리키던 버그를 `/diagnosis/result`(결과 화면)로 고쳤다(2026-08-19, E)
+
+**`npm run lint`가 `main`에서 실패한다 (A에게 알림, 2026-08-19 C 확인)**: `app/page.tsx:37`의 `setGreeting(...)`이 `react-hooks/set-state-in-effect` 에러다. 빌드는 통과하므로 Amplify 배포는 막히지 않지만 `npm run lint`는 에러 1건으로 끝난다. A 소유 파일이라 C는 고치지 않았다(`CLAUDE.md` 2절)
 
 **미확정 — 팀 전체 결정 필요**:
 - "결정 변경" 4번(Cognito Google 로그인만)이 `SPEC.md` 10절·`CLAUDE.md` 8절과 충돌한다. 사용자 확인 대기 중이며, 지금 Cognito는 이메일+비밀번호로 이미 구축돼 있다. 방향이 바뀌면 E가 재작업해야 한다

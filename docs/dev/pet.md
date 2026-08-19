@@ -7,20 +7,63 @@
 - 완료: `lib/reward.ts` 골격 + 자체 체크, `SPEC.md` 6절/`CLAUDE.md` 대조 검증
 - 완료: 펫 성장 계산 + 체크 37개, 펫 화면, 씨앗 투입 API, 진화 연출
 - 완료: 시드 종족·컬러를 A의 새 매핑으로 정렬 (`origin/main` 차단 사항 1번 해소)
+- 완료: `origin/main` 머지 (`228ceb1`), 펫 화면을 `design.md` 디자인 시스템으로 이관 (`3bc8541`)
 - 미착수: 방치형 획득, 치장 착용, 친밀도 캐릭터 구매
-- 가챠는 코드에서 제거했고 나중에 재구현한다 (아래 절 참고). 컷 아님
+- **가챠는 삭제로 결정했다 (2026-08-19).** 코드·스키마에서 제거된 상태를 유지한다. RDS 테이블 정리는 E 담당(아래 절)
 
-**아직 런타임 검증은 못 했다.** 확인한 것은 빌드 통과, `check:pet` 37개·`check:reward`·`check:diagnosis` 통과, `lint` 통과, `/pet`이 200으로 뜨는 것까지다. 씨앗 투입·레벨업·진화 연출이 실제로 도는지는 `.env` 값을 E에게 받은 뒤 확인해야 한다.
+**아직 런타임 검증은 못 했다.** 확인한 것은 `npm run build`, `tsc --noEmit`, `eslint app/pet`, `check:pet`·`check:reward`·`check:diagnosis` 통과까지다. 씨앗 투입·레벨업·진화 연출을 브라우저에서 실제로 돌려보지는 않았다 — 유저 `밤바다`의 `seeds`가 0이라 씨앗을 넣을 수 없고, 씨앗을 채우는 것은 공유 DB 쓰기라 승인이 필요하다.
 
 ## 오늘 진행 요약 (2026-08-19)
 
-`feat/pet`에 푸시한 커밋 11개. 앞의 8개는 이전 작업분이고 오늘 추가한 것은 아래 3개다.
+`feat/pet`에 푸시한 커밋 13개. 앞의 8개는 이전 작업분이고 오늘 추가한 것은 아래 5개다.
 
 | 커밋 | 내용 |
 |---|---|
 | `22d30fa` | 치장 9종 이름·`imageKey`를 새 컬러 팔레트로 교체 |
 | `78d305b` | D 마이그레이션 폐기 확정 + 컬러명 변경 문서화 |
 | `6be6151` | 씨앗→경험치 비율 1:1 → 1:10 |
+| `228ceb1` | `origin/main`을 `feat/pet`에 머지 |
+| `3bc8541` | 펫 화면을 `design.md` 디자인 시스템에 맞춤 |
+
+**`main`에는 올리지 않았다.** `feat/pet`에만 푸시했다. "결정 변경" 5번(PR로만)과 `CLAUDE.md` 4절(셀프 머지)이 아직 충돌 상태라, 어느 규칙을 따라도 안전한 쪽을 골랐다.
+
+### `origin/main` 머지 (`228ceb1`)
+
+충돌은 `docs/STATUS.md` 1건뿐이었고 `origin/main` 버전을 취했다(이 문서의 이전 "다음 할 일" 4번 지시). C가 적어 둔 펫 관련 서술은 후속 `docs:` 커밋에서 다시 채웠다.
+
+`prisma/schema.prisma`·`lib/types.ts`·`SPEC.md`는 auto-merge 됐고, 결과가 맞는지 손으로 확인했다:
+
+- 가챠 제거분(`GachaPull`·`heroPity`·`legendPity`·`gachaPulls`) 유지 — 삭제 결정대로
+- A의 `SubTypeCode`·`indicators` 보존
+- `SEED_TO_EXP = 10` 보존
+- `TypeCode` enum 주석이 `origin/main`의 새 매핑으로 갱신됨
+
+머지로 들어온 것: `app/diagnosis/`, `lib/diagnosis/`, `prisma/migrations/` 2개, `app/components/BottomNav.tsx`, `styles/tokens.css`, `design.md`, `lib/auth.ts`. B(미션)·D(커뮤니티)는 아직 `main`에 없어 들어오지 않았다.
+
+### 펫 화면 → `design.md` 이관 (`3bc8541`)
+
+Tailwind 기본 클래스로만 짜 뒀던 것을 `styles/tokens.css`의 `.hm*` 시스템으로 옮겼다. `design.md` 위반 4건을 고쳤다.
+
+| 위반 | 고친 방식 |
+|---|---|
+| `style={{ backgroundColor: colorHex }}` 3곳 | 루트에 `data-tribe`만 붙인다. `PetState`의 `colorHex` → `typeCode`+`colorName`으로 교체 |
+| CTA가 종족색 | accent(`.hm-btn`). "종족색은 CTA에 쓰지 않는다 — 모든 화면에서 같은 색이어야 학습이 된다" |
+| Primary 버튼이 여럿 | "전부 넣기"만 primary, 씨앗 10·100은 `.hm-btn--ghost` |
+| `animate-bounce` | `.hm-bounce`. 이 앱이 쓰는 모션 다섯 개 안으로 들인다 |
+
+**같이 잡은 문구 버그**: "씨앗 1개가 경험치 1이 된다"가 화면에 남아 있었다. `6be6151`에서 비율을 1:10으로 바꿀 때 이 문구를 놓쳤다. 이제 `SEED_TO_EXP`를 직접 읽어 상수가 바뀌면 문구가 따라간다.
+
+**`ANIMAL_EMOJI` 중복도 해소했다** (이전 세션에 "다음 작업 때"로 남겨 둔 것). 기본 3종은 `TRIBE[].emoji`가 정본이고 친밀도 캐릭터 3종(늑대·삵·판다)만 `AFFINITY_EMOJI`에 따로 둔다. `TRIBE.emoji`로 통째로 대체하면 친밀도 캐릭터가 빠지므로 합치는 방식을 썼다.
+
+**`app/pet/pet.css`를 새로 만든 이유**: 펫 화면에는 `.hm-pet`(폭·간격), 단계별 원판 크기, 씨앗 버튼 줄, 진화 오버레이가 필요한데 `styles/tokens.css`에 없다. 그 파일은 A가 만든 공용 토큰이고 **파일 끝에 덧붙이면 A도 같은 자리에 덧붙여 머지 충돌이 난다.** 그래서 펫 화면에서만 쓰는 배치는 화면 폴더에 뒀다. 새 색·폰트·간격 값은 정의하지 않고 기존 토큰만 조합한다 — 값의 정본은 `styles/tokens.css` 하나로 남는다.
+
+단계별 원판 크기는 `.hm-plate--hero`(7.5rem/4rem)를 2단계 기준으로 삼고 1단계 6rem/3rem, 3단계 9rem/5rem을 준다. `design.md`가 금지하는 것은 scale **애니메이션**이고 단계별 고정 크기는 애니메이션이 아니다. 단일 형태(친밀도 캐릭터)는 기준 크기를 쓴다.
+
+### 공유 RDS 실 상태 확인 (읽기 전용)
+
+`.env`의 `DATABASE_URL`에 값이 들어와 있어서 처음으로 실 DB를 읽었다. 결과는 아래 "막힌 것" 0번에 반영했다. 예측과 달랐던 것은 **유저가 1명 있고 그 유저가 틀린 펫을 가리킨다**는 점이다.
+
+`npm run db:seed`는 지금 그대로 돌리면 실패한다 — `tsx`가 `.env`를 자동으로 읽지 않아 `DATABASE_URL not found`로 죽는다. `npx prisma db seed`(Prisma CLI가 `.env`를 읽는다)나 `tsx --env-file=.env`로 돌려야 한다. `package.json`·`prisma/seed.ts`는 E 소유라 고치지 않고 `docs/STATUS.md` 차단 7번에 적었다.
 
 **A의 반영 지시 2건 처리 결과**
 
@@ -45,6 +88,7 @@
 - `scripts/check-pet.ts` — `npm run check:pet`. 성장 곡선·진화 임계값·다중 레벨업 검증
 - `app/pet/page.tsx` — 서버 컴포넌트. `force-dynamic`
 - `app/pet/_components/PetView.tsx` — 경험치 바, 씨앗 투입 버튼, 진화 풀스크린 연출 2초
+- `app/pet/pet.css` — 펫 화면 전용 배치. `styles/tokens.css`의 토큰만 조합한다 (새 값 정의 금지)
 - `app/api/pet/route.ts` — GET 초기 상태
 - `app/api/pet/feed/route.ts` — POST 씨앗 투입
 
@@ -72,7 +116,18 @@
 
 E가 `origin/main`(`12ff359`)의 **옛** `prisma/seed/items.ts`로 `db:seed`를 먼저 돌렸다. 그 파일은 여우 → `INDEPENDENT_LOW_INCOME`, 고양이 → `HEALTH_EMOTION`이고 치장 이름이 앰버·라벤더·세이지다. A가 경고했던 바로 그 상황이다. `origin/main`의 STATUS에도 차단 사항 1번으로 "시드보다 먼저 고쳐야 한다"가 아직 남아 있다.
 
-DB 접속 정보가 없어 실제 행을 확인하지는 못했다. 아래는 시드 파일과 스키마 제약에서 나오는 결론이다.
+**2026-08-19 실 DB를 읽어 확인했다.** 아래 예측이 전부 맞았고, 추가로 유저 문제 1건이 나왔다.
+
+| 확인 항목 | 실제 값 |
+|---|---|
+| 적용된 마이그레이션 | `20260819061857_init`, `20260819080703_add_subtype` 둘 다 완료 |
+| `PetSkin` | 6행. 여우·늑대 = `INDEPENDENT_LOW_INCOME`, 고양이·삵 = `HEALTH_EMOTION` (**뒤바뀜**). 곰·판다 정상 |
+| `CosmeticItem` | **12행** (18행 아님). 옛 이름 9종 + 밤별 3종. 고아 행 없음 |
+| `UserCosmetic` | 0행 — 이름 이관이 FK를 건드릴 여지가 없다 |
+| `User` | **1행** (`밤바다`). `Mission` 41행, `DiagnosisSession` 1행 |
+| `GachaPull` | 테이블 존재, 0행 |
+
+이관 표의 옛 이름 9개가 DB의 실제 이름 9개와 **정확히 일치**하고, 등급 계보도 보존된다(앰버 목도리 `LEGENDARY` → 노을 목도리 `LEGENDARY` 등 9개 전부). 즉 재시드는 이름·컬러 표기만 바꾸고 등급을 흔들지 않는다.
 
 - **펫 6종은 자동 복구된다.** `PetSkin.name`이 `@unique`이고 이름이 그대로라, 고친 시드를 다시 돌리면 `upsert`의 `update`가 `typeCode`를 교정한다. 여우↔고양이, 늑대↔삵이 여기서 바로잡힌다
 - **치장 9종은 자동 복구되지 않았다.** 이름이 바뀌어서 `upsert`가 새 행 9개를 만들고 옛 행 9개가 고아로 남는다 (총 18행)
@@ -84,16 +139,27 @@ DB 접속 정보가 없어 실제 행을 확인하지는 못했다. 아래는 �
 - 새 이름 행이 이미 있으면 유니크 제약에 걸리므로 건드리지 않고 경고만 남긴다. 그 경우는 사람이 판단한다 — 시드는 절대 지우지 않는다
 - 이관 표의 옛 이름 9개가 `origin/main`에 시드된 이름 9개와, 새 이름 9개가 현재 시드의 치장 9종과 각각 정확히 일치하는 것을 `comm`으로 확인했다
 
-**남은 확인 (DB 접속 후):** 이미 진단을 마친 유저가 있으면 `User.activePetSkinId`·`UserPetSkin`이 틀린 동물을 가리킬 수 있다. 유저 수가 0이면 문제없다. `.env`를 받으면 이것부터 본다.
+**유저 1명이 틀린 펫을 가리킨다 — 재시드 시 드러난다 (미해결)**
 
-**1. 가챠 스키마 드리프트 — 머지 전 팀 결정 필요**
+"DB 접속 후 확인"으로 남겨 뒀던 항목이고 실제로 발생했다.
 
-`origin/main`의 `schema.prisma`와 RDS에 **이미 적용된** `20260819061857_init` 마이그레이션에는 `GachaPull` 테이블·`User.heroPity`·`User.legendPity`가 살아 있다. C가 `7b0bcd0`에서 스키마에서 지운 것들이다. 내 작업을 머지하면 스키마에는 없고 실제 DB에는 있는 상태가 되어 다음 `migrate dev`가 DROP 마이그레이션을 만든다. 가챠는 나중에 재구현할 거라 테이블을 지금 지울 이유가 없다. 선택지:
+```
+유저 밤바다: typeCode = INDEPENDENT_LOW_INCOME  (새 매핑 = 고양잇과/고양이)
+             활성 펫    = 여우                    ← 유형과 안 맞음
+             UserPetSkin 보유도 여우 하나뿐
+```
 
-1. 스키마 제거분을 머지하지 않고 `GachaPull`을 되살린다 (테이블은 두고 코드만 안 쓴다). 추가 마이그레이션 없음
-2. 제거분을 머지하고 DROP 마이그레이션을 만든다. 재구현 때 다시 CREATE
+지금은 DB의 여우가 `INDEPENDENT_LOW_INCOME`이라 우연히 맞아 보인다. 고친 시드를 돌리면 여우가 `HEALTH_EMOTION`이 되어 **유형↔펫이 어긋난다.** `level 1 / exp 0 / seeds 0`이라 진행도 손실 없이 고양이로 재지정하면 끝난다 (`User.activePetSkinId` + `UserPetSkin.petSkinId`).
 
-`prisma/schema.prisma`는 전원 합의 파일이라 C 단독으로 못 정한다.
+원인은 A의 `app/api/diagnosis/complete/route.ts`가 `typeCode`로 기본 펫을 고르는데, 그 시점 DB의 매핑이 옛 값이었다는 것이다. **코드 버그가 아니다** — 재시드 후에 진단하면 올바르게 고양이가 붙는다. 이 1행은 옛 데이터일 뿐이다.
+
+**1. 가챠 — 삭제 결정, RDS 테이블 정리는 E 담당**
+
+가챠는 **삭제로 결정했다 (2026-08-19).** `schema.prisma`에서 제거된 상태(`7b0bcd0`)를 `feat/pet`에 그대로 머지했다.
+
+남은 것은 RDS 쪽이다. `20260819061857_init`으로 이미 만들어진 `GachaPull` 테이블(0행)과 `User.heroPity`·`legendPity` 컬럼이 살아 있다. 스키마에는 없고 DB에는 있으므로 **다음 `migrate dev`를 실행하는 사람이 의도치 않은 DROP 마이그레이션을 자동 생성한다.** 미리 명시적으로 정리해야 한다.
+
+`CLAUDE.md` 5절대로 마이그레이션은 스키마 담당 1인(E)만 만든다. **C는 만들지 않았고, `docs/STATUS.md` 차단 6번에 E 할 일로 적었다.** 지울 데이터는 0행이라 손실이 없다.
 
 **2. `SEED_TO_EXP` 변경이 A 소유 파일에 있다**
 
@@ -104,28 +170,35 @@ DB 접속 정보가 없어 실제 행을 확인하지는 못했다. 아래는 �
 `origin/main`의 "결정 변경" 5번은 `main`을 PR로만 올리라고 하는데 `CLAUDE.md` 4절·`업무분담.md`는 셀프 머지를 지시한다. 두 문서가 아직 안 바뀌었다. **그래서 `main`에 직접 푸시하지 않고 `feat/pet`만 푸시했다** — 어느 규칙을 따라도 안전한 쪽이다. PR을 열지 여부는 팀 결정 대기.
 
 **해소된 것 (이전 세션에 막힌 것으로 적어 뒀던 것들)**
-- ~~DB 없음~~ — RDS·Cognito·S3·Bedrock 완료(E). `.env` 값은 E에게 개별로 받는다. **받으면 씨앗 투입·레벨업·진화 연출을 실제로 돌려봐야 한다**
-- ~~디자인 토큰 없음~~ — `styles/tokens.css`와 루트 `design.md`가 `main`에 있다. 펫 화면은 Tailwind 기본 클래스로만 짜 뒀으니 이 토큰과 `design.md` 결에 맞춰 다시 손봐야 한다
+- ~~DB 없음~~ — RDS·Cognito·S3·Bedrock 완료(E). `.env`의 `DATABASE_URL`도 채워졌고 접속을 확인했다
+- ~~디자인 토큰 없음~~ — `3bc8541`에서 해소. 펫 화면을 `.hm*` 시스템으로 옮겼다
 - ~~하단 탭 없음~~ — E가 BottomNav를 넣었다. `/pet` 탭 경로가 맞는지 확인 필요
-- ~~시드 매핑 옛 값~~ — `22d30fa`에서 해소(`origin/main` 차단 사항 1번)
+- ~~시드 매핑 옛 값~~ — 시드 *파일*은 `22d30fa`에서 해소. **DB 데이터는 아직 옛 값이다** (위 0번)
+- ~~가챠 스키마 드리프트 결정 대기~~ — 삭제로 결정됐다. 남은 것은 E의 DROP 마이그레이션뿐
 
 **남아 있는 것**
-- 펫·치장 이미지 미제작. `imageKey`는 `prisma/seed/items.ts`에 고정해 뒀다. 이미지가 나오면 `PetView.tsx`의 `ANIMAL_EMOJI`를 `<img>`로 교체한다
-- 치장 획득 경로 미정. 가챠를 걷어내면서 경로가 사라졌고 별조각도 소모처가 없다 (`SPEC.md` 5절에 팀 논의 필요로 적혀 있다)
-- `npm run db:seed`는 아직 아무도 돌리지 않았다. 시드를 고친 지금은 돌려도 안전하지만, `upsert`가 `name` 기준이라 **이름을 또 바꿀 일이 있으면 시드 전에 끝내야 한다**
+- 펫·치장 이미지 미제작. `imageKey`는 `prisma/seed/items.ts`에 고정해 뒀다. 이미지가 나오면 `PetView.tsx`의 이모지 원판(`.hm-plate__disc`)만 `<img>`로 교체한다 — `design.md`가 "원판 안의 이모지만 이미지로 바뀐다"고 못 박아 뒀다
+- 치장 획득 경로 미정. 가챠를 삭제해서 경로가 사라졌고 별조각도 소모처가 없다 (`SPEC.md` 5절에 팀 논의 필요로 적혀 있다). **가챠가 삭제로 확정됐으니 이제는 미룰 수 없는 결정이다** — 치장 30종과 별조각이 둘 다 도달 불가 상태다
+- `npm run db:seed`를 아직 다시 돌리지 않았다. 공유 DB 쓰기라 승인 대기 중이다. `upsert`가 `name` 기준이라 **이름을 또 바꿀 일이 있으면 재시드 전에 끝내야 한다**
 
-## 가챠 — 제거 완료, 나중에 재구현 (`7b0bcd0`)
+## 가챠 — 삭제 확정 (2026-08-19)
 
-컷이 아니다. 우선순위를 뒤로 미뤄 코드에서 걷어냈고, 펫 화면·방치형·치장을 끝낸 뒤 다시 넣는다. 되살릴 때 필요한 것:
+**컷이다.** 이전 세션에는 "나중에 재구현"으로 미뤄 뒀지만 8/19에 삭제로 결정했다. 코드·스키마에서 제거된 상태(`7b0bcd0`)를 유지하고 다시 넣지 않는다.
+
+- `SPEC.md` 5절의 가챠 서술(확률·천장·중복 환급)은 이제 구현되지 않는 내용이다 — 5절은 C 담당 절이므로 정리 대상이다
+- **치장 획득 경로와 별조각 소모처가 사라졌다.** 가챠가 유일한 경로였다. 치장 12종(명세상 30종)과 별조각이 둘 다 도달 불가 상태다. 대체 경로 결정이 필요하다 (위 "남아 있는 것")
+- RDS의 `GachaPull` 테이블·`heroPity`·`legendPity` 정리는 E 담당 (위 1번, `docs/STATUS.md` 차단 6번)
+
+되살릴 일이 생기면 `git show 7b0bcd0`에 제거한 내용 전체가 남아 있다. 그때 필요한 것:
 
 - `prisma/schema.prisma` — `GachaPull` 모델, `User.heroPity`/`legendPity`, `CosmeticItem.pulls`
 - `lib/reward.ts` — `DUPLICATE_REFUND`(일반 2 / 희귀 5 / 영웅 20 / 전설 50)
 - `SPEC.md` 5절 — 확률(전설 0.6 / 영웅 9.4 / 희귀 40 / 일반 50), 천장(영웅 10, 전설 80), 중복 환급
 - 중복 획득 시 환급 처리가 없으면 `UserCosmetic` 유니크 제약 때문에 500이 난다. 재구현 때 이것부터 넣는다
 
-`git show 7b0bcd0` 로 제거한 내용 전체를 되돌려 볼 수 있다. `docs/인수인계.md`는 가챠 서술을 그대로 남겨 뒀다.
+`docs/인수인계.md`는 가챠 서술을 그대로 남겨 뒀다 — 삭제 확정에 맞춰 정리가 필요하다.
 
-**주의**: D가 `feat/community`에 올린 마이그레이션(`18640a7`)에는 `GachaPull` 테이블과 `heroPity`·`legendPity` 컬럼이 아직 들어 있다. 8/19에 **폐기 확정**했다 — 실행 절차와 D가 로컬에서 할 일은 `docs/STATUS.md` "D 마이그레이션 폐기" 절에 있다. 가챠를 재구현할 때도 그 마이그레이션을 되살리는 게 아니라 스키마부터 다시 넣고 새 마이그레이션을 만든다.
+**주의**: D가 `feat/community`에 올린 마이그레이션(`18640a7`)에는 `GachaPull` 테이블과 `heroPity`·`legendPity` 컬럼이 아직 들어 있다. 8/19에 **폐기 확정**했다 — 실행 절차와 D가 로컬에서 할 일은 `docs/STATUS.md` "D 마이그레이션 폐기" 절에 있다.
 
 ## TypeCode ↔ 종족 매핑 + 컬러명 변경 (`6fecded`, 컬러명은 후속 커밋)
 
@@ -147,7 +220,9 @@ A의 `feat/diagnosis`에서 매핑이 맞바뀌었고 8/19 팀 확인으로 의�
 
 **정합성 확인 완료 (2026-08-19):** A가 PR #1로 머지되어 `origin/main`의 `lib/types.ts` `TRIBE`와 `SPEC.md` 2절 표가 모두 위 새 값으로 갱신됐다. `styles/tokens.css`의 `[data-tribe]` hex도 일치한다. `prisma/seed/items.ts`가 이 세 곳과 어긋나지 않는 것을 확인했다.
 
-펫 화면에서 종족·컬러를 표시할 때는 `lib/types.ts`를 쓴다. `TRIBE`에 `emoji` 필드가 추가돼 `PetView.tsx`의 `ANIMAL_EMOJI`와 중복된다 — 다음 작업 때 `TRIBE.emoji`로 합친다. 단 `ANIMAL_EMOJI`에는 친밀도 캐릭터(늑대·삵·판다)가 있고 `TRIBE.emoji`에는 기본 3종만 있어 그대로 대체하면 안 된다.
+펫 화면에서 종족·컬러를 표시할 때는 `lib/types.ts`를 쓴다. `TRIBE.emoji`와 `PetView.tsx`의 `ANIMAL_EMOJI` 중복은 `3bc8541`에서 해소했다 — 기본 3종은 `TRIBE`에서 펼쳐 넣고 친밀도 캐릭터 3종만 `AFFINITY_EMOJI`에 따로 둔다. `TRIBE.emoji`로 통째로 대체하면 늑대·삵·판다가 빠진다.
+
+**`upsert`가 `name` 기준이라는 점은 이제 실제 문제가 됐다.** "아직 아무도 시드를 돌리지 않았으므로 안전하다"는 위 서술은 틀렸다 — E가 이미 옛 파일로 돌렸다. 그래서 `renameLegacyCosmetics()`가 필요해졌다 (위 "막힌 것" 0번).
 
 ## 검증한 것
 - `lib/reward.ts`를 `SPEC.md` 6절, `CLAUDE.md` 1절과 한 줄씩 대조함
@@ -159,14 +234,20 @@ A의 `feat/diagnosis`에서 매핑이 맞바뀌었고 8/19 팀 확인으로 의�
 
 ## 다음 할 일
 
-순서대로 한다. 위 세 개는 남은 기능보다 먼저다 — 통합이 막히면 기능을 더 만들어도 못 올린다.
+앞의 두 개는 남은 기능보다 먼저다 — DB 데이터가 틀린 채로 기능을 더 얹으면 검증이 무의미해진다.
 
-1. **고친 시드를 공유 DB에 다시 돌린다** ("막힌 것" 0번). `feat/pet`이 `main`에 올라간 뒤 `npm run db:seed` 한 번. 펫 6종 `typeCode`가 교정되고 치장 9종이 새 이름으로 이관된다. 실행 후 `CosmeticItem`이 **12행**인지(18행이 아닌지) 확인한다
-2. **`.env` 값을 E에게 받아 런타임 검증** — 씨앗 투입 → 레벨업 → 진화 연출을 실제로 한 번 돌린다. 지금까지 순수 함수 체크와 빌드만 통과한 상태다. 유저 행이 있으면 `activePetSkinId`가 맞는 동물인지도 본다
-3. **가챠 스키마 드리프트 결정을 받는다** ("막힌 것" 1번). 전원 합의 파일이라 C 단독으로 못 정한다
-4. `origin/main`을 `feat/pet`에 머지하고 빌드 확인. `docs/STATUS.md`는 충돌하므로 `origin/main` 버전을 취한다
-5. 펫 화면을 `styles/tokens.css`·`design.md` 결에 맞춘다. 지금은 Tailwind 기본 클래스뿐이라 다른 화면과 톤이 다르다
-6. 방치형 자동 획득 (`lastIdleClaimAt` 시간차, 상한 12시간분). 획득이므로 `calculateReward()`를 통과한다
-7. 치장 착용·해제 (슬롯당 1개), 목록에 수집 진행률 `12/30`
-8. 친밀도 전용 캐릭터 3종 구매·전환 (각 300 친밀도)
-9. 가챠 재구현은 위 항목이 전부 끝난 뒤. 치장 획득 경로 결정이 선행 조건이다
+1. **고친 시드를 공유 DB에 다시 돌린다** ("막힌 것" 0번). **공유 DB 쓰기라 승인 대기 중.**
+   ```bash
+   npx prisma db seed        # npm run db:seed는 .env를 못 읽어 실패한다 (STATUS 차단 7번)
+   ```
+   펫 6종 `typeCode`가 교정되고 치장 9종이 새 이름으로 이관된다. 실행 후 `CosmeticItem`이 **12행**인지(18행이 아닌지) 확인한다
+2. **유저 `밤바다`의 활성 펫을 여우 → 고양이로 재지정한다** (`User.activePetSkinId`, `UserPetSkin.petSkinId`). 1번과 같이 해야 한다 — 재시드만 하면 유형↔펫이 어긋난 상태가 드러난다. 진행도가 전부 0이라 손실 없음. 이것도 **공유 DB 쓰기라 승인 대기 중**
+3. **런타임 검증** — 씨앗 투입 → 레벨업 → 진화 연출을 브라우저에서 한 번 돌린다. 유저의 `seeds`가 0이라 검증용 씨앗을 넣어야 하고, 그것도 공유 DB 쓰기다
+4. 방치형 자동 획득 (`lastIdleClaimAt` 시간차, 상한 12시간분). 획득이므로 `calculateReward()`를 통과한다. **DB 쓰기 승인이 안 나도 진행할 수 있는 첫 항목이다**
+5. 치장 착용·해제 (슬롯당 1개), 목록에 수집 진행률 `12/30`
+6. 친밀도 전용 캐릭터 3종 구매·전환 (각 300 친밀도)
+7. **치장 획득 경로·별조각 소모처 결정** (팀). 가챠 삭제로 둘 다 도달 불가가 됐다. 5번을 만들어도 획득 경로가 없으면 화면이 늘 비어 있다
+8. `SPEC.md` 5절의 가챠 서술 정리 (5절은 C 담당). `docs/인수인계.md`의 가챠 서술도 정리 대상이다
+
+**E에게 요청할 것**: `GachaPull`·`heroPity`·`legendPity` DROP 마이그레이션 1개 (`docs/STATUS.md` 차단 6번)
+**A에게 알릴 것**: `SEED_TO_EXP` 1 → 10 변경(`lib/types.ts`), `app/page.tsx:37` lint 에러
