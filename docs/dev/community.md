@@ -4,10 +4,10 @@
 명세는 `SPEC.md` 7·8절, 규칙은 `CLAUDE.md`.
 
 ## 현재 상태
-- 완료: 갤러리 목록 화면, 상세 오버레이, 좋아요 토글, 댓글 작성, 글쓰기 모달, 본인 글 삭제, 친밀도 지급 헬퍼, 챗봇 시스템 프롬프트, 챗봇 메시지 저장 API(GET/POST, 친밀도 지급까지)
+- 완료: 갤러리 목록 화면, 상세 오버레이, 좋아요 토글, 댓글 작성, 글쓰기 모달, 본인 글 삭제, 친밀도 지급 헬퍼, 챗봇 시스템 프롬프트, 챗봇 메시지 저장 API(GET/POST, 친밀도 지급까지), 챗봇 패널 UI(개발용 `/chat` 라우트)
 - 진행 중: 없음
-- 미착수: 본인 댓글 삭제, 챗봇 화면(UI), Bedrock 실제 호출·스트리밍, LLM 주제 추천 실제 연동, 이미지 업로드
-- 보류(다음 세션 이전 필요 조건): 전체 탭 글쓰기(스키마에 ALL 값 없음), LLM 주제 추천(`BEDROCK_MODEL_ID` 없음), Bedrock 챗봇 응답 생성(`BEDROCK_MODEL_ID` 없음), 글쓰기 시 일일 미션(`DAILY_COMMUNITY_POST`) 완료 처리(B와 협의 필요) — 전부 아래 "결정한 것과 이유"에 근거 남김
+- 미착수: 본인 댓글 삭제, Bedrock 실제 호출·스트리밍, LLM 주제 추천 실제 연동, 이미지 업로드, `ChatPanel`을 `layout.tsx`의 전역 오버레이로 이전(E 대기)
+- 보류(다음 세션 이전 필요 조건): 전체 탭 글쓰기(스키마에 ALL 값 없음), LLM 주제 추천(`BEDROCK_MODEL_ID` 없음), Bedrock 챗봇 응답 생성(`BEDROCK_MODEL_ID` 없음, AWS 계정 자체가 없음), 글쓰기 시 일일 미션(`DAILY_COMMUNITY_POST`) 완료 처리(B와 협의 필요), `ChatPanel`의 `layout.tsx` 이전(E 소유 파일이라 D가 직접 못 건드림) — 전부 아래 "결정한 것과 이유"에 근거 남김
 
 ## 구현한 파일
 - `app/community/page.tsx` — 목록 화면. 서버 컴포넌트, `searchParams`의 `tab`으로 갤러리 결정
@@ -35,7 +35,9 @@
 - `app/api/community/posts/[id]/route.ts` — DELETE 추가(본인 글 소프트 삭제), GET 응답에 `isOwn` 추가
 
 - `app/chat/_lib/systemPrompt.ts` — 챗봇 "마음 친구" 시스템 프롬프트. 공통 원칙(조언·해결책·진단·평가 금지, 유형명 노출 금지, 자해·죽음 언급 시 안전 예외) + 유형별 페르소나 레이어. `buildSystemPrompt(typeCode, nickname)`을 `app/api/chat/messages/route.ts`가 참조
-- `app/api/chat/messages/route.ts` — GET(대화 이력 조회, 최근 50개, `createdAt asc`) + POST(사용자 메시지 저장 + 친밀도 지급). 진단 전(`typeCode` 없음)이면 400 `NO_TYPE_CODE`
+- `app/api/chat/messages/route.ts` — GET(대화 이력 조회, 최근 50개, `createdAt asc`, 이제 `affinityToday`도 응답에 포함) + POST(사용자 메시지 저장 + 친밀도 지급). 진단 전(`typeCode` 없음)이면 400 `NO_TYPE_CODE`
+- `app/chat/_components/ChatPanel.tsx` — 우측 460px 슬라이드 패널(클라이언트). 헤더(아바타·진행 바·ℹ 친밀도 안내·✕), 빈 상태(인사말 + 정적 추천 문구 3개), 메시지 목록(USER 우측 컬러 말풍선 / ASSISTANT 좌측 말풍선), 입력창(Enter 전송·Shift+Enter 줄바꿈). `BEDROCK_MODEL_ID` 없을 때만 개발 모드 배너 노출. `onClose`는 선택 prop — 없으면 ✕·배경 클릭 닫기를 렌더링하지 않음
+- `app/chat/page.tsx` — 개발 확인용 라우트. 서버 컴포넌트에서 `getCurrentUser()`로 `nickname`/`typeCode`를, `process.env.BEDROCK_MODEL_ID`로 `bedrockConfigured`를 읽어 `ChatPanel`에 props로 넘김. `onClose` 없이 렌더링. `export const dynamic = "force-dynamic"` 필수(아래 이유 참고)
 
 **`app/chat/` 폴더 소유 — 팀 확인 대기.** `CLAUDE.md` 2절의 폴더 소유 표(`app/diagnosis/` A, `app/missions/` B, `app/pet/` C, `app/community/` D, `app/(auth)/` E)에는 `app/chat/`이 없다. `업무분담.md`의 D 항목에 "AI 상담 챗봇"과 `/api/chat/*`가 D 담당으로 명시돼 있어 D 소유로 보고 진행했지만, `CLAUDE.md` 갱신은 전원 합의가 필요하므로 다음 통합 때 팀에 확인해 `CLAUDE.md` 2절에 정식으로 추가해야 한다.
 
@@ -67,6 +69,12 @@
 - 챗봇도 진단(`typeCode`)이 있어야 페르소나를 만들 수 있어서, 진단 전 유저가 메시지를 보내면 400 `NO_TYPE_CODE`로 막는다(처음엔 `DIAGNOSIS_REQUIRED`였다가 이후 지시로 `NO_TYPE_CODE`로 통일)
 - GET 대화 이력은 최근 50개로 제한한다. `orderBy: asc, take: 50`이 아니라 `orderBy: desc, take: 50` 후 배열을 뒤집는 방식을 쓴다 — asc로 그냥 자르면 대화가 길어졌을 때 항상 가장 오래된 50개만 보여서 최근 대화가 안 보이는 버그가 됨
 - `app/chat/_lib/systemPrompt.ts` 파일명은 이전 세션 결정(`persona.ts`에서 `systemPrompt.ts`로 변경, 유지하라는 명시적 지시)을 그대로 따른다. 이후 세션에서 다시 `persona.ts`로 만들라는 요청이 있었지만 이미 커밋된 파일이라 이름을 그대로 두고 내용만 이번 지시에 맞춰 갱신했다
+- **`ChatPanel`은 `nickname`/`typeCode`/`bedrockConfigured`를 props로 받는다(자체 fetch 아님).** GET `/api/chat/messages`는 메시지·`affinityToday`만 준다 — 이번 세션에 그 이상 확장하라는 지시가 없었다. 대신 `app/chat/page.tsx`(서버 컴포넌트)가 `getCurrentUser()`와 `process.env.BEDROCK_MODEL_ID`를 직접 읽어 props로 넘긴다. `layout.tsx`가 전역 오버레이로 `ChatPanel`을 렌더링하게 될 때도 그 부모(서버 컴포넌트)가 같은 방식으로 props를 넘겨주면 된다
+- **`app/chat/page.tsx`에 `export const dynamic = "force-dynamic"`을 반드시 넣는다.** `searchParams` 같은 동적 신호가 없는 서버 컴포넌트라 그냥 두면 Next가 빌드 시점에 정적 페이지로 캐시해버린다(빌드 시점의 dev 유저 스냅샷이 그대로 굳어 이후 요청에도 재사용됨). 실제로 처음 빌드에서 `/chat`이 `○`(Static)로 잡히는 걸 확인하고 고쳤다. `app/community/page.tsx`는 `searchParams`를 읽어서 저절로 동적이 되므로 이 설정이 필요 없었던 것과 대비됨
+- **개발 모드 배너는 서버에서 계산한 `bedrockConfigured`(boolean)로 제어한다.** `BEDROCK_MODEL_ID`는 `NEXT_PUBLIC_` 접두사가 없는 서버 전용 env라 클라이언트 컴포넌트(`ChatPanel`)에서 직접 `process.env.BEDROCK_MODEL_ID`를 읽으면 항상 `undefined`로 인라인된다. 그래서 서버 컴포넌트에서 읽어 boolean만 prop으로 내려준다 — "값이 채워지면 배너가 자동으로 사라지는" 요구를 만족하려면 이 방법뿐이다
+- 친밀도 진행 바 갱신은 `setAffinityToday(prev => prev + granted)`만 쓴다. `granted`는 서버가 이미 상한을 적용해 계산한 값이라 `prev + granted`는 수학적으로 100을 넘을 수 없다 — 클라이언트에서 별도로 `Math.min(100, ...)`을 계산하지 않는다(지시 그대로)
+- 추천 문구 클릭은 바로 전송하지 않고 입력창을 채우기만 한다. 오탈자·오클릭으로 원치 않는 메시지가 바로 나가는 걸 막기 위함(전송 여부는 사용자가 최종 확인)
+- 타이핑 인디케이터는 만들지 않았다. Bedrock 미연결 상태에서 점 3개가 계속 도는 게 더 혼란스럽다는 지시대로
 
 ## 막힌 것
 - 없음 (로컬 DB가 `prisma migrate`로 관리되지 않고 있던 것을 발견해 베이스라인 마이그레이션(`prisma/migrations/00000000000000_init`)을 만들어 해결. 기존 시드 데이터(미션 41개, 펫스킨 6개)는 유지됨. 스키마 담당과 공유 필요)
@@ -76,5 +84,6 @@
 - LLM 주제 추천 3가지 이상 연동 — `BEDROCK_MODEL_ID` 확보되면 `WriteModal`의 TODO 자리에 구현
 - 전체 탭 글쓰기 — 스키마에 ALL(또는 공용 게시판) 개념이 추가되면 `_lib/gallery.ts`의 `canWriteToGallery()`만 고치면 됨
 - `DAILY_COMMUNITY_POST` 일일 미션 완료 처리 — B와 담당 경계 협의 필요
-- 챗봇 화면(UI) — `app/api/chat/messages`의 GET/POST를 그대로 씀
-- Bedrock 실제 호출 + 스트리밍 — `BEDROCK_MODEL_ID` 확보되면 `app/api/chat/messages/route.ts`의 TODO 자리에 구현. 친밀도 지급은 이미 그 자리에서 끝났으니 새로 추가하지 말 것
+- Bedrock 실제 호출 + 스트리밍 — `BEDROCK_MODEL_ID` 확보되면 `app/api/chat/messages/route.ts`의 TODO 자리에 구현. 친밀도 지급은 이미 그 자리에서 끝났으니 새로 추가하지 말 것. 붙는 시점에 타이핑 인디케이터도 함께 추가
+- **`ChatPanel`을 `app/chat/page.tsx`(개발용)에서 `layout.tsx`의 전역 오버레이로 이전 — E와 조율 필요.** `layout.tsx`는 E 소유라 D가 직접 못 고친다. 이전할 때 `nickname`/`typeCode`/`bedrockConfigured` props를 넘기는 방식과 `onClose` 연결(전역에서는 실제로 닫을 수 있어야 함)을 그대로 유지할 것
+- `app/chat/` 폴더 소유를 `CLAUDE.md` 2절에 정식 반영 — 팀 확인 대기 (계속 남아있는 이월 항목)
