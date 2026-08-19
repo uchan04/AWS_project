@@ -2,27 +2,29 @@ import type { Adjective, TypeCode } from "@prisma/client"
 
 // 소유자: A. 표시 문자열의 유일한 출처다. 화면에 유형명("건강·정서취약형")을 절대 쓰지 않는다.
 
+// 색은 여기 한 곳에만 있다. 톤을 바꾸기로 하면 colorHex 3개만 교체한다.
+// 대안(한 톤 부드러운 파스텔): 여우 #FBBF24 / 고양이 #7DD3FC / 곰 #86EFAC
 export const TRIBE: Record<
   TypeCode,
   { family: string; animal: string; colorName: string; colorHex: string }
 > = {
-  INDEPENDENT_LOW_INCOME: {
+  HEALTH_EMOTION: {
     family: "개과",
     animal: "여우",
     colorName: "앰버 오렌지",
     colorHex: "#F59E0B",
   },
-  HEALTH_EMOTION: {
+  INDEPENDENT_LOW_INCOME: {
     family: "고양잇과",
     animal: "고양이",
-    colorName: "라벤더 퍼플",
-    colorHex: "#A78BFA",
+    colorName: "스카이 블루",
+    colorHex: "#38BDF8",
   },
   FAMILY_LIVING: {
     family: "곰과",
     animal: "곰",
-    colorName: "세이지 그린",
-    colorHex: "#84A98C",
+    colorName: "에메랄드 그린",
+    colorHex: "#34D399",
   },
 }
 
@@ -33,12 +35,12 @@ export const ADJECTIVE_LABEL: Record<Adjective, string> = {
   EASYGOING: "느긋한",
 }
 
-// 진단 6번 문항 선택지 코드 → 형용사. 상수 테이블이며 LLM을 쓰지 않는다.
+// 형용사 문항(Q13) 선택지 코드 → 형용사. 상수 테이블이며 LLM을 쓰지 않는다.
 export const ADJECTIVE_BY_CHOICE: Record<string, Adjective> = {
-  Q6_NIGHT_ALONE: "QUIET", // 밤에 혼자 있는 시간이 가장 편하다
-  Q6_WITH_CLOSE: "WARM", // 마음 맞는 사람과 있을 때가 편하다
-  Q6_ON_PLAN: "DILIGENT", // 계획대로 하루가 굴러가면 편하다
-  Q6_NO_RUSH: "EASYGOING", // 서두르지 않고 흐르는 대로가 편하다
+  Q13_NIGHT_ALONE: "QUIET", // 밤에 혼자 있는 시간이 가장 편하다
+  Q13_WITH_CLOSE: "WARM", // 마음 맞는 사람과 있을 때가 편하다
+  Q13_ON_PLAN: "DILIGENT", // 계획대로 하루가 굴러가면 편하다
+  Q13_NO_RUSH: "EASYGOING", // 서두르지 않고 흐르는 대로가 편하다
 }
 
 /** 진단 직후 부여하는 기본 닉네임. 이후 유저가 변경할 수 있다. */

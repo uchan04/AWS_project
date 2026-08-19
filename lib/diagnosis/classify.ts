@@ -1,96 +1,74 @@
-import type { Adjective, TypeCode } from "@prisma/client"
+// 유형 판정. docs/dev/diagnosis.md 6·7장이 확정 스펙이다.
+// 순수 함수. DB·LLM 없음. LLM은 문장 다듬기와 자유 입력 변환만 담당한다.
+//
+// 대분류(사용자)와 세부유형(관리자)은 서로를 참조하지 않는다. 둘 다 지표만 본다.
+// 세부유형에서 대분류를 고정 매핑으로 뽑으면 미취업빈곤형처럼 주거에 따라
+// 갈려야 하는 유형이 한 집단에 몰려 미션 배정이 틀린다.
+
+import type { Adjective, SubTypeCode, TypeCode } from "@prisma/client"
 import { ADJECTIVE_BY_CHOICE } from "../types"
-import { CHOICE_INDEX, QUESTIONS, type Axis } from "./questions"
+import { type Answer, type Indicators, resolveIndicators } from "./indicators"
 
-// 소유자: A. 유형 판정 (docs/dev/diagnosis.md 5장).
-// 판정은 100% 코드다. LLM을 호출하지 않는다. 순수 함수라 DB도 필요 없다.
-// 기대값은 scripts/check-diagnosis.ts에 고정돼 있다. npm run check:diagnosis
-
-export type AxisScores = Record<Axis, number>
-
-/** 클라이언트가 보내는 답변. 코드만 받는다. */
-export type Answer = { questionCode: string; choiceCode: string }
-
-/** 서버가 축·가중치를 채운 형태. DiagnosisSession.answers에 이대로 저장한다. */
-export type ResolvedAnswer = {
-  questionCode: string
-  choiceCode: string
-  axis: Axis | null
-  weight: number
-}
+export type { Answer, Indicators } from "./indicators"
 
 export type DiagnosisResult = {
   typeCode: TypeCode
   adjective: Adjective
-  axisScores: AxisScores
+  subTypeCode: SubTypeCode
+  indicators: Indicators
+  health: number
+  econ: number
 }
 
 /**
- * 답변을 검증하고 축·가중치를 서버 문항 테이블에서 채운다.
- * 클라이언트가 보낸 weight는 쓰지 않는다. 조작하면 원하는 유형을 만들 수 있다.
- * 문항 순서(Q1~Q6)로 정렬해 돌려준다.
+ * 대분류 3유형. 사용자에게는 동물로만 보여준다.
+ *
+ * 규칙 1이 가족 동거보다 앞이다. 가족과 살아도 건강 지표 5개 중 3개가 켜졌으면
+ * 건강·정서취약형이다. Q1 하나로 가족 동거를 확정하면 가족과 사는 심한 우울
+ * 사용자가 가장 낮은 강도의 미션을 못 받는다.
  */
-export function resolveAnswers(answers: Answer[]): ResolvedAnswer[] {
-  const byQuestion = new Map<string, ResolvedAnswer>()
-
-  for (const answer of answers) {
-    const found = CHOICE_INDEX[answer.choiceCode]
-    if (!found) {
-      throw new Error(`INVALID_ANSWER: 알 수 없는 선택지 ${answer.choiceCode}`)
-    }
-    // 선택지가 실제로 속한 문항을 기준으로 본다. 클라이언트가 보낸 questionCode는 대조용이다.
-    if (answer.questionCode !== found.question.code) {
-      throw new Error(
-        `INVALID_ANSWER: ${answer.choiceCode}는 ${found.question.code}의 선택지다`,
-      )
-    }
-    if (byQuestion.has(found.question.code)) {
-      throw new Error(`INVALID_ANSWER: ${found.question.code}가 두 번 들어왔다`)
-    }
-    byQuestion.set(found.question.code, {
-      questionCode: found.question.code,
-      choiceCode: found.choice.code,
-      axis: found.question.axis,
-      weight: found.choice.weight,
-    })
-  }
-
-  return QUESTIONS.map((question) => {
-    const resolved = byQuestion.get(question.code)
-    if (!resolved) {
-      throw new Error(`INVALID_ANSWER: ${question.code} 답변이 없다`)
-    }
-    return resolved
-  })
+export function classifyType(alone: boolean, health: number, econ: number): TypeCode {
+  if (health >= 3) return "HEALTH_EMOTION"
+  if (!alone) return "FAMILY_LIVING"
+  // 동점이면 HEALTH. 방치했을 때 위험이 크고 미션 강도가 낮아 오판정 피해가 작다
+  if (health >= 2 && health >= econ) return "HEALTH_EMOTION"
+  return "INDEPENDENT_LOW_INCOME"
 }
 
-export function classify(answers: Answer[]): DiagnosisResult {
-  const resolved = resolveAnswers(answers)
-  const choiceOf = (questionCode: string) =>
-    resolved.find((answer) => answer.questionCode === questionCode)!
+/**
+ * 세부 8유형. 관리자 전용. 화면에 노출하지 않는다.
+ *
+ * 사실 유형(자립준비·가족돌봄·지역이주)이 맨 앞이다. 외부 지원 제도가 따로 있어
+ * 관리자가 연계할 때 이 사실이 다른 취약성보다 먼저다.
+ */
+export function classifySubType(indicators: Indicators, health: number): SubTypeCode {
+  if (indicators.AFTERCARE) return "AFTERCARE_YOUTH"
+  if (indicators.CAREGIVER) return "FAMILY_CAREGIVER"
+  if (indicators.MIGRANT) return "MIGRANT_YOUTH"
+  if (health >= 3) return "HEALTH_FRAGILE"
 
-  const weightOf = (questionCode: string) => choiceOf(questionCode).weight
-
-  const axisScores: AxisScores = {
-    housing: weightOf("Q1"),
-    health: weightOf("Q2") + weightOf("Q3"),
-    employment: weightOf("Q4") + weightOf("Q5"),
+  const moneyStress = indicators.LOW_INCOME || indicators.HOUSING_UNSTABLE
+  if (indicators.DEBT && moneyStress) {
+    return indicators.ALONE ? "DEBT_INDEPENDENT" : "FINANCIAL_FRAGILE"
   }
+  if (indicators.JOBLESS && indicators.LOW_INCOME) return "JOBLESS_POOR"
+  return "FAMILY_DEPENDENT"
+}
 
-  // 규칙은 위에서부터 순서대로, 처음 걸리는 곳에서 멈춘다.
-  //   1. 가족 동거는 다른 축을 보지 않고 확정한다
-  //   2. 동점이면 HEALTH_EMOTION (미션 강도가 더 낮아 잘못 판정했을 때 피해가 적다)
-  //   3. 그 외 — 전부 0인 경우의 기본값도 여기다 (1인 가구가 이 유형의 핵심 특성)
-  const typeCode: TypeCode =
-    choiceOf("Q1").choiceCode === "Q1_FAMILY"
-      ? "FAMILY_LIVING"
-      : axisScores.health >= 2 && axisScores.health >= axisScores.employment
-        ? "HEALTH_EMOTION"
-        : "INDEPENDENT_LOW_INCOME"
+/** 진단 완료. 형용사 문항(Q13)이 없으면 닉네임을 만들 수 없으므로 거부한다 */
+export function classify(answers: Answer[]): DiagnosisResult {
+  const { indicators, adjectiveChoice, health, econ } = resolveIndicators(answers)
+
+  if (!adjectiveChoice) throw new Error("INVALID_ANSWER: 형용사 문항(Q13) 누락")
+  const adjective = ADJECTIVE_BY_CHOICE[adjectiveChoice]
+  if (!adjective) throw new Error(`INVALID_ANSWER: 형용사 매핑 없음 ${adjectiveChoice}`)
 
   return {
-    typeCode,
-    adjective: ADJECTIVE_BY_CHOICE[choiceOf("Q6").choiceCode],
-    axisScores,
+    typeCode: classifyType(indicators.ALONE, health, econ),
+    adjective,
+    subTypeCode: classifySubType(indicators, health),
+    indicators,
+    health,
+    econ,
   }
 }
