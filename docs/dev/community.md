@@ -3,6 +3,46 @@
 세션이 초기화되면 `docs/STATUS.md` 다음에 이 문서를 읽는다. 작업을 끝낼 때마다 이 문서와 `docs/STATUS.md`를 갱신하고 `docs:` 커밋으로 남긴다.
 명세는 `SPEC.md` 7·8절, 규칙은 `CLAUDE.md`.
 
+## 재개 지점
+
+D 쪽 기능 구현은 끝났고, 지금은 AWS 계정 발급(E)과 `completeMission()`(B) 두 가지 외부 결과를 기다리는 대기 상태다. 아래 6개가 막힌 항목 전부다. 재개할 때 이 표부터 본다.
+
+### 1. Bedrock 스트리밍 응답 — AWS 계정 미발급 (E)
+- **필요한 것**: E가 AWS 계정을 만들고 us-east-1에서 Bedrock Claude Sonnet 모델 액세스를 신청해 `BEDROCK_MODEL_ID`를 발급해야 한다. 로컬 개발용 AWS 자격증명도 필요
+- **고칠 파일**: `app/api/chat/messages/route.ts:45`의 TODO 자리. `buildSystemPrompt()`는 이미 호출돼 있어 `systemPrompt` 변수를 그대로 Bedrock 호출에 넘기면 된다(현재는 `void systemPrompt`로 죽여둔 상태). `app/chat/_components/ChatPanel.tsx`의 개발 모드 배너는 코드를 안 고쳐도 된다 — `app/chat/page.tsx`가 이미 `process.env.BEDROCK_MODEL_ID`를 읽어 `bedrockConfigured` prop으로 내려주는 구조라, 값이 채워지는 순간 배너가 자동으로 사라진다
+- **조심할 것**: 친밀도 이중 지급(아래 "주의사항" 참고), 타이핑 인디케이터는 이번 작업과 함께 추가(지금은 의도적으로 없음)
+
+### 2. `app/layout.tsx` 전역 마운트 — E 소유 파일
+- **필요한 것**: E가 `layout.tsx`에 `ChatPanel`을 전역 오버레이로 띄울 자리(예: 하단 탭의 챗봇 진입점)를 만들어야 한다. D는 이 파일을 직접 못 고친다(CLAUDE.md 1절)
+- **고칠 파일**: `app/layout.tsx`(E). 지금은 `app/chat/page.tsx`가 임시 확인용 라우트로 대신하고 있다
+- **조심할 것**: `ChatPanel`은 `nickname`/`typeCode`/`bedrockConfigured`를 props로 받는 구조다 — `layout.tsx`(또는 그 하위 서버 컴포넌트)가 `getCurrentUser()`와 `process.env.BEDROCK_MODEL_ID`를 읽어 그대로 넘겨주면 된다. `onClose`도 실제로 닫히게 연결해야 한다(`app/chat/page.tsx`는 `onClose` 없이 렌더링 중이라 닫기 버튼이 안 보인다)
+
+### 3. `app/chat/` 폴더 소유 확정 — `CLAUDE.md` 2절 표에 없음
+- **필요한 것**: 팀 전원 합의로 `CLAUDE.md` 2절의 폴더 소유 표에 `app/chat/` D를 정식으로 추가
+- **고칠 파일**: `CLAUDE.md` 2절(전원 합의 필요, D가 직접 못 고침)
+- **조심할 것**: `업무분담.md`의 D 항목엔 이미 명시돼 있어 형식적 절차에 가깝지만, 합의 전까지 다른 담당자가 `app/chat/`을 착각해서 건드릴 위험이 있다
+
+### 4. `Post.galleryType`이 `TypeCode`라 전체 갤러리 글쓰기 불가
+- **필요한 것**: 스키마 담당(전원 합의)이 `TypeCode` 3종 + 공용(ALL) 개념을 표현할 방법을 정해야 한다(별도 enum 분리 등)
+- **고칠 파일**: `prisma/schema.prisma`(전원 합의) 변경 후 `app/community/_lib/gallery.ts`의 `galleryTypeFilter()`와 `canWriteToGallery()` 두 함수만 고치면 된다 — ALL 관련 로직을 전부 이 파일에 모아둔 설계라 나머지(목록 API, 글쓰기 API, `WriteModal`)는 자동으로 맞춰진다
+- **조심할 것**: 같은 파일의 `canAccessGallery()`도 접근 제어를 담당하니 같이 재검토할 것
+
+### 5. LLM 글쓰기 주제 추천 — Bedrock 대기 (SPEC 8절)
+- **필요한 것**: 1번과 동일 — AWS 계정 / `BEDROCK_MODEL_ID`
+- **고칠 파일**: `app/community/_components/WriteModal.tsx:90`의 TODO 자리
+- **조심할 것**: 가짜 추천 문구를 하드코딩하지 말 것. SPEC 8절은 "3가지 이상 추천"을 요구하며 실제 LLM 호출이어야 한다
+
+### 6. `completeMission()` — B 작업 중
+- **필요한 것**: B가 `completeMission(userId, code)`의 모듈 경로, 반환값(`void` 또는 `{completed, rewardSeeds, rewardAffinity}` 등), 중복 완료 시 동작(`completed: false`로 반환하는지)을 확정해야 한다
+- **고칠 파일**: `app/api/community/posts/route.ts:57`과 `app/api/chat/messages/route.ts:53` 두 TODO 블록. 지금은 호출부가 통째로 주석 처리돼 있다 — 확정되면 import를 추가하고 주석만 풀면 된다
+- **조심할 것**: 트랜잭션에 넣지 말 것(미션 실패가 글 작성·댓글 저장을 롤백시키면 안 된다). `DAILY_CHAT`은 사용자 발화 저장 시점에만 호출한다(아래 "주의사항" 참고)
+
+### 주의사항 — 재개할 때 잊으면 버그가 된다
+- **친밀도 이중 지급**: 챗봇 친밀도(`grantAffinity(user, CHAT_TURN_AFFINITY)`)는 사용자 발화를 저장하는 시점(`app/api/chat/messages/route.ts`)에만 지급한다. Bedrock 응답을 저장하는 로직을 붙일 때 그 자리에서 또 지급하면 중복이다
+- **미션 완료도 같은 함정**: `DAILY_CHAT` 미션 완료(`completeMission`)도 사용자 발화 저장 시점에만 호출한다. Bedrock 응답 저장 자리에서 또 부르면 중복이다
+
+---
+
 ## 현재 상태
 - 완료: 갤러리 목록 화면, 상세 오버레이, 좋아요 토글, 댓글 작성, 글쓰기 모달, 본인 글 삭제, 친밀도 지급 헬퍼, 챗봇 시스템 프롬프트, 챗봇 메시지 저장 API(GET/POST, 친밀도 지급까지), 챗봇 패널 UI(개발용 `/chat` 라우트)
 - 진행 중: 없음

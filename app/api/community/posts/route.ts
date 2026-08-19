@@ -54,7 +54,14 @@ export async function POST(request: NextRequest) {
       include: { user: { select: { nickname: true, typeCode: true } } },
     })
 
-    // TODO: DAILY_COMMUNITY_POST 완료 처리 — 담당 B와 협의 중
+    // TODO: 미션 완료 연결 — B의 completeMission 대기
+    // 확정 대기: import 경로 / 반환값(void 또는 {completed,rewardSeeds,rewardAffinity}) / 중복 시 completed:false
+    // 트랜잭션에 넣지 말 것. 미션 실패가 글 작성을 롤백시키면 안 된다.
+    // try {
+    //   await completeMission(user.id, "DAILY_COMMUNITY_POST")
+    // } catch (e) {
+    //   console.error("미션 완료 처리 실패", e)
+    // }
 
     const granted = await grantAffinity(user, POST_AFFINITY)
 

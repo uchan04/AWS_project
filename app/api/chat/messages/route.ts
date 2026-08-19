@@ -50,6 +50,14 @@ export async function POST(request: NextRequest) {
 
     const granted = await grantAffinity(user, CHAT_TURN_AFFINITY)
 
+    // TODO: 미션 완료 연결 — B의 completeMission 대기
+    // 사용자 발화 저장 시점에만 호출한다. Bedrock 응답 저장 자리에서 또 부르면 중복이다.
+    // try {
+    //   await completeMission(user.id, "DAILY_CHAT")
+    // } catch (e) {
+    //   console.error("미션 완료 처리 실패", e)
+    // }
+
     return ok({ message, granted })
   } catch (error) {
     if (error instanceof UnauthorizedError) return fail("UNAUTHORIZED", error.message, 401)
