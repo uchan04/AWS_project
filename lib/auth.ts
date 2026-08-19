@@ -1,8 +1,10 @@
 import type { PetSkin, User } from "@prisma/client"
+import { headers } from "next/headers"
+import { CognitoJwtVerifier } from "aws-jwt-verify"
 import { prisma } from "@/lib/prisma"
 
 // 소유자: E. 모든 API Route Handler의 첫 줄에서 호출한다.
-// 현재는 DEV_AUTH_BYPASS 스텁이다. 실제 Cognito 검증은 8/15 마감.
+// 클라이언트는 Cognito 액세스 토큰을 `Authorization: Bearer <token>` 헤더로 보낸다.
 
 export class UnauthorizedError extends Error {
   constructor() {
@@ -11,6 +13,12 @@ export class UnauthorizedError extends Error {
 }
 
 const DEV_COGNITO_SUB = "dev-user-000"
+
+const verifier = CognitoJwtVerifier.create({
+  userPoolId: process.env.COGNITO_USER_POOL_ID ?? "",
+  tokenUse: "access",
+  clientId: process.env.COGNITO_CLIENT_ID ?? "",
+})
 
 /** 미인증이면 UnauthorizedError를 throw한다. 호출부는 401로 변환한다. */
 export async function getCurrentUser(): Promise<User> {
@@ -22,8 +30,20 @@ export async function getCurrentUser(): Promise<User> {
     })
   }
 
-  // TODO(E): aws-jwt-verify로 Cognito 액세스 토큰을 검증하고 sub으로 upsert한다.
-  throw new UnauthorizedError()
+  const authHeader = (await headers()).get("authorization")
+  const token = authHeader?.startsWith("Bearer ") ? authHeader.slice(7) : null
+  if (!token) throw new UnauthorizedError()
+
+  try {
+    const payload = await verifier.verify(token)
+    return prisma.user.upsert({
+      where: { cognitoSub: payload.sub },
+      update: {},
+      create: { cognitoSub: payload.sub },
+    })
+  } catch {
+    throw new UnauthorizedError()
+  }
 }
 
 /**
