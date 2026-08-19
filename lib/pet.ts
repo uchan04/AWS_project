@@ -1,5 +1,5 @@
 import type { Rarity, Slot } from "@prisma/client"
-import { SEED_TO_EXP, evolutionStageFor, expToNextLevel } from "@/lib/types"
+import { SEED_TO_EXP, TRIBE, evolutionStageFor, expToNextLevel } from "@/lib/types"
 
 // 소유자: C. 펫 성장 계산. 순수 함수만 둔다 (DB·요청 객체를 모르게 유지해야 체크 스크립트로 검증된다).
 // 수치 근거는 SPEC.md 5절. 곡선 상수는 lib/types.ts(A 소유)에 있으므로 여기서 다시 정의하지 않는다.
@@ -72,6 +72,25 @@ export function expProgress(level: number, exp: number): number {
   const need = expToNextLevel(Math.max(1, level))
   if (need <= 0) return 0
   return Math.min(1, Math.max(0, exp / need))
+}
+
+// ── 마스코트 이모지 ───────────────────────────────────────────────────────────
+//
+// 이미지 9장이 아직 없어 원판·배지 자리에 동물 이모지를 쓴다 (design.md).
+// 기본 3종은 lib/types.ts의 TRIBE가 정본이라 여기 다시 적지 않는다.
+// 친밀도 전용 캐릭터 3종은 TRIBE에 없으므로 여기만 따로 둔다.
+// 화면 두 곳(PetView·SkinList)이 같이 쓰므로 컴포넌트가 아니라 여기에 둔다.
+
+const AFFINITY_EMOJI: Record<string, string> = { 늑대: "🐺", 삵: "🐆", 판다: "🐼" }
+
+export const ANIMAL_EMOJI: Record<string, string> = {
+  ...Object.fromEntries(Object.values(TRIBE).map((tribe) => [tribe.animal, tribe.emoji])),
+  ...AFFINITY_EMOJI,
+}
+
+/** 이름을 모르는 동물이 와도 화면이 비지 않게 발자국을 쓴다 */
+export function animalEmoji(animal: string): string {
+  return ANIMAL_EMOJI[animal] ?? "🐾"
 }
 
 // ── 치장 목록 정렬 (SPEC.md 5절) ──────────────────────────────────────────────

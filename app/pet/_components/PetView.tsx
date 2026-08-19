@@ -3,8 +3,8 @@
 import { useState } from "react"
 import Link from "next/link"
 import type { TypeCode } from "@prisma/client"
-import { IDLE_CAP_HOURS, IDLE_SEEDS_PER_HOUR, expProgress } from "@/lib/pet"
-import { SEED_TO_EXP, TRIBE, expToNextLevel } from "@/lib/types"
+import { IDLE_CAP_HOURS, IDLE_SEEDS_PER_HOUR, animalEmoji, expProgress } from "@/lib/pet"
+import { SEED_TO_EXP, expToNextLevel } from "@/lib/types"
 import "@/styles/tokens.css"
 import "../pet.css"
 
@@ -42,18 +42,6 @@ export type PetState = {
   typeCode: TypeCode | null
 }
 
-// 친밀도 전용 캐릭터 3종. 기본 3종은 TRIBE가 정본이라 여기 적지 않는다.
-const AFFINITY_EMOJI: Record<string, string> = {
-  늑대: "🐺",
-  삵: "🐆",
-  판다: "🐼",
-}
-
-const ANIMAL_EMOJI: Record<string, string> = {
-  ...Object.fromEntries(Object.values(TRIBE).map((tribe) => [tribe.animal, tribe.emoji])),
-  ...AFFINITY_EMOJI,
-}
-
 export default function PetView({ initial }: { initial: PetState }) {
   const [pet, setPet] = useState(initial)
   const [pending, setPending] = useState(false)
@@ -62,7 +50,7 @@ export default function PetView({ initial }: { initial: PetState }) {
 
   const need = expToNextLevel(pet.level)
   const progress = expProgress(pet.level, pet.exp)
-  const emoji = ANIMAL_EMOJI[pet.animal] ?? "🐾"
+  const emoji = animalEmoji(pet.animal)
   // 단일 형태(친밀도 캐릭터)는 단계 크기를 쓰지 않는다
   const stage = pet.stageCount > 1 ? Math.min(pet.evolutionStage, 3) : 2
 
@@ -241,9 +229,12 @@ export default function PetView({ initial }: { initial: PetState }) {
           ) : null}
         </div>
 
-        {/* 치장 화면으로. design.md의 tertiary(밑줄 링크)다 — primary는 위에 이미 하나 있다 */}
+        {/* design.md의 tertiary(밑줄 링크)다 — primary는 위에 이미 하나 있다 */}
         <Link className="hm-link" href="/pet/cosmetics">
           치장 꾸미기
+        </Link>
+        <Link className="hm-link" href="/pet/skins">
+          캐릭터 바꾸기
         </Link>
       </div>
 
