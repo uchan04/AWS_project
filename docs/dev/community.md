@@ -35,7 +35,9 @@
 - `app/api/community/posts/[id]/route.ts` — DELETE 추가(본인 글 소프트 삭제), GET 응답에 `isOwn` 추가
 
 - `app/chat/_lib/systemPrompt.ts` — 챗봇 "마음 친구" 시스템 프롬프트. 공통 원칙(조언·해결책·진단·평가 금지, 유형명 노출 금지, 자해·죽음 언급 시 안전 예외) + 유형별 페르소나 레이어. `buildSystemPrompt(typeCode, nickname)`을 `app/api/chat/messages/route.ts`가 참조
-- `app/api/chat/messages/route.ts` — GET(대화 이력 조회, `createdAt asc`) + POST(사용자 메시지 저장 + 친밀도 지급). 진단 전(`typeCode` 없음)이면 400 `DIAGNOSIS_REQUIRED`
+- `app/api/chat/messages/route.ts` — GET(대화 이력 조회, 최근 50개, `createdAt asc`) + POST(사용자 메시지 저장 + 친밀도 지급). 진단 전(`typeCode` 없음)이면 400 `NO_TYPE_CODE`
+
+**`app/chat/` 폴더 소유 — 팀 확인 대기.** `CLAUDE.md` 2절의 폴더 소유 표(`app/diagnosis/` A, `app/missions/` B, `app/pet/` C, `app/community/` D, `app/(auth)/` E)에는 `app/chat/`이 없다. `업무분담.md`의 D 항목에 "AI 상담 챗봇"과 `/api/chat/*`가 D 담당으로 명시돼 있어 D 소유로 보고 진행했지만, `CLAUDE.md` 갱신은 전원 합의가 필요하므로 다음 통합 때 팀에 확인해 `CLAUDE.md` 2절에 정식으로 추가해야 한다.
 
 ## 삭제한 파일
 - `app/community/[type]/page.tsx` — URL로 다른 종족 갤러리에 접근 가능했던 예전 동적 라우트. 팀 디자인 시안 반영으로 갤러리 탭이 "전체/나의 종족" 2개로 바뀌면서 제거
@@ -62,7 +64,9 @@
 - 삭제 후 화면 갱신은 페이지 새로고침이 아니라 `next/navigation`의 `useRouter().refresh()`로 처리. 서버 컴포넌트(`page.tsx`)의 데이터만 다시 가져오고 모달이 닫히는 클라이언트 상태는 유지됨
 - **챗봇 메시지 API는 실제 Bedrock 호출 없이 "사용자 메시지 저장" 부분만 이번 세션에 완성.** `POST`가 `buildSystemPrompt()`로 시스템 프롬프트를 실제로 만들어두지만(파일이 아무데도 안 쓰이는 죽은 코드가 되지 않도록), 호출부는 `// TODO: Bedrock 호출...` 주석만 남기고 실제 모델 호출·스트리밍·`ChatRole.ASSISTANT` 저장은 하지 않음. 가짜 어시스턴트 응답을 지어내지 않음(하드코딩 금지 원칙과 동일)
 - **친밀도 지급 시점 판단: "1턴"을 사용자가 메시지를 보낸 시점으로 본다.** Bedrock 응답이 아직 없으므로 사용자 발화 저장 직후 `grantAffinity(user, CHAT_TURN_AFFINITY)`를 호출한다. **주의: 나중에 Bedrock 어시스턴트 응답 저장 로직을 추가할 때 그 자리에서 다시 지급하면 안 된다** — 지급은 이 POST 핸들러 한 곳에서만 일어나야 한다(이중 지급 방지)
-- 챗봇도 진단(`typeCode`)이 있어야 페르소나를 만들 수 있어서, 진단 전 유저가 메시지를 보내면 400 `DIAGNOSIS_REQUIRED`로 막는다
+- 챗봇도 진단(`typeCode`)이 있어야 페르소나를 만들 수 있어서, 진단 전 유저가 메시지를 보내면 400 `NO_TYPE_CODE`로 막는다(처음엔 `DIAGNOSIS_REQUIRED`였다가 이후 지시로 `NO_TYPE_CODE`로 통일)
+- GET 대화 이력은 최근 50개로 제한한다. `orderBy: asc, take: 50`이 아니라 `orderBy: desc, take: 50` 후 배열을 뒤집는 방식을 쓴다 — asc로 그냥 자르면 대화가 길어졌을 때 항상 가장 오래된 50개만 보여서 최근 대화가 안 보이는 버그가 됨
+- `app/chat/_lib/systemPrompt.ts` 파일명은 이전 세션 결정(`persona.ts`에서 `systemPrompt.ts`로 변경, 유지하라는 명시적 지시)을 그대로 따른다. 이후 세션에서 다시 `persona.ts`로 만들라는 요청이 있었지만 이미 커밋된 파일이라 이름을 그대로 두고 내용만 이번 지시에 맞춰 갱신했다
 
 ## 막힌 것
 - 없음 (로컬 DB가 `prisma migrate`로 관리되지 않고 있던 것을 발견해 베이스라인 마이그레이션(`prisma/migrations/00000000000000_init`)을 만들어 해결. 기존 시드 데이터(미션 41개, 펫스킨 6개)는 유지됨. 스키마 담당과 공유 필요)
