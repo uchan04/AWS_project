@@ -5,15 +5,19 @@ import type { TypeCode } from "@prisma/client"
 import { TRIBE } from "@/lib/types"
 import { timeAgo } from "@/app/community/_lib/format"
 import { POST_AFFINITY, COMMENT_AFFINITY, CHAT_TURN_AFFINITY } from "@/app/community/_lib/affinity"
+import { CHAT_STARTERS } from "@/app/chat/_lib/starters"
 
 const NEUTRAL_COLOR = "#9CA3AF"
 
-// 정적 상수다. LLM이 만든 추천이 아니다.
-const SUGGESTIONS = [
-  "오늘 있었던 일을 이야기하고 싶어요",
-  "그냥 마음이 좀 복잡해요",
-  "특별한 일은 없었지만 기록해두고 싶어요",
-]
+// 유형별 6개 중 3개를 무작위로 골라 반환한다. lodash 등 외부 라이브러리를 쓰지 않는다.
+function pickThreeStarters(typeCode: TypeCode): string[] {
+  const shuffled = [...CHAT_STARTERS[typeCode]]
+  for (let i = shuffled.length - 1; i > 0; i--) {
+    const j = Math.floor(Math.random() * (i + 1))
+    ;[shuffled[i], shuffled[j]] = [shuffled[j], shuffled[i]]
+  }
+  return shuffled.slice(0, 3)
+}
 
 type ChatMessageDTO = {
   id: string
@@ -42,6 +46,9 @@ export function ChatPanel({
   const [sending, setSending] = useState(false)
   const [streaming, setStreaming] = useState(false)
   const [streamingText, setStreamingText] = useState("")
+  // 패널이 새로 마운트될 때(재진입 시) 한 번만 뽑는다. 서버에서 섞으면 hydration이 어긋나므로
+  // 로딩 화면 뒤에 가려진 이 값은 클라이언트 렌더에서만 실제로 쓰인다(아래 loading 분기 참고).
+  const [starters] = useState(() => (typeCode ? pickThreeStarters(typeCode) : []))
   const listEndRef = useRef<HTMLDivElement>(null)
 
   const accentColor = typeCode ? TRIBE[typeCode].colorHex : NEUTRAL_COLOR
@@ -219,7 +226,7 @@ export function ChatPanel({
               </div>
               {typeCode && (
                 <div className="flex flex-col gap-2">
-                  {SUGGESTIONS.map((text) => (
+                  {starters.map((text) => (
                     <button
                       key={text}
                       type="button"
