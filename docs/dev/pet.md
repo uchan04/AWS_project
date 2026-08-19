@@ -1,13 +1,13 @@
-# 펫·가챠 개발 문서 (담당 C)
+# 펫 개발 문서 (담당 C)
 
 세션이 초기화되면 `docs/STATUS.md` 다음에 이 문서를 읽는다. 작업을 끝낼 때마다 이 문서와 `docs/STATUS.md`를 갱신하고 `docs:` 커밋으로 남긴다.
 명세는 `SPEC.md` 5·6절, 규칙은 `CLAUDE.md`.
 
 ## 현재 상태
 - 완료: `lib/reward.ts` 골격 + 자체 체크, `SPEC.md` 6절/`CLAUDE.md` 대조 검증
-- 진행 중: 없음
-- 미착수: 펫 화면·진화, 방치형 획득, 치장 착용, 친밀도 캐릭터 구매
-- **가챠 = 보류 (2026-08-19). 컷이 아니라 "나중에 구현"이다.** 우선순위를 뒤로 미뤘을 뿐 범위에서 빠지지 않았다. 펫 화면·방치형·치장을 먼저 끝내고 여유가 생기면 착수한다
+- 진행 중: 펫 화면 (`feat/pet`)
+- 미착수: 방치형 획득, 치장 착용, 친밀도 캐릭터 구매
+- 가챠는 코드에서 제거했고 나중에 재구현한다 (아래 절 참고). 컷 아님
 
 ## 구현한 파일
 - `lib/reward.ts` — `calculateReward(skin, base)`, `capAffinity()`
@@ -22,16 +22,30 @@
 ## 막힌 것
 - 펫·치장 이미지 미제작. `imageKey`는 `prisma/seed/items.ts`에 미리 고정해 뒀다
 
-## 커밋하지 않은 작업 트리 변경 (2026-08-19 시점)
+## 가챠 — 제거 완료, 나중에 재구현 (`7b0bcd0`)
 
-가챠를 **제거하는** 방향의 수정이 작업 트리에 남아 있으나 **커밋하지 않았다.** 가챠는 나중에 구현하기로 했으므로 이 변경은 보류 상태다. 다음 세션에서 판단해서 되돌리거나(`git checkout -- <파일>`) 확정한다.
+컷이 아니다. 우선순위를 뒤로 미뤄 코드에서 걷어냈고, 펫 화면·방치형·치장을 끝낸 뒤 다시 넣는다. 되살릴 때 필요한 것:
 
-- `prisma/schema.prisma` — `GachaPull` 모델, `User.heroPity`/`legendPity`, `CosmeticItem.pulls` 삭제
-- `lib/reward.ts` — `DUPLICATE_REFUND` 상수 삭제
-- `prisma/seed/items.ts` — `GACHA_COSMETICS` → `SHOP_COSMETICS` 이름 변경
-- `SPEC.md` 5절, `업무분담.md`, `docs/STATUS.md` — 가챠 절 삭제·"컷" 표기
+- `prisma/schema.prisma` — `GachaPull` 모델, `User.heroPity`/`legendPity`, `CosmeticItem.pulls`
+- `lib/reward.ts` — `DUPLICATE_REFUND`(일반 2 / 희귀 5 / 영웅 20 / 전설 50)
+- `SPEC.md` 5절 — 확률(전설 0.6 / 영웅 9.4 / 희귀 40 / 일반 50), 천장(영웅 10, 전설 80), 중복 환급
+- 중복 획득 시 환급 처리가 없으면 `UserCosmetic` 유니크 제약 때문에 500이 난다. 재구현 때 이것부터 넣는다
 
-**가챠를 되살리려면 위 4개 파일을 되돌리면 된다.** `docs/인수인계.md`는 이미 원래대로(가챠 포함) 되돌려 놨다.
+`git show 7b0bcd0` 로 제거한 내용 전체를 되돌려 볼 수 있다. `docs/인수인계.md`는 가챠 서술을 그대로 남겨 뒀다.
+
+**주의**: D가 `feat/community`에 올린 마이그레이션에는 `GachaPull`·`heroPity`가 아직 들어 있다. 그 마이그레이션은 폐기 대상이다 (`docs/STATUS.md` "통합 시 주의" 참고).
+
+## TypeCode ↔ 종족 매핑 변경 (`6fecded`)
+
+A의 `feat/diagnosis`에서 매핑이 맞바뀌었고 8/19 팀 확인으로 의도된 변경이다.
+
+| TypeCode | 과 | 동물 | 컬러 |
+|---|---|---|---|
+| `HEALTH_EMOTION` | 개과 | 여우 | 앰버 오렌지 |
+| `INDEPENDENT_LOW_INCOME` | 고양잇과 | 고양이 | 라벤더 퍼플 |
+| `FAMILY_LIVING` | 곰과 | 곰 | 세이지 그린 |
+
+`prisma/seed/items.ts`는 이 새 매핑으로 맞춰 놨다. **`main`의 `SPEC.md` 2절 표와 `lib/types.ts`는 아직 옛 매핑이라 A 브랜치가 머지되기 전까지 서로 어긋난다.** 펫 화면에서 종족·컬러를 표시할 때는 `lib/types.ts`를 쓰되, A 머지 후 값이 뒤바뀌지 않는지 반드시 다시 확인한다.
 
 ## 검증한 것
 - `lib/reward.ts`를 `SPEC.md` 6절, `CLAUDE.md` 1절과 한 줄씩 대조함
@@ -44,4 +58,4 @@
 ## 다음 할 일
 - 펫 화면(레벨·경험치·진화 연출)부터 착수 — DB 없이도 `DEV_AUTH_BYPASS`로 화면 작업 가능
 - 그다음 방치형 자동 획득 → 치장 착용 → 친밀도 캐릭터 구매
-- 가챠는 위 항목이 끝난 뒤에 착수 (보류 중)
+- 가챠 재구현은 위 항목이 전부 끝난 뒤
