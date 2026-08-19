@@ -54,20 +54,26 @@
 - `User.heroPity` / `User.legendPity` 컬럼이 남아 있다. 같은 커밋에서 제거했다
 - A의 `SubTypeCode`·`indicators`가 빠져 있다 (`main` 시점 스키마로 만들어졌다)
 
-**실행 상태:** `main`에는 `prisma/migrations/`가 아예 없으므로 지금 `main`에서 지울 것은 없다. 이 파일은 `feat/community` 머지 시점에 들어오려 하므로, 그때 커밋에 포함시키지 않고 드롭한다.
+**이 문서는 머지 시 `origin/main` 버전을 취한다.** 로컬 사본이 뒤처졌다. `origin/main`은 같은 결정을 "차단 사항 4번"으로 이미 기록해 뒀다.
+
+**실행 상태 (2026-08-19 재확인):** `origin/main`에 이제 E가 만든 실제 마이그레이션 2개가 있다 — `20260819061857_init/`, `20260819080703_add_subtype/`. D의 `00000000000000_init/`은 이것으로 **대체됐다.** 머지하면 init이 두 개가 되어 `migrate deploy`가 깨진다.
 
 ```bash
-# feat/community 머지 시 (머지 담당이 실행)
-git merge feat/community          # 이 파일이 추가됨
-git rm -r --cached prisma/migrations/00000000000000_init
-rm -rf prisma/migrations/00000000000000_init
+# D가 자기 브랜치에서 실행 (origin/main 차단 사항 4번)
+git rm -r prisma/migrations/00000000000000_init
+git pull origin main   # main의 마이그레이션 2개를 받는다
 ```
 
 원본은 `18640a7`에 영구 보존되므로 필요하면 `git show 18640a7` 로 언제든 되돌려 본다.
 
 **D가 로컬에서 해야 할 것:** D의 로컬 DB `_prisma_migrations` 테이블에 이 마이그레이션이 적용됨으로 기록돼 있다. 파일이 사라지면 다음 `prisma migrate` 실행이 "폴더에 없는 마이그레이션" 오류를 낸다. **로컬** DB에서 해당 행을 지우거나, 초기화가 필요하면 CLAUDE.md 5절대로 **팀에 먼저 알린 뒤** 로컬에서만 초기화한다. 공유 RDS에는 `migrate reset`을 절대 쓰지 않는다.
 
-**진짜 init은 누가 만드나:** CLAUDE.md 5절대로 스키마 담당 1인(E)이 A·C·D 스키마를 모두 합친 뒤 `npx prisma migrate dev`를 **한 번만** 실행해 생성한다. 그 전까지 `main`에는 마이그레이션이 없으므로 `npm run db:push`(= `prisma migrate deploy`)로 적용할 이력이 없다.
+**진짜 init은 이미 생겼다:** E가 `20260819061857_init`을 생성해 RDS에 적용했다. 나머지 4인은 `git pull && npx prisma migrate deploy && npx prisma generate`만 실행한다 (CLAUDE.md 5절).
+
+**여기서 새 문제가 생겼다 — 가챠 스키마 드리프트 (C 확인, 미해결):** `origin/main`의 `schema.prisma`와 적용된 init 마이그레이션에는 `GachaPull` 테이블·`User.heroPity`·`User.legendPity`가 **아직 살아 있다.** C가 `7b0bcd0`에서 스키마에서 제거한 것들이다. C의 작업을 `main`에 머지하면 스키마에는 없고 실제 RDS에는 있는 상태가 되어, 다음 `migrate dev`가 DROP 마이그레이션을 만들어 낸다. 가챠는 "나중에 재구현"이라 테이블을 지금 지울 이유가 없으므로 **머지 전에 팀 결정이 필요하다.** 선택지는 아래 두 개다.
+
+1. C의 스키마 제거분을 머지하지 않고 `GachaPull`을 스키마에 되살린다 (테이블을 그대로 두고 코드만 안 쓴다). 추가 마이그레이션 없음
+2. C의 제거분을 머지하고 DROP 마이그레이션을 하나 만든다. 재구현 때 다시 CREATE 해야 한다
 
 ## 전체 차단 사항
 
