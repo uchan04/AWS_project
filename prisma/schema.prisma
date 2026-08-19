@@ -10,10 +10,25 @@ datasource db {
   url      = env("DATABASE_URL")
 }
 
+// 사용자에게 보이는 대분류. 화면에는 유형 이름을 쓰지 않고 동물·종족만 보여준다.
 enum TypeCode {
-  INDEPENDENT_LOW_INCOME // 독립거주-저소득형 / 개과 / 여우
-  HEALTH_EMOTION // 건강·정서취약형 / 고양잇과 / 고양이
+  INDEPENDENT_LOW_INCOME // 독립거주-저소득형 / 고양잇과 / 고양이
+  HEALTH_EMOTION // 건강·정서취약형 / 개과 / 여우
   FAMILY_LIVING // 가족동거형 / 곰과 / 곰
+}
+
+// 관리자 전용 세부유형. 연구보고서 9유형에서 경계선지능청년을 뺀 8개다.
+// (IQ 71~84는 자기보고로 측정할 수 없고 묻는 것 자체가 낙인이다)
+// 절대 화면에 노출하지 않는다. 관리자 화면은 TypeCode × SubTypeCode 교차표로 본다.
+enum SubTypeCode {
+  AFTERCARE_YOUTH // 자립준비청년
+  FAMILY_CAREGIVER // 가족돌봄청년
+  MIGRANT_YOUTH // 지역이주청년
+  HEALTH_FRAGILE // 건강취약형
+  DEBT_INDEPENDENT // 독립생계채무형
+  FINANCIAL_FRAGILE // 금융취약청년
+  JOBLESS_POOR // 미취업빈곤형
+  FAMILY_DEPENDENT // 가족의존형
 }
 
 enum Adjective {
@@ -65,6 +80,9 @@ model User {
   typeCode  TypeCode?
   adjective Adjective?
 
+  // 관리자 통계용. API 응답과 화면에 절대 내보내지 않는다.
+  subTypeCode SubTypeCode?
+
   level          Int @default(1)
   exp            Int @default(0)
   evolutionStage Int @default(1) // 1~3
@@ -106,13 +124,15 @@ model User {
 }
 
 model DiagnosisSession {
-  id          String    @id @default(cuid())
+  id          String       @id @default(cuid())
   userId      String
-  answers     Json // [{ questionCode, choiceCode, axis, weight }]
+  answers     Json // [{ questionCode, choiceCode }] — 조기 종료 때문에 문항 수가 사용자마다 다르다
+  indicators  Json? // 지표 14개. { ALONE: true, LOW_INCOME: false, ... }
   typeCode    TypeCode
+  subTypeCode SubTypeCode?
   adjective   Adjective
   reasonText  String? // LLM이 생성한 근거 3줄
-  completedAt DateTime  @default(now())
+  completedAt DateTime     @default(now())
 
   user User @relation(fields: [userId], references: [id])
 
