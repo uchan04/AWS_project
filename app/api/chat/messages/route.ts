@@ -17,7 +17,7 @@ export async function GET(_request: NextRequest) {
       take: 50,
     })
 
-    return ok({ messages: recent.reverse() })
+    return ok({ messages: recent.reverse(), affinityToday: user.affinityToday })
   } catch (error) {
     if (error instanceof UnauthorizedError) return fail("UNAUTHORIZED", error.message, 401)
     throw error
