@@ -9,12 +9,15 @@ export async function GET(_request: NextRequest) {
   try {
     const user = await getCurrentUser()
 
-    const messages = await prisma.chatMessage.findMany({
+    // 최근 50개만 노출한다. desc + take로 최신 50개를 뽑은 뒤 표시 순서(오름차순)로 뒤집는다 —
+    // asc + take만 쓰면 대화가 길어졌을 때 항상 "가장 오래된" 50개만 보여 최근 대화가 안 보인다.
+    const recent = await prisma.chatMessage.findMany({
       where: { userId: user.id },
-      orderBy: { createdAt: "asc" },
+      orderBy: { createdAt: "desc" },
+      take: 50,
     })
 
-    return ok({ messages })
+    return ok({ messages: recent.reverse() })
   } catch (error) {
     if (error instanceof UnauthorizedError) return fail("UNAUTHORIZED", error.message, 401)
     throw error
@@ -27,7 +30,7 @@ export async function POST(request: NextRequest) {
     const user = await getCurrentUserWithSkin()
 
     if (!user.typeCode) {
-      return fail("DIAGNOSIS_REQUIRED", "진단을 먼저 완료해주세요", 400)
+      return fail("NO_TYPE_CODE", "진단을 먼저 완료해주세요", 400)
     }
 
     const payload = await request.json().catch(() => null)
