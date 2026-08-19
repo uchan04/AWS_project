@@ -4,91 +4,46 @@
 명세는 `SPEC.md` 10절, 규칙은 `CLAUDE.md`.
 
 ## 현재 상태
-- 완료: Next.js 프로젝트, Prisma 6 + 스키마, `lib/auth.ts` 스텁, `lib/prisma.ts`, `lib/api.ts`, `.env.example`
-- 진행 중: 없음
-- 미착수: Amplify, RDS, Cognito, Bedrock 확인, S3 + CloudFront, CloudWatch + SNS, 로그인 화면, 희망 문구 배너, 발표 자료
+- 완료: Next.js 프로젝트, Prisma 6 + 스키마, `lib/auth.ts`(실 Cognito 검증), `lib/prisma.ts`, `lib/api.ts`, `.env.example`, RDS, Cognito, S3+CloudFront, CloudWatch+SNS, Bedrock 확인, 하단 탭 내비게이션, Amplify 앱 생성(환경변수 포함)
+- 진행 중: Amplify GitHub 연동 (브라우저 OAuth 필요 — 아래 참고)
+- 미착수: 로그인 화면, 희망 문구 배너, 발표 자료
 
 ## 구현한 파일
-- `lib/auth.ts` — `getCurrentUser()`. 현재 `DEV_AUTH_BYPASS=true`면 고정 유저를 upsert해 반환하는 스텁
+- `lib/auth.ts` — `getCurrentUser()`. `DEV_AUTH_BYPASS=true`면 고정 유저 upsert 스텁, 아니면 `Authorization: Bearer <token>` 헤더를 `aws-jwt-verify`로 검증 후 `sub`으로 upsert
 - `lib/prisma.ts` — PrismaClient 싱글턴 (hot reload 커넥션 고갈 방지)
 - `lib/api.ts` — `ok()` / `fail()` 응답 헬퍼
 - `prisma/seed.ts` — 시드 엔트리
+- `app/components/BottomNav.tsx` + `app/layout.tsx` — 하단 탭 5개(진단결과/미션/펫/커뮤니티/챗봇). **동결**, 다른 담당자는 이 파일들을 고치지 않는다
+- `app/globals.css` — 종족 컬러 토큰 3종(`--color-canine` `--color-feline` `--color-ursine`) 추가
 
 ## 결정한 것과 이유
 - **Prisma는 6.x로 고정한다.** 7은 `prisma.config.ts` + driver adapter가 필수여서 설정 실패 지점이 늘고 참고 자료도 적다
 - `DEV_AUTH_BYPASS`는 배포 환경에서 절대 true로 두지 않는다
+- **RDS는 Publicly Accessible=true, SG는 5432를 0.0.0.0/0에 개방했다.** 스펙 초안의 "퍼블릭 액세스 차단"과 충돌했다 — 팀원 5명이 로컬 PC에서 직접 `DATABASE_URL`로 접속해 개발해야 하는데 비공개로 두면 물리적으로 접속이 불가능하다. EC2/bastion/VPN은 이미 배제한 선택지였다. 강력한 마스터 비밀번호로만 방어한다. **발표 전 반드시 팀에서 재검토할 것** — 데모 종료 후에는 잠가야 한다
+- Cognito 인증 코드 비활성(스펙대로), 비밀번호 정책은 최소 8자만 강제(팀원 마찰 최소화)
+- Amplify 환경변수에 `DATABASE_URL`(마스터 비밀번호 포함)을 평문으로 등록했다. Secrets Manager는 팀이 이미 배제한 선택지라 `.env.example`에 정한 방식(Amplify 환경변수가 유일한 비밀값 저장소)을 그대로 따른다
+- Amplify 환경변수에는 `AWS_` 프리픽스를 쓸 수 없다(예약어). `AWS_REGION`은 Lambda 런타임이 자동 주입하므로 별도 등록 불필요
 
 ## 막힌 것
-- RDS 미생성. `DATABASE_URL`이 비어 있어 `prisma migrate dev`를 아직 실행하지 못했다
+- **Amplify ↔ GitHub 연동은 CLI로 끝까지 할 수 없다.** GitHub App 설치는 브라우저 OAuth 동의가 필요해 계정 소유자가 직접 눌러야 한다. 아래 "Amplify GitHub 연동" 절차대로 진행하면 5분 내 끝난다
 
 ## 다음 할 일
-1. RDS Postgres `db.t4g.micro` 생성 (퍼블릭 액세스 차단, 자동 백업 7일) → `DATABASE_URL` 채우고 `npx prisma migrate dev --name init` → 마이그레이션 커밋
-2. GitHub 레포 연결 (아래 "GitHub 레포 연결" 참고) + Amplify Hosting 배포. Amplify 환경변수에 `.env.example`의 키 전부 등록
-3. Cognito 사용자 풀 (이메일+비밀번호, 인증 코드 비활성) → `lib/auth.ts`의 TODO를 `aws-jwt-verify`로 구현
+1. **(사용자 직접) Amplify GitHub 연동** — 아래 절차 참고. 끝나면 `main` push 시 자동 배포된다
+2. Cognito 회원가입 실패 시 미인증 사용자 리다이렉트 규칙 확정: API는 401 + `{ error: { code: "UNAUTHORIZED" } }`, 화면은 `/login`으로 리다이렉트 (E가 로그인 화면 만들 때 함께 정리)
+3. 로그인·회원가입·로그아웃 화면 (`app/(auth)/`)
+4. 희망 문구 배너 (상수 3~5개)
+5. 8/20부터 발표 자료 착수
 
-4. `app/layout.tsx`에 하단 탭 내비게이션(미션 / 펫 / 커뮤니티 / 챗봇 / 진단 결과)을 넣고 동결한다. 5인이 각자 자기 탭을 추가하면 이 파일에서 충돌한다. **경로는 아직 없어도 링크를 먼저 박아두고**, 각 담당이 자기 폴더에 `page.tsx`를 만들면 자동으로 연결된다
-5. 미인증 처리 규칙을 정해 전원에게 알린다. `getCurrentUser()`가 throw했을 때 API는 401 + `{ error: { code: "UNAUTHORIZED" } }`, 화면은 `/login`으로 리다이렉트. 각자 다르게 처리하면 화면마다 동작이 달라진다
+## Amplify GitHub 연동 (사용자가 직접 해야 하는 단계)
 
-## GitHub 레포 연결
+CLI로 앱(`welli`, appId `d36bhb2dnkr0oj`)과 환경변수까지는 이미 만들어 놓았다. GitHub 저장소 연결만 남았다.
 
-원격은 이미 등록되어 있다(`origin` = `https://github.com/uchan04/AWS_project.git`). 레포는 비어 있으므로 아래 "경우 2"에 해당한다.
+1. [AWS Amplify 콘솔](https://us-east-1.console.aws.amazon.com/amplify/apps/d36bhb2dnkr0oj)에서 `welli` 앱을 연다
+2. "Hosting" → "Connect branch" (또는 "Deploy without Git provider"가 아니라 GitHub 선택)
+3. GitHub로 로그인 → "AWS Amplify" GitHub App 설치를 승인 → 저장소 `uchan04/AWS_project`, 브랜치 `main` 선택
+4. 빌드 설정은 Next.js 자동 감지 기본값 그대로 저장
+5. 첫 배포가 끝나면 `https://main.d36bhb2dnkr0oj.amplifyapp.com` (또는 표시되는 도메인)이 라이브 URL이다
 
-로컬 저장소는 이미 초기화되어 있고 첫 커밋(`chore: 프로젝트 초기 설정`)이 들어가 있다. 원격만 붙이면 된다.
+## GitHub 레포·브랜치
 
-**먼저 커밋 작성자를 본인으로 바꾼다.** 지금은 임시값(`isol-service` / `dev@example.com`)으로 커밋되어 있다.
-
-```bash
-git config --global user.name "본인 이름"
-git config --global user.email "본인 GitHub 이메일"
-git commit --amend --reset-author --no-edit
-```
-
-### 경우 1 — GitHub 레포를 아직 만들지 않았다
-
-GitHub에서 새 레포를 만들 때 **README·.gitignore·라이선스를 추가하지 않는다**(빈 레포). 그다음:
-
-```bash
-git remote add origin https://github.com/<계정>/<레포>.git
-git branch -M main
-git push -u origin main
-```
-
-### 경우 2 — 이미 만들어둔 레포가 있는데 비어 있다
-
-경우 1과 동일하다. 커밋이 하나도 없으면 그냥 push된다.
-
-### 경우 3 — 이미 만들어둔 레포에 커밋이 있다 (README 등)
-
-원격 내용을 가져와 합친다. 히스토리가 서로 무관하므로 옵션이 필요하다.
-
-```bash
-git remote add origin https://github.com/<계정>/<레포>.git
-git fetch origin
-git merge origin/main --allow-unrelated-histories
-```
-
-`README.md`나 `.gitignore`에서 충돌이 나면 **이 저장소 쪽 내용을 채택한다**(원격에 있던 것은 GitHub이 자동 생성한 껍데기다). 해결 후:
-
-```bash
-git add . && git commit && git push -u origin main
-```
-
-> 원격 히스토리를 버리고 덮어쓰는 방법(`git push --force`)도 있지만, 다른 사람이 이미 그 레포를 clone했거나 커밋을 올렸다면 그 작업이 복구 불가능하게 사라진다. 팀 전원이 아직 아무것도 올리지 않은 것을 확인한 경우에만 쓴다.
-
-### 경우 4 — 이미 clone해둔 로컬 폴더가 따로 있다
-
-`git merge`로 합치려 하지 말고 파일을 옮기는 쪽이 간단하다. clone한 폴더로 이 프로젝트의 파일 전부(`.git` 제외)를 복사하고, 그쪽에서 `npm install` 후 커밋한다.
-
-### 연결 후
-
-4명에게 알린다. 각자:
-
-```bash
-git clone <레포 URL>
-cd <레포>
-npm install
-cp .env.example .env   # DATABASE_URL을 E에게 받아 채운다
-git checkout -b feat/<자기 브랜치>
-```
-
-브랜치 5개(`feat/diagnosis` `feat/missions` `feat/pet` `feat/community` `feat/infra`)는 각자 만들어도 되고 E가 미리 만들어 push해도 된다.
+레포 연결과 브랜치 5개(`feat/diagnosis` `feat/missions` `feat/pet` `feat/community` `feat/infra`) 생성이 끝났다. `DATABASE_URL` 등 실제 값이 든 `.env`는 커밋하지 않으므로, 팀원에게는 E가 개별적으로 값을 공유한다.
