@@ -25,10 +25,10 @@ D 쪽 기능 구현은 끝났고, 지금은 `completeMission()`(B) 외부 결과
 - **고칠 파일**: `prisma/schema.prisma`(전원 합의) 변경 후 `app/community/_lib/gallery.ts`의 `galleryTypeFilter()`와 `canWriteToGallery()` 두 함수만 고치면 된다 — ALL 관련 로직을 전부 이 파일에 모아둔 설계라 나머지(목록 API, 글쓰기 API, `WriteModal`)는 자동으로 맞춰진다
 - **조심할 것**: 같은 파일의 `canAccessGallery()`도 접근 제어를 담당하니 같이 재검토할 것
 
-### 5. LLM 글쓰기 주제 추천 — Bedrock 대기 (SPEC 8절)
-- **필요한 것**: 1번과 동일 — AWS 계정 / `BEDROCK_MODEL_ID`
+### 5. LLM 글쓰기 주제 추천 (SPEC 8절)
+- **필요한 것**: AWS 계정 / `BEDROCK_MODEL_ID`는 확보됐다(2026-08-19). 더 이상 외부 요인에 막혀 있지 않고, 아직 구현하지 않았을 뿐이다 — 2026-08-19 세션(추천 문구 유형별 분리 작업)은 이 항목이 아니다. 다음 D 세션에서 착수
 - **고칠 파일**: `app/community/_components/WriteModal.tsx:90`의 TODO 자리
-- **조심할 것**: 가짜 추천 문구를 하드코딩하지 말 것. SPEC 8절은 "3가지 이상 추천"을 요구하며 실제 LLM 호출이어야 한다
+- **조심할 것**: 가짜 추천 문구를 하드코딩하지 말 것. SPEC 8절은 "3가지 이상 추천"을 요구하며 실제 LLM 호출이어야 한다. `app/api/chat/stream/route.ts`의 `ConverseStreamCommand` 호출 패턴을 참고할 것(단, 이건 스트리밍이 필요 없는 단발 호출이라 `ConverseCommand`가 더 맞을 수 있음)
 
 ### 6. `completeMission()` — B 작업 중
 - **필요한 것**: B가 `completeMission(userId, code)`의 모듈 경로, 반환값(`void` 또는 `{completed, rewardSeeds, rewardAffinity}` 등), 중복 완료 시 동작(`completed: false`로 반환하는지)을 확정해야 한다
@@ -42,7 +42,7 @@ D 쪽 기능 구현은 끝났고, 지금은 `completeMission()`(B) 외부 결과
 ---
 
 ## 현재 상태
-- 완료: 갤러리 목록 화면, 상세 오버레이, 좋아요 토글, 댓글 작성, 글쓰기 모달, 본인 글 삭제, 친밀도 지급 헬퍼, 챗봇 시스템 프롬프트, 챗봇 메시지 저장 API(GET/POST, 친밀도 지급까지), 챗봇 패널 UI(개발용 `/chat` 라우트), **Bedrock 스트리밍 응답 연결(`POST /api/chat/stream`), 타이핑 인디케이터**
+- 완료: 갤러리 목록 화면, 상세 오버레이, 좋아요 토글, 댓글 작성, 글쓰기 모달, 본인 글 삭제, 친밀도 지급 헬퍼, 챗봇 시스템 프롬프트, 챗봇 메시지 저장 API(GET/POST, 친밀도 지급까지), 챗봇 패널 UI(개발용 `/chat` 라우트), Bedrock 스트리밍 응답 연결(`POST /api/chat/stream`), 타이핑 인디케이터, **유형별 챗봇 추천 문구 6개씩·3개 랜덤 노출(LLM 아님, 정적 상수)**
 - 진행 중: 없음
 - 미착수: 본인 댓글 삭제, LLM 주제 추천 실제 연동, 이미지 업로드, `ChatPanel`을 `layout.tsx`의 전역 오버레이로 이전(E 대기)
 - 보류(다음 세션 이전 필요 조건): 전체 탭 글쓰기(스키마에 ALL 값 없음), LLM 주제 추천(SPEC 8절, 이번 세션 범위 아님), 글쓰기 시 일일 미션(`DAILY_COMMUNITY_POST`) 완료 처리(B와 협의 필요), `ChatPanel`의 `layout.tsx` 이전(E 소유 파일이라 D가 직접 못 건드림) — 전부 아래 "결정한 것과 이유"에 근거 남김
@@ -73,9 +73,10 @@ D 쪽 기능 구현은 끝났고, 지금은 `completeMission()`(B) 외부 결과
 - `app/api/community/posts/[id]/route.ts` — DELETE 추가(본인 글 소프트 삭제), GET 응답에 `isOwn` 추가
 
 - `app/chat/_lib/systemPrompt.ts` — 챗봇 "마음 친구" 시스템 프롬프트. 공통 원칙(조언·해결책·진단·평가 금지, 유형명 노출 금지, 자해·죽음 언급 시 안전 예외) + 유형별 페르소나 레이어. `buildSystemPrompt(typeCode, nickname)`을 `app/api/chat/messages/route.ts`와 `app/api/chat/stream/route.ts`가 참조
+- `app/chat/_lib/starters.ts` — **이번 세션에 추가.** `CHAT_STARTERS: Record<TypeCode, string[]>`. 빈 화면 추천 문구를 유형별 6개씩 정적 상수로 둔다. `TypeCode`는 `@prisma/client`에서 그대로 import(새로 정의하지 않음). LLM 호출 없음
 - `app/api/chat/messages/route.ts` — GET(대화 이력 조회, 최근 50개, `createdAt asc`, 이제 `affinityToday`도 응답에 포함) + POST(사용자 메시지 저장 + 친밀도 지급). 진단 전(`typeCode` 없음)이면 400 `NO_TYPE_CODE`
 - `app/api/chat/stream/route.ts` — **이번 세션에 추가.** POST. 사용자 메시지 저장 이후 클라이언트가 이어서 호출한다. 최근 20개 대화 이력을 Converse 형식으로 변환해 `ConverseStreamCommand`로 호출하고, 토큰을 `text/plain` 스트림으로 그대로 흘린다. 스트림이 `messageStop`까지 정상 종료됐고 내용이 비어있지 않을 때만 `ChatRole.ASSISTANT`로 저장한다. 메시지 저장·친밀도 지급·미션 완료는 이 라우트에서 하지 않는다(모두 `app/api/chat/messages/route.ts` 소관, 이중 지급 방지). `BEDROCK_MODEL_ID`가 없으면 500 `BEDROCK_NOT_CONFIGURED`로 막는다(클라이언트는 `bedrockConfigured`가 false면 애초에 이 라우트를 호출하지 않는다)
-- `app/chat/_components/ChatPanel.tsx` — 우측 460px 슬라이드 패널(클라이언트). 헤더(아바타·진행 바·ℹ 친밀도 안내·✕), 빈 상태(인사말 + 정적 추천 문구 3개), 메시지 목록(USER 우측 컬러 말풍선 / ASSISTANT 좌측 말풍선), 입력창(Enter 전송·Shift+Enter 줄바꿈). `BEDROCK_MODEL_ID` 없을 때만 개발 모드 배너 노출. `onClose`는 선택 prop — 없으면 ✕·배경 클릭 닫기를 렌더링하지 않음. **이번 세션에 수정**: 사용자 메시지 저장 성공 직후 `streamAssistantReply()`를 호출해 `/api/chat/stream`을 스트리밍으로 소비하도록 연결. 첫 토큰이 오기 전에는 점 3개짜리 타이핑 인디케이터를, 토큰이 오면 그 자리에서 텍스트가 자라나는 말풍선을 보여준다. 스트림이 끝까지 정상 수신됐을 때만 로컬 `messages`에 반영하고(서버 저장 조건과 동일), 스트리밍 중에는 입력창·전송 버튼을 비활성화해 중복 요청을 막는다
+- `app/chat/_components/ChatPanel.tsx` — 우측 460px 슬라이드 패널(클라이언트). 헤더(아바타·진행 바·ℹ 친밀도 안내·✕), 빈 상태(인사말 + 유형별 추천 문구 3개), 메시지 목록(USER 우측 컬러 말풍선 / ASSISTANT 좌측 말풍선), 입력창(Enter 전송·Shift+Enter 줄바꿈). `BEDROCK_MODEL_ID` 없을 때만 개발 모드 배너 노출. `onClose`는 선택 prop — 없으면 ✕·배경 클릭 닫기를 렌더링하지 않음. 이전 세션에 사용자 메시지 저장 성공 직후 `streamAssistantReply()`를 호출해 `/api/chat/stream`을 스트리밍으로 소비하도록 연결(첫 토큰 전엔 타이핑 인디케이터, 이후엔 텍스트가 자라나는 말풍선, 스트리밍 중 입력창·전송 버튼 비활성화)했다. **이번 세션에 수정**: 하드코딩된 `SUGGESTIONS` 배열을 지우고, `CHAT_STARTERS[typeCode]` 6개 중 3개를 뽑는 `pickThreeStarters()`(Fisher-Yates, 외부 라이브러리 없이 직접 구현)를 추가. 결과는 `useState(() => typeCode ? pickThreeStarters(typeCode) : [])` 초기화 함수 안에서 한 번만 계산해 `starters` state로 보관 — 리렌더마다 다시 섞이지 않고, 컴포넌트가 새로 마운트될 때(패널 재진입)만 새로 뽑힌다
 - `app/chat/page.tsx` — 개발 확인용 라우트. 서버 컴포넌트에서 `getCurrentUser()`로 `nickname`/`typeCode`를, `process.env.BEDROCK_MODEL_ID`로 `bedrockConfigured`를 읽어 `ChatPanel`에 props로 넘김. `onClose` 없이 렌더링. `export const dynamic = "force-dynamic"` 필수(아래 이유 참고)
 
 **`app/chat/` 폴더 소유 — 팀 확인 대기.** `CLAUDE.md` 2절의 폴더 소유 표(`app/diagnosis/` A, `app/missions/` B, `app/pet/` C, `app/community/` D, `app/(auth)/` E)에는 `app/chat/`이 없다. `업무분담.md`의 D 항목에 "AI 상담 챗봇"과 `/api/chat/*`가 D 담당으로 명시돼 있어 D 소유로 보고 진행했지만, `CLAUDE.md` 갱신은 전원 합의가 필요하므로 다음 통합 때 팀에 확인해 `CLAUDE.md` 2절에 정식으로 추가해야 한다.
@@ -119,6 +120,10 @@ D 쪽 기능 구현은 끝났고, 지금은 `completeMission()`(B) 외부 결과
 - 친밀도 진행 바 갱신은 `setAffinityToday(prev => prev + granted)`만 쓴다. `granted`는 서버가 이미 상한을 적용해 계산한 값이라 `prev + granted`는 수학적으로 100을 넘을 수 없다 — 클라이언트에서 별도로 `Math.min(100, ...)`을 계산하지 않는다(지시 그대로)
 - 추천 문구 클릭은 바로 전송하지 않고 입력창을 채우기만 한다. 오탈자·오클릭으로 원치 않는 메시지가 바로 나가는 걸 막기 위함(전송 여부는 사용자가 최종 확인)
 - **(지난 세션) 타이핑 인디케이터는 만들지 않았었다.** Bedrock 미연결 상태에서 점 3개가 계속 도는 게 더 혼란스럽다는 지시대로였다. 이번 세션에 Bedrock 연결과 함께 추가했다 — 첫 토큰이 오기 전까지만 점 3개(`animate-bounce`, `globals.css` 수정 없이 Tailwind 기본 클래스 + 인라인 `animationDelay`만 사용), 토큰이 오면 그 자리에서 텍스트로 교체된다
+- **(지난 세션) 빈 화면 추천 문구는 하드코딩된 3개 배열(`SUGGESTIONS`)로 모든 유형에 동일하게 노출했었다.** 이번 세션에 유형별 6개씩(`app/chat/_lib/starters.ts`의 `CHAT_STARTERS`)으로 분리하고 그중 3개를 무작위로 보여주도록 바꿨다. LLM을 쓰지 않는다 — 정적 상수일 뿐이며, 문구 텍스트는 지시받은 그대로 넣었다(임의로 다듬지 않음)
+- **랜덤 선택은 `useState`의 초기화 함수 안에서 한 번만 실행한다.** `useState(() => typeCode ? pickThreeStarters(typeCode) : [])` — 서버에서 미리 섞으면 SSR HTML과 클라이언트 hydration 렌더가 다른 조합을 계산해 hydration 불일치 경고가 난다. 다만 이 값이 실제로 화면에 노출되는 시점은 `loading`이 `false`가 된 뒤(GET `/api/chat/messages` 완료 후)라 SSR 시점엔 애초에 렌더되지 않는 분기(`loading ? ... : ...`) 뒤에 가려져 있고, hydration 비교 대상도 아니다. `useEffect`로 재추첨하지 않는다 — 그러면 리렌더마다 값이 또 바뀔 위험이 있고, 컴포넌트가 마운트될 때(패널을 닫았다 다시 열 때) 한 번만 뽑히는 요구를 깨뜨린다
+- **셔플은 Fisher-Yates를 직접 구현했다.** lodash 같은 새 라이브러리를 추가하지 않는다는 지시에 따름(`package.json`에 이미 있는 것만 사용)
+- **`typeCode`가 `null`이면 `starters`도 빈 배열(`[]`)이 된다.** 렌더 쪽의 `{typeCode && (...)}` 가드는 그대로 유지했다 — 이미 있던 "진단 미완료 안내" 동작을 건드리지 않기 위해 이중으로 막아둔 것이지 새로 만든 로직은 아니다
 
 ## 막힌 것
 - 없음 (로컬 DB가 `prisma migrate`로 관리되지 않고 있던 것을 발견해 베이스라인 마이그레이션(`prisma/migrations/00000000000000_init`)을 만들어 해결. 기존 시드 데이터(미션 41개, 펫스킨 6개)는 유지됨. 스키마 담당과 공유 필요)
