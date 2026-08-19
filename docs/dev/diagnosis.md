@@ -8,8 +8,8 @@
 **브랜치 규칙 (2026-08-19 변경).** A 담당분은 `feat/diagnosis`에 커밋한다. `main`에 직접 커밋하지 않고 PR로만 올린다. `prisma/schema.prisma` 변경분도 이 브랜치에 담고, 머지 여부와 `prisma migrate dev` 실행은 팀이 결정한다.
 
 ## 현재 상태
-- 완료: 미션 41개, 지표 14개 정의, 12문항 + 형용사 문항, `classify()`·`classifySub()`, 무손실 조기 종료, 스냅샷 체크, 화면 3장(진단·결과·홈), 화면 3장 디자인 시스템 적용 + Figma 팔레트·폰트 반영(12장), 진단 API 3종 + 화면 연결, `draft.ts` 제거
-- 진행 중: 없음. 2차 마이그레이션 대기(13장)
+- 완료: 미션 41개, 지표 14개 정의, 12문항 + 형용사 문항, `classify()`·`classifySub()`, 무손실 조기 종료, 스냅샷 체크, 화면 3장(진단·결과·홈), 화면 3장 디자인 시스템 적용 + Figma 팔레트·폰트 반영(12장), 진단 API 3종 + 화면 연결, `draft.ts` 제거, **2차 마이그레이션 적용 후 실 DB로 전체 흐름 확인 완료(14장)**
+- 진행 중: 없음
 - 미착수: Bedrock 호출 2종, 관리자 교차표, 홈의 펫·미션 실데이터(B·C API 대기)
 
 ## 구현한 파일
@@ -77,13 +77,23 @@ DB가 아직 없다(`DATABASE_URL` 미공유). **DB가 필요 없는 것부터 �
 - **재진단은 닉네임을 덮어쓰지 않는다.** 저장된 닉네임이 이전 판정의 기본 닉네임과 똑같을 때만 새 기본 닉네임으로 바꾼다. 유저가 직접 고친 이름은 유지되고, 종족이 바뀌었는데 "조용한 여우"가 남는 경우는 고쳐진다
 - **재진단은 레벨·경험치·재화·아이템·연속 기록을 건드리지 않는다.** 유형이 바뀌어도 키운 것은 남는다. 활성 펫 스킨만 새 유형의 기본 스킨으로 바꾼다
 - **완료 API는 기본 펫 스킨이 없어도 실패하지 않는다.** `npm run db:seed`가 C의 `items.ts` 때문에 아직 막혀 있어서, 시드 전에도 진단은 끝까지 되어야 한다
+- **하단 탭을 없애고 사이드바 하나만 쓴다** (2026-08-19, 사용자 결정). E가 "데스크톱은 사이드바 / 모바일은 하단 탭" 이원화를 제안했지만, 내비게이션이 두 벌이면 화면마다 어느 쪽이 뜨는지 확인해야 하고 활성 표시·경로도 두 곳에서 갈린다. 마감이 3일 남은 상태에서 감당할 비용이 아니다. 모바일에서는 같은 사이드바를 아이콘만 남긴 좁은 레일로 줄인다. 진단 문항 화면에서는 내비를 숨긴다(이탈 방지). 적용은 E, 적용되면 A가 `styles/tokens.css`의 `--nav-h`를 지우고 `min-height: 100dvh`로 되돌린다
+- **미션 데이터는 DB가 원본, `prisma/seed/missions.ts`는 그 DB를 채우는 시드다** (B와 합의, 2026-08-19). 화면에 41개 문구를 다시 복사하지 않는다. B는 `시드 → DB Mission → GET /api/missions → 화면`으로 가고, A의 홈 미션 미리보기도 그 API가 생기면 그쪽으로 바꾼다. 그때까지 홈이 `DAILY`를 직접 읽는 것은 임시다 — `prisma/seed/missions.ts:1`이 `import type`뿐이라 Prisma가 클라이언트 번들에 들어가지 않는 것은 빌드 산출물에서 확인했다(`.next/static/chunks`에 `PrismaClient` 없음, 미션 문구는 있음)
 - **6·7장의 기대값을 먼저 확정한 뒤 판정 함수를 구현한다.** 순서를 뒤집으면 구현 결과를 그대로 기대값으로 박게 되고, 테스트가 아무것도 검증하지 않는다. 이 테스트가 발표에서 제시할 정확도 근거다
 
 ## 3. 막힌 것
-- **2차 마이그레이션 미적용 (E 대기). 지금 진단 API 3종이 런타임에 전부 500이다.** DB에 `SubTypeCode` enum과 `User.subTypeCode`, `DiagnosisSession.subTypeCode`/`indicators`가 없다. Prisma는 모델의 모든 컬럼을 select하므로 `getCurrentUser()`의 upsert부터 `P2022: The column User.subTypeCode does not exist`로 죽는다. 13장에 넘길 DDL을 적어 뒀다. `migrate dev`는 E만 실행한다(`CLAUDE.md` 5절)
-- **`lib/auth.ts`(E 소유)가 모듈 로드 시점에 Cognito 검증기를 만든다.** `COGNITO_USER_POOL_ID`가 비어 있으면 `Invalid Cognito User Pool ID`로 **빌드가 깨진다** — API 라우트를 가진 사람 전원(A·B·C·D)이 같이 막힌다. 로컬에서는 `.env`에 형식만 맞는 더미 값을 넣어 우회했다. 13장에 요청분을 적어 뒀다
-- Bedrock 연결 확인 미완 (E 대기). 4단계에서 필요
-- `prisma/seed/items.ts`의 펫 3종이 아직 옛 동물 매핑이다. **C 담당 파일이라 내가 못 고친다.** 요청 대기
+
+해소된 것 (2026-08-19):
+
+- ~~2차 마이그레이션 미적용~~ — E가 `20260819080703_add_subtype`을 `main`에 올렸다. `migrate deploy`로 적용 완료. `P2022`로 500이던 진단 API 3종이 정상 동작한다
+- ~~`lib/auth.ts`가 모듈 로드 시점에 Cognito 검증기를 만들어 빌드가 깨짐~~ — E가 `getVerifier()` 지연 생성으로 고쳤다. `.env`에 넣었던 더미 Pool ID·Client ID를 지웠다(`DEV_AUTH_BYPASS=true`면 빈 값이어도 빌드가 통과한다)
+
+남은 것:
+
+- Bedrock 연결 확인 미완 (E 대기). 4단계(자유 입력 enum 변환·근거 3줄 요약)에서 필요하고, 그전까지 진단은 선택지 버튼만으로 끝까지 동작한다
+- `prisma/seed/items.ts`의 펫 3종이 아직 옛 동물 매핑이다. **C 담당 파일이라 내가 못 고친다.** 첫 `npm run db:seed`보다 먼저 고쳐야 한다. 그래서 `activePetSkinId`가 아직 `null`이고 홈·결과의 마스코트는 이모지다
+- 홈 미션 미리보기가 아직 `prisma/seed/missions.ts`의 `DAILY` 배열을 읽는다. B가 `GET /api/missions`를 올리면 그쪽으로 바꾼다(2장 마지막 항목)
+- 하단 탭 제거 + 사이드바 단일 구조가 아직 적용되지 않았다. E 작업분이고, 적용되면 A가 `styles/tokens.css`의 `--nav-h`를 되돌린다(12장)
 - Google 로그인 전용 결정이 `SPEC.md` 10절("소셜 로그인은 쓰지 않는다")과 `CLAUDE.md` 8절과 충돌한다. 둘 다 공유 문서라 임의로 안 고친다
 
 ---
@@ -268,11 +278,11 @@ Q13은 조기 종료 대상이 아니다. 형용사가 없으면 닉네임을 �
 
 | `TypeCode` | 동물 | 종족 | 색 | 논문 비율 |
 |---|---|---|---|---|
-| `HEALTH_EMOTION` | 여우 | 개과 | `#F59E0B` 앰버 오렌지 | 12.13% |
-| `INDEPENDENT_LOW_INCOME` | 고양이 | 고양잇과 | `#38BDF8` 스카이 블루 | 16.75% |
-| `FAMILY_LIVING` | 곰 | 곰과 | `#34D399` 에메랄드 그린 | 71.12% |
+| `HEALTH_EMOTION` | 여우 | 개과 | `#E8956A` 노을 주황 | 12.13% |
+| `INDEPENDENT_LOW_INCOME` | 고양이 | 고양잇과 | `#6A95C8` 새벽 파랑 | 16.75% |
+| `FAMILY_LIVING` | 곰 | 곰과 | `#7AAE82` 이끼 초록 | 71.12% |
 
-색은 `lib/types.ts`의 `TRIBE` 한 곳에만 있다. 파스텔 톤으로 바꾸기로 하면 hex 3개만 교체한다(대안값을 그 파일 주석에 적어 둔다).
+색은 `lib/types.ts`의 `TRIBE`와 `styles/tokens.css`의 `[data-tribe]` 두 곳에 있다 — 한쪽만 고치지 않는다(12장). **컬러명은 첫 `npm run db:seed` 전에 확정했다.** `prisma/seed/items.ts`의 upsert가 아이템 `name`을 유니크 키로 쓰므로, 시드를 돌린 뒤 이름을 바꾸면 옛 행이 남고 새 행이 추가된다.
 
 ```
 1. health >= 3                        → HEALTH_EMOTION
@@ -602,29 +612,48 @@ model DiagnosisSession {
 
 ## 13. 다음 할 일
 
-### 다른 사람에게 넘길 것
+### 다른 사람에게 넘길 것 — 남은 것
 
-**E — 2차 마이그레이션.** A의 PR을 머지한 뒤 `npx prisma migrate dev --name add_subtype`를 한 번 실행한다. Prisma가 만들 DDL은 아래와 같다(`prisma migrate diff`로 확인한 실제 출력이다).
+**E — 하단 탭 제거 + 사이드바 단일.** 사용자 결정이다(2장). `app/layout.tsx`에서 `BottomNav`를 빼고 사이드바 하나만 남긴다. 모바일은 아이콘만 남긴 좁은 레일, 진단 문항 화면(`/diagnosis`)에서는 내비를 숨긴다. 적용됐다고 알려주면 A가 `styles/tokens.css`의 `--nav-h`를 지운다.
 
-```sql
-CREATE TYPE "SubTypeCode" AS ENUM ('AFTERCARE_YOUTH', 'FAMILY_CAREGIVER', 'MIGRANT_YOUTH', 'HEALTH_FRAGILE', 'DEBT_INDEPENDENT', 'FINANCIAL_FRAGILE', 'JOBLESS_POOR', 'FAMILY_DEPENDENT');
-ALTER TABLE "DiagnosisSession" ADD COLUMN "indicators" JSONB, ADD COLUMN "subTypeCode" "SubTypeCode";
-ALTER TABLE "User" ADD COLUMN "subTypeCode" "SubTypeCode";
-```
+**E — Amplify ↔ GitHub 연동.** 브라우저 수동 단계라 계정 소유자만 할 수 있다.
 
-전부 nullable 컬럼 추가라 기존 데이터는 지워지지 않는다. `migrate reset`은 쓰지 않는다.
+**C — `prisma/seed/items.ts` 동물 매핑.** 여우 → `HEALTH_EMOTION`, 고양이 → `INDEPENDENT_LOW_INCOME`, 치장 "라벤더" 3종 이름을 `SPEC.md` 2절의 확정 컬러명(노을 주황·새벽 파랑·이끼 초록)에 맞춘다. **`npm run db:seed`보다 먼저 고쳐야 한다.** upsert 키가 아이템 `name`이라 시드를 한 번 돌린 뒤 이름을 바꾸면 옛 행이 DB에 남는다.
 
-**E — `lib/auth.ts` 지연 초기화.** 모듈 로드 시점에 `CognitoJwtVerifier.create()`를 부르면 `COGNITO_USER_POOL_ID`가 비어 있을 때 빌드가 깨진다. `getCurrentUser()` 안으로 옮기거나, 실제 Pool ID·Client ID를 팀에 공유하고 Amplify 환경변수에도 등록한다.
+**D — 중복 init 마이그레이션.** `feat/community`의 `prisma/migrations/00000000000000_init/`을 지우고 `main`의 `20260819061857_init/`·`20260819080703_add_subtype/`을 받는다. **8/20 5인 머지 전에 처리해야 한다.** 그대로 머지되면 init이 두 개가 되어 `migrate deploy`가 깨진다.
 
-**E — 나머지.** `app/globals.css`의 `--color-canine/feline/ursine` 3줄 삭제(`styles/tokens.css`와 값이 다르다) / `BottomNav`의 `/diagnosis` 라벨 "진단결과" 수정 + 진단 진행 중 숨김 / `.env.example`의 DB 이름 `isol` → `welli`. 탭 높이를 바꾸면 `styles/tokens.css`의 `--nav-h`도 같이 바꿔야 한다고 알린다.
+**B — `GET /api/missions`.** 나오면 홈 미션 미리보기를 그쪽으로 바꾼다.
 
-**C — `prisma/seed/items.ts` 동물 매핑.** 여우 → `HEALTH_EMOTION`, 고양이 → `INDEPENDENT_LOW_INCOME`, 치장 "라벤더" 3종 이름 변경. **`npm run db:seed`보다 먼저 고쳐야 한다.** 지금 시드를 돌리면 틀린 매핑이 공유 DB에 들어간다.
+### 넘겨서 끝난 것 (기록)
 
-**D — 중복 init 마이그레이션.** `feat/community`의 `prisma/migrations/00000000000000_init/`을 지우고 `main`의 `20260819061857_init/`을 쓴다. 그대로 머지되면 `migrate deploy`가 깨진다.
+- E — 2차 마이그레이션 `20260819080703_add_subtype`: A가 넘긴 DDL 그대로 적용됐다
+- E — `lib/auth.ts` 지연 초기화: `getVerifier()`로 고쳐졌다
+- E — `app/globals.css`의 종족색 3줄 삭제, `BottomNav`의 "진단결과" 경로 수정, `.env.example` DB 이름 `welli`
 
 ### A가 이어서 할 것
 
-1. 2차 마이그레이션 후 진단 → 결과 → 홈 전체 흐름을 브라우저에서 확인 (지금은 `P2022`로 500이다)
-2. 관리자 교차표 (대분류 × 세부유형)
-3. 펫 이미지가 S3에 올라오면 홈·결과의 종족색 원판을 이미지로 교체 (C·E 대기). 자리와 크기는 `styles/tokens.css`의 `.hm-plate__disc`(결과 7.5rem·기본 4.5rem)와 `.hm-tile__face`가 잡아 뒀다
-4. 다른 화면(미션·펫·커뮤니티)도 같은 결로 맞추려면 담당자에게 `design.md`와 `styles/tokens.css`를 알린다. 남의 폴더는 A가 고치지 않는다
+1. 관리자 교차표 (대분류 × 세부유형)
+2. 펫 이미지가 S3에 올라오면 홈·결과의 종족색 원판을 이미지로 교체 (C·E 대기). 자리와 크기는 `styles/tokens.css`의 `.hm-plate__disc`(결과 7.5rem·기본 4.5rem)와 `.hm-tile__face`가 잡아 뒀다
+3. 다른 화면(미션·펫·커뮤니티)도 같은 결로 맞추려면 담당자에게 `design.md`와 `styles/tokens.css`를 알린다. 남의 폴더는 A가 고치지 않는다
+
+---
+
+## 14. 실 DB 검증 기록 (2026-08-19)
+
+2차 마이그레이션이 적용된 뒤 처음으로 진단 전체 흐름을 실제 RDS에 붙여 확인했다. 그전까지는 `P2022`로 API 3종이 전부 500이었으므로, 이 기록이 "화면과 DB가 실제로 이어졌다"는 첫 증거다.
+
+절차: `git merge origin/main` → `npx prisma migrate deploy`(적용할 것 없음 = 이미 최신) → `npx prisma generate` → `npm run build` → `next start -p 3101`.
+
+확인한 것:
+
+| 확인 | 결과 |
+|---|---|
+| `GET /api/diagnosis/me` (진단 전) | `{"data":null}` — 홈이 시작 화면을 띄운다 |
+| `POST /api/diagnosis/complete` 조작된 답변 | `{"error":{"code":"INVALID_ANSWER","message":"진단 답변이 올바르지 않습니다"}}` 400 |
+| 진단 12문항 응답 후 결과 화면 | `data-tribe="INDEPENDENT_LOW_INCOME"`, "🐱 고양잇과 · 고양이 / 새벽 파랑", 기본 닉네임 "다정한 고양이"가 입력창에 채워짐 |
+| 닉네임을 "밤바다"로 바꾸고 시작하기 | `PATCH /api/diagnosis/nickname` 200, 홈으로 이동 |
+| 홈 | "오늘 하루도 / 밤바다 / 🐱 고양잇과", 일일 미션 4개 표시 |
+
+`npm run build`와 `npm run check:diagnosis` 모두 통과한다. 남은 것은 마스코트(펫 이미지 대기)와 미션 완료 여부 표시(B API 대기)뿐이다.
+
+**빌드 캐시 주의.** `next start`는 캐시된 빌드를 내보낸다. 코드를 고쳤으면 `npm run build`를 다시 돌리고 서버를 재시작해야 화면에 반영된다.
