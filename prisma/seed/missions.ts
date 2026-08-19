@@ -10,7 +10,9 @@ import type { Prisma, PrismaClient, TypeCode } from "@prisma/client"
 // code는 유니크해야 한다. 규칙: DAILY_*, {유형}_S{단계}_{번호}
 // 보상과 사진 미션 배치는 stageMission()이 강제한다. 개별 미션에서 값을 덮어쓰지 않는다.
 
-const DAILY: Prisma.MissionCreateInput[] = [
+// 홈 화면의 "오늘의 미션 미리보기"가 이 배열을 그대로 읽는다(app/page.tsx).
+// 문구를 두 곳에 복사하지 않기 위해 export한다. 런타임 import는 타입뿐이라 클라이언트에서도 안전하다
+export const DAILY: Prisma.MissionCreateInput[] = [
   {
     code: "DAILY_CURTAIN",
     scope: "DAILY",
@@ -83,7 +85,7 @@ function stageMission(
   }
 }
 
-// 독립거주-저소득형 (여우) — 1인 가구 92%, 저소득 87%, 부채 31%
+// 독립거주-저소득형 (고양이) — 1인 가구 92%, 저소득 87%, 부채 31%
 // 혼자 사는 생활 관리가 중심이다. 돈을 쓰게 만드는 미션을 두지 않는다.
 const INDEPENDENT = [
   stageMission("INDEPENDENT_LOW_INCOME", 1, 1, "창문 열고 환기하기", "창문을 열어 5분만 공기를 바꿔봐요."),
@@ -100,7 +102,7 @@ const INDEPENDENT = [
   stageMission("INDEPENDENT_LOW_INCOME", 3, 4, "밖에 30분 앉아있기", "공원 벤치나 도서관 자리에 앉아 있던 자리를 찍어봐요."),
 ]
 
-// 건강·정서취약형 (고양이) — 우울 57%, 소진 85%, 미취업 54%, 의료 미충족·활동 제약 높음
+// 건강·정서취약형 (여우) — 우울 57%, 소진 85%, 미취업 54%, 의료 미충족·활동 제약 높음
 // 세 유형 중 강도를 가장 낮게 잡는다. 몸과 기분 회복이 먼저다.
 const HEALTH = [
   stageMission("HEALTH_EMOTION", 1, 1, "이불 정리하기", "일어난 자리를 손으로 한 번만 펴줘요."),

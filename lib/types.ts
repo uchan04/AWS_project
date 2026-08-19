@@ -2,27 +2,35 @@ import type { Adjective, TypeCode } from "@prisma/client"
 
 // 소유자: A. 표시 문자열의 유일한 출처다. 화면에 유형명("건강·정서취약형")을 절대 쓰지 않는다.
 
+// 색은 여기 한 곳에만 있다. 톤을 바꾸기로 하면 colorHex 3개만 교체한다.
+// 값의 출처는 Figma 프로토타입(isol-design_Figma README "디자인 규칙" 절)이다.
+// 이전 값(#F59E0B / #38BDF8 / #34D399)은 종이색 배경 #F5F0E8에서 형광으로 떠서 버렸다.
+// 같은 색을 styles/tokens.css의 [data-tribe] 규칙이 들고 있다. 한쪽만 바꾸지 않는다.
+// emoji는 펫 이미지가 S3에 올라오기 전까지 쓰는 마스코트 자리다. 항상 aria-hidden으로 넣는다.
 export const TRIBE: Record<
   TypeCode,
-  { family: string; animal: string; colorName: string; colorHex: string }
+  { family: string; animal: string; emoji: string; colorName: string; colorHex: string }
 > = {
-  INDEPENDENT_LOW_INCOME: {
+  HEALTH_EMOTION: {
     family: "개과",
     animal: "여우",
-    colorName: "앰버 오렌지",
-    colorHex: "#F59E0B",
+    emoji: "🦊",
+    colorName: "노을 주황",
+    colorHex: "#E8956A",
   },
-  HEALTH_EMOTION: {
+  INDEPENDENT_LOW_INCOME: {
     family: "고양잇과",
     animal: "고양이",
-    colorName: "라벤더 퍼플",
-    colorHex: "#A78BFA",
+    emoji: "🐱",
+    colorName: "새벽 파랑",
+    colorHex: "#6A95C8",
   },
   FAMILY_LIVING: {
     family: "곰과",
     animal: "곰",
-    colorName: "세이지 그린",
-    colorHex: "#84A98C",
+    emoji: "🐻",
+    colorName: "이끼 초록",
+    colorHex: "#7AAE82",
   },
 }
 
@@ -33,12 +41,12 @@ export const ADJECTIVE_LABEL: Record<Adjective, string> = {
   EASYGOING: "느긋한",
 }
 
-// 진단 6번 문항 선택지 코드 → 형용사. 상수 테이블이며 LLM을 쓰지 않는다.
+// 형용사 문항(Q13) 선택지 코드 → 형용사. 상수 테이블이며 LLM을 쓰지 않는다.
 export const ADJECTIVE_BY_CHOICE: Record<string, Adjective> = {
-  Q6_NIGHT_ALONE: "QUIET", // 밤에 혼자 있는 시간이 가장 편하다
-  Q6_WITH_CLOSE: "WARM", // 마음 맞는 사람과 있을 때가 편하다
-  Q6_ON_PLAN: "DILIGENT", // 계획대로 하루가 굴러가면 편하다
-  Q6_NO_RUSH: "EASYGOING", // 서두르지 않고 흐르는 대로가 편하다
+  Q13_NIGHT_ALONE: "QUIET", // 밤에 혼자 있는 시간이 가장 편하다
+  Q13_WITH_CLOSE: "WARM", // 마음 맞는 사람과 있을 때가 편하다
+  Q13_ON_PLAN: "DILIGENT", // 계획대로 하루가 굴러가면 편하다
+  Q13_NO_RUSH: "EASYGOING", // 서두르지 않고 흐르는 대로가 편하다
 }
 
 /** 진단 직후 부여하는 기본 닉네임. 이후 유저가 변경할 수 있다. */
