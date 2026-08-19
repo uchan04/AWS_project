@@ -100,7 +100,11 @@ body {
    ───────────────────────────────────────────────────────────── */
 
 .hm {
-  min-height: 100dvh;
+  /* 100dvh를 쓰면 하단 탭(E 소유 BottomNav) 높이만큼 항상 스크롤이 생긴다.
+     body가 auto 높이라 100%는 해석되지 않으므로(판이 내용 높이로 쪼그라든다) 탭 높이를 빼 준다.
+     --nav-h는 BottomNav의 py-3 + text-xs 한 줄 + 위쪽 테두리 1px다. 탭 높이가 바뀌면 여기도 바꾼다 */
+  --nav-h: calc(2.5rem + 1px);
+  min-height: calc(100dvh - var(--nav-h));
   background: var(--color-paper);
   color: var(--color-ink);
   font-family: var(--font-body);

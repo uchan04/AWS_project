@@ -2,7 +2,7 @@
 
 // 소유자: A. 홈. 종족·펫·오늘 미션 진입점.
 //
-// 유저·펫·미션 데이터는 DATABASE_URL 공유 후에 붙인다. 지금은 진단 결과만 보여준다.
+// 진단 결과는 GET /api/diagnosis/me에서 읽는다. 펫·미션 실데이터는 B·C의 API가 나온 뒤에 붙인다.
 // 진단 전에는 진단 화면으로 보내는 것 하나만 남긴다. 홈에 아무것도 못 하는 카드를 늘리지 않는다.
 //
 // 스타일은 design.md가 정한다. Hallmark · macrostructure: Index-First.
@@ -11,14 +11,11 @@
 import Link from "next/link"
 import { useEffect, useState } from "react"
 import type { TypeCode } from "@prisma/client"
-import { classify } from "@/lib/diagnosis/classify"
-import { TRIBE, defaultNickname } from "@/lib/types"
+import { TRIBE } from "@/lib/types"
 // 미션 문구는 A가 가진 시드 콘텐츠가 정본이다. 홈에 복사해 두지 않고 그 배열을 읽는다
 import { DAILY } from "@/prisma/seed/missions"
 import "@/styles/tokens.css"
-import { readDraft } from "./diagnosis/draft"
-
-type Me = { typeCode: TypeCode; nickname: string; greeting: string }
+import { type DiagnosisView, fetchMe } from "./diagnosis/api"
 
 // 진단 전 화면에서 세 종족을 나란히 보여줄 때 쓴다
 const TRIBE_LIST = (Object.keys(TRIBE) as TypeCode[]).map((code) => ({ code, ...TRIBE[code] }))
@@ -31,22 +28,34 @@ function greetingFor(hour: number): string {
 }
 
 export default function HomePage() {
-  const [me, setMe] = useState<Me | null>(null)
+  // undefined = 아직 읽는 중. null과 구분해야 진단한 사람에게 시작 화면이 깜박이지 않는다
+  const [me, setMe] = useState<DiagnosisView | null | undefined>(undefined)
+  const [greeting, setGreeting] = useState("")
 
   useEffect(() => {
-    const draft = readDraft()
-    if (!draft) return
-    try {
-      const { typeCode, adjective } = classify(draft)
-      setMe({
-        typeCode,
-        nickname: defaultNickname(typeCode, adjective),
-        greeting: greetingFor(new Date().getHours()),
+    let alive = true
+    setGreeting(greetingFor(new Date().getHours()))
+    fetchMe()
+      .then((next) => {
+        if (alive) setMe(next)
       })
-    } catch {
-      setMe(null)
+      .catch(() => {
+        if (alive) setMe(null)
+      })
+    return () => {
+      alive = false
     }
   }, [])
+
+  if (me === undefined) {
+    return (
+      <main className="hm hm--canvas">
+        <div className="hm__col">
+          <p className="hm__note">불러오고 있어요…</p>
+        </div>
+      </main>
+    )
+  }
 
   // 진단 전 홈 = 시작 화면. Figma 인트로 구성(왼쪽 글, 오른쪽 안내 카드)을 가져왔다
   if (!me) {
@@ -96,7 +105,8 @@ export default function HomePage() {
             </ul>
             <hr className="hm__rule" />
             <p className="hm__note">약 3분 걸려요. 언제든 다시 할 수 있어요.</p>
-            <p className="hm__note">답한 내용은 이 기기에만 남아요.</p>
+            {/* 결과가 서버에 저장되므로 "이 기기에만 남는다"고 쓸 수 없다 */}
+            <p className="hm__note">결과는 내 계정에만 저장돼요.</p>
           </div>
         </div>
       </main>
@@ -111,7 +121,7 @@ export default function HomePage() {
         {/* 인사말·이름은 왼쪽, 마스코트는 오른쪽. Figma 홈 헤더 구성이다 */}
         <div className="hm-home__head">
           <div className="hm-home__who">
-            <p className="hm__note">{me.greeting}</p>
+            <p className="hm__note">{greeting}</p>
             <h1 className="hm-home__name">{me.nickname}</h1>
             <span className="hm-pill">
               <span aria-hidden="true">{tribe.emoji}</span> {tribe.family}

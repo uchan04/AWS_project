@@ -18,7 +18,7 @@ import {
 } from "@/lib/diagnosis/adaptive"
 import type { Answer } from "@/lib/diagnosis/indicators"
 import "@/styles/tokens.css"
-import { saveDraft } from "./draft"
+import { completeDiagnosis } from "./api"
 
 /**
  * 진행률. 총 문항 수는 사람마다 달라서 쓸 수 없으므로 "좁혀진 정도"로 센다.
@@ -41,29 +41,47 @@ function progressOf(answers: Answer[]): number {
 export default function DiagnosisPage() {
   const router = useRouter()
   const [answers, setAnswers] = useState<Answer[]>([])
+  // 완료 API 실패 시 답변을 잃지 않는다. 같은 답변으로 다시 보낼 수 있게 화면을 유지한다
+  const [error, setError] = useState<string | null>(null)
 
   const question = useMemo(() => nextQuestion(answers), [answers])
   const almostDone = useMemo(() => canDecide(answers), [answers])
   const progress = useMemo(() => progressOf(answers), [answers])
+
+  // 판정은 서버가 한다. 화면은 답변만 보낸다
+  async function submit(all: Answer[]) {
+    setError(null)
+    try {
+      await completeDiagnosis(all)
+      router.push("/diagnosis/result")
+    } catch (caught) {
+      setError(caught instanceof Error ? caught.message : "잠시 후 다시 시도해 주세요")
+    }
+  }
 
   function choose(choiceCode: string) {
     if (!question) return
     const next = [...answers, { questionCode: question.code, choiceCode }]
     setAnswers(next)
     if (nextQuestion(next)) return
-
-    // 완료 API(POST /api/diagnosis/complete)는 DATABASE_URL 공유 후에 붙인다.
-    // 그때까지는 답변을 결과 화면으로 넘기고 판정을 화면에서 한다.
-    saveDraft(next)
-    router.push("/diagnosis/result")
+    void submit(next)
   }
 
-  // 마지막 답변 직후. 결과 화면으로 넘어가는 사이에만 보인다
+  // 마지막 답변 직후. 결과 화면으로 넘어가는 사이에 보인다
   if (!question) {
     return (
       <main className="hm hm--canvas">
-        <div className="hm__col">
-          <p className="hm__note">결과를 준비하고 있어요…</p>
+        <div className="hm__col hm-ask">
+          {error ? (
+            <div className="hm-card">
+              <p>{error}</p>
+              <button type="button" onClick={() => void submit(answers)} className="hm-btn hm-card__cta">
+                다시 보내기
+              </button>
+            </div>
+          ) : (
+            <p className="hm__note">결과를 준비하고 있어요…</p>
+          )}
         </div>
       </main>
     )

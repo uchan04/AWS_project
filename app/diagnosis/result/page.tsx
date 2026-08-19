@@ -3,45 +3,66 @@
 // 소유자: A. 진단 결과 화면. docs/dev/diagnosis.md 10장.
 //
 // 화면에 유형명("건강·정서취약형")과 세부유형을 절대 쓰지 않는다. 종족·동물·색만 보여준다.
-// 판정을 여기서 하는 것은 완료 API가 붙기 전까지의 임시 조치다(app/diagnosis/draft.ts).
+// 판정 결과는 GET /api/diagnosis/me에서 읽는다. 화면은 classify()를 부르지 않는다.
 //
 // 스타일은 design.md가 정한다. Hallmark · macrostructure: Photographic.
 // 종족색은 data-tribe로만 넣는다. style={{ backgroundColor }}를 쓰지 않는다.
 
+import { useRouter } from "next/navigation"
 import Link from "next/link"
 import { useEffect, useState } from "react"
-import type { Adjective, TypeCode } from "@prisma/client"
-import { classify } from "@/lib/diagnosis/classify"
-import { NICKNAME_MAX, TRIBE, defaultNickname, isValidNickname } from "@/lib/types"
+import { NICKNAME_MAX, TRIBE, isValidNickname } from "@/lib/types"
 import "@/styles/tokens.css"
-import { readDraft } from "../draft"
+import { type DiagnosisView, fetchMe, saveNickname } from "../api"
 
-type View =
-  | { status: "loading" }
-  | { status: "empty" }
-  | { status: "ok"; typeCode: TypeCode; adjective: Adjective }
+type View = { status: "loading" } | { status: "empty" } | { status: "ok"; me: DiagnosisView }
 
 export default function DiagnosisResultPage() {
+  const router = useRouter()
   const [view, setView] = useState<View>({ status: "loading" })
   const [nickname, setNickname] = useState("")
   // blur 전에는 오류를 띄우지 않는다. 지우는 중에 빨간 글씨가 따라오면 압박이 된다
   const [touched, setTouched] = useState(false)
+  const [saving, setSaving] = useState(false)
+  const [saveError, setSaveError] = useState<string | null>(null)
 
   useEffect(() => {
-    const draft = readDraft()
-    if (!draft) {
-      setView({ status: "empty" })
-      return
-    }
-    try {
-      const { typeCode, adjective } = classify(draft)
-      setView({ status: "ok", typeCode, adjective })
-      setNickname(defaultNickname(typeCode, adjective))
-    } catch {
-      // 답변이 깨졌으면 다시 진단하는 것이 유일한 복구 경로다
-      setView({ status: "empty" })
+    let alive = true
+    fetchMe()
+      .then((me) => {
+        if (!alive) return
+        if (!me) {
+          setView({ status: "empty" })
+          return
+        }
+        setView({ status: "ok", me })
+        setNickname(me.nickname)
+      })
+      .catch(() => {
+        if (alive) setView({ status: "empty" })
+      })
+    return () => {
+      alive = false
     }
   }, [])
+
+  async function start(current: DiagnosisView) {
+    // 이름을 바꾸지 않았으면 서버를 부르지 않는다
+    if (nickname === current.nickname) {
+      router.push("/")
+      return
+    }
+    setSaving(true)
+    setSaveError(null)
+    try {
+      await saveNickname(nickname)
+      router.push("/")
+    } catch (caught) {
+      setSaveError(caught instanceof Error ? caught.message : "잠시 후 다시 시도해 주세요")
+    } finally {
+      setSaving(false)
+    }
+  }
 
   if (view.status === "loading") {
     return (
@@ -69,12 +90,13 @@ export default function DiagnosisResultPage() {
     )
   }
 
-  const tribe = TRIBE[view.typeCode]
+  // 이모지·색이름은 표시용 상수에서만 가져온다. API는 종족 표시명만 준다
+  const tribe = TRIBE[view.me.typeCode]
   const valid = isValidNickname(nickname)
   const showError = touched && !valid
 
   return (
-    <main className="hm hm--canvas" data-tribe={view.typeCode}>
+    <main className="hm hm--canvas" data-tribe={view.me.typeCode}>
       <div className="hm__col hm-result">
         {/* 왼쪽 종족판 · 오른쪽 안내와 이름. Figma 결과 화면 구성이다 */}
         <div className="hm-result__grid">
@@ -141,11 +163,17 @@ export default function DiagnosisResultPage() {
               </p>
             </div>
 
-            {/* 닉네임 PATCH·유저 저장은 DATABASE_URL 공유 후에 붙인다 */}
-            <Link href="/" aria-disabled={!valid} className="hm-btn">
+            {/* 이름을 고쳤을 때만 PATCH하고 홈으로 넘어간다 */}
+            <button
+              type="button"
+              onClick={() => void start(view.me)}
+              disabled={!valid || saving}
+              className="hm-btn"
+            >
               {/* 닉네임을 문장에 넣지 않는다. 조사(으로/로)가 받침에 따라 갈려서 어색해진다 */}
-              이 이름으로 시작하기
-            </Link>
+              {saving ? "저장하고 있어요…" : "이 이름으로 시작하기"}
+            </button>
+            {saveError && <p className="hm-field__help hm-field__help--error">{saveError}</p>}
 
             <Link href="/diagnosis" className="hm-link">
               다시 진단하기
