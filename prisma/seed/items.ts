@@ -103,10 +103,62 @@ const AFFINITY_COSMETICS: Prisma.CosmeticItemCreateInput[] = [
   { name: "밤별 배경", slot: "BACKGROUND", rarity: "EPIC", tribeColor: "INDEPENDENT_LOW_INCOME", affinityOnly: true, priceAffinity: 200, imageKey: "cosmetics/bg-night.png" },
 ]
 
+// 2026-08-19: 옛 이름으로 이미 시드된 공유 DB를 되돌리기 위한 이름 이관 표.
+// E가 옛 시드 파일로 db:seed를 먼저 돌려 앰버·라벤더·세이지 9종이 DB에 들어갔다.
+// upsert 키가 name이라 이름만 바꾸면 새 행 9개가 생기고 옛 행 9개가 고아로 남는다.
+// 그래서 upsert 전에 옛 이름 행을 새 이름으로 바꾼다. UserCosmetic FK는 id를
+// 참조하므로 이름 변경은 안전하고, 지우는 것이 없어 되돌릴 것도 없다.
+// 옛 행이 없으면(깨끗한 DB) 아무 일도 하지 않는다.
+const RENAMED_COSMETICS: ReadonlyArray<readonly [string, string]> = [
+  ["앰버 모자", "노을 모자"],
+  ["앰버 목도리", "노을 목도리"],
+  ["앰버 배경", "노을 배경"],
+  ["라벤더 모자", "새벽 모자"],
+  ["라벤더 목도리", "새벽 목도리"],
+  ["라벤더 배경", "새벽 배경"],
+  ["세이지 모자", "이끼 모자"],
+  ["세이지 목도리", "이끼 목도리"],
+  ["세이지 배경", "이끼 배경"],
+]
+
+/**
+ * 옛 이름 행을 새 이름으로 바꾼다. 새 이름 행이 이미 있으면 건드리지 않고 남겨 둔다
+ * (이름을 바꾸면 유니크 제약에 걸린다). 그 경우 사람이 판단해야 하므로 경고만 남긴다.
+ */
+async function renameLegacyCosmetics(prisma: PrismaClient) {
+  const leftovers: string[] = []
+
+  for (const [oldName, newName] of RENAMED_COSMETICS) {
+    const legacy = await prisma.cosmeticItem.findUnique({ where: { name: oldName } })
+    if (!legacy) continue
+
+    const taken = await prisma.cosmeticItem.findUnique({ where: { name: newName } })
+    if (taken) {
+      leftovers.push(oldName)
+      continue
+    }
+
+    await prisma.cosmeticItem.update({ where: { id: legacy.id }, data: { name: newName } })
+    console.log(`  치장 이름 이관: ${oldName} → ${newName}`)
+  }
+
+  if (leftovers.length > 0) {
+    console.warn(
+      `  경고: 옛 이름 행 ${leftovers.length}개가 남았다 (새 이름 행이 이미 있어 이관 불가): ${leftovers.join(", ")}\n` +
+        `  UserCosmetic이 참조하지 않는지 확인한 뒤 사람이 직접 지운다. 시드는 지우지 않는다.`,
+    )
+  }
+}
+
 export async function seedItems(prisma: PrismaClient) {
+  // 펫 6종은 이름이 그대로라 upsert가 typeCode를 알아서 고친다.
+  // (E가 옛 매핑으로 시드한 여우↔고양이·늑대↔삵도 여기서 교정된다)
   for (const skin of PET_SKINS) {
     await prisma.petSkin.upsert({ where: { name: skin.name }, update: skin, create: skin })
   }
+
+  // 치장은 이름이 바뀌었으므로 upsert 전에 이관한다. 순서를 바꾸면 고아 행이 생긴다.
+  await renameLegacyCosmetics(prisma)
 
   const cosmetics = [...SHOP_COSMETICS, ...AFFINITY_COSMETICS]
   for (const item of cosmetics) {
