@@ -14,11 +14,21 @@ export class UnauthorizedError extends Error {
 
 const DEV_COGNITO_SUB = "dev-user-000"
 
-const verifier = CognitoJwtVerifier.create({
-  userPoolId: process.env.COGNITO_USER_POOL_ID ?? "",
-  tokenUse: "access",
-  clientId: process.env.COGNITO_CLIENT_ID ?? "",
-})
+// DEV_AUTH_BYPASS=true인 로컬 개발 환경은 COGNITO_USER_POOL_ID를 설정할 필요가 없다.
+// 모듈 로드 시점에 CognitoJwtVerifier.create()를 부르면 빈 Pool ID로 즉시 throw해서
+// API 라우트를 가진 사람 전원의 `npm run build`가 깨진다. 실제로 검증이 필요한 시점에만 만든다.
+let verifier: ReturnType<typeof CognitoJwtVerifier.create> | null = null
+
+function getVerifier() {
+  if (!verifier) {
+    verifier = CognitoJwtVerifier.create({
+      userPoolId: process.env.COGNITO_USER_POOL_ID ?? "",
+      tokenUse: "access",
+      clientId: process.env.COGNITO_CLIENT_ID ?? "",
+    })
+  }
+  return verifier
+}
 
 /** 미인증이면 UnauthorizedError를 throw한다. 호출부는 401로 변환한다. */
 export async function getCurrentUser(): Promise<User> {
@@ -35,7 +45,7 @@ export async function getCurrentUser(): Promise<User> {
   if (!token) throw new UnauthorizedError()
 
   try {
-    const payload = await verifier.verify(token)
+    const payload = await getVerifier().verify(token)
     return prisma.user.upsert({
       where: { cognitoSub: payload.sub },
       update: {},

@@ -4,7 +4,7 @@ import Link from "next/link"
 import { usePathname } from "next/navigation"
 
 const TABS = [
-  { href: "/diagnosis", label: "진단결과" },
+  { href: "/diagnosis/result", label: "진단결과" },
   { href: "/missions", label: "미션" },
   { href: "/pet", label: "펫" },
   { href: "/community", label: "커뮤니티" },
