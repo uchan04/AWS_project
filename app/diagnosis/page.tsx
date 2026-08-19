@@ -5,11 +5,14 @@
 // 한 장으로 만든다. 문항별 라우트를 만들지 않는다.
 // 다음 문항은 nextQuestion()이 정한다. 문항마다 서버를 부르지 않는다.
 // 진행률을 "n/13"으로 쓰지 않는다. 조기 종료 때문에 총 문항 수가 사용자마다 다르다.
+//
+// 스타일은 design.md가 정한다. Hallmark · macrostructure: Conversational FAQ.
 
 import { useRouter } from "next/navigation"
 import { useMemo, useState } from "react"
 import { canDecide, nextQuestion } from "@/lib/diagnosis/adaptive"
 import type { Answer } from "@/lib/diagnosis/indicators"
+import "@/styles/tokens.css"
 import { saveDraft } from "./draft"
 
 export default function DiagnosisPage() {
@@ -34,42 +37,61 @@ export default function DiagnosisPage() {
   // 마지막 답변 직후. 결과 화면으로 넘어가는 사이에만 보인다
   if (!question) {
     return (
-      <main className="mx-auto flex min-h-screen max-w-md items-center justify-center p-6">
-        <p className="text-sm text-neutral-500">결과를 준비하고 있어요…</p>
+      <main className="hm">
+        <div className="hm__col">
+          <p className="hm__note">결과를 준비하고 있어요…</p>
+        </div>
       </main>
     )
   }
 
   return (
-    <main className="mx-auto flex min-h-screen max-w-md flex-col gap-6 p-6">
-      <p className="text-sm text-neutral-500">
-        {almostDone ? "거의 다 왔어요" : `${answers.length + 1}번째 질문이에요`}
-      </p>
+    <main className="hm">
+      <div className="hm__col hm-ask">
+        <div className="hm-status">
+          {/* 답한 개수만 점으로 보여준다. 총 개수는 사람마다 달라서 쓸 수 없다 */}
+          <span className="hm-status__dots" aria-hidden="true">
+            {answers.map((answer) => (
+              <span key={answer.questionCode} className="hm-status__dot" />
+            ))}
+            <span className="hm-status__dot hm-status__dot--now" />
+          </span>
+          <span className="hm__note">
+            {almostDone ? "거의 다 왔어요" : `${answers.length + 1}번째 질문이에요`}
+          </span>
+        </div>
 
-      <h1 className="text-xl font-bold leading-relaxed">{question.text}</h1>
+        {/* key로 문항이 바뀔 때만 페이드한다. 같은 문항에서는 아무것도 움직이지 않는다 */}
+        <div key={question.code} className="hm-fade hm-ask__body">
+          <h1 className="hm-ask__question">{question.text}</h1>
 
-      <div className="flex flex-col gap-3">
-        {question.choices.map((choice) => (
+          <div className="hm-ask__choices">
+            {question.choices.map((choice) => (
+              <button
+                key={choice.code}
+                type="button"
+                onClick={() => choose(choice.code)}
+                className="hm-row"
+              >
+                <span>{choice.label}</span>
+                <span className="hm-row__mark" aria-hidden="true">
+                  →
+                </span>
+              </button>
+            ))}
+          </div>
+        </div>
+
+        {answers.length > 0 && (
           <button
-            key={choice.code}
             type="button"
-            onClick={() => choose(choice.code)}
-            className="rounded-xl border border-neutral-300 px-4 py-4 text-left text-base hover:bg-neutral-100 dark:border-neutral-700 dark:hover:bg-neutral-900"
+            onClick={() => setAnswers(answers.slice(0, -1))}
+            className="hm-link"
           >
-            {choice.label}
+            이전 질문으로
           </button>
-        ))}
+        )}
       </div>
-
-      {answers.length > 0 && (
-        <button
-          type="button"
-          onClick={() => setAnswers(answers.slice(0, -1))}
-          className="self-start text-sm text-neutral-500 underline"
-        >
-          이전 질문으로
-        </button>
-      )}
     </main>
   )
 }

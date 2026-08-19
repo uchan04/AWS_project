@@ -4,12 +4,16 @@
 //
 // 화면에 유형명("건강·정서취약형")과 세부유형을 절대 쓰지 않는다. 종족·동물·색만 보여준다.
 // 판정을 여기서 하는 것은 완료 API가 붙기 전까지의 임시 조치다(app/diagnosis/draft.ts).
+//
+// 스타일은 design.md가 정한다. Hallmark · macrostructure: Photographic.
+// 종족색은 data-tribe로만 넣는다. style={{ backgroundColor }}를 쓰지 않는다.
 
 import Link from "next/link"
 import { useEffect, useState } from "react"
 import type { Adjective, TypeCode } from "@prisma/client"
 import { classify } from "@/lib/diagnosis/classify"
 import { NICKNAME_MAX, TRIBE, defaultNickname, isValidNickname } from "@/lib/types"
+import "@/styles/tokens.css"
 import { readDraft } from "../draft"
 
 type View =
@@ -20,6 +24,8 @@ type View =
 export default function DiagnosisResultPage() {
   const [view, setView] = useState<View>({ status: "loading" })
   const [nickname, setNickname] = useState("")
+  // blur 전에는 오류를 띄우지 않는다. 지우는 중에 빨간 글씨가 따라오면 압박이 된다
+  const [touched, setTouched] = useState(false)
 
   useEffect(() => {
     const draft = readDraft()
@@ -39,66 +45,90 @@ export default function DiagnosisResultPage() {
 
   if (view.status === "loading") {
     return (
-      <main className="mx-auto flex min-h-screen max-w-md items-center justify-center p-6">
-        <p className="text-sm text-neutral-500">결과를 준비하고 있어요…</p>
+      <main className="hm">
+        <div className="hm__col">
+          <p className="hm__note">결과를 준비하고 있어요…</p>
+        </div>
       </main>
     )
   }
 
   if (view.status === "empty") {
     return (
-      <main className="mx-auto flex min-h-screen max-w-md flex-col items-center justify-center gap-4 p-6 text-center">
-        <p className="text-base">아직 진단 결과가 없어요.</p>
-        <Link href="/diagnosis" className="rounded-xl border border-neutral-300 px-6 py-3 dark:border-neutral-700">
-          진단 시작하기
-        </Link>
+      <main className="hm">
+        <div className="hm__col hm-result">
+          <div className="hm-result__head">
+            <h1 className="hm-result__title">아직 진단 결과가 없어요</h1>
+            <p className="hm__note">몇 가지만 물어볼게요. 답하기 어려운 건 넘어가도 괜찮아요.</p>
+          </div>
+          <Link href="/diagnosis" className="hm-btn">
+            진단 시작하기
+          </Link>
+        </div>
       </main>
     )
   }
 
   const tribe = TRIBE[view.typeCode]
   const valid = isValidNickname(nickname)
+  const showError = touched && !valid
 
   return (
-    <main className="mx-auto flex min-h-screen max-w-md flex-col gap-6 p-6">
-      <p className="text-sm text-neutral-500">당신의 종족이에요</p>
+    <main className="hm" data-tribe={view.typeCode}>
+      <div className="hm__col hm-result">
+        <p className="hm__note">당신의 종족이에요</p>
 
-      <div
-        className="flex flex-col items-center gap-2 rounded-2xl px-6 py-10 text-center text-neutral-900"
-        style={{ backgroundColor: tribe.colorHex }}
-      >
-        <span className="text-5xl">{tribe.animal}</span>
-        <span className="text-lg font-bold">{tribe.family}</span>
-        <span className="text-sm opacity-80">{tribe.colorName}</span>
+        {/* 펫 이미지는 S3 업로드 전이다. 원판이 그 자리를 잡고 있다 */}
+        <div className="hm-plate">
+          <span className="hm-plate__disc" aria-hidden="true">
+            {tribe.animal}
+          </span>
+          <span className="hm-plate__animal">{tribe.family}</span>
+          <span className="hm-plate__caption">{tribe.colorName}</span>
+        </div>
+
+        <div className="hm-field">
+          <label className="hm-field__label" htmlFor="nickname">
+            이름
+          </label>
+          <div className="hm-field__box">
+            <input
+              id="nickname"
+              value={nickname}
+              onChange={(event) => setNickname(event.target.value)}
+              onBlur={() => setTouched(true)}
+              maxLength={NICKNAME_MAX}
+              aria-invalid={showError}
+              aria-describedby="nickname-help"
+              className="hm-field__input"
+            />
+            {showError && (
+              <span className="hm-field__glyph" aria-hidden="true">
+                !
+              </span>
+            )}
+          </div>
+          {/* 도움말과 오류가 같은 자리를 쓴다. 자리를 비워둬서 오류가 떠도 화면이 밀리지 않는다 */}
+          <p
+            id="nickname-help"
+            className={`hm-field__help${showError ? " hm-field__help--error" : ""}`}
+          >
+            {showError
+              ? "닉네임은 2~12자로 입력해 주세요"
+              : "지금 바꿔도 되고, 나중에 바꿔도 돼요"}
+          </p>
+        </div>
+
+        {/* 닉네임 PATCH·유저 저장은 DATABASE_URL 공유 후에 붙인다 */}
+        <Link href="/" aria-disabled={!valid} className="hm-btn">
+          {/* 닉네임을 문장에 넣지 않는다. 조사(으로/로)가 받침에 따라 갈려서 어색해진다 */}
+          이 이름으로 시작하기
+        </Link>
+
+        <Link href="/diagnosis" className="hm-link">
+          다시 진단하기
+        </Link>
       </div>
-
-      <label className="flex flex-col gap-2">
-        <span className="text-sm text-neutral-500">이름은 지금 바꿔도 되고, 나중에 바꿔도 돼요</span>
-        <input
-          value={nickname}
-          onChange={(event) => setNickname(event.target.value)}
-          maxLength={NICKNAME_MAX}
-          className="rounded-xl border border-neutral-300 px-4 py-3 text-base dark:border-neutral-700"
-        />
-        {!valid && <span className="text-sm text-red-500">닉네임은 2~12자로 입력해 주세요</span>}
-      </label>
-
-      {/* 닉네임 PATCH·유저 저장은 DATABASE_URL 공유 후에 붙인다 */}
-      <Link
-        href="/"
-        aria-disabled={!valid}
-        className={`rounded-xl px-4 py-4 text-center text-base font-bold text-neutral-900 ${
-          valid ? "" : "pointer-events-none opacity-40"
-        }`}
-        style={{ backgroundColor: tribe.colorHex }}
-      >
-        {/* 닉네임을 문장에 넣지 않는다. 조사(으로/로)가 받침에 따라 갈려서 어색해진다 */}
-        이 이름으로 시작하기
-      </Link>
-
-      <Link href="/diagnosis" className="self-center text-sm text-neutral-500 underline">
-        다시 진단하기
-      </Link>
     </main>
   )
 }
