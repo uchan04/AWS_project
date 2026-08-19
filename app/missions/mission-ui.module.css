@@ -67,11 +67,57 @@
   to { opacity: 0; transform: translateY(-18px) scale(0.94); }
 }
 
-/* 전역에서 사용 가능하도록 :global 래퍼 */
-:global(.mission-slide-in) {
+/* 애니메이션 class */
+.mascotWalk {
+  animation: mascotWalk 3s ease-in-out infinite;
+}
+
+.mascotStretch {
+  animation: mascotStretch 3s ease-in-out infinite;
+}
+
+.mascotDrink {
+  animation: mascotDrink 3s ease-in-out infinite;
+}
+
+.mascotEat {
+  animation: mascotEat 0.9s ease-in-out infinite;
+}
+
+.mascotRest {
+  animation: mascotRest 2.4s ease-in-out infinite;
+}
+
+.mascotLook {
+  animation: mascotLook 2.4s ease-in-out infinite;
+}
+
+.mascotWrite {
+  animation: mascotWrite 3s ease-in-out infinite;
+}
+
+.mascotMusic {
+  animation: mascotMusic 1s ease-in-out infinite;
+}
+
+.mascotPhoto {
+  animation: mascotPhoto 3s ease-in-out infinite;
+}
+
+.mascotFloat {
+  animation: float 3s ease-in-out infinite;
+}
+
+@keyframes float {
+  0%, 100% { transform: translateY(0px); }
+  50% { transform: translateY(-8px); }
+}
+
+/* 카드 전환 효과 */
+.missionSlideIn {
   animation: missionSlideIn 0.38s cubic-bezier(0.22, 1, 0.36, 1) both;
 }
 
-:global(.mission-slide-out) {
+.missionSlideOut {
   animation: missionSlideOut 0.28s ease-in forwards;
 }

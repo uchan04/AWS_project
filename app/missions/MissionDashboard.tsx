@@ -1,53 +1,118 @@
 "use client"
 
-import { useState, useRef } from "react"
-import "./mission-ui.module.css"
+import { useState, useRef, useEffect, useCallback } from "react"
+import styles from "./mission-ui.module.css"
 
-// ─── 임시 시각 데이터 (TODO: API 연결 시 제거) ────────────────────────────
+// ─── 임시 시각 데이터 ─────────────────────────────────────────────────────
+// UI 비교 전용. Figma 원본 스크린샷과 동일한 고양이 미션 사용.
+// 3단계에서 GET /api/missions 응답으로 완전 교체 예정.
+// localStorage, 클라이언트 보상·해금 계산 금지.
 
 const TEMP_PROFILE = {
-  nickname: "조용한 여우",
-  character: "fox" as const,
+  nickname: "고요한 고양이",
+  character: "cat" as const,
 }
 
-const TEMP_MISSIONS = [
+type TempMission = {
+  id: string
+  step: number
+  title: string
+  emoji: string
+  description: string
+  requiresPhoto: boolean
+  completed: boolean
+  reward: { seeds: number; starShards: number; affinity: number }
+}
+
+const TEMP_MISSIONS: TempMission[] = [
   {
-    id: "temp-daily-1",
-    title: "커튼 열고 햇빛 보기",
-    emoji: "🌤️",
-    description: "창문 커튼을 열고 1분만 바깥을 바라봐요.",
-    requiresPhoto: false,
-    completed: false,
-    reward: { seeds: 10, starShards: 0, affinity: 0 },
-  },
-  {
-    id: "temp-daily-2",
-    title: "물 한 잔 마시기",
-    emoji: "💧",
-    description: "지금 물 한 잔을 마셔요.",
-    requiresPhoto: false,
-    completed: false,
-    reward: { seeds: 10, starShards: 0, affinity: 0 },
-  },
-  {
-    id: "temp-stage-1",
-    title: "창문 열고 환기하기",
-    emoji: "🌬️",
-    description: "창문을 열어 5분만 공기를 바꿔봐요.",
+    id: "c1_1",
+    step: 1,
+    title: "좋아하는 장소 간단히 그려보기",
+    emoji: "🎨",
+    description: "잘 그리지 않아도 괜찮아요. 내 마음속 좋아하는 장소를 대충이라도 그려봐요.",
     requiresPhoto: false,
     completed: false,
     reward: { seeds: 20, starShards: 0, affinity: 0 },
   },
   {
-    id: "temp-stage-2",
-    title: "그릇 하나 씻기",
-    emoji: "🍽️",
-    description: "쌓인 그릇 중 하나만 씻어봐요.",
+    id: "c1_2",
+    step: 1,
+    title: "오늘 느낌 이모지 3개로 표현",
+    emoji: "😊",
+    description: "오늘 하루를 이모지 3개로만 표현해봐요. 설명 없이 이모지만으로도 충분해요.",
     requiresPhoto: false,
     completed: false,
     reward: { seeds: 20, starShards: 0, affinity: 0 },
+  },
+  {
+    id: "c1_3",
+    step: 1,
+    title: "10분 동안 완전히 쉬기",
+    emoji: "😴",
+    description: "핸드폰도, 생각도 잠깐 내려두고 10분 동안 그냥 있어봐요. 아무것도 안 해도 돼요.",
+    requiresPhoto: false,
+    completed: false,
+    reward: { seeds: 20, starShards: 0, affinity: 0 },
+  },
+  {
+    id: "c1_4",
+    step: 1,
+    title: "좋아하는 동물 영상 보기",
+    emoji: "🐾",
+    description: "귀여운 동물 영상을 5분만 봐요. 그게 전부예요. 충분해요.",
+    requiresPhoto: false,
+    completed: false,
+    reward: { seeds: 20, starShards: 0, affinity: 0 },
+  },
+  {
+    id: "c2_1",
+    step: 2,
+    title: "좋아하는 책/만화 10페이지 읽기",
+    emoji: "📚",
+    description: "부담 없이 좋아하는 것 10페이지만 읽어봐요. 멈추고 싶으면 멈춰도 돼요.",
+    requiresPhoto: false,
+    completed: false,
+    reward: { seeds: 35, starShards: 0, affinity: 0 },
+  },
+  {
+    id: "c2_2",
+    step: 2,
+    title: "내 공간 작은 것 하나 바꿔보기",
+    emoji: "🏠",
+    description: "꽃 한 송이, 인형 위치 바꾸기, 포스터 하나. 아주 작은 변화면 충분해요.",
+    requiresPhoto: false,
+    completed: false,
+    reward: { seeds: 35, starShards: 0, affinity: 0 },
+  },
+  {
+    id: "c2_3",
+    step: 2,
+    title: "새로운 음악 장르 5분 탐험",
+    emoji: "🎼",
+    description: "평소와 다른 장르의 음악을 5분만 들어봐요. 마음에 안 들어도 괜찮아요.",
+    requiresPhoto: true,
+    completed: false,
+    reward: { seeds: 35, starShards: 0, affinity: 0 },
+  },
+  {
+    id: "c2_4",
+    step: 2,
+    title: "오늘 잘한 점 하나 찾기",
+    emoji: "⭐",
+    description: '"숨만 쉬었다"도 괜찮아요. 오늘 내가 한 것 중 잘한 점 하나를 찾아봐요.',
+    requiresPhoto: false,
+    completed: false,
+    reward: { seeds: 35, starShards: 0, affinity: 0 },
   },
 ]
+
+const TEMP_STEPS = [
+  { step: 1, unlocked: true, completedCount: 0, unlockNeeded: 0 },
+  { step: 2, unlocked: false, completedCount: 0, unlockNeeded: 3 },
+]
+
+const DISPLAY_COUNT = 4
 
 // ─── 미션 화면 전용 색상 (Figma 원본) ──────────────────────────────────────
 
@@ -69,27 +134,19 @@ const CHARACTER_EMOJI = {
   bear: "🐻",
 }
 
-// ─── 애니메이션 매핑 ────────────────────────────────────────────────────────
+// ─── 애니메이션 매핑 (CSS Module class) ───────────────────────────────────
 
-const ANIM_MAP: Record<string, string> = {
-  walk: "mascotWalk",
-  stretch: "mascotStretch",
-  drink: "mascotDrink",
-  eat: "mascotEat",
-  rest: "mascotRest",
-  look: "mascotLook",
-  write: "mascotWrite",
-  music: "mascotMusic",
-  photo: "mascotPhoto",
-  default: "float",
-}
-
-const ANIM_DURATION: Record<string, string> = {
-  rest: "2.4s",
-  look: "2.4s",
-  default: "3s",
-  eat: "0.9s",
-  music: "1s",
+const ANIM_CLASS: Record<string, string> = {
+  walk: styles.mascotWalk,
+  stretch: styles.mascotStretch,
+  drink: styles.mascotDrink,
+  eat: styles.mascotEat,
+  rest: styles.mascotRest,
+  look: styles.mascotLook,
+  write: styles.mascotWrite,
+  music: styles.mascotMusic,
+  photo: styles.mascotPhoto,
+  default: styles.mascotFloat,
 }
 
 const ANIM_CAPTION: Record<string, string> = {
@@ -121,8 +178,6 @@ function getMissionAnimType(mission: { title: string; emoji: string }): string {
 
 // ─── Mission modal ──────────────────────────────────────────────────────────
 
-type TempMission = (typeof TEMP_MISSIONS)[number]
-
 interface MissionModalProps {
   mission: TempMission
   color: string
@@ -137,8 +192,7 @@ function MissionModal({ mission, color, bg, mascotEmoji, onClose }: MissionModal
   const fileRef = useRef<HTMLInputElement>(null)
 
   const animType = getMissionAnimType(mission)
-  const animName = ANIM_MAP[animType] ?? "float"
-  const animDur = ANIM_DURATION[animType] ?? "1.4s"
+  const animClass = ANIM_CLASS[animType] ?? styles.mascotFloat
   const caption = ANIM_CAPTION[animType] ?? ANIM_CAPTION.default
 
   function handleFile(e: React.ChangeEvent<HTMLInputElement>) {
@@ -200,11 +254,11 @@ function MissionModal({ mission, color, bg, mascotEmoji, onClose }: MissionModal
             ×
           </button>
           <div
+            className={animClass}
             style={{
               fontSize: 120,
               lineHeight: 1,
               display: "inline-block",
-              animation: `${animName} ${animDur} ease-in-out infinite`,
             }}
           >
             {mascotEmoji}
@@ -388,52 +442,125 @@ function MissionModal({ mission, color, bg, mascotEmoji, onClose }: MissionModal
   )
 }
 
-// ─── Main dashboard ─────────────────────────────────────────────────────────
+// ─── Step section (Figma 원본 기반) ────────────────────────────────────────
 
-export default function MissionDashboard() {
-  const [selected, setSelected] = useState<TempMission | null>(null)
+interface StepSectionProps {
+  step: number
+  missions: TempMission[]
+  unlocked: boolean
+  unlockNeeded: number
+  completedIds: string[]
+  color: string
+  bg: string
+  onSelect: (m: TempMission) => void
+}
 
-  const profile = TEMP_PROFILE
-  const color = CHARACTER_COLOR[profile.character]
-  const bg = CHARACTER_BG[profile.character]
-  const mascotEmoji = CHARACTER_EMOJI[profile.character]
+function StepSection({ step, missions, unlocked, unlockNeeded, completedIds, color, bg, onSelect }: StepSectionProps) {
+  const initQueue = useCallback(() => {
+    const undone = missions.filter((m) => !completedIds.includes(m.id)).map((m) => m.id)
+    const done = missions.filter((m) => completedIds.includes(m.id)).map((m) => m.id)
+    return [...undone, ...done].slice(0, DISPLAY_COUNT)
+  }, [missions, completedIds])
+
+  const [displayIds, setDisplayIds] = useState<string[]>(initQueue)
+  const [exitingIds, setExitingIds] = useState<Set<string>>(new Set())
+  const prevCompleted = useRef(new Set(completedIds))
+
+  useEffect(() => {
+    const newlyDone = completedIds.filter((id) => !prevCompleted.current.has(id))
+    prevCompleted.current = new Set(completedIds)
+
+    newlyDone.forEach((id) => {
+      if (!displayIds.includes(id)) return
+      if (exitingIds.has(id)) return
+
+      setExitingIds((prev) => new Set([...prev, id]))
+
+      setTimeout(() => {
+        setExitingIds((prev) => {
+          const s = new Set(prev)
+          s.delete(id)
+          return s
+        })
+        setDisplayIds((prev) => {
+          const shown = new Set(prev)
+          const next = missions.find((m) => !completedIds.includes(m.id) && !shown.has(m.id))
+          if (!next) return prev
+          return prev.map((p) => (p === id ? next.id : p))
+        })
+      }, 300)
+    })
+  }, [completedIds, missions, displayIds, exitingIds])
+
+  const stepDone = missions.filter((m) => completedIds.includes(m.id)).length
 
   return (
-    <>
-      <div className="screen-enter" style={{ flex: 1, overflow: "hidden auto", padding: "32px 40px 56px" }}>
-        <div style={{ marginBottom: 28 }}>
-          <h1
-            style={{
-              fontFamily: "'Gowun Dodum', sans-serif",
-              fontSize: 28,
-              color: "#2A1F14",
-              margin: "0 0 6px",
-            }}
-          >
-            {mascotEmoji} 오늘의 미션
-          </h1>
-          <p style={{ color: "#7A6B58", fontSize: 14, margin: 0 }}>
-            {profile.nickname}님, 오늘도 작은 걸음을 함께 걸어요.
-          </p>
-        </div>
-
+    <div style={{ marginBottom: 32 }}>
+      <div style={{ display: "flex", alignItems: "center", gap: 12, marginBottom: 16 }}>
         <div
           style={{
-            display: "grid",
-            gridTemplateColumns: "repeat(4, 1fr)",
-            gap: 20,
+            width: 32,
+            height: 32,
+            borderRadius: "50%",
+            background: unlocked ? color : "#DDD0BC",
+            color: "white",
+            display: "flex",
+            alignItems: "center",
+            justifyContent: "center",
+            fontSize: 14,
+            fontWeight: 700,
+            flexShrink: 0,
           }}
         >
-          {TEMP_MISSIONS.map((mission) => (
+          {step}
+        </div>
+        <div style={{ flex: 1 }}>
+          <span style={{ fontFamily: "'Gowun Dodum', sans-serif", fontSize: 17, color: unlocked ? "#2A1F14" : "#9A8A76" }}>
+            {step === 1 ? "첫 걸음" : step === 2 ? "한 걸음 더" : `${step}단계`}
+          </span>
+          {!unlocked && (
+            <span style={{ marginLeft: 10, fontSize: 12, color: "#9A8A76" }}>
+              🔒 이전 단계 {unlockNeeded}개 완료 시 해제
+            </span>
+          )}
+        </div>
+        <span
+          style={{
+            fontSize: 13,
+            color: "#9A8A76",
+            background: "#F0EAD8",
+            padding: "4px 12px",
+            borderRadius: 99,
+          }}
+        >
+          {stepDone}/{missions.length} 완료
+        </span>
+      </div>
+
+      <div
+        style={{
+          display: "grid",
+          gridTemplateColumns: "repeat(4, 1fr)",
+          gap: 20,
+          opacity: unlocked ? 1 : 0.4,
+          pointerEvents: unlocked ? "auto" : "none",
+        }}
+      >
+        {displayIds.map((id) => {
+          const mission = missions.find((m) => m.id === id)
+          if (!mission) return null
+          const done = completedIds.includes(id)
+          const exiting = exitingIds.has(id)
+          return (
             <button
-              key={mission.id}
-              onClick={() => setSelected(mission)}
-              className="card-hover mission-slide-in"
+              key={id}
+              onClick={() => onSelect(mission)}
+              className={`card-hover ${exiting ? styles.missionSlideOut : styles.missionSlideIn}`}
               style={{
-                background: mission.completed ? bg : "#FDFBF5",
+                background: done ? bg : "#FDFBF5",
                 borderRadius: 18,
                 padding: "24px",
-                border: `1.5px solid ${mission.completed ? color + "55" : "#DDD0BC"}`,
+                border: `1.5px solid ${done ? color + "55" : "#DDD0BC"}`,
                 cursor: "pointer",
                 textAlign: "left",
               }}
@@ -463,10 +590,85 @@ export default function MissionDashboard() {
                   🌱 +{mission.reward.seeds}
                 </span>
               </div>
-              {mission.completed && <div style={{ marginTop: 8, fontSize: 12, color, fontWeight: 700 }}>완료 ✓</div>}
+              {done && <div style={{ marginTop: 8, fontSize: 12, color, fontWeight: 700 }}>완료 ✓</div>}
             </button>
-          ))}
+          )
+        })}
+      </div>
+    </div>
+  )
+}
+
+// ─── Main dashboard ─────────────────────────────────────────────────────────
+
+export default function MissionDashboard() {
+  const [selected, setSelected] = useState<TempMission | null>(null)
+
+  const profile = TEMP_PROFILE
+  const color = CHARACTER_COLOR[profile.character]
+  const bg = CHARACTER_BG[profile.character]
+  const mascotEmoji = CHARACTER_EMOJI[profile.character]
+
+  const completedIds: string[] = [] // TODO: 3단계에서 서버 응답으로 교체
+
+  return (
+    <>
+      <div className="screen-enter" style={{ flex: 1, overflow: "hidden auto", padding: "32px 40px 56px", background: "#F5F0E8", position: "relative" }}>
+        {/* 하트 버튼 (Figma 원본 챗봇 버튼 위치) */}
+        <button
+          style={{
+            position: "absolute",
+            top: 20,
+            right: 24,
+            zIndex: 100,
+            width: 48,
+            height: 48,
+            borderRadius: "50%",
+            background: "#FDFBF5",
+            border: "2px solid #DDD0BC",
+            cursor: "pointer",
+            fontSize: 22,
+            display: "flex",
+            alignItems: "center",
+            justifyContent: "center",
+            boxShadow: "0 2px 10px rgba(0,0,0,0.08)",
+            transition: "all 0.2s",
+          }}
+          aria-label="마음 친구"
+        >
+          🤍
+        </button>
+
+        <div style={{ marginBottom: 28 }}>
+          <h1
+            style={{
+              fontFamily: "'Gowun Dodum', sans-serif",
+              fontSize: 28,
+              color: "#2A1F14",
+              margin: "0 0 6px",
+            }}
+          >
+            {mascotEmoji} 오늘의 미션
+          </h1>
+          <p style={{ color: "#9A8A76", fontSize: 14, margin: 0 }}>작은 한 걸음이 큰 변화를 만들어요. 할 수 있는 것부터 천천히.</p>
         </div>
+
+        {TEMP_STEPS.map((stepInfo) => {
+          const stepMissions = TEMP_MISSIONS.filter((m) => m.step === stepInfo.step)
+          return (
+            <StepSection
+              key={stepInfo.step}
+              step={stepInfo.step}
+              missions={stepMissions}
+              unlocked={stepInfo.unlocked}
+              unlockNeeded={stepInfo.unlockNeeded}
+              completedIds={completedIds}
+              color={color}
+              bg={bg}
+              onSelect={setSelected}
+            />
+          )
+        })}
       </div>
 
       {selected && <MissionModal mission={selected} color={color} bg={bg} mascotEmoji={mascotEmoji} onClose={() => setSelected(null)} />}
