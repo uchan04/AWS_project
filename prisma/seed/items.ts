@@ -1,6 +1,6 @@
 import type { Prisma, PrismaClient } from "@prisma/client"
 
-// 소유자: C. 펫·캐릭터 6종 + 가챠 치장 9종 + 친밀도 전용 치장 3종.
+// 소유자: C. 펫·캐릭터 6종 + 치장 9종 + 친밀도 전용 치장 3종.
 // 이미지는 아직 없다. imageKey는 아래 규칙으로 미리 고정했으니 같은 이름으로 S3에 올린다.
 //   펫:   pets/{base}-{1|2|3}.png   (stageCount가 1이면 pets/{base}.png)
 //   치장: cosmetics/{key}.png
@@ -59,9 +59,9 @@ const PET_SKINS: Prisma.PetSkinCreateInput[] = [
   },
 ]
 
-// 가챠 풀 9종. 등급 분포는 일반 3 / 희귀 3 / 영웅 2 / 전설 1 (SPEC.md 5절).
-// 컬러는 tribeColor로 표현한다. AMBER=개과, LAVENDER=고양잇과, SAGE=곰과
-const GACHA_COSMETICS: Prisma.CosmeticItemCreateInput[] = [
+// 가챠 기능 컷(2026-08-19, 팀 결정)으로 획득 경로 미정. 컬러는 tribeColor로 표현한다.
+// AMBER=개과, LAVENDER=고양잇과, SAGE=곰과. 획득 경로는 docs/dev/pet.md 참고
+const SHOP_COSMETICS: Prisma.CosmeticItemCreateInput[] = [
   { name: "앰버 모자", slot: "HAT", rarity: "COMMON", tribeColor: "INDEPENDENT_LOW_INCOME", imageKey: "cosmetics/hat-amber.png" },
   { name: "라벤더 모자", slot: "HAT", rarity: "RARE", tribeColor: "HEALTH_EMOTION", imageKey: "cosmetics/hat-lavender.png" },
   { name: "세이지 모자", slot: "HAT", rarity: "EPIC", tribeColor: "FAMILY_LIVING", imageKey: "cosmetics/hat-sage.png" },
@@ -75,7 +75,7 @@ const GACHA_COSMETICS: Prisma.CosmeticItemCreateInput[] = [
   { name: "라벤더 배경", slot: "BACKGROUND", rarity: "EPIC", tribeColor: "HEALTH_EMOTION", imageKey: "cosmetics/bg-lavender.png" },
 ]
 
-// 친밀도 상점 전용 3종. affinityOnly=true이므로 가챠 추첨 풀에서 반드시 제외한다.
+// 친밀도 상점 전용 3종. affinityOnly=true로 구분한다.
 const AFFINITY_COSMETICS: Prisma.CosmeticItemCreateInput[] = [
   { name: "밤별 모자", slot: "HAT", rarity: "EPIC", tribeColor: "HEALTH_EMOTION", affinityOnly: true, priceAffinity: 200, imageKey: "cosmetics/hat-night.png" },
   { name: "밤별 목도리", slot: "SCARF", rarity: "EPIC", tribeColor: "HEALTH_EMOTION", affinityOnly: true, priceAffinity: 200, imageKey: "cosmetics/scarf-night.png" },
@@ -87,7 +87,7 @@ export async function seedItems(prisma: PrismaClient) {
     await prisma.petSkin.upsert({ where: { name: skin.name }, update: skin, create: skin })
   }
 
-  const cosmetics = [...GACHA_COSMETICS, ...AFFINITY_COSMETICS]
+  const cosmetics = [...SHOP_COSMETICS, ...AFFINITY_COSMETICS]
   for (const item of cosmetics) {
     await prisma.cosmeticItem.upsert({ where: { name: item.name }, update: item, create: item })
   }

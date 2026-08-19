@@ -155,32 +155,12 @@ S3 presigned URL로 브라우저가 S3에 직접 업로드하고, 업로드 성�
 | 재화 | 획득 경로 | 사용처 |
 |---|---|---|
 | 씨앗 | 일일 미션, 단계 미션, 방치형 자동 획득 | 펫 경험치 투입 |
-| 별조각 | 일일 퀘스트 전체 완료, streak 7일 달성, 단계 미션 클리어, 가챠 중복 환급 | 가챠 1회 = 10개 |
+| 별조각 | 일일 퀘스트 전체 완료, streak 7일 달성, 단계 미션 클리어 | 미정 (가챠 기능 컷으로 소모처 없음. 2026-08-19 팀 결정) |
 | 친밀도 | AI 챗봇 대화, 커뮤니티 활동(글 작성·댓글) | 친밀도 전용 치장 아이템, 친밀도 전용 캐릭터 구매 |
 
 친밀도는 **하루 최대 100까지만** 지급한다. 챗봇 1턴 5, 글 작성 20, 댓글 5로 하고 누계가 100에 도달하면 이후 지급은 0이다. `User.affinityToday`와 `affinityTodayDate`를 접속 시점에 비교해 리셋한다(미션 초기화와 같은 패턴).
 
 오프라인 모임 기능을 추후 구현하면 모임 참석 시 친밀도를 대량 지급한다. 이번 범위에는 포함하지 않는다.
-
-### 가챠
-
-- 확률: 전설 0.6% / 영웅 9.4% / 희귀 40% / 일반 50%
-- 영웅 천장: `heroPity`가 10에 도달하면 영웅 이상 확정. 영웅 이상 획득 시 리셋
-- 전설 천장: `legendPity`가 80에 도달하면 전설 확정. 전설 획득 시 리셋
-- 1회 10 별조각. 확률과 천장 수치는 가챠 화면에 공개 표기
-
-**아이템 9종과 등급 배분** — 3부위 × 3컬러다. 등급은 아래처럼 배분한다.
-
-| 부위 | 일반 | 희귀 | 영웅 | 전설 |
-|---|---|---|---|---|
-| 모자 | 1 | 1 | 1 | - |
-| 목도리 | 1 | 1 | - | 1 |
-| 배경 | 1 | 1 | 1 | - |
-| 합계 | 3 | 3 | 2 | 1 |
-
-**중복 획득 처리** — 이미 보유한 아이템이 나오면 `UserCosmetic`을 만들지 않고 별조각을 환급한다. 환급량은 일반 2 / 희귀 5 / 영웅 20 / 전설 50이다. `GachaPull`에는 `wasDuplicate`, `refundShards`와 함께 기록을 남긴다. 이 처리가 없으면 유니크 제약 때문에 500 에러가 난다.
-
-**시연 관련 주의**: 1회 10 별조각이므로 전설 천장 80회는 800 별조각이다. 정상 플레이로는 60일 이상 걸려 녹화에서 천장 연출을 찍을 수 없다. 데모 계정에 별조각 1000개를 시드해서 실제 80회 연출을 촬영한다. 밸런스는 손대지 않는다.
 
 ### 친밀도 전용 캐릭터
 
@@ -198,7 +178,9 @@ S3 presigned URL로 브라우저가 S3에 직접 업로드하고, 업로드 성�
 
 ### 친밀도 전용 치장 아이템
 
-가챠 9종과 별개로 3종(모자·목도리·배경 각 1개)을 친밀도 상점에 둔다. 가격은 각 친밀도 200, 등급 표기는 영웅이다. `CosmeticItem.affinityOnly = true`로 구분하고, **가챠 추첨 풀에서는 반드시 제외한다.**
+3종(모자·목도리·배경 각 1개)을 친밀도 상점에 둔다. 가격은 각 친밀도 200, 등급 표기는 영웅이다. `CosmeticItem.affinityOnly = true`로 구분한다.
+
+**가챠 기능 컷 (2026-08-19, 팀 결정)** — 확률형 뽑기·천장(`heroPity`/`legendPity`)·`GachaPull` 모델을 전부 제외했다. 가챠 풀로 기획됐던 치장 9종(`prisma/seed/items.ts`의 `SHOP_COSMETICS`)은 스키마·시드에 남아 있지만 **획득 경로가 미정이다.** 별조각도 이 경로가 사라져 소모처가 없다. 두 문제는 팀 논의로 별도 결정이 필요하다(예: 씨앗 상점, 단계 보상 직접 지급 등).
 
 ### 출석 보상 캘린더
 
@@ -232,10 +214,10 @@ export async function getCurrentUser(): Promise<User>
 
 ### `lib/reward.ts` — 소유자 C
 
-캐릭터 고유 효과는 이 한 함수에서만 적용한다. 미션 보상, 방치형 수령, 출석 보상, 챗봇·커뮤니티 친밀도 지급, 가챠 중복 환급이 전부 이 함수를 통과해야 한다.
+캐릭터 고유 효과는 이 한 함수에서만 적용한다. 미션 보상, 방치형 수령, 출석 보상, 챗봇·커뮤니티 친밀도 지급이 전부 이 함수를 통과해야 한다.
 
 ```ts
-// lib/reward.ts — 소유자: C (펫·가챠 담당)
+// lib/reward.ts — 소유자: C (펫 담당)
 type RewardInput = { seeds?: number; starShards?: number; affinity?: number }
 
 export function calculateReward(skin: PetSkin | null, base: RewardInput): RewardInput
@@ -317,8 +299,7 @@ Cognito 기반 인증, Amplify 관리형 HTTPS 강제, Prisma parameterized quer
 | `User.affinityToday` / `affinityTodayDate` | 친밀도 일일 상한 100 계산. 접속 시점 비교로 리셋 |
 | `User.attendanceTotal` | 출석 `dayIndex`를 7일 주기로 계산하기 위한 누적값 |
 | `PetSkin.stageCount` | 기본 펫은 3(진화), 친밀도 캐릭터는 1(단일 형태). 이미지 키 suffix 유무를 결정 |
-| `CosmeticItem.affinityOnly` | `true`면 친밀도 상점 전용. 가챠 추첨 풀에서 제외 |
-| `GachaPull.wasDuplicate` / `refundShards` | 중복 획득 시 환급 기록 |
+| `CosmeticItem.affinityOnly` | `true`면 친밀도 상점 전용 |
 | `Post.galleryType` | 작성 시점 갤러리를 글에 박아둔다. 재진단으로 유형이 바뀌어도 글은 이동하지 않는다 |
 | `Post.likeCount` / `commentCount` | 비정규화 컬럼. 목록에서 집계 쿼리를 피하기 위한 것이며 좋아요·댓글 API에서 함께 갱신한다 |
 
@@ -331,7 +312,6 @@ Cognito 기반 인증, Amplify 관리형 HTTPS 강제, Prisma parameterized quer
 /api/missions/*     B
 /api/upload/*       B   (presigned URL 발급)
 /api/pet/*          C
-/api/gacha/*        C
 /api/community/*    D
 /api/chat/*         D
 /api/auth/*         E
@@ -358,6 +338,7 @@ HTTP 상태 코드는 `200` `400` `401` `404` `500`만 쓴다. `message`는 화�
 - 사진 미션의 Bedrock 비전 판정
 - 커뮤니티 이미지 업로드, 신고·차단
 - 커뮤니티 협력형 지표(전체 미션 달성 합계)
+- 가챠(확률형 뽑기): 2026-08-19 중간 체크포인트에서 팀 결정으로 컷. 개발 리소스 대비 우선순위가 낮다고 판단. 치장 아이템 9종의 대체 획득 경로와 별조각 소모처는 미정
 
 ---
 

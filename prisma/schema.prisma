@@ -80,9 +80,6 @@ model User {
   activePetSkinId String?
   activePetSkin   PetSkin? @relation("ActiveSkin", fields: [activePetSkinId], references: [id])
 
-  heroPity   Int @default(0)
-  legendPity Int @default(0)
-
   streakCount    Int       @default(0)
   lastStreakDate DateTime?
 
@@ -96,7 +93,6 @@ model User {
   missions     UserMission[]
   petSkins     UserPetSkin[]
   cosmetics    UserCosmetic[]
-  gachaPulls   GachaPull[]
   posts        Post[]
   comments     Comment[]
   likes        PostLike[]
@@ -189,14 +185,13 @@ model CosmeticItem {
 
   tribeColor TypeCode // 컬러 계열. 3컬러를 TypeCode로 표현한다
 
-  // true면 친밀도 전용 상점 아이템이며 가챠 추첨 풀에서 제외한다.
+  // true면 친밀도 전용 상점 아이템
   affinityOnly  Boolean @default(false)
   priceAffinity Int?
 
   imageKey String
 
   owners UserCosmetic[]
-  pulls  GachaPull[]
 }
 
 model UserCosmetic {
@@ -210,24 +205,6 @@ model UserCosmetic {
   item CosmeticItem @relation(fields: [itemId], references: [id])
 
   @@unique([userId, itemId])
-}
-
-model GachaPull {
-  id       String   @id @default(cuid())
-  userId   String
-  itemId   String
-  rarity   Rarity
-  wasPity  Boolean  @default(false)
-  pulledAt DateTime @default(now())
-
-  // 이미 보유한 아이템이 나온 경우. UserCosmetic은 만들지 않고 별조각을 환급한다.
-  wasDuplicate Boolean @default(false)
-  refundShards Int     @default(0)
-
-  user User         @relation(fields: [userId], references: [id])
-  item CosmeticItem @relation(fields: [itemId], references: [id])
-
-  @@index([userId, pulledAt])
 }
 
 model AttendanceClaim {
