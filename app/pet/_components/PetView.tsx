@@ -1,6 +1,7 @@
 "use client"
 
 import { useState } from "react"
+import Link from "next/link"
 import type { TypeCode } from "@prisma/client"
 import { IDLE_CAP_HOURS, IDLE_SEEDS_PER_HOUR, expProgress } from "@/lib/pet"
 import { SEED_TO_EXP, TRIBE, expToNextLevel } from "@/lib/types"
@@ -29,6 +30,8 @@ export type PetState = {
   idleSeeds: number
   /** 상한(12시간분)에 닿아 누적이 멈춘 상태인지 */
   idleCapped: boolean
+  /** 착용 중인 치장 이름. 이미지가 없어 이름 배지로만 보여준다 */
+  worn: string[]
   animal: string
   family: string
   colorName: string
@@ -142,6 +145,15 @@ export default function PetView({ initial }: { initial: PetState }) {
             {pet.stageCount > 1 ? `${pet.evolutionStage}단계` : "단일 형태"} · {pet.colorName}
           </span>
           {pet.effectLabel ? <span className="hm-pill">{pet.effectLabel}</span> : null}
+          {pet.worn.length > 0 ? (
+            <span className="hm-pet__worn">
+              {pet.worn.map((name) => (
+                <span className="hm-pill" key={name}>
+                  {name}
+                </span>
+              ))}
+            </span>
+          ) : null}
         </div>
 
         <div className="hm-card">
@@ -228,6 +240,11 @@ export default function PetView({ initial }: { initial: PetState }) {
             </p>
           ) : null}
         </div>
+
+        {/* 치장 화면으로. design.md의 tertiary(밑줄 링크)다 — primary는 위에 이미 하나 있다 */}
+        <Link className="hm-link" href="/pet/cosmetics">
+          치장 꾸미기
+        </Link>
       </div>
 
       {evolvedTo ? (

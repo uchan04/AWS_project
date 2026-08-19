@@ -57,3 +57,24 @@
   font-size: var(--text-lg);
   margin: 0;
 }
+
+/* 치장 타일. 버튼이 타일 아래에 붙으므로 위쪽 여백만 준다 */
+.hm-pet__cos .hm-btn {
+  margin-top: var(--space-3xs);
+}
+
+/* 미획득 실루엣 (SPEC.md 5절). 이미지가 없어 지금은 글자를 죽여 둔다.
+   이미지가 오면 아래에 .hm-pet__cos--locked img { filter: brightness(0) opacity(.28) }를
+   더하면 된다 — 새 색 값을 만들지 않고 실루엣이 된다 */
+.hm-pet__cos--locked .hm-tile__title {
+  color: var(--color-muted);
+  font-weight: 400;
+}
+
+/* 착용 중인 치장 줄. 펫 화면에서 원판 아래에 붙는다 */
+.hm-pet__worn {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--space-3xs);
+  justify-content: center;
+}

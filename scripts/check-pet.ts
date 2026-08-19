@@ -6,6 +6,7 @@ import {
   MS_PER_IDLE_SEED,
   applySeeds,
   cappedStage,
+  compareCosmetics,
   expProgress,
   idleAccrual,
 } from "../lib/pet"
@@ -167,5 +168,33 @@ assert.equal(skewed.nextClaimAt.getTime(), at(HOUR).getTime())
 
 // 같은 시각이면 0개
 assert.equal(idleAccrual(T0, T0).seeds, 0)
+
+// ── 치장 목록 정렬 ────────────────────────────────────────────────────────────
+// 화면과 API가 같은 함수를 쓴다. 순서가 바뀌면 여기서 걸린다
+
+const cos = (name: string, slot: "HAT" | "SCARF" | "BACKGROUND", rarity: "COMMON" | "RARE" | "EPIC" | "LEGENDARY") =>
+  ({ name, slot, rarity }) as const
+
+assert.deepEqual(
+  [
+    cos("이끼 배경", "BACKGROUND", "COMMON"),
+    cos("노을 목도리", "SCARF", "LEGENDARY"),
+    cos("새벽 목도리", "SCARF", "COMMON"),
+    cos("이끼 모자", "HAT", "EPIC"),
+    cos("노을 모자", "HAT", "COMMON"),
+  ]
+    .sort(compareCosmetics)
+    .map((item) => item.name),
+  // 슬롯(모자 → 목도리 → 배경) → 등급(일반 → 희귀 → 영웅 → 전설) 순
+  ["노을 모자", "이끼 모자", "새벽 목도리", "노을 목도리", "이끼 배경"],
+)
+
+// 슬롯·등급이 같으면 이름 가나다순 (매 요청마다 순서가 흔들리지 않게)
+assert.deepEqual(
+  [cos("이끼 모자", "HAT", "EPIC"), cos("밤별 모자", "HAT", "EPIC")]
+    .sort(compareCosmetics)
+    .map((item) => item.name),
+  ["밤별 모자", "이끼 모자"],
+)
 
 console.log("pet 체크 통과")

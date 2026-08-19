@@ -1,5 +1,6 @@
 import { getCurrentUserWithSkin } from "@/lib/auth"
 import { cappedStage, idleAccrual } from "@/lib/pet"
+import { prisma } from "@/lib/prisma"
 import { calculateReward } from "@/lib/reward"
 import { TRIBE } from "@/lib/types"
 import PetView, { type PetState } from "./_components/PetView"
@@ -35,6 +36,12 @@ export default async function PetPage() {
     const idle = idleAccrual(user.lastIdleClaimAt, new Date())
     const idleSeeds = calculateReward(skin, { seeds: idle.seeds }).seeds ?? 0
 
+    // 착용 중인 치장. 이미지가 아직 없어 이름만 배지로 보여준다 (SPEC.md 5절)
+    const worn = await prisma.userCosmetic.findMany({
+      where: { userId: user.id, equipped: true },
+      select: { item: { select: { name: true } } },
+    })
+
     state = {
       level: user.level,
       exp: user.exp,
@@ -42,6 +49,7 @@ export default async function PetPage() {
       seeds: user.seeds,
       idleSeeds,
       idleCapped: idle.capped,
+      worn: worn.map((row) => row.item.name),
       animal: skin?.name ?? tribe.animal,
       family: tribe.family,
       colorName: tribe.colorName,

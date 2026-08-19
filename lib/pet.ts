@@ -1,3 +1,4 @@
+import type { Rarity, Slot } from "@prisma/client"
 import { SEED_TO_EXP, evolutionStageFor, expToNextLevel } from "@/lib/types"
 
 // 소유자: C. 펫 성장 계산. 순수 함수만 둔다 (DB·요청 객체를 모르게 유지해야 체크 스크립트로 검증된다).
@@ -71,6 +72,26 @@ export function expProgress(level: number, exp: number): number {
   const need = expToNextLevel(Math.max(1, level))
   if (need <= 0) return 0
   return Math.min(1, Math.max(0, exp / need))
+}
+
+// ── 치장 목록 정렬 (SPEC.md 5절) ──────────────────────────────────────────────
+//
+// 화면(app/pet/cosmetics/page.tsx)과 API(app/api/pet/cosmetics)가 같은 목록을 만든다.
+// 정렬을 각자 두면 조용히 어긋나므로 여기 한 곳에 둔다. DB를 모르는 순수 비교 함수다.
+
+export const COSMETIC_SLOT_ORDER: readonly Slot[] = ["HAT", "SCARF", "BACKGROUND"]
+export const COSMETIC_RARITY_ORDER: readonly Rarity[] = ["COMMON", "RARE", "EPIC", "LEGENDARY"]
+
+/** 슬롯 → 등급 → 이름 순. 화면이 매번 같은 순서로 보이게 고정한다 */
+export function compareCosmetics(
+  a: { slot: Slot; rarity: Rarity; name: string },
+  b: { slot: Slot; rarity: Rarity; name: string },
+): number {
+  return (
+    COSMETIC_SLOT_ORDER.indexOf(a.slot) - COSMETIC_SLOT_ORDER.indexOf(b.slot) ||
+    COSMETIC_RARITY_ORDER.indexOf(a.rarity) - COSMETIC_RARITY_ORDER.indexOf(b.rarity) ||
+    a.name.localeCompare(b.name, "ko")
+  )
 }
 
 // ── 방치형 자동 획득 (SPEC.md 5절) ────────────────────────────────────────────
