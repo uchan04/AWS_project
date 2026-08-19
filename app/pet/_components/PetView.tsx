@@ -2,7 +2,7 @@
 
 import { useState } from "react"
 import type { TypeCode } from "@prisma/client"
-import { expProgress } from "@/lib/pet"
+import { IDLE_CAP_HOURS, IDLE_SEEDS_PER_HOUR, expProgress } from "@/lib/pet"
 import { SEED_TO_EXP, TRIBE, expToNextLevel } from "@/lib/types"
 import "@/styles/tokens.css"
 import "../pet.css"
@@ -12,7 +12,9 @@ import "../pet.css"
 // 스타일은 design.md가 정한다. Hallmark · editorial / soft.
 // - 종족색은 data-tribe로만 넣는다. style={{ backgroundColor }}를 쓰지 않는다
 // - 색 면적은 종족 원판 1개 + 희석된 면 1개까지. 그래서 경험치 바와 CTA는 accent를 쓴다
-// - Primary CTA는 화면에 하나뿐이다. 나머지 씨앗 버튼은 ghost다
+// - Primary CTA는 화면에 하나뿐이다. 나머지 씨앗 버튼은 ghost다.
+//   방치형으로 모인 씨앗이 있으면 그것을 받는 것이 더 앞선 행동이라 "받기"가 primary가 되고
+//   "전부 넣기"가 ghost로 내려간다. 어느 상태에서도 primary는 하나다
 //
 // 이미지 9장이 아직 없어 동물 이모지를 원판 자리에 쓴다. 장식이므로 aria-hidden을 붙이고
 // 종족·동물 이름은 옆에 글자로 따로 쓴다.
@@ -23,6 +25,10 @@ export type PetState = {
   exp: number
   evolutionStage: number
   seeds: number
+  /** 방치형으로 모여 있는(아직 안 받은) 씨앗. 배율까지 적용된 값이다 */
+  idleSeeds: number
+  /** 상한(12시간분)에 닿아 누적이 멈춘 상태인지 */
+  idleCapped: boolean
   animal: string
   family: string
   colorName: string
@@ -96,6 +102,29 @@ export default function PetView({ initial }: { initial: PetState }) {
     }
   }
 
+  // 방치형 수령. 서버가 지급량을 다시 계산하므로 화면의 숫자를 보내지 않는다 (SPEC.md 5절)
+  async function claim() {
+    if (pending || pet.idleSeeds < 1) return
+    setPending(true)
+    setError(null)
+
+    try {
+      const res = await fetch("/api/pet/idle", { method: "POST" })
+      const json = await res.json()
+
+      if (!res.ok) {
+        setError(json?.error?.message ?? "잠시 후 다시 시도해 주세요")
+        return
+      }
+
+      setPet((prev) => ({ ...prev, seeds: json.data.seeds, idleSeeds: 0, idleCapped: false }))
+    } catch {
+      setError("네트워크 연결을 확인해 주세요")
+    } finally {
+      setPending(false)
+    }
+  }
+
   return (
     <main className="hm hm--canvas" data-tribe={pet.typeCode ?? undefined}>
       <div className="hm__col hm-pet">
@@ -134,6 +163,31 @@ export default function PetView({ initial }: { initial: PetState }) {
           </div>
         </div>
 
+        {pet.idleSeeds > 0 ? (
+          <div className="hm-card">
+            <div className="hm-status">
+              <span className="hm-row__label">모인 씨앗</span>
+              <span className="hm__note">{pet.idleSeeds}개</span>
+            </div>
+            <p className="hm__note">
+              {pet.idleCapped
+                ? `한 번에 모이는 양(${IDLE_CAP_HOURS}시간분)을 채웠어요. 받아 가면 다시 모여요.`
+                : `자리를 비운 동안 모였어요. 시간마다 ${IDLE_SEEDS_PER_HOUR}개씩 쌓여요.`}
+            </p>
+            <div className="hm-pet__acts">
+              <button
+                type="button"
+                onClick={claim}
+                disabled={pending}
+                aria-disabled={pending}
+                className="hm-btn"
+              >
+                {pet.idleSeeds}개 받기
+              </button>
+            </div>
+          </div>
+        ) : null}
+
         <div className="hm-card">
           <div className="hm-status">
             <span className="hm-row__label">가진 씨앗</span>
@@ -158,7 +212,8 @@ export default function PetView({ initial }: { initial: PetState }) {
               onClick={() => feed(pet.seeds)}
               disabled={pending || pet.seeds < 1}
               aria-disabled={pending || pet.seeds < 1}
-              className="hm-btn"
+              // 받을 씨앗이 남아 있으면 그쪽이 primary다. 화면에 primary는 하나만 둔다
+              className={pet.idleSeeds > 0 ? "hm-btn hm-btn--ghost" : "hm-btn"}
             >
               전부 넣기
             </button>

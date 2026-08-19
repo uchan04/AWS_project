@@ -1,5 +1,14 @@
 import assert from "node:assert/strict"
-import { applySeeds, cappedStage, expProgress } from "../lib/pet"
+import {
+  IDLE_CAP_HOURS,
+  IDLE_MAX_SEEDS,
+  IDLE_SEEDS_PER_HOUR,
+  MS_PER_IDLE_SEED,
+  applySeeds,
+  cappedStage,
+  expProgress,
+  idleAccrual,
+} from "../lib/pet"
 import { EVOLUTION_LEVEL, SEED_TO_EXP, expToNextLevel } from "../lib/types"
 
 // npm run check:pet
@@ -99,5 +108,64 @@ assert.equal(expProgress(2, 100), 0.5)
 assert.equal(expProgress(1, 100), 1)
 assert.equal(expProgress(1, 999), 1)
 assert.equal(expProgress(1, -5), 0)
+
+// ── 방치형 자동 획득 (SPEC.md 5절) ────────────────────────────────────────────
+
+// 수치를 먼저 못 박는다. 상한 12시간분은 명세값, 2/시간은 C가 정한 값이다
+assert.equal(IDLE_CAP_HOURS, 12)
+assert.equal(IDLE_SEEDS_PER_HOUR, 2)
+assert.equal(IDLE_MAX_SEEDS, 24)
+assert.equal(MS_PER_IDLE_SEED, 30 * 60 * 1000) // 30분에 1개
+
+const T0 = new Date("2026-08-19T00:00:00.000Z")
+const at = (ms: number) => new Date(T0.getTime() + ms)
+const MIN = 60 * 1000
+const HOUR = 60 * MIN
+
+// 첫 접속은 소급 지급하지 않고 기준 시각만 심는다
+const first = idleAccrual(null, T0)
+assert.equal(first.seeds, 0)
+assert.equal(first.nextClaimAt.getTime(), T0.getTime())
+assert.equal(first.capped, false)
+
+// 30분에 1개. 29분에는 0개다
+assert.equal(idleAccrual(T0, at(29 * MIN)).seeds, 0)
+assert.equal(idleAccrual(T0, at(30 * MIN)).seeds, 1)
+assert.equal(idleAccrual(T0, at(HOUR)).seeds, IDLE_SEEDS_PER_HOUR)
+assert.equal(idleAccrual(T0, at(6 * HOUR)).seeds, 12)
+
+// 자투리 시간은 다음 수령으로 넘어간다. 45분 = 1개 + 15분치
+const partial = idleAccrual(T0, at(45 * MIN))
+assert.equal(partial.seeds, 1)
+assert.equal(partial.nextClaimAt.getTime(), at(30 * MIN).getTime()) // now가 아니다
+assert.equal(partial.msToNextSeed, 15 * MIN)
+
+// 자투리를 넘긴 뒤 15분 더 지나면 1개가 더 쌓인다 (자투리가 버려지지 않는지)
+assert.equal(idleAccrual(partial.nextClaimAt, at(60 * MIN)).seeds, 1)
+
+// 상한: 12시간분 24개에서 멈춘다. 3일을 비워도 같다
+assert.equal(idleAccrual(T0, at(12 * HOUR)).seeds, IDLE_MAX_SEEDS)
+assert.equal(idleAccrual(T0, at(72 * HOUR)).seeds, IDLE_MAX_SEEDS)
+
+// 상한을 넘긴 초과분은 버린다 — 기준 시각이 now로 밀린다.
+// 이게 아니면 24개를 받은 직후에 또 24개가 남아 무한 누적이 된다
+const over = idleAccrual(T0, at(72 * HOUR))
+assert.equal(over.capped, true)
+assert.equal(over.nextClaimAt.getTime(), at(72 * HOUR).getTime())
+assert.equal(idleAccrual(over.nextClaimAt, at(72 * HOUR)).seeds, 0)
+
+// 상한 직전은 capped가 아니고 자투리를 넘긴다
+const justUnder = idleAccrual(T0, at(12 * HOUR - MIN))
+assert.equal(justUnder.capped, false)
+assert.equal(justUnder.seeds, 23)
+assert.equal(justUnder.nextClaimAt.getTime(), at(11.5 * HOUR).getTime())
+
+// 기준 시각이 미래면(시계 오차) 지급하지 않고 기준을 그대로 둔다
+const skewed = idleAccrual(at(HOUR), T0)
+assert.equal(skewed.seeds, 0)
+assert.equal(skewed.nextClaimAt.getTime(), at(HOUR).getTime())
+
+// 같은 시각이면 0개
+assert.equal(idleAccrual(T0, T0).seeds, 0)
 
 console.log("pet 체크 통과")

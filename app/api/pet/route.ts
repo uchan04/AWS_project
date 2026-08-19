@@ -1,6 +1,7 @@
 import { fail, ok } from "@/lib/api"
 import { UnauthorizedError, getCurrentUserWithSkin } from "@/lib/auth"
-import { cappedStage } from "@/lib/pet"
+import { cappedStage, idleAccrual } from "@/lib/pet"
+import { calculateReward } from "@/lib/reward"
 
 // 소유자: C. 펫 화면 초기 상태. (SPEC.md 5절)
 
@@ -9,6 +10,10 @@ export async function GET() {
     const user = await getCurrentUserWithSkin()
     const stageCount = user.activePetSkin?.stageCount ?? 3
 
+    // 아직 안 받은 방치형 씨앗. 홈 화면(A)에서 "받을 씨앗 N개" 배지로도 쓸 수 있다.
+    // 지급은 POST /api/pet/idle 만 한다 — 조회에 쓰기를 섞지 않는다
+    const idle = idleAccrual(user.lastIdleClaimAt, new Date())
+
     return ok({
       level: user.level,
       exp: user.exp,
@@ -16,6 +21,11 @@ export async function GET() {
       // (미션 보상이 씨앗만 올리고 진화 단계를 갱신하지 않은 경우 등)
       evolutionStage: cappedStage(user.level, stageCount),
       seeds: user.seeds,
+      idle: {
+        seeds: calculateReward(user.activePetSkin, { seeds: idle.seeds }).seeds ?? 0,
+        capped: idle.capped,
+        msToNextSeed: idle.msToNextSeed,
+      },
       typeCode: user.typeCode,
       nickname: user.nickname,
       skin: user.activePetSkin

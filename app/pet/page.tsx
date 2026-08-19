@@ -1,5 +1,6 @@
 import { getCurrentUserWithSkin } from "@/lib/auth"
-import { cappedStage } from "@/lib/pet"
+import { cappedStage, idleAccrual } from "@/lib/pet"
+import { calculateReward } from "@/lib/reward"
 import { TRIBE } from "@/lib/types"
 import PetView, { type PetState } from "./_components/PetView"
 import "@/styles/tokens.css"
@@ -29,11 +30,18 @@ export default async function PetPage() {
     // 진단 전이면 typeCode가 없다. 기본 펫이 정해지기 전이므로 곰과 색을 임시로 쓴다.
     const tribe = user.typeCode ? TRIBE[user.typeCode] : TRIBE.FAMILY_LIVING
 
+    // 방치형으로 모인 씨앗을 화면에 미리 보여준다. 지급은 유저가 버튼을 눌렀을 때
+    // POST /api/pet/idle 이 한다 — 페이지를 열기만 해도 쓰기가 나가면 안 된다.
+    const idle = idleAccrual(user.lastIdleClaimAt, new Date())
+    const idleSeeds = calculateReward(skin, { seeds: idle.seeds }).seeds ?? 0
+
     state = {
       level: user.level,
       exp: user.exp,
       evolutionStage: cappedStage(user.level, stageCount),
       seeds: user.seeds,
+      idleSeeds,
+      idleCapped: idle.capped,
       animal: skin?.name ?? tribe.animal,
       family: tribe.family,
       colorName: tribe.colorName,
