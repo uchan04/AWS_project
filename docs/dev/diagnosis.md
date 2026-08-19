@@ -8,9 +8,9 @@
 **브랜치 규칙 (2026-08-19 변경).** A 담당분은 `feat/diagnosis`에 커밋한다. `main`에 직접 커밋하지 않고 PR로만 올린다. `prisma/schema.prisma` 변경분도 이 브랜치에 담고, 머지 여부와 `prisma migrate dev` 실행은 팀이 결정한다.
 
 ## 현재 상태
-- 완료: 미션 41개, 지표 14개 정의, 12문항 + 형용사 문항, `classify()`·`classifySub()`, 무손실 조기 종료, 스냅샷 체크, 화면 3장(진단·결과·홈), 화면 3장 디자인 시스템 적용 + Figma 팔레트·폰트 반영(12장)
-- 진행 중: 없음. DB 대기
-- 미착수: 완료 API, 닉네임 PATCH, Bedrock 호출 2종, 관리자 교차표
+- 완료: 미션 41개, 지표 14개 정의, 12문항 + 형용사 문항, `classify()`·`classifySub()`, 무손실 조기 종료, 스냅샷 체크, 화면 3장(진단·결과·홈), 화면 3장 디자인 시스템 적용 + Figma 팔레트·폰트 반영(12장), 진단 API 3종 + 화면 연결, `draft.ts` 제거
+- 진행 중: 없음. 2차 마이그레이션 대기(13장)
+- 미착수: Bedrock 호출 2종, 관리자 교차표, 홈의 펫·미션 실데이터(B·C API 대기)
 
 ## 구현한 파일
 - `lib/types.ts` — 종족·동물·색, 형용사 매핑, 기본 닉네임, 성장 곡선 상수
@@ -21,9 +21,12 @@
 - `lib/diagnosis/adaptive.ts` — `possibleTypes()` / `canDecide()` / `nextQuestion()`. 무손실 조기 종료
 - `scripts/check-diagnosis.ts` — `npm run check:diagnosis`
 - `app/diagnosis/page.tsx` — 진단 화면 한 장. 클라이언트 컴포넌트. 답변은 state에만 있고 문항마다 서버를 부르지 않는다. 진행 문구는 `canDecide()`로 갈린다(확정 전 "n번째 질문이에요", 확정 후 "거의 다 왔어요")
-- `app/diagnosis/draft.ts` — 답변을 결과 화면으로 넘기는 `sessionStorage` 통로. **완료 API가 붙으면 지운다**
-- `app/diagnosis/result/page.tsx` — 결과 화면. 종족·동물·색·기본 닉네임. 닉네임은 입력값 자체가 값이라 저장 버튼이 없다(PATCH는 DB 후)
-- `app/page.tsx` — 홈. 진단 전에는 시작 버튼 하나, 진단 후에는 종족 행 + 미션·커뮤니티 진입점
+- `app/api/diagnosis/complete/route.ts` — 답변을 받아 서버에서 판정하고 `User`·`DiagnosisSession`을 한 트랜잭션에 저장한다. 응답에 세부유형·지표를 넣지 않는다
+- `app/api/diagnosis/me/route.ts` — 현재 유저의 판정. 진단 전이면 `data: null`
+- `app/api/diagnosis/nickname/route.ts` — 닉네임 PATCH. 2~12자 검증
+- `app/diagnosis/api.ts` — 세 화면이 쓰는 호출부. `draft.ts`를 대신한다. `{data}`/`{error}` 봉투를 여기서만 벗긴다
+- `app/diagnosis/result/page.tsx` — 결과 화면. `GET /me`로 읽는다. 닉네임은 값을 바꿨을 때만 PATCH하고 홈으로 넘어간다
+- `app/page.tsx` — 홈. `GET /me`가 `null`이면 시작 화면, 있으면 종족 헤더 + 펫·미션·커뮤니티 진입점
 - `styles/tokens.css` — 화면 3장이 쓰는 디자인 토큰과 컴포넌트 클래스. `app/globals.css`(E 소유)를 고치지 않기 위해 전부 `.hm` 아래로 범위를 가둔다. 12장
 - `design.md` — 3화면이 공유하는 디자인 기준(색·타이포·모션·상태). 화면을 새로 만들 때 이 문서를 먼저 본다
 
@@ -40,19 +43,15 @@ DB가 아직 없다(`DATABASE_URL` 미공유). **DB가 필요 없는 것부터 �
 3. ~~조기 종료~~
 4. ~~스냅샷 체크~~
 
-### 2단계 — DB 없이 계속
+### 2단계 — DB 없이 계속 — **완료**
 
-5. ~~진단 화면~~ — 완료. 브라우저에서 실제로 클릭해 확인했다(첫 선택지 경로 9문항, 두 번째 선택지 경로 12문항)
-6. ~~홈 화면~~ — 완료
-7. ~~결과 화면~~ — 완료. 두 번째 선택지 경로에서 고양잇과·스카이 블루·"다정한 고양이"가 나오는 것까지 확인
-
-**화면 3장은 판정 결과를 클라이언트에서 계산한다.** 완료 API가 없어서다. `app/diagnosis/draft.ts`가 유일한 임시 지점이고, API가 붙으면 이 파일과 세 화면의 `classify()` 호출을 함께 지운다.
-
-`lib/diagnosis/classify.ts`가 클라이언트 번들에 들어가므로 세부유형 8개의 코드명이 브라우저 소스에 문자열로 남는다. 화면에 그리지는 않는다. API로 옮기면 사라진다.
+5. ~~진단 화면~~ — 브라우저에서 실제로 클릭해 확인했다(첫 선택지 경로 9문항, 두 번째 선택지 경로 12문항)
+6. ~~홈 화면~~
+7. ~~결과 화면~~ — 두 번째 선택지 경로에서 고양잇과·스카이 블루·"다정한 고양이"가 나오는 것까지 확인
 
 ### 3단계 — DB 연결 후
 
-8. 진단 완료 API, 닉네임 PATCH
+8. ~~진단 완료 API, 닉네임 PATCH~~ — 완료(10장). `draft.ts`와 화면의 `classify()` 호출을 함께 지웠다. 이제 판정 코드가 클라이언트 번들에 들어가지 않으므로 세부유형 코드명도 브라우저 소스에 남지 않는다
 9. 관리자 교차표 (대분류 × 세부유형)
 
 ### 4단계 — Bedrock 확인 후
@@ -74,10 +73,15 @@ DB가 아직 없다(`DATABASE_URL` 미공유). **DB가 필요 없는 것부터 �
 - 형용사는 마지막 문항 4지선다에 1:1 매핑. `lib/types.ts`의 `ADJECTIVE_BY_CHOICE` 상수 테이블
 - 진단 로직은 `lib/diagnosis/` 하위. `lib/types.ts`는 4명이 import하는 공유 파일이라 문항·판정 코드를 넣지 않는다
 - 화면은 선택지 버튼만으로 먼저 완성한다. Bedrock이 늦어져도 진단 플로우 전체가 동작해야 한다
+- **`GET /api/diagnosis/me`를 계약에 추가했다.** 원래 계약에는 완료 API와 닉네임 PATCH만 있었다. 결과 화면과 홈이 새로고침·직접 진입을 견뎌야 하는데, 판정 결과를 클라이언트에 다시 저장하면 `draft.ts`를 없앤 이유가 사라진다. 서버에 한 번 더 물어보는 쪽이 싸다
+- **재진단은 닉네임을 덮어쓰지 않는다.** 저장된 닉네임이 이전 판정의 기본 닉네임과 똑같을 때만 새 기본 닉네임으로 바꾼다. 유저가 직접 고친 이름은 유지되고, 종족이 바뀌었는데 "조용한 여우"가 남는 경우는 고쳐진다
+- **재진단은 레벨·경험치·재화·아이템·연속 기록을 건드리지 않는다.** 유형이 바뀌어도 키운 것은 남는다. 활성 펫 스킨만 새 유형의 기본 스킨으로 바꾼다
+- **완료 API는 기본 펫 스킨이 없어도 실패하지 않는다.** `npm run db:seed`가 C의 `items.ts` 때문에 아직 막혀 있어서, 시드 전에도 진단은 끝까지 되어야 한다
 - **6·7장의 기대값을 먼저 확정한 뒤 판정 함수를 구현한다.** 순서를 뒤집으면 구현 결과를 그대로 기대값으로 박게 되고, 테스트가 아무것도 검증하지 않는다. 이 테스트가 발표에서 제시할 정확도 근거다
 
 ## 3. 막힌 것
-- `DATABASE_URL` 미공유 (E 대기). 화면 작업에는 영향 없음
+- **2차 마이그레이션 미적용 (E 대기). 지금 진단 API 3종이 런타임에 전부 500이다.** DB에 `SubTypeCode` enum과 `User.subTypeCode`, `DiagnosisSession.subTypeCode`/`indicators`가 없다. Prisma는 모델의 모든 컬럼을 select하므로 `getCurrentUser()`의 upsert부터 `P2022: The column User.subTypeCode does not exist`로 죽는다. 13장에 넘길 DDL을 적어 뒀다. `migrate dev`는 E만 실행한다(`CLAUDE.md` 5절)
+- **`lib/auth.ts`(E 소유)가 모듈 로드 시점에 Cognito 검증기를 만든다.** `COGNITO_USER_POOL_ID`가 비어 있으면 `Invalid Cognito User Pool ID`로 **빌드가 깨진다** — API 라우트를 가진 사람 전원(A·B·C·D)이 같이 막힌다. 로컬에서는 `.env`에 형식만 맞는 더미 값을 넣어 우회했다. 13장에 요청분을 적어 뒀다
 - Bedrock 연결 확인 미완 (E 대기). 4단계에서 필요
 - `prisma/seed/items.ts`의 펫 3종이 아직 옛 동물 매핑이다. **C 담당 파일이라 내가 못 고친다.** 요청 대기
 - Google 로그인 전용 결정이 `SPEC.md` 10절("소셜 로그인은 쓰지 않는다")과 `CLAUDE.md` 8절과 충돌한다. 둘 다 공유 문서라 임의로 안 고친다
@@ -429,7 +433,15 @@ export function nextQuestion(answers: Answer[]): Question | null
 7. `DiagnosisSession` 생성 — `answers`와 `indicators` 저장
 8. 5·6·7을 하나의 `prisma.$transaction`으로 묶는다
 
-**재진단은 이 엔드포인트를 그대로 다시 호출한다.** `DiagnosisSession`은 매번 새 행이 쌓이므로 이력이 남는다.
+**재진단은 이 엔드포인트를 그대로 다시 호출한다.** `DiagnosisSession`은 매번 새 행이 쌓이므로 이력이 남는다. 4의 닉네임은 저장된 값이 이전 기본 닉네임과 같을 때만 새로 만든다(2장).
+
+### `GET /api/diagnosis/me`
+
+```ts
+{ data: { typeCode, adjective, nickname, family, animal, colorHex } }   // 진단 전이면 data: null
+```
+
+완료 API와 같은 모양이다. 결과 화면과 홈이 새로고침·직접 진입을 견디게 하는 유일한 통로다. 401은 화면에서 `null`로 취급해 시작 화면을 보여준다.
 
 ### `PATCH /api/diagnosis/nickname`
 
@@ -590,8 +602,29 @@ model DiagnosisSession {
 
 ## 13. 다음 할 일
 
-1. C에게 `prisma/seed/items.ts` 동물 매핑 교체 요청 (여우 → `HEALTH_EMOTION`, 고양이 → `INDEPENDENT_LOW_INCOME`, 치장 "라벤더" 3종 이름 변경)
-2. `DATABASE_URL` 공유 후 완료 API·닉네임 PATCH·관리자 교차표
-3. 완료 API가 붙으면 `app/diagnosis/draft.ts`를 지우고 세 화면의 `classify()` 호출을 API 응답으로 바꾼다
-4. 펫 이미지가 S3에 올라오면 홈·결과의 종족색 원판을 이미지로 교체 (C·E 대기). 자리와 크기는 `styles/tokens.css`의 `.hm-plate__disc`(결과 7.5rem·기본 4.5rem)와 `.hm-tile__face`가 잡아 뒀다
-5. 다른 화면(미션·펫·커뮤니티)도 같은 결로 맞추려면 담당자에게 `design.md`와 `styles/tokens.css`를 알린다. 남의 폴더는 A가 고치지 않는다
+### 다른 사람에게 넘길 것
+
+**E — 2차 마이그레이션.** A의 PR을 머지한 뒤 `npx prisma migrate dev --name add_subtype`를 한 번 실행한다. Prisma가 만들 DDL은 아래와 같다(`prisma migrate diff`로 확인한 실제 출력이다).
+
+```sql
+CREATE TYPE "SubTypeCode" AS ENUM ('AFTERCARE_YOUTH', 'FAMILY_CAREGIVER', 'MIGRANT_YOUTH', 'HEALTH_FRAGILE', 'DEBT_INDEPENDENT', 'FINANCIAL_FRAGILE', 'JOBLESS_POOR', 'FAMILY_DEPENDENT');
+ALTER TABLE "DiagnosisSession" ADD COLUMN "indicators" JSONB, ADD COLUMN "subTypeCode" "SubTypeCode";
+ALTER TABLE "User" ADD COLUMN "subTypeCode" "SubTypeCode";
+```
+
+전부 nullable 컬럼 추가라 기존 데이터는 지워지지 않는다. `migrate reset`은 쓰지 않는다.
+
+**E — `lib/auth.ts` 지연 초기화.** 모듈 로드 시점에 `CognitoJwtVerifier.create()`를 부르면 `COGNITO_USER_POOL_ID`가 비어 있을 때 빌드가 깨진다. `getCurrentUser()` 안으로 옮기거나, 실제 Pool ID·Client ID를 팀에 공유하고 Amplify 환경변수에도 등록한다.
+
+**E — 나머지.** `app/globals.css`의 `--color-canine/feline/ursine` 3줄 삭제(`styles/tokens.css`와 값이 다르다) / `BottomNav`의 `/diagnosis` 라벨 "진단결과" 수정 + 진단 진행 중 숨김 / `.env.example`의 DB 이름 `isol` → `welli`. 탭 높이를 바꾸면 `styles/tokens.css`의 `--nav-h`도 같이 바꿔야 한다고 알린다.
+
+**C — `prisma/seed/items.ts` 동물 매핑.** 여우 → `HEALTH_EMOTION`, 고양이 → `INDEPENDENT_LOW_INCOME`, 치장 "라벤더" 3종 이름 변경. **`npm run db:seed`보다 먼저 고쳐야 한다.** 지금 시드를 돌리면 틀린 매핑이 공유 DB에 들어간다.
+
+**D — 중복 init 마이그레이션.** `feat/community`의 `prisma/migrations/00000000000000_init/`을 지우고 `main`의 `20260819061857_init/`을 쓴다. 그대로 머지되면 `migrate deploy`가 깨진다.
+
+### A가 이어서 할 것
+
+1. 2차 마이그레이션 후 진단 → 결과 → 홈 전체 흐름을 브라우저에서 확인 (지금은 `P2022`로 500이다)
+2. 관리자 교차표 (대분류 × 세부유형)
+3. 펫 이미지가 S3에 올라오면 홈·결과의 종족색 원판을 이미지로 교체 (C·E 대기). 자리와 크기는 `styles/tokens.css`의 `.hm-plate__disc`(결과 7.5rem·기본 4.5rem)와 `.hm-tile__face`가 잡아 뒀다
+4. 다른 화면(미션·펫·커뮤니티)도 같은 결로 맞추려면 담당자에게 `design.md`와 `styles/tokens.css`를 알린다. 남의 폴더는 A가 고치지 않는다
