@@ -10,7 +10,9 @@ import type { Prisma, PrismaClient, TypeCode } from "@prisma/client"
 // code는 유니크해야 한다. 규칙: DAILY_*, {유형}_S{단계}_{번호}
 // 보상과 사진 미션 배치는 stageMission()이 강제한다. 개별 미션에서 값을 덮어쓰지 않는다.
 
-const DAILY: Prisma.MissionCreateInput[] = [
+// 홈 화면의 "오늘의 미션 미리보기"가 이 배열을 그대로 읽는다(app/page.tsx).
+// 문구를 두 곳에 복사하지 않기 위해 export한다. 런타임 import는 타입뿐이라 클라이언트에서도 안전하다
+export const DAILY: Prisma.MissionCreateInput[] = [
   {
     code: "DAILY_CURTAIN",
     scope: "DAILY",

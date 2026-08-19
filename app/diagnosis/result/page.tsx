@@ -45,7 +45,7 @@ export default function DiagnosisResultPage() {
 
   if (view.status === "loading") {
     return (
-      <main className="hm">
+      <main className="hm hm--canvas">
         <div className="hm__col">
           <p className="hm__note">결과를 준비하고 있어요…</p>
         </div>
@@ -55,7 +55,7 @@ export default function DiagnosisResultPage() {
 
   if (view.status === "empty") {
     return (
-      <main className="hm">
+      <main className="hm hm--canvas">
         <div className="hm__col hm-result">
           <div className="hm-result__head">
             <h1 className="hm-result__title">아직 진단 결과가 없어요</h1>
@@ -74,62 +74,84 @@ export default function DiagnosisResultPage() {
   const showError = touched && !valid
 
   return (
-    <main className="hm" data-tribe={view.typeCode}>
+    <main className="hm hm--canvas" data-tribe={view.typeCode}>
       <div className="hm__col hm-result">
-        <p className="hm__note">당신의 종족이에요</p>
-
-        {/* 펫 이미지는 S3 업로드 전이다. 이모지 마스코트가 그 자리를 잡고 있다 */}
-        <div className="hm-plate">
-          <span className="hm-plate__disc hm-float" aria-hidden="true">
-            {tribe.emoji}
-          </span>
-          <span className="hm-plate__animal">
-            {tribe.family} · {tribe.animal}
-          </span>
-          <span className="hm-plate__caption">{tribe.colorName}</span>
-        </div>
-
-        <div className="hm-field">
-          <label className="hm-field__label" htmlFor="nickname">
-            이름
-          </label>
-          <div className="hm-field__box">
-            <input
-              id="nickname"
-              value={nickname}
-              onChange={(event) => setNickname(event.target.value)}
-              onBlur={() => setTouched(true)}
-              maxLength={NICKNAME_MAX}
-              aria-invalid={showError}
-              aria-describedby="nickname-help"
-              className="hm-field__input"
-            />
-            {showError && (
-              <span className="hm-field__glyph" aria-hidden="true">
-                !
-              </span>
-            )}
+        {/* 왼쪽 종족판 · 오른쪽 안내와 이름. Figma 결과 화면 구성이다 */}
+        <div className="hm-result__grid">
+          {/* 펫 이미지는 S3 업로드 전이다. 이모지 마스코트가 그 자리를 잡고 있다 */}
+          <div className="hm-plate hm-plate--hero">
+            <span className="hm-plate__disc hm-bounce" aria-hidden="true">
+              {tribe.emoji}
+            </span>
+            <span className="hm-plate__eyebrow">당신은</span>
+            <span className="hm-plate__animal">
+              {tribe.family} · {tribe.animal}
+            </span>
+            <span className="hm-plate__caption">{tribe.colorName}</span>
           </div>
-          {/* 도움말과 오류가 같은 자리를 쓴다. 자리를 비워둬서 오류가 떠도 화면이 밀리지 않는다 */}
-          <p
-            id="nickname-help"
-            className={`hm-field__help${showError ? " hm-field__help--error" : ""}`}
-          >
-            {showError
-              ? "닉네임은 2~12자로 입력해 주세요"
-              : "지금 바꿔도 되고, 나중에 바꿔도 돼요"}
-          </p>
+
+          <div className="hm-result__side">
+            {/* 종족의 성격을 설명하지 않는다. 유형 설명은 낙인이 된다(SPEC 2절).
+                서비스가 무엇을 하는지만 적는다 */}
+            <div className="hm-card">
+              <p className="hm__note">이렇게 함께해요</p>
+              <ul className="hm-check">
+                {["매일 작은 미션으로 나를 돌봐요", "펫을 함께 키우며 성장해요", "같은 종족과 익명으로 이야기해요"].map(
+                  (line) => (
+                    <li key={line}>
+                      <span className="hm-check__mark" aria-hidden="true">
+                        ✓
+                      </span>
+                      <span>{line}</span>
+                    </li>
+                  ),
+                )}
+              </ul>
+            </div>
+
+            <div className="hm-field">
+              <label className="hm-field__label" htmlFor="nickname">
+                이름
+              </label>
+              <div className="hm-field__box">
+                <input
+                  id="nickname"
+                  value={nickname}
+                  onChange={(event) => setNickname(event.target.value)}
+                  onBlur={() => setTouched(true)}
+                  maxLength={NICKNAME_MAX}
+                  aria-invalid={showError}
+                  aria-describedby="nickname-help"
+                  className="hm-field__input"
+                />
+                {showError && (
+                  <span className="hm-field__glyph" aria-hidden="true">
+                    !
+                  </span>
+                )}
+              </div>
+              {/* 도움말과 오류가 같은 자리를 쓴다. 자리를 비워둬서 오류가 떠도 화면이 밀리지 않는다 */}
+              <p
+                id="nickname-help"
+                className={`hm-field__help${showError ? " hm-field__help--error" : ""}`}
+              >
+                {showError
+                  ? "닉네임은 2~12자로 입력해 주세요"
+                  : "지금 바꿔도 되고, 나중에 바꿔도 돼요"}
+              </p>
+            </div>
+
+            {/* 닉네임 PATCH·유저 저장은 DATABASE_URL 공유 후에 붙인다 */}
+            <Link href="/" aria-disabled={!valid} className="hm-btn">
+              {/* 닉네임을 문장에 넣지 않는다. 조사(으로/로)가 받침에 따라 갈려서 어색해진다 */}
+              이 이름으로 시작하기
+            </Link>
+
+            <Link href="/diagnosis" className="hm-link">
+              다시 진단하기
+            </Link>
+          </div>
         </div>
-
-        {/* 닉네임 PATCH·유저 저장은 DATABASE_URL 공유 후에 붙인다 */}
-        <Link href="/" aria-disabled={!valid} className="hm-btn">
-          {/* 닉네임을 문장에 넣지 않는다. 조사(으로/로)가 받침에 따라 갈려서 어색해진다 */}
-          이 이름으로 시작하기
-        </Link>
-
-        <Link href="/diagnosis" className="hm-link">
-          다시 진단하기
-        </Link>
       </div>
     </main>
   )

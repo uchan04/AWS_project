@@ -110,10 +110,70 @@ body {
 }
 
 .hm__col {
-  max-width: 30rem;
+  /* 폭은 화면이 정한다. Figma는 진단 680px · 결과 840px · 홈 전체폭을 쓴다 */
+  max-width: var(--col-max, 30rem);
+  width: 100%;
   margin-inline: auto;
   padding-inline: max(var(--space-md), env(safe-area-inset-left));
   padding-block: var(--space-lg) max(var(--space-xl), env(safe-area-inset-bottom));
+}
+
+/* 캔버스 — 카드 한 장이 화면 가운데 뜨는 화면(진단·결과). Figma의 #EDE5D0 판이다 */
+.hm--canvas {
+  display: grid;
+  align-content: center;
+  background: var(--color-paper-2);
+}
+
+/* Figma의 .card — 카드색 면 + 1px 테두리 + 낮은 그림자 */
+.hm-card {
+  display: grid;
+  gap: var(--space-2xs);
+  align-content: start;
+  padding: clamp(var(--space-md), 4vw, var(--space-lg));
+  border: 1px solid var(--color-rule);
+  border-radius: var(--radius-card);
+  background: var(--color-card);
+  box-shadow: var(--shadow-card);
+}
+
+/* 카드 아래에 붙는 버튼. 카드 폭을 다 쓴다 */
+.hm-card__cta {
+  margin-top: var(--space-2xs);
+}
+
+/* 종족색을 종이색으로 희석한 카드. 채도 면적은 여기까지다(design.md) */
+.hm-card--tribe {
+  border-color: color-mix(in oklch, var(--tribe) 33%, var(--color-card));
+  background: color-mix(in oklch, var(--tribe) 22%, var(--color-card));
+}
+
+.hm-card__head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--space-sm);
+}
+
+.hm-card__title {
+  font-family: var(--font-display);
+  font-size: var(--text-md);
+  margin: 0;
+}
+
+/* 진행률 바 — Figma에서 가져왔다. 값은 "좁혀진 정도"다. 총 문항 수를 노출하지 않는다 */
+.hm-bar {
+  height: 6px;
+  border-radius: var(--radius-pill);
+  background: var(--color-rule);
+  overflow: hidden;
+}
+
+.hm-bar__fill {
+  height: 100%;
+  border-radius: var(--radius-pill);
+  background: var(--color-accent);
+  transition: width var(--dur-long) var(--ease-out);
 }
 
 .hm h1,
@@ -150,27 +210,14 @@ body {
   margin: 0;
 }
 
-/* 상태 줄 — 답한 개수만 보여준다. 총 문항 수는 조기 종료 때문에 쓸 수 없다 */
+/* 진행률 바 위의 줄. 왼쪽은 지금 몇 번째인지, 오른쪽은 퍼센트.
+   총 문항 수는 조기 종료 때문에 어느 쪽에도 쓰지 않는다 */
 .hm-status {
   display: flex;
   align-items: center;
+  justify-content: space-between;
   gap: var(--space-2xs);
-}
-
-.hm-status__dots {
-  display: flex;
-  gap: var(--space-3xs);
-}
-
-.hm-status__dot {
-  width: 5px;
-  height: 5px;
-  border-radius: var(--radius-pill);
-  background: var(--color-rule-2);
-}
-
-.hm-status__dot--now {
-  background: var(--color-ink-2);
+  margin-bottom: var(--space-2xs);
 }
 
 /* ─────────────────────────────────────────────────────────────
@@ -201,6 +248,15 @@ body {
 
 .hm-row__label {
   font-weight: 700;
+}
+
+/* 선택지 앞 글자(A·B·C). Figma의 선택지 카드에서 가져왔다. 눈으로 짚는 자리다 */
+.hm-row__key {
+  display: block;
+  font-size: var(--text-label);
+  font-weight: 700;
+  color: var(--color-muted);
+  margin-bottom: var(--space-3xs);
 }
 
 .hm-row__hint {
@@ -365,6 +421,28 @@ body {
   line-height: 1;
 }
 
+/* 결과 화면의 큰 판. Figma는 마스코트를 100px로 쓴다 */
+.hm-plate--hero {
+  padding-block: var(--space-2xl);
+}
+
+.hm-plate--hero .hm-plate__disc {
+  width: 7.5rem;
+  height: 7.5rem;
+  font-size: 4rem;
+}
+
+.hm-plate--hero .hm-plate__animal {
+  font-size: var(--text-lg);
+}
+
+.hm-plate__eyebrow {
+  font-size: var(--text-label);
+  font-weight: 700;
+  letter-spacing: 0.08em;
+  color: var(--color-ink-2);
+}
+
 .hm-plate__animal {
   font-family: var(--font-display);
   font-size: var(--text-md);
@@ -374,23 +452,6 @@ body {
 .hm-plate__caption {
   font-size: var(--text-label);
   color: var(--color-ink-2);
-}
-
-/* 홈 목록의 종족 행 — 작은 원판만 색을 쓴다 */
-.hm-swatch {
-  display: grid;
-  place-items: center;
-  width: 2.5rem;
-  height: 2.5rem;
-  border-radius: var(--radius-pill);
-  background: var(--tribe);
-  color: var(--tribe-ink);
-  font-size: var(--text-md);
-  line-height: 1;
-}
-
-.hm-row--tribe {
-  grid-template-columns: auto minmax(0, 1fr) auto;
 }
 
 /* 종족 배지 — 이름 옆에 붙는 작은 알약. 종족색을 종이색으로 희석해서 쓴다 */
@@ -479,8 +540,72 @@ body {
 }
 
 /* ─────────────────────────────────────────────────────────────
-   모션 — Figma의 fadeSlideIn·float 두 개만 가져왔다.
-   누름(translateY(1px))과 hover 들림(-1px)까지 합쳐 네 가지가 전부다.
+   목록 — 체크 목록(결과 화면)과 타일 격자(홈 미션 미리보기). 둘 다 Figma에서 가져왔다
+   ───────────────────────────────────────────────────────────── */
+
+.hm-check {
+  display: grid;
+  gap: var(--space-2xs);
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+.hm-check li {
+  display: grid;
+  grid-template-columns: auto minmax(0, 1fr);
+  gap: var(--space-2xs);
+  font-size: var(--text-label);
+  color: var(--color-ink-2);
+}
+
+.hm-check__mark {
+  color: var(--color-accent);
+  font-weight: 700;
+}
+
+.hm-tiles {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(min(9rem, 100%), 1fr));
+  gap: var(--space-2xs);
+}
+
+.hm-tile {
+  display: grid;
+  gap: var(--space-3xs);
+  align-content: start;
+  padding: var(--space-sm);
+  border: 1px solid var(--color-paper-2);
+  border-radius: var(--radius-input);
+  background: var(--color-paper);
+}
+
+.hm-tile__title {
+  font-size: var(--text-label);
+  font-weight: 700;
+}
+
+/* 종족 타일 — 진단 전 화면에서 세 종족을 나란히 놓을 때 */
+.hm-tile--tribe {
+  justify-items: center;
+  border-color: color-mix(in oklch, var(--tribe) 33%, var(--color-card));
+  background: color-mix(in oklch, var(--tribe) 22%, var(--color-card));
+  text-align: center;
+}
+
+.hm-tile__face {
+  font-size: var(--text-xl);
+  line-height: 1;
+}
+
+.hm-tile__hint {
+  font-size: var(--text-label);
+  color: var(--color-muted);
+}
+
+/* ─────────────────────────────────────────────────────────────
+   모션 — Figma의 fadeSlideIn·float·bounceIn 세 개를 가져왔다.
+   누름(translateY(1px))과 hover 들림(-1px)까지 합쳐 다섯 가지가 전부다.
    ───────────────────────────────────────────────────────────── */
 
 @keyframes hm-fade {
@@ -506,6 +631,29 @@ body {
 
 .hm-fade {
   animation: hm-fade var(--dur-short) var(--ease-out) both;
+}
+
+/* 결과 마스코트 등장 1회. Figma의 bounceIn 값 그대로다.
+   scale을 쓰는 자리는 이 하나뿐이다(design.md) */
+@keyframes hm-bounce {
+  0% {
+    transform: scale(0.4);
+    opacity: 0;
+  }
+  60% {
+    transform: scale(1.08);
+  }
+  80% {
+    transform: scale(0.96);
+  }
+  100% {
+    transform: scale(1);
+    opacity: 1;
+  }
+}
+
+.hm-bounce {
+  animation: hm-bounce 500ms cubic-bezier(0.36, 0.07, 0.19, 0.97) both;
 }
 
 /* 마스코트만 쓴다. 화면에 하나뿐이다 */
@@ -537,6 +685,7 @@ body {
 
 /* Hallmark · genre: editorial · macrostructure: Conversational FAQ · design-system: design.md · designed-as-app */
 .hm-ask {
+  --col-max: 42.5rem; /* Figma 680px */
   display: grid;
   gap: var(--space-lg);
   align-content: start;
@@ -550,18 +699,38 @@ body {
 .hm-ask__question {
   font-size: clamp(1.5625rem, 3.5vw + 0.75rem, 1.9531rem);
   line-height: 1.35;
+  text-align: center;
 }
 
+/* Figma는 선택지를 2열 격자로 깐다. 좁은 화면에서는 자동으로 1열이 된다 */
 .hm-ask__choices {
   display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(min(13.75rem, 100%), 1fr));
   gap: var(--space-2xs);
+  align-items: start;
 }
 
 /* Hallmark · genre: editorial · macrostructure: Photographic · design-system: design.md · designed-as-app */
 .hm-result {
+  --col-max: 52.5rem; /* Figma 840px */
   display: grid;
   gap: var(--space-md);
   align-content: start;
+}
+
+/* 왼쪽 종족판, 오른쪽 설명·이름. 좁은 화면에서는 위아래로 쌓인다 */
+.hm-result__grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(min(18.75rem, 100%), 1fr));
+  gap: var(--space-md);
+  align-items: center;
+}
+
+.hm-result__side {
+  display: grid;
+  gap: var(--space-sm);
+  align-content: start;
+  min-width: 0;
 }
 
 .hm-result__head {
@@ -575,27 +744,75 @@ body {
   line-height: 1.25;
 }
 
+/* 진단 전 시작 화면. Figma 인트로 — 왼쪽 글, 오른쪽 안내 카드 */
+.hm-intro {
+  --col-max: 56.25rem; /* Figma 900px */
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(min(20rem, 100%), 1fr));
+  gap: clamp(var(--space-md), 4vw, var(--space-xl));
+  align-items: center;
+}
+
+.hm-intro__side {
+  display: grid;
+  gap: var(--space-md);
+  justify-items: start;
+  min-width: 0;
+}
+
+.hm-intro__mascot {
+  justify-self: center;
+  font-size: 4.5rem;
+  line-height: 1;
+  margin-bottom: var(--space-2xs);
+}
+
+.hm-trio {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: var(--space-2xs);
+  width: 100%;
+}
+
 /* Hallmark · genre: editorial · macrostructure: Index-First · design-system: design.md · designed-as-app */
 .hm-home {
+  --col-max: 52.5rem;
   display: grid;
   gap: var(--space-md);
   align-content: start;
 }
 
+/* 인사말과 이름은 왼쪽, 마스코트는 오른쪽. Figma 홈 헤더다 */
 .hm-home__head {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: var(--space-sm);
+  flex-wrap: wrap;
+  padding-block-end: var(--space-xs);
+}
+
+.hm-home__who {
   display: grid;
   gap: var(--space-2xs);
-  padding-block-end: var(--space-xs);
+  min-width: 0;
+}
+
+.hm-home__mascot {
+  font-size: 3.5rem;
+  line-height: 1;
+}
+
+.hm-home__cards {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(min(17.5rem, 100%), 1fr));
+  gap: var(--space-sm);
+  align-items: start;
 }
 
 .hm-home__name {
   font-size: var(--text-lg);
   line-height: 1.25;
-}
-
-.hm-home__index {
-  display: grid;
-  gap: var(--space-2xs);
 }
 
 .hm-home__foot {
