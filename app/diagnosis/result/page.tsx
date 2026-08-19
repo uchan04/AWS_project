@@ -78,12 +78,14 @@ export default function DiagnosisResultPage() {
       <div className="hm__col hm-result">
         <p className="hm__note">당신의 종족이에요</p>
 
-        {/* 펫 이미지는 S3 업로드 전이다. 원판이 그 자리를 잡고 있다 */}
+        {/* 펫 이미지는 S3 업로드 전이다. 이모지 마스코트가 그 자리를 잡고 있다 */}
         <div className="hm-plate">
-          <span className="hm-plate__disc" aria-hidden="true">
-            {tribe.animal}
+          <span className="hm-plate__disc hm-float" aria-hidden="true">
+            {tribe.emoji}
           </span>
-          <span className="hm-plate__animal">{tribe.family}</span>
+          <span className="hm-plate__animal">
+            {tribe.family} · {tribe.animal}
+          </span>
           <span className="hm-plate__caption">{tribe.colorName}</span>
         </div>
 

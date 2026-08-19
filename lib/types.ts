@@ -3,28 +3,34 @@ import type { Adjective, TypeCode } from "@prisma/client"
 // 소유자: A. 표시 문자열의 유일한 출처다. 화면에 유형명("건강·정서취약형")을 절대 쓰지 않는다.
 
 // 색은 여기 한 곳에만 있다. 톤을 바꾸기로 하면 colorHex 3개만 교체한다.
-// 대안(한 톤 부드러운 파스텔): 여우 #FBBF24 / 고양이 #7DD3FC / 곰 #86EFAC
+// 값의 출처는 Figma 프로토타입(isol-design_Figma README "디자인 규칙" 절)이다.
+// 이전 값(#F59E0B / #38BDF8 / #34D399)은 종이색 배경 #F5F0E8에서 형광으로 떠서 버렸다.
+// 같은 색을 styles/tokens.css의 [data-tribe] 규칙이 들고 있다. 한쪽만 바꾸지 않는다.
+// emoji는 펫 이미지가 S3에 올라오기 전까지 쓰는 마스코트 자리다. 항상 aria-hidden으로 넣는다.
 export const TRIBE: Record<
   TypeCode,
-  { family: string; animal: string; colorName: string; colorHex: string }
+  { family: string; animal: string; emoji: string; colorName: string; colorHex: string }
 > = {
   HEALTH_EMOTION: {
     family: "개과",
     animal: "여우",
-    colorName: "앰버 오렌지",
-    colorHex: "#F59E0B",
+    emoji: "🦊",
+    colorName: "노을 주황",
+    colorHex: "#E8956A",
   },
   INDEPENDENT_LOW_INCOME: {
     family: "고양잇과",
     animal: "고양이",
-    colorName: "스카이 블루",
-    colorHex: "#38BDF8",
+    emoji: "🐱",
+    colorName: "새벽 파랑",
+    colorHex: "#6A95C8",
   },
   FAMILY_LIVING: {
     family: "곰과",
     animal: "곰",
-    colorName: "에메랄드 그린",
-    colorHex: "#34D399",
+    emoji: "🐻",
+    colorName: "이끼 초록",
+    colorHex: "#7AAE82",
   },
 }
 

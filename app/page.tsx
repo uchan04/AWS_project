@@ -16,7 +16,14 @@ import { TRIBE, defaultNickname } from "@/lib/types"
 import "@/styles/tokens.css"
 import { readDraft } from "./diagnosis/draft"
 
-type Me = { typeCode: TypeCode; nickname: string }
+type Me = { typeCode: TypeCode; nickname: string; greeting: string }
+
+// 시간대 인사. 서버 렌더 시각과 브라우저 시각이 다를 수 있으므로 마운트 후에만 계산한다
+function greetingFor(hour: number): string {
+  if (hour < 12) return "좋은 아침이에요"
+  if (hour < 18) return "오늘 하루도"
+  return "오늘도 수고했어요"
+}
 
 export default function HomePage() {
   const [me, setMe] = useState<Me | null>(null)
@@ -26,7 +33,11 @@ export default function HomePage() {
     if (!draft) return
     try {
       const { typeCode, adjective } = classify(draft)
-      setMe({ typeCode, nickname: defaultNickname(typeCode, adjective) })
+      setMe({
+        typeCode,
+        nickname: defaultNickname(typeCode, adjective),
+        greeting: greetingFor(new Date().getHours()),
+      })
     } catch {
       setMe(null)
     }
@@ -60,15 +71,18 @@ export default function HomePage() {
     <main className="hm" data-tribe={me.typeCode}>
       <div className="hm__col hm-home">
         <div className="hm-home__head">
-          <p className="hm__note">{tribe.family}</p>
+          <p className="hm__note">{me.greeting}</p>
           <h1 className="hm-home__name">{me.nickname}</h1>
+          <span className="hm-pill">
+            <span aria-hidden="true">{tribe.emoji}</span> {tribe.family}
+          </span>
         </div>
 
         <div className="hm-home__index">
-          {/* 펫 이미지는 S3 업로드 전이다. 지금은 종족색 원판이 자리를 잡는다 */}
+          {/* 펫 이미지는 S3 업로드 전이다. 지금은 이모지 마스코트가 자리를 잡는다 */}
           <Link href="/pet" className="hm-row hm-row--tribe">
             <span className="hm-swatch" aria-hidden="true">
-              {tribe.animal}
+              {tribe.emoji}
             </span>
             <span>
               <span className="hm-row__label">키우기</span>

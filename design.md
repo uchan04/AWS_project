@@ -30,31 +30,44 @@ playful은 쓰지 않는다.
 
 ## Theme
 
-색은 OKLCH로만 쓴다. 순수 검정·흰색은 쓰지 않는다. 회색은 따뜻한 쪽으로 물들인다.
+**색의 출처는 Figma 프로토타입이다** (`isol-design_Figma/README.md` "디자인 규칙" 절).
+그 hex를 그대로 쓴다. OKLCH로 변환하지 않는다 — 두 곳의 값이 갈라지면 그게 다음 버그다.
+순수 검정·흰색은 쓰지 않는다. 회색은 따뜻한 쪽으로 물들어 있다.
 
-- `--color-paper`   oklch(97.6% 0.008 78)
-- `--color-paper-2` oklch(94.6% 0.011 76)
-- `--color-paper-3` oklch(91.5% 0.013 74)
-- `--color-ink`     oklch(27% 0.014 62)
-- `--color-ink-2`   oklch(42% 0.013 62)
-- `--color-muted`   oklch(50% 0.012 66)
-- `--color-rule`    oklch(89% 0.01 72)
-- `--color-rule-2`  oklch(67% 0.014 70)
-- `--color-accent`  oklch(52% 0.058 44)
-- `--color-accent-ink` oklch(97.6% 0.008 78)
-- `--color-focus`   oklch(34% 0.085 250)
-- `--color-error`   oklch(52% 0.17 25)
+| 토큰 | 값 | 용도 |
+|---|---|---|
+| `--color-paper` | `#F5F0E8` | 배경 |
+| `--color-paper-2` | `#EDE5D0` | 캔버스. 비활성 면 |
+| `--color-card` | `#FDFBF5` | 카드·행·입력창 |
+| `--color-ink` | `#2A1F14` | 본문 |
+| `--color-ink-2` | `#4A3B29` | 보조 본문 |
+| `--color-muted` | `#7A6B58` | 캡션 |
+| `--color-rule` | `#DDD0BC` | 카드 테두리·구분선 |
+| `--color-rule-2` | `#8F8069` | 입력창 테두리 (종이색 대비 3.39:1) |
+| `--color-accent` | `#4B7A5B` | 주색. CTA |
+| `--color-strong` | `#A9542A` | 강조. 화살표·hover |
+| `--color-focus` | `#1F4D33` | 포커스 링 3px |
+| `--color-error` | `#B3261E` | 오류 |
 
-강조색(accent)은 채도를 낮춘 흙빛이다. **채도가 높은 색은 종족색 하나뿐**이고, 그것도 원판
-하나로 면적을 제한한다. 사용자마다 다른 종족색이 화면의 유일한 색 사건이 되도록 나머지를 비운다.
+`--color-muted`와 `--color-strong`은 명암비 4.5:1을 맞추려고 조정한 값이다(Figma 원본
+`#9A8A76`·`#C97B4B`는 AA 미달). **더 밝게 바꾸지 않는다.**
 
-종족색은 `lib/types.ts`의 `TRIBE[].colorHex`를 그대로 OKLCH로 옮겨 `styles/tokens.css`의
-`[data-tribe="…"]` 규칙에 둔다. 화면에서 `style={{ backgroundColor: … }}`로 색을 넣지 않는다.
-루트에 `data-tribe={typeCode}`만 붙이면 `--tribe`가 정해진다.
+**채도가 높은 색은 종족색 하나뿐**이고, 그것도 원판 하나로 면적을 제한한다. 사용자마다
+다른 종족색이 화면의 유일한 색 사건이 되도록 나머지를 비운다.
 
-- `HEALTH_EMOTION`(여우) oklch(76.9% 0.163 70) ← `#F59E0B`
-- `INDEPENDENT_LOW_INCOME`(고양이) oklch(78.6% 0.126 225) ← `#38BDF8`
-- `FAMILY_LIVING`(곰) oklch(78.2% 0.145 165) ← `#34D399`
+종족색은 `lib/types.ts`의 `TRIBE[].colorHex`와 `styles/tokens.css`의 `[data-tribe="…"]`가
+같은 값을 든다. 한쪽만 바꾸지 않는다. 화면에서 `style={{ backgroundColor: … }}`는 쓰지 않고
+루트에 `data-tribe={typeCode}`만 붙인다.
+
+- `HEALTH_EMOTION`(여우 🦊) `#E8956A`
+- `INDEPENDENT_LOW_INCOME`(고양이 🐱) `#6A95C8`
+- `FAMILY_LIVING`(곰 🐻) `#7AAE82`
+
+이전 값(`#F59E0B` / `#38BDF8` / `#34D399`)은 종이색 배경에서 형광으로 떠 보이고 초록이
+주색 `#4B7A5B`와 부딪혀서 버렸다.
+
+펫 이미지가 S3에 올라오기 전까지 마스코트는 이모지다(`TRIBE[].emoji`). 장식이므로 항상
+`aria-hidden="true"`를 붙이고, 종족명은 옆에 글자로 따로 쓴다.
 
 다크 모드는 두지 않는다. 종이색 한 벌로 간다.
 
@@ -62,10 +75,13 @@ playful은 쓰지 않는다.
 
 Hallmark 폰트 목록에는 한글 폰트가 없다. 한글 서비스라 대체가 필요하다.
 
-- Display: Gowun Batang 700 (부드러운 한글 명조. 제목·종족명)
-- Body: IBM Plex Sans KR 400 (Hallmark 본문 허용 목록의 IBM Plex Sans 한글판)
+폰트도 Figma 값을 쓴다.
+
+- Display: Gowun Dodum 400 (제목·종족명). 굵기가 400 하나뿐이므로 **700을 주지 않는다.**
+  합성 볼드가 되어 글자가 흐려진다. 제목 대비는 크기와 서체 차이로 낸다
+- Body: Noto Sans KR 400 / 강조 700
 - Outlier: 없음. 두 벌로 끝낸다.
-- 굵기 대비: 본문 400 / 제목 700 = 300단위
+- 굵기 대비: 본문 400 / 라벨·CTA 700. 500은 쓰지 않는다(600은 웹폰트에 없다)
 - 배율 1.25, 본문 16px 기준. 질문 제목은 `clamp(1.5625rem, 3.5vw + 0.75rem, 1.9531rem)`
 - Arial·Helvetica·system-only는 쓰지 않는다.
 
@@ -78,9 +94,12 @@ Hallmark 폰트 목록에는 한글 폰트가 없다. 한글 서비스라 대체
 - easing: `--ease-out` `--ease-in` `--ease-in-out`
 - duration: `--dur-micro` 120ms / `--dur-short` 220ms / `--dur-long` 420ms
 - 애니메이션은 `transform`과 `opacity`만 건드린다.
-- 이 앱이 쓰는 모션은 **두 개뿐**이다: 누름(`translateY(1px)`), 문항 교체(opacity 페이드).
-- 스크롤 연동 애니메이션, 카드 hover 확대, 등장 스태거는 쓰지 않는다.
-- `prefers-reduced-motion: reduce`에서 150ms 이하로 줄이고 누름 이동을 없앤다.
+- 이 앱이 쓰는 모션은 **네 개뿐**이다. 앞의 둘은 Figma의 `fadeSlideIn`·`float`를 그대로 옮겼다.
+  등장(`.hm-fade` = opacity + `translateY(10px)`), 마스코트(`.hm-float` = 3s 상하 8px),
+  누름(`translateY(1px)`), 카드 hover(그림자 + `translateY(-1px)`).
+- 스크롤 연동 애니메이션, 확대(scale), 등장 스태거는 쓰지 않는다.
+- `prefers-reduced-motion: reduce`에서 150ms 이하로 줄이고, 누름·hover 이동을 없애고,
+  `.hm-float`는 **끈다**. 반복 애니메이션은 시간만 줄이면 빠르게 깜빡여 더 나쁘다.
 
 ## Microinteractions stance
 
@@ -101,11 +120,13 @@ Hallmark 폰트 목록에는 한글 폰트가 없다. 한글 서비스라 대체
 
 - 앱 화면에는 장식을 넣지 않는다. 기능이 화면을 이끈다.
 - 색 면적: 종족 원판 1개 + 희석된 판 1개까지. 그 이상 채우지 않는다.
+- 이모지는 마스코트 자리(원판·배지)에만 쓴다. 문장 안이나 버튼 라벨에는 넣지 않는다.
+  펫 이미지가 오면 원판 안의 이모지만 이미지로 바뀐다.
 
 ## 화면이 반드시 공유하는 것
 
 - 종이색·먹색, accent, 포커스 색
-- Gowun Batang + IBM Plex Sans KR
+- Gowun Dodum + Noto Sans KR
 - CTA 목소리(pill·44px·accent)
 - 목록 행(`.hm-row`) 하나가 진단 선택지와 홈 메뉴를 동시에 담당한다
 - 최대 폭 30rem, 한 열, 왼쪽 정렬
