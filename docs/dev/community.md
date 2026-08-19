@@ -5,15 +5,16 @@
 
 ## 재개 지점
 
-D 쪽 기능 구현은 끝났고, 지금은 `completeMission()`(B) 외부 결과를 기다리는 대기 상태다. AWS 계정·`BEDROCK_MODEL_ID`는 확보되어 챗봇 스트리밍은 완료했다(2026-08-19). 아래 5개가 남은 막힌 항목이다. 재개할 때 이 표부터 본다.
+D 쪽 기능 구현은 끝났고, 지금은 `completeMission()`(B) 외부 결과를 기다리는 대기 상태다. AWS 계정·`BEDROCK_MODEL_ID`는 확보되어 챗봇 스트리밍은 완료했다(2026-08-19). origin/main을 머지해 인프라 완료분(Cognito 실검증, `BottomNav`, RDS 마이그레이션 등)도 받았다(2026-08-19). 아래 6개가 남은 막힌 항목이다. 재개할 때 이 표부터 본다.
 
 ### 1. Bedrock 스트리밍 응답 — 완료 (2026-08-19)
 `POST /api/chat/stream`을 새로 만들어 `ConverseStreamCommand`로 응답을 스트리밍하고, 스트림이 `messageStop`까지 정상 종료된 경우에만 `ChatRole.ASSISTANT`로 저장한다. 기존 `app/api/chat/messages/route.ts`(사용자 발화 저장 + 친밀도 지급)는 건드리지 않았다. 자세한 내용은 아래 "구현한 파일"·"결정한 것과 이유" 참고.
 
-### 2. `app/layout.tsx` 전역 마운트 — E 소유 파일
+### 2. `app/layout.tsx` 전역 마운트 — 아직 안 됨 (정정, 2026-08-19)
+- **정정**: main 머지로 `app/layout.tsx`에 `<BottomNav />`가 추가된 걸 확인했다. `BottomNav`의 "챗봇" 탭은 `<Link href="/chat">`로 **일반 라우트 이동**만 한다 — `ChatPanel`을 전역 오버레이로 띄우는 상태 토글은 아직 없다. D의 임시 라우트(`app/chat/page.tsx`)가 그대로 이동 목적지가 된 것뿐이라, 이 항목은 **완료가 아니다.** 아래 내용은 여전히 유효하다
 - **필요한 것**: E가 `layout.tsx`에 `ChatPanel`을 전역 오버레이로 띄울 자리(예: 하단 탭의 챗봇 진입점)를 만들어야 한다. D는 이 파일을 직접 못 고친다(CLAUDE.md 1절)
 - **고칠 파일**: `app/layout.tsx`(E). 지금은 `app/chat/page.tsx`가 임시 확인용 라우트로 대신하고 있다
-- **조심할 것**: `ChatPanel`은 `nickname`/`typeCode`/`bedrockConfigured`를 props로 받는 구조다 — `layout.tsx`(또는 그 하위 서버 컴포넌트)가 `getCurrentUser()`와 `process.env.BEDROCK_MODEL_ID`를 읽어 그대로 넘겨주면 된다. `onClose`도 실제로 닫히게 연결해야 한다(`app/chat/page.tsx`는 `onClose` 없이 렌더링 중이라 닫기 버튼이 안 보인다)
+- **조심할 것**: `ChatPanel`은 `nickname`/`typeCode`/`bedrockConfigured`를 props로 받는 구조다 — `layout.tsx`(또는 그 하위 서버 컴포넌트)가 `getCurrentUser()`와 `process.env.BEDROCK_MODEL_ID`를 읽어 그대로 넘겨주면 된다. `onClose`도 실제로 닫히게 연결해야 한다(`app/chat/page.tsx`는 `onClose` 없이 렌더링 중이라 닫기 버튼이 안 보인다). 오버레이로 바뀌면 `ChatPanel`의 `fixed inset-0 z-50` 래퍼가 `BottomNav`의 `z-10`과 겹치는지도 같이 확인할 것(별도 작업, 이번엔 안 건드림)
 
 ### 3. `app/chat/` 폴더 소유 확정 — `CLAUDE.md` 2절 표에 없음
 - **필요한 것**: 팀 전원 합의로 `CLAUDE.md` 2절의 폴더 소유 표에 `app/chat/` D를 정식으로 추가
@@ -34,6 +35,11 @@ D 쪽 기능 구현은 끝났고, 지금은 `completeMission()`(B) 외부 결과
 - **필요한 것**: B가 `completeMission(userId, code)`의 모듈 경로, 반환값(`void` 또는 `{completed, rewardSeeds, rewardAffinity}` 등), 중복 완료 시 동작(`completed: false`로 반환하는지)을 확정해야 한다
 - **고칠 파일**: `app/api/community/posts/route.ts:57`과 `app/api/chat/messages/route.ts:53` 두 TODO 블록. 지금은 호출부가 통째로 주석 처리돼 있다 — 확정되면 import를 추가하고 주석만 풀면 된다
 - **조심할 것**: 트랜잭션에 넣지 말 것(미션 실패가 글 작성·댓글 저장을 롤백시키면 안 된다). `DAILY_CHAT`은 사용자 발화 저장 시점에만 호출한다(아래 "주의사항" 참고)
+
+### 7. 클라이언트 Authorization 헤더 — 담당 미정, 팀 확인 대기 (신규, 2026-08-19)
+- **필요한 것**: 로그인 화면·토큰 보관 담당이 아직 정해지지 않았다(E가 유력하지만 확정은 아님). `lib/auth.ts`의 서버 쪽 Cognito 토큰 검증(main 머지로 확인)은 끝났지만, D의 `app/chat/_components/ChatPanel.tsx`와 커뮤니티 쪽 `fetch` 호출 어디도 `Authorization: Bearer <token>` 헤더를 붙이지 않는다
+- **고칠 파일**: 미정 — 로그인 흐름·토큰 저장 방식(어디 담당, 어떤 스토리지)이 먼저 정해져야 D 쪽 fetch 호출부를 고칠 수 있다
+- **조심할 것**: `DEV_AUTH_BYPASS=true`인 로컬 개발에서는 증상이 안 보인다. 이 상태로 배포하면 토큰이 없어 전 API가 401이 된다
 
 ### 주의사항 — 재개할 때 잊으면 버그가 된다
 - **친밀도 이중 지급**: 챗봇 친밀도(`grantAffinity(user, CHAT_TURN_AFFINITY)`)는 사용자 발화를 저장하는 시점(`app/api/chat/messages/route.ts`)에만 지급한다. Bedrock 응답을 저장하는 로직을 붙일 때 그 자리에서 또 지급하면 중복이다

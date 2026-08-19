@@ -49,6 +49,8 @@
 
 **클라이언트 Authorization 헤더 — 로그인 화면·토큰 보관은 E 담당, 방식 확정 대기**: `lib/auth.ts` 서버 검증은 완료됐으나 클라이언트가 토큰을 싣지 않는다. 이대로 배포하면 전 API가 401이다.
 
+**lib/auth.ts 모듈 최상위 Cognito 검증기 초기화로 빌드 불가 — E 수정 대기**: `lib/auth.ts`가 `CognitoJwtVerifier.create(...)`를 모듈 최상위(함수 밖)에서 호출한다. `DEV_AUTH_BYPASS=true`여도 이 호출은 분기 이전에 실행되므로 우회되지 않는다. `COGNITO_USER_POOL_ID`가 빈 값이면 즉시 throw해 `npm run build`가 `lib/auth.ts`를 import하는 모든 라우트에서 실패한다(2026-08-19, feat/community에 main 머지 후 확인). D 소유 파일이 아니라 직접 고치지 않았다. E에게 수정 요청함.
+
 GitHub 원격은 해결됐다 — https://github.com/uchan04/AWS_project
 
 ## 마일스톤
