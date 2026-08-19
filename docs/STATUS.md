@@ -3,7 +3,7 @@
 **모든 세션은 이 문서부터 읽는다.** 그다음 아래 "지금 읽어야 할 문서"만 읽고 시작한다.
 
 최종 갱신: 2026-08-19
-현재 단계: **D2 — 기능 병렬 개발. 8/19 중간 체크포인트**
+현재 단계: **D2 — 인프라 완료, 기능 5개 병렬 착수 (8/19 중간 체크포인트)**
 
 팀원 인수인계용 단일 문서는 [`docs/인수인계.md`](인수인계.md)에 있다. 새로 합류하거나 노션으로 공유할 때는 그 문서를 쓴다.
 
@@ -31,20 +31,26 @@
 
 | 담당 | 범위 | 상태 | 비고 |
 |---|---|---|---|
-| A | 진단 + 미션 콘텐츠 + 홈 | 판정 로직 + 화면 3장(진단·결과·홈) + Figma 값·구성 반영 완료 | DB 없이 할 것 없음. 완료 API·닉네임 PATCH는 `DATABASE_URL` 대기 |
-| B | 미션 시스템 + 사진 업로드 | 미착수 | 일일 미션 5개로 선행 개발 가능 |
-| C | 펫 + 가챠 | `lib/reward.ts` 골격 완료 | 8/16 오전까지 확정 필요 |
-| D | 커뮤니티 + 챗봇 | 미착수 | |
-| E | 인프라 + 인증 | 프로젝트 생성·스키마·auth 스텁 완료 | RDS·Amplify·Cognito 남음 |
+| A | 진단 + 미션 콘텐츠 + 홈 | 미션 41개, 13문항 + 판정 함수, 조기 종료, 화면 3장(진단·결과·홈) + Figma 값·구성 반영, 완료 API·닉네임 PATCH 완료 | DB 연결 확인됨. 홈 실데이터는 B·C API 대기 |
+| B | 미션 시스템 + 사진 업로드 | 미착수 | `DATABASE_URL`·S3 버킷 확보됨, 착수 가능 |
+| C | 펫 + 가챠 | `lib/reward.ts` 골격 완료 | 착수 가능. `prisma/seed/items.ts` 동물 매핑 수정이 먼저 |
+| D | 커뮤니티 + 챗봇 | 구현 중 (`feat/community`에 커뮤니티·챗봇 대량 커밋) | 브랜치에 중복 init 마이그레이션 있음. 아래 차단 사항 참고 |
+| E | 인프라 + 인증 | RDS·Cognito·S3+CloudFront·CloudWatch+SNS·Bedrock·auth 실검증·하단 탭 내비 완료 | Amplify GitHub 연동만 남음(브라우저 수동 단계) |
 
 ## 전체 차단 사항
 
 지금 프로젝트를 멈춰 세우는 것만 적는다. 해결되면 즉시 지운다.
 
-1. **RDS 없음** — `DATABASE_URL`이 비어 있어 `prisma migrate dev`를 아직 실행하지 못했다. `prisma/migrations/`가 없다. E 담당. A·B·C·D의 화면·API가 전부 여기서 막혀 있다
-2. **`lib/auth.ts`가 스텁** — `DEV_AUTH_BYPASS=true`로만 동작한다. 실제 Cognito 검증 필요(Google IdP 전용). E 담당
-3. **`prisma/schema.prisma` 변경 대기** — A가 `feat/diagnosis`에 `SubTypeCode` enum과 `subTypeCode`·`indicators` 컬럼을 담았다. PR 머지 후 E가 `migrate dev`를 돌려야 한다. 나머지는 `git pull && npx prisma migrate deploy && npx prisma generate`
-4. **`prisma/seed/items.ts` 동물 매핑이 옛 값** — 여우↔고양이가 뒤바뀌었고 치장 "라벤더" 3종 이름이 색과 안 맞는다. **C 담당 파일이라 A가 못 고친다.** C 요청 대기
+인프라 차단은 해소됐다(RDS·Cognito·S3·Bedrock 완료). `.env`의 `DATABASE_URL`·`COGNITO_*`·`S3_BUCKET`·`CLOUDFRONT_DOMAIN`·`BEDROCK_MODEL_ID`는 E에게 개별 공유받는다. 남은 것은 아래 4개다.
+
+1. **`prisma/seed/items.ts` 동물 매핑이 옛 값** — 여우↔고양이가 뒤바뀌었고 치장 "라벤더" 3종 이름이 색과 안 맞는다. **`npm run db:seed`보다 먼저 고쳐야 한다.** 안 고치면 뒤바뀐 매핑이 DB에 들어간다. C 담당 파일이라 A가 못 고친다
+2. **`SubTypeCode` 2차 마이그레이션 필요** — 초기 마이그레이션(`20260819061857_init`)에 A의 `SubTypeCode` enum과 `subTypeCode`·`indicators` 컬럼이 빠졌다. A의 PR 머지 후 E가 `migrate dev`를 한 번 더 돌려야 한다. 나머지는 `git pull && npx prisma migrate deploy && npx prisma generate`
+3. **`feat/community`에 중복 init 마이그레이션** — D 브랜치에 `prisma/migrations/00000000000000_init/`이 있고 `main`에는 `20260819061857_init/`이 있다. 머지하면 init이 두 개가 되어 `migrate deploy`가 깨진다(`CLAUDE.md` 5절). D가 자기 브랜치의 `prisma/migrations/`를 지우고 main 것을 받아야 한다
+4. **종족 색이 두 곳에 다르게 정의됨** — `app/globals.css`(E)의 `--color-canine/feline/ursine`은 `#d97706`/`#8b5cf6`/`#6b8f71`이고, `styles/tokens.css`·`lib/types.ts`(A)는 `#E8956A`/`#6A95C8`/`#7AAE82`다. `#8b5cf6`은 결정 1에서 버린 옛 "라벤더 퍼플"이다. E가 `globals.css`의 세 줄을 지우는 쪽으로 정리해야 한다
+
+**남은 수동 단계**: Amplify Hosting ↔ GitHub 연동. GitHub App 설치는 브라우저 OAuth 동의가 필요해 계정 소유자가 직접 눌러야 한다. 절차는 `docs/dev/infra.md` 참고
+
+**보안 재검토 필요**: RDS를 팀원 로컬 개발 편의를 위해 Publicly Accessible=true로 설정했다(포트 5432를 0.0.0.0/0에 개방, 강력한 마스터 비밀번호로만 방어). 발표 전에 팀 전체가 재검토할 것 — 상세 이유는 `docs/dev/infra.md` "결정한 것과 이유" 참고
 
 GitHub 원격 — https://github.com/uchan04/AWS_project
 
@@ -64,10 +70,10 @@ GitHub 원격 — https://github.com/uchan04/AWS_project
 
 | 날짜 | 목표 | 상태 |
 |---|---|---|
-| 8/14 | 레포·프로젝트·브랜치, auth 스텁, schema 초안 | 지연 — 레포·프로젝트·schema·auth 스텁 완료, 브랜치 5개 미생성 |
-| 8/15 | RDS + 마이그레이션 + `DATABASE_URL` 공유, 첫 라이브 배포 | 진행 중 |
-| 8/16 | schema 확정, 미션 41개, Cognito | 미션 41개 완료. schema·Cognito 남음 |
-| 8/16 | 기능 5개 병렬 착수, 하루 2회 통합 시작 | |
+| 8/14 | 레포·프로젝트·브랜치, auth 스텁, schema 초안 | 완료 (지연 반영) |
+| 8/15 | RDS + 마이그레이션 + `DATABASE_URL` 공유, 첫 라이브 배포 | RDS·마이그레이션 완료(8/19). Amplify 라이브 배포는 GitHub 연동 대기 |
+| 8/16 | schema 확정, 미션 41개, Cognito | 미션 41개·Cognito 완료. schema는 이미 안정적으로 사용 중 |
+| 8/16 | 기능 5개 병렬 착수, 하루 2회 통합 시작 | 8/19부터 착수 가능 (차단 해소) |
 | 8/19 | 중간 체크포인트 (컷 판단) | |
 | 8/20 | 기능 동결, 발표 자료 착수 | |
 | 8/22 | 개발 마감 | |

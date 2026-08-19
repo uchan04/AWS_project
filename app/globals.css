@@ -3,11 +3,19 @@
 :root {
   --background: #ffffff;
   --foreground: #171717;
+
+  /* 종족(과) 컬러 — SPEC.md 2절. 형용사와 무관하게 과 단위로만 고정한다 */
+  --color-canine: #d97706; /* 개과 · 여우 · 앰버 오렌지 */
+  --color-feline: #8b5cf6; /* 고양잇과 · 고양이 · 라벤더 퍼플 */
+  --color-ursine: #6b8f71; /* 곰과 · 곰 · 세이지 그린 */
 }
 
 @theme inline {
   --color-background: var(--background);
   --color-foreground: var(--foreground);
+  --color-canine: var(--color-canine);
+  --color-feline: var(--color-feline);
+  --color-ursine: var(--color-ursine);
   --font-sans: var(--font-geist-sans);
   --font-mono: var(--font-geist-mono);
 }
