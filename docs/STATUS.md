@@ -2,7 +2,7 @@
 
 **모든 세션은 이 문서부터 읽는다.** 그다음 아래 "지금 읽어야 할 문서"만 읽고 시작한다.
 
-최종 갱신: 2026-08-18
+최종 갱신: 2026-08-19
 현재 단계: **D1 — 인프라 착수 (8/14 목표가 8/15로 하루 지연)**
 
 팀원 인수인계용 단일 문서는 [`docs/인수인계.md`](인수인계.md)에 있다. 새로 합류하거나 노션으로 공유할 때는 그 문서를 쓴다.
@@ -34,7 +34,7 @@
 | A | 진단 + 미션 콘텐츠 | 1단계 완료 (미션 41개, 6문항, 판정 함수, 체크 18개) | 화면·API는 `DATABASE_URL` 대기 |
 | B | 미션 시스템 + 사진 업로드 | 미착수 | 일일 미션 5개로 선행 개발 가능 |
 | C | 펫 + 가챠 | `lib/reward.ts` 골격 완료 | 8/16 오전까지 확정 필요 |
-| D | 커뮤니티 + 챗봇 | 기능 구현 끝. 미션 완료 연동 호출부(`completeMission`)는 주석으로 준비만 해둠 | AWS 계정(E)과 `completeMission()`(B) 대기 상태. 막힌 항목 6개와 주의사항은 `docs/dev/community.md` 상단 "재개 지점" 참고 |
+| D | 커뮤니티 + 챗봇 | 기능 구현 끝. 챗봇 Bedrock 스트리밍 연결 완료(2026-08-19). 미션 완료 연동 호출부(`completeMission`)는 주석으로 준비만 해둠 | `completeMission()`(B) 대기 상태. 막힌 항목 5개와 주의사항은 `docs/dev/community.md` 상단 "재개 지점" 참고 |
 | E | 인프라 + 인증 | 프로젝트 생성·스키마·auth 스텁 완료 | RDS·Amplify·Cognito 남음 |
 
 ## 전체 차단 사항
@@ -42,9 +42,10 @@
 지금 프로젝트를 멈춰 세우는 것만 적는다. 해결되면 즉시 지운다.
 
 1. **`lib/auth.ts`가 스텁** — `DEV_AUTH_BYPASS=true`로만 동작한다. 실제 Cognito 검증 필요. E 담당
-2. **AWS 계정이 아직 없음** — Bedrock 호출(챗봇 응답, 글쓰기 LLM 주제 추천)이 전부 이걸로 막혀 있다. `BEDROCK_MODEL_ID`도 계정이 있어야 발급된다. E 담당
 
 해결됨: 로컬 `DATABASE_URL`은 채워져 있었으나 `prisma/migrations/`가 없어 `migrate status`가 "관리되지 않는 DB"로 잡혔다(기존 시드 데이터가 있어 `migrate dev`가 리셋을 요구). D가 8/18에 `prisma migrate diff`로 베이스라인 SQL을 만들고 `migrate resolve --applied`로 데이터 손실 없이 마이그레이션 이력을 만들었다(`00000000000000_init`). 이제 A·B·C·D 모두 `git pull && npx prisma migrate deploy && npx prisma generate`만 실행하면 된다. RDS(배포용)는 아직 별개로 E 확인 필요.
+
+해결됨: AWS 계정과 Bedrock 액세스가 확보되어 `BEDROCK_MODEL_ID`가 발급됐다(`us.anthropic.claude-sonnet-4-5-20250929-v1:0`, us-east-1). 로컬 개발용 AWS 자격증명은 각자 `aws configure`(또는 `aws sso login`)로 받아야 한다 — `.env`에 AWS 키를 직접 넣지 않는다, SDK가 기본 자격증명 체인에서 읽는다. D가 8/19에 챗봇 스트리밍(`POST /api/chat/stream`)을 이걸로 연결 완료. 글쓰기 LLM 주제 추천(`WriteModal`)은 아직 미구현(다음 D 세션).
 
 GitHub 원격은 해결됐다 — https://github.com/uchan04/AWS_project
 

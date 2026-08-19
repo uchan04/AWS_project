@@ -5,12 +5,10 @@
 
 ## 재개 지점
 
-D 쪽 기능 구현은 끝났고, 지금은 AWS 계정 발급(E)과 `completeMission()`(B) 두 가지 외부 결과를 기다리는 대기 상태다. 아래 6개가 막힌 항목 전부다. 재개할 때 이 표부터 본다.
+D 쪽 기능 구현은 끝났고, 지금은 `completeMission()`(B) 외부 결과를 기다리는 대기 상태다. AWS 계정·`BEDROCK_MODEL_ID`는 확보되어 챗봇 스트리밍은 완료했다(2026-08-19). 아래 5개가 남은 막힌 항목이다. 재개할 때 이 표부터 본다.
 
-### 1. Bedrock 스트리밍 응답 — AWS 계정 미발급 (E)
-- **필요한 것**: E가 AWS 계정을 만들고 us-east-1에서 Bedrock Claude Sonnet 모델 액세스를 신청해 `BEDROCK_MODEL_ID`를 발급해야 한다. 로컬 개발용 AWS 자격증명도 필요
-- **고칠 파일**: `app/api/chat/messages/route.ts:45`의 TODO 자리. `buildSystemPrompt()`는 이미 호출돼 있어 `systemPrompt` 변수를 그대로 Bedrock 호출에 넘기면 된다(현재는 `void systemPrompt`로 죽여둔 상태). `app/chat/_components/ChatPanel.tsx`의 개발 모드 배너는 코드를 안 고쳐도 된다 — `app/chat/page.tsx`가 이미 `process.env.BEDROCK_MODEL_ID`를 읽어 `bedrockConfigured` prop으로 내려주는 구조라, 값이 채워지는 순간 배너가 자동으로 사라진다
-- **조심할 것**: 친밀도 이중 지급(아래 "주의사항" 참고), 타이핑 인디케이터는 이번 작업과 함께 추가(지금은 의도적으로 없음)
+### 1. Bedrock 스트리밍 응답 — 완료 (2026-08-19)
+`POST /api/chat/stream`을 새로 만들어 `ConverseStreamCommand`로 응답을 스트리밍하고, 스트림이 `messageStop`까지 정상 종료된 경우에만 `ChatRole.ASSISTANT`로 저장한다. 기존 `app/api/chat/messages/route.ts`(사용자 발화 저장 + 친밀도 지급)는 건드리지 않았다. 자세한 내용은 아래 "구현한 파일"·"결정한 것과 이유" 참고.
 
 ### 2. `app/layout.tsx` 전역 마운트 — E 소유 파일
 - **필요한 것**: E가 `layout.tsx`에 `ChatPanel`을 전역 오버레이로 띄울 자리(예: 하단 탭의 챗봇 진입점)를 만들어야 한다. D는 이 파일을 직접 못 고친다(CLAUDE.md 1절)
@@ -44,10 +42,10 @@ D 쪽 기능 구현은 끝났고, 지금은 AWS 계정 발급(E)과 `completeMis
 ---
 
 ## 현재 상태
-- 완료: 갤러리 목록 화면, 상세 오버레이, 좋아요 토글, 댓글 작성, 글쓰기 모달, 본인 글 삭제, 친밀도 지급 헬퍼, 챗봇 시스템 프롬프트, 챗봇 메시지 저장 API(GET/POST, 친밀도 지급까지), 챗봇 패널 UI(개발용 `/chat` 라우트)
+- 완료: 갤러리 목록 화면, 상세 오버레이, 좋아요 토글, 댓글 작성, 글쓰기 모달, 본인 글 삭제, 친밀도 지급 헬퍼, 챗봇 시스템 프롬프트, 챗봇 메시지 저장 API(GET/POST, 친밀도 지급까지), 챗봇 패널 UI(개발용 `/chat` 라우트), **Bedrock 스트리밍 응답 연결(`POST /api/chat/stream`), 타이핑 인디케이터**
 - 진행 중: 없음
-- 미착수: 본인 댓글 삭제, Bedrock 실제 호출·스트리밍, LLM 주제 추천 실제 연동, 이미지 업로드, `ChatPanel`을 `layout.tsx`의 전역 오버레이로 이전(E 대기)
-- 보류(다음 세션 이전 필요 조건): 전체 탭 글쓰기(스키마에 ALL 값 없음), LLM 주제 추천(`BEDROCK_MODEL_ID` 없음), Bedrock 챗봇 응답 생성(`BEDROCK_MODEL_ID` 없음, AWS 계정 자체가 없음), 글쓰기 시 일일 미션(`DAILY_COMMUNITY_POST`) 완료 처리(B와 협의 필요), `ChatPanel`의 `layout.tsx` 이전(E 소유 파일이라 D가 직접 못 건드림) — 전부 아래 "결정한 것과 이유"에 근거 남김
+- 미착수: 본인 댓글 삭제, LLM 주제 추천 실제 연동, 이미지 업로드, `ChatPanel`을 `layout.tsx`의 전역 오버레이로 이전(E 대기)
+- 보류(다음 세션 이전 필요 조건): 전체 탭 글쓰기(스키마에 ALL 값 없음), LLM 주제 추천(SPEC 8절, 이번 세션 범위 아님), 글쓰기 시 일일 미션(`DAILY_COMMUNITY_POST`) 완료 처리(B와 협의 필요), `ChatPanel`의 `layout.tsx` 이전(E 소유 파일이라 D가 직접 못 건드림) — 전부 아래 "결정한 것과 이유"에 근거 남김
 
 ## 구현한 파일
 - `app/community/page.tsx` — 목록 화면. 서버 컴포넌트, `searchParams`의 `tab`으로 갤러리 결정
@@ -74,9 +72,10 @@ D 쪽 기능 구현은 끝났고, 지금은 AWS 계정 발급(E)과 `completeMis
 - `app/api/community/posts/route.ts` — POST 추가(글쓰기)
 - `app/api/community/posts/[id]/route.ts` — DELETE 추가(본인 글 소프트 삭제), GET 응답에 `isOwn` 추가
 
-- `app/chat/_lib/systemPrompt.ts` — 챗봇 "마음 친구" 시스템 프롬프트. 공통 원칙(조언·해결책·진단·평가 금지, 유형명 노출 금지, 자해·죽음 언급 시 안전 예외) + 유형별 페르소나 레이어. `buildSystemPrompt(typeCode, nickname)`을 `app/api/chat/messages/route.ts`가 참조
+- `app/chat/_lib/systemPrompt.ts` — 챗봇 "마음 친구" 시스템 프롬프트. 공통 원칙(조언·해결책·진단·평가 금지, 유형명 노출 금지, 자해·죽음 언급 시 안전 예외) + 유형별 페르소나 레이어. `buildSystemPrompt(typeCode, nickname)`을 `app/api/chat/messages/route.ts`와 `app/api/chat/stream/route.ts`가 참조
 - `app/api/chat/messages/route.ts` — GET(대화 이력 조회, 최근 50개, `createdAt asc`, 이제 `affinityToday`도 응답에 포함) + POST(사용자 메시지 저장 + 친밀도 지급). 진단 전(`typeCode` 없음)이면 400 `NO_TYPE_CODE`
-- `app/chat/_components/ChatPanel.tsx` — 우측 460px 슬라이드 패널(클라이언트). 헤더(아바타·진행 바·ℹ 친밀도 안내·✕), 빈 상태(인사말 + 정적 추천 문구 3개), 메시지 목록(USER 우측 컬러 말풍선 / ASSISTANT 좌측 말풍선), 입력창(Enter 전송·Shift+Enter 줄바꿈). `BEDROCK_MODEL_ID` 없을 때만 개발 모드 배너 노출. `onClose`는 선택 prop — 없으면 ✕·배경 클릭 닫기를 렌더링하지 않음
+- `app/api/chat/stream/route.ts` — **이번 세션에 추가.** POST. 사용자 메시지 저장 이후 클라이언트가 이어서 호출한다. 최근 20개 대화 이력을 Converse 형식으로 변환해 `ConverseStreamCommand`로 호출하고, 토큰을 `text/plain` 스트림으로 그대로 흘린다. 스트림이 `messageStop`까지 정상 종료됐고 내용이 비어있지 않을 때만 `ChatRole.ASSISTANT`로 저장한다. 메시지 저장·친밀도 지급·미션 완료는 이 라우트에서 하지 않는다(모두 `app/api/chat/messages/route.ts` 소관, 이중 지급 방지). `BEDROCK_MODEL_ID`가 없으면 500 `BEDROCK_NOT_CONFIGURED`로 막는다(클라이언트는 `bedrockConfigured`가 false면 애초에 이 라우트를 호출하지 않는다)
+- `app/chat/_components/ChatPanel.tsx` — 우측 460px 슬라이드 패널(클라이언트). 헤더(아바타·진행 바·ℹ 친밀도 안내·✕), 빈 상태(인사말 + 정적 추천 문구 3개), 메시지 목록(USER 우측 컬러 말풍선 / ASSISTANT 좌측 말풍선), 입력창(Enter 전송·Shift+Enter 줄바꿈). `BEDROCK_MODEL_ID` 없을 때만 개발 모드 배너 노출. `onClose`는 선택 prop — 없으면 ✕·배경 클릭 닫기를 렌더링하지 않음. **이번 세션에 수정**: 사용자 메시지 저장 성공 직후 `streamAssistantReply()`를 호출해 `/api/chat/stream`을 스트리밍으로 소비하도록 연결. 첫 토큰이 오기 전에는 점 3개짜리 타이핑 인디케이터를, 토큰이 오면 그 자리에서 텍스트가 자라나는 말풍선을 보여준다. 스트림이 끝까지 정상 수신됐을 때만 로컬 `messages`에 반영하고(서버 저장 조건과 동일), 스트리밍 중에는 입력창·전송 버튼을 비활성화해 중복 요청을 막는다
 - `app/chat/page.tsx` — 개발 확인용 라우트. 서버 컴포넌트에서 `getCurrentUser()`로 `nickname`/`typeCode`를, `process.env.BEDROCK_MODEL_ID`로 `bedrockConfigured`를 읽어 `ChatPanel`에 props로 넘김. `onClose` 없이 렌더링. `export const dynamic = "force-dynamic"` 필수(아래 이유 참고)
 
 **`app/chat/` 폴더 소유 — 팀 확인 대기.** `CLAUDE.md` 2절의 폴더 소유 표(`app/diagnosis/` A, `app/missions/` B, `app/pet/` C, `app/community/` D, `app/(auth)/` E)에는 `app/chat/`이 없다. `업무분담.md`의 D 항목에 "AI 상담 챗봇"과 `/api/chat/*`가 D 담당으로 명시돼 있어 D 소유로 보고 진행했지만, `CLAUDE.md` 갱신은 전원 합의가 필요하므로 다음 통합 때 팀에 확인해 `CLAUDE.md` 2절에 정식으로 추가해야 한다.
@@ -104,7 +103,12 @@ D 쪽 기능 구현은 끝났고, 지금은 AWS 계정 발급(E)과 `completeMis
 - 삭제는 소프트 삭제(`deletedAt`)이며 친밀도를 회수하지 않는다. `affinityToday`가 이미 누적돼 있어 삭제 후 재작성으로 하루 상한을 넘길 수 없음
 - 글쓰기 API는 `galleryType`을 요청 바디로 받되, `canAccessGallery(galleryType, user.typeCode)`로 본인 종족과 다르면 차단 → `canWriteToGallery(galleryType)`로 `ALL`을 차단하는 순서로 검증(먼저 소속 확인, 그다음 쓰기 가능 여부)
 - 삭제 후 화면 갱신은 페이지 새로고침이 아니라 `next/navigation`의 `useRouter().refresh()`로 처리. 서버 컴포넌트(`page.tsx`)의 데이터만 다시 가져오고 모달이 닫히는 클라이언트 상태는 유지됨
-- **챗봇 메시지 API는 실제 Bedrock 호출 없이 "사용자 메시지 저장" 부분만 이번 세션에 완성.** `POST`가 `buildSystemPrompt()`로 시스템 프롬프트를 실제로 만들어두지만(파일이 아무데도 안 쓰이는 죽은 코드가 되지 않도록), 호출부는 `// TODO: Bedrock 호출...` 주석만 남기고 실제 모델 호출·스트리밍·`ChatRole.ASSISTANT` 저장은 하지 않음. 가짜 어시스턴트 응답을 지어내지 않음(하드코딩 금지 원칙과 동일)
+- **(지난 세션) 챗봇 메시지 API는 실제 Bedrock 호출 없이 "사용자 메시지 저장" 부분만 완성했었다.** 이번 세션에 AWS 계정·`BEDROCK_MODEL_ID`가 확보되어 실제 연결을 완료했다(아래 항목들).
+- **Bedrock 호출을 별도 라우트(`POST /api/chat/stream`)로 분리했다.** `app/api/chat/messages/route.ts`(사용자 발화 저장 + 친밀도 지급)는 건드리지 않는다는 지시를 그대로 지키기 위함. 클라이언트가 메시지 저장 성공 후 이어서 스트림 라우트를 호출하는 2단계 흐름이다 — 한 라우트에서 저장과 생성을 모두 하지 않는다
+- **대화 이력은 최근 20개만 Bedrock에 보낸다.** GET `/api/chat/messages`의 50개(화면 표시용)와는 별개 상수(`HISTORY_LIMIT`)다. 매 요청마다 전체 대화를 보내면 토큰 비용이 계속 누적된다는 지시에 따름
+- **스트림은 `messageStop` 이벤트까지 정상 수신되고 내용이 비어있지 않을 때만 저장한다.** 클라이언트 fetch가 중간에 끊기거나(reader 루프 도중 예외) Bedrock 쪽 스트림이 에러로 끝나면 `completed`가 `true`가 되지 않아 저장을 건너뛴다 — 잘린 문장이 다음 대화 이력에 섞이는 것을 막기 위함(지시 그대로)
+- **클라이언트도 같은 조건으로 화면에 반영한다.** `reader.read()` 루프가 끝난 뒤 누적 텍스트가 있을 때만 `messages`에 추가한다. 서버가 저장을 거부한 상황(스트림 중단)에서 화면에만 메시지가 남는 불일치를 막기 위함
+- **스트리밍 중에는 입력창·전송 버튼을 비활성화한다.** 응답이 오는 도중 사용자가 새 메시지를 보내면 두 번째 스트림 요청이 아직 저장되지 않은 이전 대화 상태를 이력으로 읽어갈 수 있어 순서를 보장하기 위해 막았다
 - **친밀도 지급 시점 판단: "1턴"을 사용자가 메시지를 보낸 시점으로 본다.** Bedrock 응답이 아직 없으므로 사용자 발화 저장 직후 `grantAffinity(user, CHAT_TURN_AFFINITY)`를 호출한다. **주의: 나중에 Bedrock 어시스턴트 응답 저장 로직을 추가할 때 그 자리에서 다시 지급하면 안 된다** — 지급은 이 POST 핸들러 한 곳에서만 일어나야 한다(이중 지급 방지)
 - 챗봇도 진단(`typeCode`)이 있어야 페르소나를 만들 수 있어서, 진단 전 유저가 메시지를 보내면 400 `NO_TYPE_CODE`로 막는다(처음엔 `DIAGNOSIS_REQUIRED`였다가 이후 지시로 `NO_TYPE_CODE`로 통일)
 - GET 대화 이력은 최근 50개로 제한한다. `orderBy: asc, take: 50`이 아니라 `orderBy: desc, take: 50` 후 배열을 뒤집는 방식을 쓴다 — asc로 그냥 자르면 대화가 길어졌을 때 항상 가장 오래된 50개만 보여서 최근 대화가 안 보이는 버그가 됨
@@ -114,16 +118,15 @@ D 쪽 기능 구현은 끝났고, 지금은 AWS 계정 발급(E)과 `completeMis
 - **개발 모드 배너는 서버에서 계산한 `bedrockConfigured`(boolean)로 제어한다.** `BEDROCK_MODEL_ID`는 `NEXT_PUBLIC_` 접두사가 없는 서버 전용 env라 클라이언트 컴포넌트(`ChatPanel`)에서 직접 `process.env.BEDROCK_MODEL_ID`를 읽으면 항상 `undefined`로 인라인된다. 그래서 서버 컴포넌트에서 읽어 boolean만 prop으로 내려준다 — "값이 채워지면 배너가 자동으로 사라지는" 요구를 만족하려면 이 방법뿐이다
 - 친밀도 진행 바 갱신은 `setAffinityToday(prev => prev + granted)`만 쓴다. `granted`는 서버가 이미 상한을 적용해 계산한 값이라 `prev + granted`는 수학적으로 100을 넘을 수 없다 — 클라이언트에서 별도로 `Math.min(100, ...)`을 계산하지 않는다(지시 그대로)
 - 추천 문구 클릭은 바로 전송하지 않고 입력창을 채우기만 한다. 오탈자·오클릭으로 원치 않는 메시지가 바로 나가는 걸 막기 위함(전송 여부는 사용자가 최종 확인)
-- 타이핑 인디케이터는 만들지 않았다. Bedrock 미연결 상태에서 점 3개가 계속 도는 게 더 혼란스럽다는 지시대로
+- **(지난 세션) 타이핑 인디케이터는 만들지 않았었다.** Bedrock 미연결 상태에서 점 3개가 계속 도는 게 더 혼란스럽다는 지시대로였다. 이번 세션에 Bedrock 연결과 함께 추가했다 — 첫 토큰이 오기 전까지만 점 3개(`animate-bounce`, `globals.css` 수정 없이 Tailwind 기본 클래스 + 인라인 `animationDelay`만 사용), 토큰이 오면 그 자리에서 텍스트로 교체된다
 
 ## 막힌 것
 - 없음 (로컬 DB가 `prisma migrate`로 관리되지 않고 있던 것을 발견해 베이스라인 마이그레이션(`prisma/migrations/00000000000000_init`)을 만들어 해결. 기존 시드 데이터(미션 41개, 펫스킨 6개)는 유지됨. 스키마 담당과 공유 필요)
 
 ## 다음 할 일
 - 본인 댓글 삭제
-- LLM 주제 추천 3가지 이상 연동 — `BEDROCK_MODEL_ID` 확보되면 `WriteModal`의 TODO 자리에 구현
+- LLM 주제 추천 3가지 이상 연동 — `BEDROCK_MODEL_ID` 확보됐으니 `WriteModal`의 TODO 자리에 구현 가능. `app/api/chat/stream/route.ts`의 `ConverseStreamCommand` 호출 패턴을 참고할 것(단, 이건 비스트리밍 단발 호출이라 `ConverseCommand`가 더 맞을 수 있음)
 - 전체 탭 글쓰기 — 스키마에 ALL(또는 공용 게시판) 개념이 추가되면 `_lib/gallery.ts`의 `canWriteToGallery()`만 고치면 됨
 - `DAILY_COMMUNITY_POST` 일일 미션 완료 처리 — B와 담당 경계 협의 필요
-- Bedrock 실제 호출 + 스트리밍 — `BEDROCK_MODEL_ID` 확보되면 `app/api/chat/messages/route.ts`의 TODO 자리에 구현. 친밀도 지급은 이미 그 자리에서 끝났으니 새로 추가하지 말 것. 붙는 시점에 타이핑 인디케이터도 함께 추가
 - **`ChatPanel`을 `app/chat/page.tsx`(개발용)에서 `layout.tsx`의 전역 오버레이로 이전 — E와 조율 필요.** `layout.tsx`는 E 소유라 D가 직접 못 고친다. 이전할 때 `nickname`/`typeCode`/`bedrockConfigured` props를 넘기는 방식과 `onClose` 연결(전역에서는 실제로 닫을 수 있어야 함)을 그대로 유지할 것
 - `app/chat/` 폴더 소유를 `CLAUDE.md` 2절에 정식 반영 — 팀 확인 대기 (계속 남아있는 이월 항목)
