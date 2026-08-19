@@ -8,9 +8,9 @@
 **브랜치 규칙 (2026-08-19 변경).** A 담당분은 `feat/diagnosis`에 커밋한다. `main`에 직접 커밋하지 않고 PR로만 올린다. `prisma/schema.prisma` 변경분도 이 브랜치에 담고, 머지 여부와 `prisma migrate dev` 실행은 팀이 결정한다.
 
 ## 현재 상태
-- 완료: 미션 41개, 지표 14개 정의, 12문항 + 형용사 문항, `classify()`·`classifySub()`, 무손실 조기 종료, 스냅샷 체크, 진단 화면
-- 진행 중: 홈 화면
-- 미착수: 완료 API, 결과 화면, Bedrock 호출 2종, 재진단, 관리자 교차표
+- 완료: 미션 41개, 지표 14개 정의, 12문항 + 형용사 문항, `classify()`·`classifySub()`, 무손실 조기 종료, 스냅샷 체크, 화면 3장(진단·결과·홈)
+- 진행 중: 없음. DB 대기
+- 미착수: 완료 API, 닉네임 PATCH, Bedrock 호출 2종, 관리자 교차표
 
 ## 구현한 파일
 - `lib/types.ts` — 종족·동물·색, 형용사 매핑, 기본 닉네임, 성장 곡선 상수
@@ -20,7 +20,10 @@
 - `lib/diagnosis/classify.ts` — `classify()`(3대분류) + `classifySub()`(8세부유형). 순수 함수, LLM·DB 없음
 - `lib/diagnosis/adaptive.ts` — `possibleTypes()` / `canDecide()` / `nextQuestion()`. 무손실 조기 종료
 - `scripts/check-diagnosis.ts` — `npm run check:diagnosis`
-- `app/diagnosis/page.tsx` — 진단 화면 한 장. 클라이언트 컴포넌트. 답변은 state에만 있고 문항마다 서버를 부르지 않는다. 진행 문구는 `canDecide()`로 갈린다(확정 전 "n번째 질문이에요", 확정 후 "거의 다 왔어요"). 완료 시점은 아직 `console.log`
+- `app/diagnosis/page.tsx` — 진단 화면 한 장. 클라이언트 컴포넌트. 답변은 state에만 있고 문항마다 서버를 부르지 않는다. 진행 문구는 `canDecide()`로 갈린다(확정 전 "n번째 질문이에요", 확정 후 "거의 다 왔어요")
+- `app/diagnosis/draft.ts` — 답변을 결과 화면으로 넘기는 `sessionStorage` 통로. **완료 API가 붙으면 지운다**
+- `app/diagnosis/result/page.tsx` — 결과 화면. 종족·동물·색·기본 닉네임. 닉네임은 입력값 자체가 값이라 저장 버튼이 없다(PATCH는 DB 후)
+- `app/page.tsx` — 홈. 진단 전에는 시작 버튼 하나, 진단 후에는 종족 카드 + 미션·커뮤니티 진입점
 
 ---
 
@@ -37,9 +40,13 @@ DB가 아직 없다(`DATABASE_URL` 미공유). **DB가 필요 없는 것부터 �
 
 ### 2단계 — DB 없이 계속
 
-5. ~~진단 화면~~ — 완료. 브라우저에서 첫 선택지만 계속 누르는 흐름을 실제로 돌려 9문항 후 종료를 확인했다
-6. 홈 화면 — 종족·펫·오늘 미션 진입점 (담당 A로 확정, 2026-08-19)
-7. 결과 화면 — 종족·색·기본 닉네임
+5. ~~진단 화면~~ — 완료. 브라우저에서 실제로 클릭해 확인했다(첫 선택지 경로 9문항, 두 번째 선택지 경로 12문항)
+6. ~~홈 화면~~ — 완료
+7. ~~결과 화면~~ — 완료. 두 번째 선택지 경로에서 고양잇과·스카이 블루·"다정한 고양이"가 나오는 것까지 확인
+
+**화면 3장은 판정 결과를 클라이언트에서 계산한다.** 완료 API가 없어서다. `app/diagnosis/draft.ts`가 유일한 임시 지점이고, API가 붙으면 이 파일과 세 화면의 `classify()` 호출을 함께 지운다.
+
+`lib/diagnosis/classify.ts`가 클라이언트 번들에 들어가므로 세부유형 8개의 코드명이 브라우저 소스에 문자열로 남는다. 화면에 그리지는 않는다. API로 옮기면 사라진다.
 
 ### 3단계 — DB 연결 후
 
@@ -499,8 +506,7 @@ model DiagnosisSession {
 
 ## 12. 다음 할 일
 
-1. `app/page.tsx` 홈 화면 — 종족·펫·오늘 미션 진입점
-2. `app/diagnosis/result/page.tsx` 결과 화면
-3. 진단 화면의 `console.log`를 완료 API 호출로 교체하고 결과 화면으로 이동
-4. C에게 `prisma/seed/items.ts` 동물 매핑 교체 요청 (여우 → `HEALTH_EMOTION`, 고양이 → `INDEPENDENT_LOW_INCOME`, 치장 "라벤더" 3종 이름 변경)
-5. `DATABASE_URL` 공유 후 완료 API·닉네임 PATCH·관리자 교차표
+1. C에게 `prisma/seed/items.ts` 동물 매핑 교체 요청 (여우 → `HEALTH_EMOTION`, 고양이 → `INDEPENDENT_LOW_INCOME`, 치장 "라벤더" 3종 이름 변경)
+2. `DATABASE_URL` 공유 후 완료 API·닉네임 PATCH·관리자 교차표
+3. 완료 API가 붙으면 `app/diagnosis/draft.ts`를 지우고 세 화면의 `classify()` 호출을 API 응답으로 바꾼다
+4. 펫 이미지가 S3에 올라오면 홈·결과의 색 카드를 이미지로 교체 (C·E 대기)
