@@ -549,6 +549,103 @@ function ProgressCard({ title, value, color, bg }: ProgressCardProps) {
   )
 }
 
+// ─── Attendance calendar ───────────────────────────────────────────────────
+
+interface AttendanceCalendarProps {
+  cycleDay: number
+  claimedToday: boolean
+  attendanceTotal: number
+  color: string
+  bg: string
+  onClaim: () => void
+}
+
+function AttendanceCalendar({ cycleDay, claimedToday, attendanceTotal, color, bg, onClaim }: AttendanceCalendarProps) {
+  const [claiming, setClaiming] = useState(false)
+
+  async function handleClaim() {
+    setClaiming(true)
+    try {
+      const res = await fetch("/api/missions/attendance/claim", { method: "POST" })
+      const json = await res.json()
+
+      if (res.ok && !json.data.alreadyClaimed) {
+        onClaim()
+      }
+    } catch {
+      // silent
+    } finally {
+      setClaiming(false)
+    }
+  }
+
+  return (
+    <div
+      style={{
+        background: bg,
+        border: `1.5px solid ${color}33`,
+        borderRadius: 16,
+        padding: "20px",
+      }}
+    >
+      <h3
+        style={{
+          fontFamily: "'Gowun Dodum', sans-serif",
+          fontSize: 16,
+          color: "#2A1F14",
+          margin: "0 0 12px",
+        }}
+      >
+        출석 캘린더
+      </h3>
+      <div style={{ display: "flex", gap: 8, marginBottom: 14 }}>
+        {[1, 2, 3, 4, 5, 6, 7].map((day) => {
+          const done = attendanceTotal >= day || (day === cycleDay && claimedToday)
+          return (
+            <div
+              key={day}
+              style={{
+                flex: 1,
+                background: done ? color : "#F5F0E8",
+                color: done ? "white" : "#9A8A76",
+                borderRadius: 10,
+                padding: "10px 4px",
+                textAlign: "center",
+                fontSize: 12,
+                fontWeight: 700,
+              }}
+            >
+              {day}일
+            </div>
+          )
+        })}
+      </div>
+      {claimedToday ? (
+        <p style={{ fontSize: 13, color, textAlign: "center", margin: 0 }}>✓ 오늘 출석 완료</p>
+      ) : (
+        <button
+          onClick={handleClaim}
+          disabled={claiming}
+          style={{
+            width: "100%",
+            background: color,
+            color: "white",
+            border: "none",
+            borderRadius: 12,
+            padding: "12px",
+            fontSize: 14,
+            fontWeight: 700,
+            cursor: claiming ? "not-allowed" : "pointer",
+            opacity: claiming ? 0.5 : 1,
+          }}
+        >
+          {claiming ? "수령 중..." : "오늘 출석 받기"}
+        </button>
+      )}
+    </div>
+  )
+}
+
 // ─── Main dashboard ────────────────────────────────────────────────────────
 
 export default function MissionDashboard() {
@@ -639,7 +736,7 @@ export default function MissionDashboard() {
         <p style={{ fontSize: 14, color: "#7A6B58", margin: 0 }}>작은 한 걸음씩, 함께 걸어가요</p>
       </header>
 
-      <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(140px, 1fr))", gap: 12, marginBottom: 36 }}>
+      <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(140px, 1fr))", gap: 12, marginBottom: 24 }}>
         <ProgressCard
           title="오늘 달성률"
           value={`${dashboard.progress.dailyCompleted} / ${dashboard.progress.dailyTotal}`}
@@ -653,6 +750,17 @@ export default function MissionDashboard() {
           bg={bg}
         />
         <ProgressCard title="연속 달성" value={`${dashboard.progress.streak}일`} color={color} bg={bg} />
+      </div>
+
+      <div style={{ marginBottom: 36 }}>
+        <AttendanceCalendar
+          cycleDay={dashboard.attendance.cycleDay}
+          claimedToday={dashboard.attendance.claimedToday}
+          attendanceTotal={dashboard.attendance.attendanceTotal}
+          color={color}
+          bg={bg}
+          onClaim={handleComplete}
+        />
       </div>
 
       <StepSection
