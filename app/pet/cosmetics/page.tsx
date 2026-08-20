@@ -13,9 +13,11 @@ export const dynamic = "force-dynamic"
 export default async function CosmeticsPage() {
   let items: CosmeticRow[]
   let progress: { owned: number; total: number }
+  let affinity: number
 
   try {
     const user = await getCurrentUser()
+    affinity = user.affinity
 
     const [all, owned] = await Promise.all([
       prisma.cosmeticItem.findMany(),
@@ -55,5 +57,5 @@ export default async function CosmeticsPage() {
     )
   }
 
-  return <CosmeticList items={items} progress={progress} />
+  return <CosmeticList items={items} progress={progress} affinity={affinity} />
 }
