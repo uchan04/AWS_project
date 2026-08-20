@@ -845,9 +845,9 @@ export default function MissionDashboard() {
                 disabled={!hasPrev}
                 style={{
                   position: "absolute",
-                  left: -8,
+                  left: -32,
                   top: "50%",
-                  transform: "translateY(-50%)",
+                  transform: "translateY(-50%) scaleX(0.7)",
                   background: "transparent",
                   color: hasPrev ? color : "#DDD0BC",
                   border: "none",
@@ -871,9 +871,9 @@ export default function MissionDashboard() {
                 disabled={!hasNext}
                 style={{
                   position: "absolute",
-                  right: -8,
+                  right: -32,
                   top: "50%",
-                  transform: "translateY(-50%)",
+                  transform: "translateY(-50%) scaleX(0.7)",
                   background: "transparent",
                   color: hasNext ? color : "#DDD0BC",
                   border: "none",
