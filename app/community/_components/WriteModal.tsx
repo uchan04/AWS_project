@@ -2,8 +2,21 @@
 
 import { useState } from "react"
 import { useRouter } from "next/navigation"
+import type { TypeCode } from "@prisma/client"
 import { TRIBE } from "@/lib/types"
 import { canWriteToGallery, type GalleryTab } from "../_lib/gallery"
+import { TOPICS, type WriteTopic } from "../_lib/topics"
+
+// 6개 중 3개를 무작위로 고른다. ChatPanel의 pickThreeStarters()와 같은 방식이며
+// 외부 라이브러리를 쓰지 않는다.
+function pickThreeTopics(typeCode: TypeCode): WriteTopic[] {
+  const shuffled = [...TOPICS[typeCode]]
+  for (let i = shuffled.length - 1; i > 0; i--) {
+    const j = Math.floor(Math.random() * (i + 1))
+    ;[shuffled[i], shuffled[j]] = [shuffled[j], shuffled[i]]
+  }
+  return shuffled.slice(0, 3)
+}
 
 export function WriteModal({ gallery }: { gallery: GalleryTab }) {
   const router = useRouter()
@@ -12,6 +25,10 @@ export function WriteModal({ gallery }: { gallery: GalleryTab }) {
   const [body, setBody] = useState("")
   const [pending, setPending] = useState(false)
   const [error, setError] = useState<string | null>(null)
+  // 모달을 열 때 한 번만 고른다. 입력 중에는 목록이 바뀌지 않는다.
+  // 훅은 아래 canWriteToGallery 조기 return보다 위에 있어야 한다 —
+  // 아래에 두면 전체 탭에서 훅 개수가 달라져 터진다.
+  const [topics, setTopics] = useState<WriteTopic[]>([])
 
   if (!canWriteToGallery(gallery)) {
     return (
@@ -66,7 +83,10 @@ export function WriteModal({ gallery }: { gallery: GalleryTab }) {
     <>
       <button
         type="button"
-        onClick={() => setIsOpen(true)}
+        onClick={() => {
+          setTopics(pickThreeTopics(gallery))
+          setIsOpen(true)
+        }}
         className="rounded-xl px-5 py-2.5 text-sm font-semibold text-white transition"
         style={{ backgroundColor: tribeColor }}
       >
@@ -87,10 +107,31 @@ export function WriteModal({ gallery }: { gallery: GalleryTab }) {
               </button>
             </div>
 
-            {/* TODO: Bedrock 주제 추천 — BEDROCK_MODEL_ID 확보 후 구현 (SPEC 8절) */}
-            <div className="mb-4 rounded-xl border border-dashed border-neutral-300 bg-neutral-50 px-4 py-3 text-xs text-neutral-400">
-              주제 추천 준비 중이에요
-            </div>
+            {/* 주제 추천(SPEC 8절). 지금은 고정 문구이며 `_lib/topics.ts`가 유일한 출처다.
+                전체 탭은 typeCode를 알 수 없어 topics가 비어 있고, 그때는 영역 자체를 렌더하지 않는다. */}
+            {topics.length > 0 && (
+              <div className="mb-4">
+                <p className="mb-2 text-xs text-neutral-400">선택하면 제목과 본문이 채워져요</p>
+                <div className="flex flex-col gap-2">
+                  {topics.map((topic) => (
+                    <button
+                      key={topic.title}
+                      type="button"
+                      onClick={() => {
+                        setTitle(topic.title)
+                        setBody(topic.draft)
+                      }}
+                      className="rounded-xl border border-neutral-200 px-4 py-2.5 text-left transition hover:bg-neutral-50"
+                    >
+                      <span className="block text-sm font-semibold" style={{ color: tribeColor }}>
+                        {topic.title}
+                      </span>
+                      <span className="mt-0.5 block text-xs leading-relaxed text-neutral-500">{topic.draft}</span>
+                    </button>
+                  ))}
+                </div>
+              </div>
+            )}
 
             <input
               value={title}
