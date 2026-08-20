@@ -1,51 +1,35 @@
 "use client"
 
-import { useState } from "react"
+import { useState, useEffect } from "react"
 import Link from "next/link"
 import { usePathname } from "next/navigation"
+import { TRIBE } from "@/lib/types"
+import type { TypeCode } from "@prisma/client"
 
-// TODO: 실제 사용자 API 연결 시 제거. 임시 프로필 데이터.
-const TEMP_SIDEBAR_PROFILE = {
-  nickname: "고요한 고양이",
-  character: "cat" as const,
-  seeds: 42,
-  level: 3,
-  createdAt: "2026-08-15",
+type ProfileData = {
+  nickname: string
+  typeCode: TypeCode | null
+  seeds: number
+  level: number
+  createdAt: string
 }
 
-const CHARACTER_COLOR = {
-  fox: "#E8956A",
-  cat: "#6A95C8",
-  bear: "#7AAE82",
-}
-
-const CHARACTER_BG = {
-  fox: "#FAE8D8",
-  cat: "#D8E8FA",
-  bear: "#D8F0DC",
-}
-
-const CHARACTER_EMOJI = {
-  fox: "🦊",
-  cat: "🐱",
-  bear: "🐻",
-}
-
-const CHARACTER_LABEL = {
-  fox: "개과",
-  cat: "고양잇과",
-  bear: "곰과",
-}
-
-// 펫 이모지 (임시)
-function petEmoji(character: keyof typeof CHARACTER_EMOJI, level: number): string {
-  const emojis = {
-    fox: ["🦊", "🦊", "🦊"],
-    cat: ["🐱", "🐈", "🐈‍⬛"],
-    bear: ["🐻", "🐻", "🐻"],
+function getBgColor(hex: string): string {
+  // colorHex → 배경색 (약한 톤)
+  const map: Record<string, string> = {
+    "#E8956A": "#FAE8D8", // 여우 주황
+    "#6A95C8": "#D8E8FA", // 고양이 파랑
+    "#7AAE82": "#D8F0DC", // 곰 초록
   }
+  return map[hex] || "#F5F0E8"
+}
+
+function getStageEmoji(typeCode: TypeCode | null, level: number): string {
+  if (!typeCode) return "🌱"
+  const tribe = TRIBE[typeCode]
   const stage = level >= 15 ? 2 : level >= 5 ? 1 : 0
-  return emojis[character][stage]
+  // 임시: emoji만 반환 (S3 이미지 전까지)
+  return tribe.emoji
 }
 
 const TABS: { href: string; label: string; emoji: string; desc: string }[] = [
@@ -58,10 +42,46 @@ const TABS: { href: string; label: string; emoji: string; desc: string }[] = [
 export function Sidebar() {
   const pathname = usePathname()
   const [showAccount, setShowAccount] = useState(false)
+  const [profile, setProfile] = useState<ProfileData | null>(null)
+  const [loading, setLoading] = useState(true)
 
-  const profile = TEMP_SIDEBAR_PROFILE
-  const color = CHARACTER_COLOR[profile.character]
-  const bg = CHARACTER_BG[profile.character]
+  useEffect(() => {
+    Promise.all([fetch("/api/pet"), fetch("/api/diagnosis/me")])
+      .then(([petRes, diagRes]) => Promise.all([petRes.json(), diagRes.json()]))
+      .then(([petData, diagData]) => {
+        setProfile({
+          nickname: diagData.data?.nickname || "익명",
+          typeCode: diagData.data?.typeCode || null,
+          seeds: petData.data?.seeds || 0,
+          level: petData.data?.level || 1,
+          createdAt: diagData.data?.createdAt || new Date().toISOString(),
+        })
+      })
+      .catch(() => {
+        setProfile({
+          nickname: "익명",
+          typeCode: null,
+          seeds: 0,
+          level: 1,
+          createdAt: new Date().toISOString(),
+        })
+      })
+      .finally(() => setLoading(false))
+  }, [])
+
+  // 진단 문항 화면에서 숨김
+  if (pathname === "/diagnosis") {
+    return null
+  }
+
+  if (loading || !profile) {
+    return null
+  }
+
+  const tribe = profile.typeCode ? TRIBE[profile.typeCode] : null
+  const color = tribe?.colorHex || "#7A6B58"
+  const bg = getBgColor(color)
+  const familyLabel = tribe?.family || "미분류"
   const joinDate = new Date(profile.createdAt).toLocaleDateString("ko-KR", {
     year: "numeric",
     month: "long",
@@ -114,7 +134,7 @@ export function Sidebar() {
                 fontSize: 22,
               }}
             >
-              {petEmoji(profile.character, profile.level)}
+              {getStageEmoji(profile.typeCode, profile.level)}
             </div>
             <div style={{ flex: 1, minWidth: 0 }}>
               <p
@@ -131,7 +151,7 @@ export function Sidebar() {
                 {profile.nickname}
               </p>
               <p style={{ margin: "1px 0 0", fontSize: 11, color, fontWeight: 700 }}>
-                {CHARACTER_EMOJI[profile.character]} {CHARACTER_LABEL[profile.character]}
+                {tribe?.emoji || "🌱"} {familyLabel}
               </p>
             </div>
           </div>
@@ -301,12 +321,12 @@ export function Sidebar() {
                   gap: 16,
                 }}
               >
-                <div style={{ fontSize: 52 }}>{CHARACTER_EMOJI[profile.character]}</div>
+                <div style={{ fontSize: 52 }}>{tribe?.emoji || "🌱"}</div>
                 <div style={{ textAlign: "left" }}>
                   <p style={{ fontFamily: "'Gowun Dodum', sans-serif", fontSize: 18, color: "#2A1F14", margin: "0 0 3px" }}>
                     {profile.nickname}
                   </p>
-                  <p style={{ margin: 0, fontSize: 12, color, fontWeight: 700 }}>{CHARACTER_LABEL[profile.character]}</p>
+                  <p style={{ margin: 0, fontSize: 12, color, fontWeight: 700 }}>{familyLabel}</p>
                 </div>
               </div>
 
