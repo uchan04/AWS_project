@@ -46,6 +46,7 @@ export function Sidebar() {
   const [showAccount, setShowAccount] = useState(false)
   const [profile, setProfile] = useState<ProfileData | null>(null)
   const [loading, setLoading] = useState(true)
+  const [compact, setCompact] = useState(false)
 
   useEffect(() => {
     function loadProfile() {
@@ -91,6 +92,16 @@ export function Sidebar() {
     }
   }, [])
 
+  // 화면 크기 감지
+  useEffect(() => {
+    function checkWidth() {
+      setCompact(window.innerWidth <= 768)
+    }
+    checkWidth()
+    window.addEventListener("resize", checkWidth)
+    return () => window.removeEventListener("resize", checkWidth)
+  }, [])
+
   // 진단 문항 화면에서 숨김
   if (pathname === "/diagnosis") {
     return null
@@ -120,8 +131,17 @@ export function Sidebar() {
         </div>
 
         {/* Profile card */}
-        <div style={{ margin: "16px 16px 8px", background: bg, borderRadius: 16, padding: "16px" }}>
-          <div style={{ display: "flex", alignItems: "center", gap: 10, marginBottom: 10 }}>
+        {compact ? (
+          <div
+            style={{
+              margin: "8px",
+              background: bg,
+              borderRadius: 12,
+              padding: "12px 8px",
+              display: "flex",
+              justifyContent: "center",
+            }}
+          >
             <div
               style={{
                 width: 40,
@@ -151,37 +171,71 @@ export function Sidebar() {
               ) : null}
               <span style={{ display: profile.imageUrl ? "none" : "block" }}>{getStageEmoji(profile.typeCode)}</span>
             </div>
-            <div style={{ flex: 1, minWidth: 0 }}>
-              <div style={{ display: "flex", alignItems: "center", gap: 6, marginBottom: 2 }}>
-                <p
-                  style={{
-                    margin: 0,
-                    fontFamily: "'Gowun Dodum', sans-serif",
-                    fontSize: 14,
-                    color: "#2A1F14",
-                    overflow: "hidden",
-                    textOverflow: "ellipsis",
-                    whiteSpace: "nowrap",
-                  }}
-                >
-                  {profile.nickname}
-                </p>
-                <span style={{ fontSize: 11, color: "#9A8A76", fontWeight: 600 }}>Lv.{profile.level}</span>
+          </div>
+        ) : (
+          <div style={{ margin: "16px 16px 8px", background: bg, borderRadius: 16, padding: "16px" }}>
+            <div style={{ display: "flex", alignItems: "center", gap: 10, marginBottom: 10 }}>
+              <div
+                style={{
+                  width: 40,
+                  height: 40,
+                  borderRadius: "50%",
+                  background: "white",
+                  display: "flex",
+                  alignItems: "center",
+                  justifyContent: "center",
+                  fontSize: 22,
+                  overflow: "hidden",
+                }}
+              >
+                {profile.imageUrl ? (
+                  // eslint-disable-next-line @next/next/no-img-element
+                  <img
+                    src={profile.imageUrl}
+                    alt="펫"
+                    style={{ width: "100%", height: "100%", objectFit: "cover" }}
+                    onError={(e) => {
+                      e.currentTarget.style.display = "none"
+                      if (e.currentTarget.nextSibling) {
+                        ;(e.currentTarget.nextSibling as HTMLElement).style.display = "block"
+                      }
+                    }}
+                  />
+                ) : null}
+                <span style={{ display: profile.imageUrl ? "none" : "block" }}>{getStageEmoji(profile.typeCode)}</span>
               </div>
-              <p style={{ margin: 0, fontSize: 11, color, fontWeight: 700 }}>
-                {tribe?.emoji || "🌱"} {familyLabel}
-              </p>
+              <div style={{ flex: 1, minWidth: 0 }}>
+                <div style={{ display: "flex", alignItems: "center", gap: 6, marginBottom: 2 }}>
+                  <p
+                    style={{
+                      margin: 0,
+                      fontFamily: "'Gowun Dodum', sans-serif",
+                      fontSize: 14,
+                      color: "#2A1F14",
+                      overflow: "hidden",
+                      textOverflow: "ellipsis",
+                      whiteSpace: "nowrap",
+                    }}
+                  >
+                    {profile.nickname}
+                  </p>
+                  <span style={{ fontSize: 11, color: "#9A8A76", fontWeight: 600 }}>Lv.{profile.level}</span>
+                </div>
+                <p style={{ margin: 0, fontSize: 11, color, fontWeight: 700 }}>
+                  {tribe?.emoji || "🌱"} {familyLabel}
+                </p>
+              </div>
+            </div>
+            <div style={{ display: "flex", flexDirection: "column", gap: 3, fontSize: 11, color: "#7A6B58", marginTop: 8 }}>
+              <span>🌱 씨앗 {profile.seeds}개</span>
+              <span>💖 친밀도 {profile.affinity}</span>
+              <span>⭐ 별조각 {profile.starShards}</span>
             </div>
           </div>
-          <div style={{ display: "flex", flexDirection: "column", gap: 3, fontSize: 11, color: "#7A6B58", marginTop: 8 }}>
-            <span>🌱 씨앗 {profile.seeds}개</span>
-            <span>💖 친밀도 {profile.affinity}</span>
-            <span>⭐ 별조각 {profile.starShards}</span>
-          </div>
-        </div>
+        )}
 
         {/* Nav */}
-        <nav style={{ flex: 1, padding: "8px 12px", overflowY: "auto" }}>
+        <nav style={{ flex: 1, padding: compact ? "8px 4px" : "8px 12px", overflowY: "auto" }}>
           {TABS.map(({ href, label, emoji, desc }) => {
             const active = pathname === href
             return (
@@ -192,8 +246,9 @@ export function Sidebar() {
                   width: "100%",
                   display: "flex",
                   alignItems: "center",
-                  gap: 12,
-                  padding: "10px 12px",
+                  justifyContent: compact ? "center" : "flex-start",
+                  gap: compact ? 0 : 12,
+                  padding: compact ? "10px 8px" : "10px 12px",
                   border: "none",
                   borderRadius: 12,
                   background: active ? color : "transparent",
@@ -210,36 +265,43 @@ export function Sidebar() {
                   if (!active) e.currentTarget.style.background = "transparent"
                 }}
               >
-                <span style={{ fontSize: 18, width: 24, textAlign: "center", flexShrink: 0 }}>{emoji}</span>
-                <div>
-                  <p
-                    className={styles.navLabel}
-                    style={{
-                      fontWeight: active ? 700 : 500,
-                      color: active ? "white" : "#2A1F14",
-                    }}
-                  >
-                    {label}
-                  </p>
-                  <p className={styles.navDesc} style={{ color: active ? "rgba(255,255,255,0.75)" : "#9A8A76" }}>
-                    {desc}
-                  </p>
-                </div>
+                {compact ? (
+                  <span style={{ fontSize: 20 }}>{emoji}</span>
+                ) : (
+                  <>
+                    <span style={{ fontSize: 18, width: 24, textAlign: "center", flexShrink: 0 }}>{emoji}</span>
+                    <div>
+                      <p
+                        className={styles.navLabel}
+                        style={{
+                          fontWeight: active ? 700 : 500,
+                          color: active ? "white" : "#2A1F14",
+                        }}
+                      >
+                        {label}
+                      </p>
+                      <p className={styles.navDesc} style={{ color: active ? "rgba(255,255,255,0.75)" : "#9A8A76" }}>
+                        {desc}
+                      </p>
+                    </div>
+                  </>
+                )}
               </Link>
             )
           })}
         </nav>
 
         {/* Footer — 내 계정 */}
-        <div style={{ padding: "12px 16px 20px", borderTop: "1px solid #EDE5D0" }}>
+        <div style={{ padding: compact ? "8px 4px 12px" : "12px 16px 20px", borderTop: "1px solid #EDE5D0" }}>
           <button
             onClick={() => setShowAccount(true)}
             style={{
               width: "100%",
               display: "flex",
               alignItems: "center",
-              gap: 10,
-              padding: "10px 12px",
+              justifyContent: compact ? "center" : "flex-start",
+              gap: compact ? 0 : 10,
+              padding: compact ? "10px 8px" : "10px 12px",
               border: "1px solid #DDD0BC",
               borderRadius: 12,
               background: "transparent",
@@ -255,16 +317,18 @@ export function Sidebar() {
             }}
           >
             <span style={{ fontSize: 16 }}>👤</span>
-            <span
-              style={{
-                fontSize: 13,
-                color: "#5A4A3A",
-                fontFamily: "'Noto Sans KR', sans-serif",
-                fontWeight: 500,
-              }}
-            >
-              내 계정
-            </span>
+            {!compact && (
+              <span
+                style={{
+                  fontSize: 13,
+                  color: "#5A4A3A",
+                  fontFamily: "'Noto Sans KR', sans-serif",
+                  fontWeight: 500,
+                }}
+              >
+                내 계정
+              </span>
+            )}
           </button>
         </div>
       </aside>

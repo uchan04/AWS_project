@@ -57,20 +57,4 @@
   .navDesc {
     display: none;
   }
-
-  /* 펫 카드 콤팩트 */
-  .sidebar > div:nth-child(2) {
-    margin: 8px 8px 8px;
-    padding: 12px 8px;
-  }
-
-  .sidebar > div:nth-child(2) > div:first-child > div:last-child,
-  .sidebar > div:nth-child(2) > div:last-child {
-    display: none;
-  }
-
-  /* 내 계정 텍스트 숨김 */
-  .sidebar > div:last-child button span:last-child {
-    display: none;
-  }
 }
