@@ -18,8 +18,8 @@ export async function GET() {
     const dashboard = await buildDashboard(refreshedUser)
 
     return ok(dashboard)
-  } catch (err: any) {
-    if (err.message === "로그인이 필요합니다") {
+  } catch (err) {
+    if (err instanceof Error && err.message === "로그인이 필요합니다") {
       return fail("UNAUTHORIZED", err.message, 401)
     }
     console.error("GET /api/missions error:", err)

@@ -115,17 +115,17 @@ export async function completeMission(params: {
             }
           }
 
+          // 일일 전체 완료: streak 갱신 + 별조각 60 보너스
           await tx.user.update({
             where: { id: actor.id },
             data: {
               streakCount: newStreak,
               lastStreakDate: todayDate,
+              starShards: { increment: 60 },
             },
           })
         }
       }
-
-      // TODO: 일일 전체 완료·7일 streak 별조각 보너스 — 팀 합의 필요
     })
 
     return {
@@ -137,8 +137,8 @@ export async function completeMission(params: {
         affinity: mission.rewardAffinity,
       },
     }
-  } catch (err: any) {
-    if (err.code === "P2002") {
+  } catch (err) {
+    if (err && typeof err === "object" && "code" in err && err.code === "P2002") {
       // 중복 완료 → 추가 보상 0
       return {
         newlyCompleted: false,
