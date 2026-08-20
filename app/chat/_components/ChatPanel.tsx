@@ -1,6 +1,7 @@
 "use client"
 
 import { useEffect, useRef, useState } from "react"
+import { useRouter } from "next/navigation"
 import type { TypeCode } from "@prisma/client"
 import { TRIBE } from "@/lib/types"
 import { timeAgo } from "@/app/community/_lib/format"
@@ -50,6 +51,7 @@ export function ChatPanel({
   // 로딩 화면 뒤에 가려진 이 값은 클라이언트 렌더에서만 실제로 쓰인다(아래 loading 분기 참고).
   const [starters] = useState(() => (typeCode ? pickThreeStarters(typeCode) : []))
   const listEndRef = useRef<HTMLDivElement>(null)
+  const router = useRouter()
 
   const accentColor = typeCode ? TRIBE[typeCode].colorHex : NEUTRAL_COLOR
 
@@ -178,16 +180,15 @@ export function ChatPanel({
             >
               ℹ
             </button>
-            {onClose && (
-              <button
-                type="button"
-                onClick={onClose}
-                className="flex h-8 w-8 shrink-0 items-center justify-center rounded-full text-neutral-400 hover:bg-neutral-100"
-                aria-label="닫기"
-              >
-                ✕
-              </button>
-            )}
+            {/* 전역 오버레이면 onClose로 닫고, /chat 라우트로 들어온 경우엔 이전 화면으로 돌아간다 */}
+            <button
+              type="button"
+              onClick={() => (onClose ? onClose() : router.back())}
+              className="flex h-8 w-8 shrink-0 items-center justify-center rounded-full text-neutral-400 hover:bg-neutral-100"
+              aria-label="닫기"
+            >
+              ✕
+            </button>
           </div>
 
           <div className="mt-3 h-1.5 w-full overflow-hidden rounded-full bg-neutral-100">
