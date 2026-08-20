@@ -14,7 +14,7 @@ D 쪽 기능 구현은 끝났고, 지금은 `completeMission()`(B) 외부 결과
 - `app/chat/_components/ChatLauncher.tsx`(신규, 클라이언트)가 열림 상태를 갖고, `app/layout.tsx`는 import 한 줄 + `<ChatLauncher />` 한 줄만 추가했다. E와 사전 공유했고 `layout.tsx` 변경은 **PR 리뷰를 받는다**
 - 임시 라우트 `app/chat/page.tsx`는 삭제했다(`/chat`은 이제 404). `app/chat/_components/`·`app/chat/_lib/`·`app/api/chat/`은 그대로다
 - `ChatPanel`이 받던 `nickname`/`typeCode`/`bedrockConfigured` props는 없앴다. 자세한 이유는 아래 "결정한 것과 이유" 참고
-- 남은 확인: 패널 열기·닫기 상호작용은 브라우저로 직접 확인하지 못했다(확장 미연결). SSR HTML과 API 응답까지만 검증했다
+- 브라우저 확인 완료(2026-08-20): 홈·미션·펫·커뮤니티 네 화면에서 플로팅 버튼 → 패널 열림, ✕ 닫힘, 배경 딤 클릭 닫힘을 실제로 눌러 확인했다. `/diagnosis`에서는 버튼이 안 보인다. 콘솔 에러 0건(React DevTools 안내와 HMR 로그만, 하이드레이션 경고 없음)
 
 ### 3. `app/chat/` 폴더 소유 확정 — `CLAUDE.md` 2절 표에 없음
 - **필요한 것**: 팀 전원 합의로 `CLAUDE.md` 2절의 폴더 소유 표에 `app/chat/` D를 정식으로 추가
@@ -75,7 +75,9 @@ D 쪽 기능 구현은 끝났고, 지금은 `completeMission()`(B) 외부 결과
 - `app/community/_components/PostCard.tsx` — 카드를 `<button onClick>`으로 바꿔 클릭 시 상세를 열도록 함
 - `app/community/_components/PostList.tsx` — 삭제 완료(`onDeleted`) 시 모달을 닫고 `useRouter().refresh()`로 서버 컴포넌트 데이터를 다시 가져와 목록을 갱신
 - `app/community/_components/PostDetailModal.tsx` — `isOwn`일 때만 "삭제" 버튼 노출, 삭제 성공 시 `onDeleted` 콜백 호출
-- `app/community/page.tsx` — 헤더에 `WriteModal` 배치(전체/종족 탭 공통, 내부에서 분기)
+- `app/community/page.tsx` — 헤더에 `WriteModal` 배치(전체/종족 탭 공통, 내부에서 분기). **2026-08-20**: `getCurrentUser()`~`listGalleryPosts()`를 `try/catch`로 감싸고 실패 시 "로그인이 필요해요" 안내를 렌더한다. `export const dynamic = "force-dynamic"` 추가
+- `app/community/_components/PostList.tsx` — **2026-08-20**: `<PostDetailModal>`에 `key={selectedPostId}` 추가. 다른 글을 열면 컴포넌트가 새로 마운트되도록 보장한다
+- `app/community/_components/PostDetailModal.tsx` — **2026-08-20**: 상세 로드 `useEffect` 본문의 `setLoading(true)`·`setError(null)` 두 줄 삭제(lint `react-hooks/set-state-in-effect` 해소)
 - `app/api/community/posts/route.ts` — POST 추가(글쓰기)
 - `app/api/community/posts/[id]/route.ts` — DELETE 추가(본인 글 소프트 삭제), GET 응답에 `isOwn` 추가. GET의 `comments`도 prisma 결과 그대로 내리지 않고 `{ id, body, createdAt, user, isOwn }`으로 매핑(`userId`·`postId`·`deletedAt` 미노출)
 - `app/api/community/posts/[id]/comments/route.ts` — POST 응답의 `comment`를 GET 상세와 같은 형태(`{ id, body, createdAt, user, isOwn: true }`)로 매핑. 트랜잭션·`grantAffinity`·`COMMENT_AFFINITY` 로직은 그대로 둠
@@ -153,6 +155,12 @@ D 쪽 기능 구현은 끝났고, 지금은 `completeMission()`(B) 외부 결과
 - **401은 진단 안내가 아니라 로그인 안내를 띄운다.** 둘 다 `typeCode`가 `null`이라 구분 없이 두면 로그인이 안 된 사용자에게 "진단을 먼저 완료해야" 라고 잘못 안내한다. `unauthorized` state로 갈라 로그인 안내만 띄우고 입력을 막는다(크래시 없음)
 - **`/diagnosis`에서는 플로팅 버튼을 숨긴다.** `Sidebar`가 같은 경로에서 같은 방식(`usePathname()`)으로 숨는다 — 진단 문항 화면의 몰입을 깨지 않기 위한 기존 결정에 동작을 맞췄다. 로그인 라우트는 아직 없어서(`app/(auth)/` 미생성) 제외 경로는 `/diagnosis` 하나뿐이다. 로그인 화면이 생기면 여기에 함께 추가한다
 - **`router.back()` 폴백을 지웠다.** `/chat` 라우트로 직접 들어오는 경우를 위한 코드였는데 그 라우트를 없앴고, `ChatLauncher`가 항상 `onClose`를 넘긴다. `useRouter` import도 다른 데서 안 써서 같이 정리했다
+
+### 인증 실패 처리와 lint (2026-08-20)
+- **커뮤니티 목록도 인증 실패에 안내를 띄운다.** 프로덕션(`DEV_AUTH_BYPASS` 없음)에서는 `getCurrentUser()`가 그대로 throw해 페이지가 500이 됐다. C의 `app/pet/page.tsx`가 쓰는 `try/catch` + 안내 렌더 패턴을 그대로 맞췄다 — 새 패턴을 만들지 않았다
+- **에러 종류로 문구를 가르지 않는다.** 인증 실패든 DB 실패든 안내 한 장이면 충분하다. 갈라 놓으면 화면 상태가 늘어나기만 하고, 지금 단계에서 사용자가 할 수 있는 행동(로그인·진단)은 어차피 같다
+- **`export const dynamic = "force-dynamic"`이 필수다.** 없으면 빌드 시점에 catch 쪽 안내 화면이 정적으로 굳어 로그인한 뒤에도 그게 나온다. `pet/page.tsx`가 같은 이유로 넣어뒀다(`searchParams` 덕에 이미 동적이지만 의도를 명시해 둔다)
+- **`set-state-in-effect`는 `key`로 풀었다.** `PostDetailModal`의 상세 로드 이펙트가 본문에서 `setLoading(true)`·`setError(null)`을 불러 lint 에러였다. 두 줄은 `useState` 초기값과 같은 상태를 다시 세팅하는 것이라, `PostList`가 `key={selectedPostId}`로 렌더해 글이 바뀌면 새로 마운트되도록 보장한 뒤 지웠다. 이펙트에 의존성 배열을 늘리거나 리셋 로직을 추가하는 방식은 쓰지 않았다
 - **`BottomNav.tsx`는 그대로 뒀다.** `layout.tsx`가 더 이상 쓰지 않는 죽은 파일이지만 D 소유가 아니다(삭제 판단은 E). `docs/STATUS.md` 차단 10번에 E 항목으로 이미 올라가 있다
 
 ## 막힌 것
@@ -163,5 +171,4 @@ D 쪽 기능 구현은 끝났고, 지금은 `completeMission()`(B) 외부 결과
 - 전체 탭 글쓰기 — 스키마에 ALL(또는 공용 게시판) 개념이 추가되면 `_lib/gallery.ts`의 `canWriteToGallery()`만 고치면 됨
 - `DAILY_COMMUNITY_POST` 일일 미션 완료 처리 — B와 담당 경계 협의 필요
 - **`layout.tsx` 변경분 PR 리뷰 — E.** 전역 오버레이 이전은 끝났고(2026-08-20) E와 사전 공유했다. 공유 파일이므로 머지 전 PR 리뷰를 받는다. diff는 import 한 줄 + `<ChatLauncher />` 한 줄뿐이다
-- **패널 열기·닫기 브라우저 확인 — 미완.** 이번 세션엔 브라우저 확장이 연결되지 않아 SSR HTML(네 화면에 버튼 있음 / `/diagnosis`에 없음)과 API 응답까지만 확인했다. 실제 클릭으로 열림·✕·배경 딤 닫힘을 한 번 눌러볼 것
 - `app/chat/` 폴더 소유를 `CLAUDE.md` 2절에 정식 반영 — 팀 확인 대기 (계속 남아있는 이월 항목)
