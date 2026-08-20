@@ -34,7 +34,7 @@
 | A | 진단 + 미션 콘텐츠 + 홈 | 미션 41개, 13문항 + 판정 함수, 조기 종료, 화면 3장 + Figma 값·구성 반영, 진단 API 3종(완료·조회·닉네임) + 화면 연결 완료 | 2차 마이그레이션 완료, API 정상 동작. 홈 실데이터는 B·C API 대기 |
 | B | 미션 시스템 + 사진 업로드 | **착수했다** (2026-08-20 확인). `feat/missions`에 1단계 미션 대시보드 UI, 사진 모달 Figma 정렬, 사진 미션 검증 스펙 문서 | `main`에 아직 없다. `completeMission()`을 D가 기다리는 중 |
 | C | 펫 | **`SPEC.md` 5절 기능 완료.** 성장·씨앗 투입·진화 연출, 방치형 자동 획득, 치장 착용·해제, 친밀도 캐릭터 구매·전환 + 화면 3장 | `feat/pet` 20커밋이 `main`에 없다(PR 여부 팀 결정 대기). 런타임 검증은 공유 DB 쓰기 승인 대기(차단 1). 치장 획득 경로 팀 결정 필요(차단 8). 가챠 DROP 마이그레이션은 E(차단 6) |
-| D | 커뮤니티 + 챗봇 | 기능 구현 끝. 챗봇 Bedrock 스트리밍 연결 완료, `docs/SETUP.md`(로컬 개발환경 가이드) 추가. 미션 완료 연동 호출부(`completeMission`)는 주석으로 준비만 해 둠 | `main`에 아직 없다. `completeMission()`(B) 대기. 세부는 `docs/dev/community.md` "재개 지점" |
+| D | 커뮤니티 + 챗봇 | 기능 구현 끝. 챗봇 Bedrock 스트리밍 연결 완료(2026-08-19). 미션 완료 연동 호출부(`completeMission`)는 주석으로 준비만 해둠 | `completeMission()`(B) 대기 상태. 막힌 항목 5개와 주의사항은 `docs/dev/community.md` 상단 "재개 지점" 참고 |
 | E | 인프라 + 인증 | RDS·Cognito·S3+CloudFront·CloudWatch+SNS·Bedrock·auth 실검증·하단 탭 내비 완료, PR #1 머지 + 2차 마이그레이션 + auth 빌드 수정 + 색 토큰 정리 완료 | Amplify GitHub 연동만 남음(브라우저 수동 단계) |
 
 ## 전체 차단 사항
@@ -74,6 +74,8 @@
 **남은 수동 단계**: Amplify Hosting ↔ GitHub 연동. GitHub App 설치는 브라우저 OAuth 동의가 필요해 계정 소유자가 직접 눌러야 한다. 절차는 `docs/dev/infra.md` 참고
 
 **보안 재검토 필요**: RDS를 팀원 로컬 개발 편의를 위해 Publicly Accessible=true로 설정했다(포트 5432를 0.0.0.0/0에 개방, 강력한 마스터 비밀번호로만 방어). 발표 전에 팀 전체가 재검토할 것 — 상세 이유는 `docs/dev/infra.md` "결정한 것과 이유" 참고
+
+**클라이언트 Authorization 헤더 — 로그인 화면·토큰 보관은 E 담당, 방식 확정 대기**: `lib/auth.ts` 서버 검증은 완료됐으나 클라이언트가 토큰을 싣지 않는다. 이대로 배포하면 전 API가 401이다.
 
 GitHub 원격 — https://github.com/uchan04/AWS_project
 
