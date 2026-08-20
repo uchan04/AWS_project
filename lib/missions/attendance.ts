@@ -100,8 +100,8 @@ export async function claimAttendance(actor: ActorWithSkin): Promise<AttendanceR
         affinity: ATTENDANCE_REWARDS[((actor.attendanceTotal - 1) % 7) + 1]?.affinity || 0,
       },
     }
-  } catch (err: any) {
-    if (err.code === "P2002") {
+  } catch (err) {
+    if (err && typeof err === "object" && "code" in err && err.code === "P2002") {
       // 중복 수령
       const cycleDay = actor.attendanceTotal > 0 ? ((actor.attendanceTotal - 1) % 7) + 1 : 1
       return {

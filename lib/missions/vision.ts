@@ -104,9 +104,14 @@ export async function verifyMissionPhoto(params: {
       throw new Error("verify_mission Tool이 호출되지 않았습니다")
     }
 
-    const input = toolUse.input as any
+    const input = toolUse.input
 
-    if (typeof input?.passed !== "boolean" || typeof input?.reason !== "string") {
+    if (
+      !input ||
+      typeof input !== "object" ||
+      typeof input.passed !== "boolean" ||
+      typeof input.reason !== "string"
+    ) {
       throw new Error("Tool Use 결과 형식이 잘못되었습니다")
     }
 
@@ -119,7 +124,7 @@ export async function verifyMissionPhoto(params: {
       passed: input.passed,
       reason,
     }
-  } catch (err: any) {
+  } catch (err) {
     console.error("Bedrock vision error:", err)
     throw new Error("사진을 확인하지 못했습니다. 잠시 후 다시 시도해 주세요.")
   }

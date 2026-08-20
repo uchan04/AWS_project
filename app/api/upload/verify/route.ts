@@ -78,12 +78,14 @@ export async function POST(req: Request) {
       completed: completionResult.newlyCompleted,
       reward: completionResult.reward,
     })
-  } catch (err: any) {
-    if (err.message === "로그인이 필요합니다") {
-      return fail("UNAUTHORIZED", err.message, 401)
-    }
-    if (err.message.includes("S3") || err.message.includes("파일")) {
-      return fail("INVALID_FILE", err.message, 400)
+  } catch (err) {
+    if (err instanceof Error) {
+      if (err.message === "로그인이 필요합니다") {
+        return fail("UNAUTHORIZED", err.message, 401)
+      }
+      if (err.message.includes("S3") || err.message.includes("파일")) {
+        return fail("INVALID_FILE", err.message, 400)
+      }
     }
     console.error("POST /api/upload/verify error:", err)
     return fail("INTERNAL_ERROR", err.message || "사진 검증 중 오류가 발생했습니다", 500)

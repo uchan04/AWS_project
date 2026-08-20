@@ -655,26 +655,47 @@ export default function MissionDashboard() {
   const [selected, setSelected] = useState<MissionDTO | null>(null)
 
   const loadDashboard = useCallback(async () => {
-    setLoading(true)
-    setError(null)
     try {
       const res = await fetch("/api/missions")
       const json = await res.json()
       if (!res.ok) {
         setError(json.error?.message || "미션을 불러올 수 없습니다")
+        setLoading(false)
         return
       }
       setDashboard(json.data)
+      setLoading(false)
     } catch (err) {
       setError("네트워크 오류가 발생했습니다")
-    } finally {
       setLoading(false)
     }
   }, [])
 
   useEffect(() => {
-    loadDashboard()
-  }, [loadDashboard])
+    let mounted = true
+    async function load() {
+      try {
+        const res = await fetch("/api/missions")
+        const json = await res.json()
+        if (!mounted) return
+        if (!res.ok) {
+          setError(json.error?.message || "미션을 불러올 수 없습니다")
+          setLoading(false)
+          return
+        }
+        setDashboard(json.data)
+        setLoading(false)
+      } catch (err) {
+        if (!mounted) return
+        setError("네트워크 오류가 발생했습니다")
+        setLoading(false)
+      }
+    }
+    void load()
+    return () => {
+      mounted = false
+    }
+  }, [])
 
   if (loading) {
     return (
