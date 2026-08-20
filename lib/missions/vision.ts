@@ -104,7 +104,7 @@ export async function verifyMissionPhoto(params: {
       throw new Error("verify_mission Tool이 호출되지 않았습니다")
     }
 
-    const input = toolUse.input
+    const input = toolUse.input as { passed?: unknown; reason?: unknown }
 
     if (
       !input ||

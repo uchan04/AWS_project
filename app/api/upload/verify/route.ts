@@ -88,6 +88,7 @@ export async function POST(req: Request) {
       }
     }
     console.error("POST /api/upload/verify error:", err)
-    return fail("INTERNAL_ERROR", err.message || "사진 검증 중 오류가 발생했습니다", 500)
+    const message = err instanceof Error ? err.message : "사진 검증 중 오류가 발생했습니다"
+    return fail("INTERNAL_ERROR", message, 500)
   }
 }

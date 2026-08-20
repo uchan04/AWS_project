@@ -2,7 +2,7 @@
 
 import { useState, useRef, useEffect, useCallback } from "react"
 import styles from "./mission-ui.module.css"
-import type { DashboardDTO, MissionDTO, StageMissionDTO } from "@/lib/missions/dashboard"
+import type { DashboardDTO, MissionDTO } from "@/lib/missions/dashboard"
 
 // ─── 미션 화면 전용 색상 (Figma 원본) ──────────────────────────────────────
 
@@ -428,7 +428,7 @@ interface StepSectionProps {
   onSelect: (m: MissionDTO) => void
 }
 
-function StepSection({ title, subtitle, missions, color, bg, mascotEmoji, unlocked = true, progress, onSelect }: StepSectionProps) {
+function StepSection({ title, subtitle, missions, color, bg, unlocked = true, progress, onSelect }: StepSectionProps) {
   return (
     <section style={{ marginBottom: 36 }}>
       <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: 14 }}>
@@ -665,7 +665,7 @@ export default function MissionDashboard() {
       }
       setDashboard(json.data)
       setLoading(false)
-    } catch (err) {
+    } catch {
       setError("네트워크 오류가 발생했습니다")
       setLoading(false)
     }
@@ -685,7 +685,7 @@ export default function MissionDashboard() {
         }
         setDashboard(json.data)
         setLoading(false)
-      } catch (err) {
+      } catch {
         if (!mounted) return
         setError("네트워크 오류가 발생했습니다")
         setLoading(false)

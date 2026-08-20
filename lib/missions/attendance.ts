@@ -1,7 +1,7 @@
 import type { User, PetSkin } from "@prisma/client"
 import { prisma } from "@/lib/prisma"
 import { calculateReward, capAffinity, type RewardInput } from "@/lib/reward"
-import { getTodayKey, getToday } from "./reset"
+import { getToday } from "./reset"
 
 export type AttendanceResult = {
   alreadyClaimed: boolean

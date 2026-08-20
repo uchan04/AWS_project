@@ -1,4 +1,4 @@
-import type { TypeCode, User } from "@prisma/client"
+import type { User } from "@prisma/client"
 import { prisma } from "@/lib/prisma"
 import { getTodayKey } from "./reset"
 import { getStageProgress } from "./stages"

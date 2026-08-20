@@ -13,6 +13,7 @@ type ProfileData = {
   seeds: number
   level: number
   createdAt: string
+  imageUrl: string | null
 }
 
 function getBgColor(hex: string): string {
@@ -25,11 +26,9 @@ function getBgColor(hex: string): string {
   return map[hex] || "#F5F0E8"
 }
 
-function getStageEmoji(typeCode: TypeCode | null, level: number): string {
+function getStageEmoji(typeCode: TypeCode | null): string {
   if (!typeCode) return "🌱"
   const tribe = TRIBE[typeCode]
-  const stage = level >= 15 ? 2 : level >= 5 ? 1 : 0
-  // 임시: emoji만 반환 (S3 이미지 전까지)
   return tribe.emoji
 }
 
@@ -56,6 +55,7 @@ export function Sidebar() {
           seeds: petData.data?.seeds || 0,
           level: petData.data?.level || 1,
           createdAt: diagData.data?.createdAt || new Date().toISOString(),
+          imageUrl: petData.data?.imageUrl || null,
         })
       })
       .catch(() => {
@@ -65,6 +65,7 @@ export function Sidebar() {
           seeds: 0,
           level: 1,
           createdAt: new Date().toISOString(),
+          imageUrl: null,
         })
       })
       .finally(() => setLoading(false))
@@ -111,9 +112,24 @@ export function Sidebar() {
                 alignItems: "center",
                 justifyContent: "center",
                 fontSize: 22,
+                overflow: "hidden",
               }}
             >
-              {getStageEmoji(profile.typeCode, profile.level)}
+              {profile.imageUrl ? (
+                // eslint-disable-next-line @next/next/no-img-element
+                <img
+                  src={profile.imageUrl}
+                  alt="펫"
+                  style={{ width: "100%", height: "100%", objectFit: "cover" }}
+                  onError={(e) => {
+                    e.currentTarget.style.display = "none"
+                    if (e.currentTarget.nextSibling) {
+                      ;(e.currentTarget.nextSibling as HTMLElement).style.display = "block"
+                    }
+                  }}
+                />
+              ) : null}
+              <span style={{ display: profile.imageUrl ? "none" : "block" }}>{getStageEmoji(profile.typeCode)}</span>
             </div>
             <div style={{ flex: 1, minWidth: 0 }}>
               <p
@@ -300,7 +316,34 @@ export function Sidebar() {
                   gap: 16,
                 }}
               >
-                <div style={{ fontSize: 52 }}>{tribe?.emoji || "🌱"}</div>
+                <div
+                  style={{
+                    width: 52,
+                    height: 52,
+                    display: "flex",
+                    alignItems: "center",
+                    justifyContent: "center",
+                    fontSize: 52,
+                    overflow: "hidden",
+                    borderRadius: "50%",
+                  }}
+                >
+                  {profile.imageUrl ? (
+                    // eslint-disable-next-line @next/next/no-img-element
+                    <img
+                      src={profile.imageUrl}
+                      alt="펫"
+                      style={{ width: "100%", height: "100%", objectFit: "cover" }}
+                      onError={(e) => {
+                        e.currentTarget.style.display = "none"
+                        if (e.currentTarget.nextSibling) {
+                          ;(e.currentTarget.nextSibling as HTMLElement).style.display = "block"
+                        }
+                      }}
+                    />
+                  ) : null}
+                  <span style={{ display: profile.imageUrl ? "none" : "block" }}>{tribe?.emoji || "🌱"}</span>
+                </div>
                 <div style={{ textAlign: "left" }}>
                   <p style={{ fontFamily: "'Gowun Dodum', sans-serif", fontSize: 18, color: "#2A1F14", margin: "0 0 3px" }}>
                     {profile.nickname}

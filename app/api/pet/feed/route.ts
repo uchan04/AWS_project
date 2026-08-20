@@ -55,7 +55,14 @@ export async function POST(request: Request) {
 
     if (!result) return fail("NOT_ENOUGH_SEEDS", "씨앗이 부족합니다")
 
-    return ok(result)
+    // S3 이미지 URL 생성
+    const cloudfront = process.env.CLOUDFRONT_DOMAIN
+    const imageUrl =
+      cloudfront && user.activePetSkin
+        ? `${cloudfront}/${user.activePetSkin.imageKeyBase}-${result.evolutionStage}.png`
+        : null
+
+    return ok({ ...result, imageUrl })
   } catch (error) {
     if (error instanceof UnauthorizedError) return fail("UNAUTHORIZED", error.message, 401)
     console.error("[POST /api/pet/feed]", error)
