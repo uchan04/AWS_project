@@ -630,7 +630,7 @@ function AttendanceCalendar({ cycleDay, claimedToday, attendanceTotal, color, bg
         })}
       </div>
       {claimedToday ? (
-        <p style={{ fontSize: 13, color, textAlign: "center", margin: 0 }}>✓ 오늘 출석 완료</p>
+        <p style={{ fontSize: 13, color, textAlign: "center", margin: 0 }}>✓ 오늘 출석은 이미 받았어요</p>
       ) : (
         <button
           onClick={handleClaim}
