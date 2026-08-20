@@ -28,6 +28,8 @@ export async function GET() {
       exp: user.exp,
       evolutionStage,
       seeds: user.seeds,
+      affinity: user.affinity,
+      starShards: user.starShards,
       idle: {
         seeds: calculateReward(user.activePetSkin, { seeds: idle.seeds }).seeds ?? 0,
         capped: idle.capped,

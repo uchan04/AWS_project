@@ -11,6 +11,8 @@ type ProfileData = {
   nickname: string
   typeCode: TypeCode | null
   seeds: number
+  affinity: number
+  starShards: number
   level: number
   createdAt: string
   imageUrl: string | null
@@ -46,29 +48,47 @@ export function Sidebar() {
   const [loading, setLoading] = useState(true)
 
   useEffect(() => {
-    Promise.all([fetch("/api/pet"), fetch("/api/diagnosis/me")])
-      .then(([petRes, diagRes]) => Promise.all([petRes.json(), diagRes.json()]))
-      .then(([petData, diagData]) => {
-        setProfile({
-          nickname: diagData.data?.nickname || "익명",
-          typeCode: diagData.data?.typeCode || null,
-          seeds: petData.data?.seeds || 0,
-          level: petData.data?.level || 1,
-          createdAt: diagData.data?.createdAt || new Date().toISOString(),
-          imageUrl: petData.data?.imageUrl || null,
+    function loadProfile() {
+      Promise.all([fetch("/api/pet"), fetch("/api/diagnosis/me")])
+        .then(([petRes, diagRes]) => Promise.all([petRes.json(), diagRes.json()]))
+        .then(([petData, diagData]) => {
+          setProfile({
+            nickname: diagData.data?.nickname || "익명",
+            typeCode: diagData.data?.typeCode || null,
+            seeds: petData.data?.seeds || 0,
+            affinity: petData.data?.affinity || 0,
+            starShards: petData.data?.starShards || 0,
+            level: petData.data?.level || 1,
+            createdAt: diagData.data?.createdAt || new Date().toISOString(),
+            imageUrl: petData.data?.imageUrl || null,
+          })
         })
-      })
-      .catch(() => {
-        setProfile({
-          nickname: "익명",
-          typeCode: null,
-          seeds: 0,
-          level: 1,
-          createdAt: new Date().toISOString(),
-          imageUrl: null,
+        .catch(() => {
+          setProfile({
+            nickname: "익명",
+            typeCode: null,
+            seeds: 0,
+            affinity: 0,
+            starShards: 0,
+            level: 1,
+            createdAt: new Date().toISOString(),
+            imageUrl: null,
+          })
         })
-      })
-      .finally(() => setLoading(false))
+        .finally(() => setLoading(false))
+    }
+
+    loadProfile()
+
+    // 미션 완료 시 씨앗 갱신
+    function handleMissionComplete() {
+      loadProfile()
+    }
+    window.addEventListener("mission-completed", handleMissionComplete)
+
+    return () => {
+      window.removeEventListener("mission-completed", handleMissionComplete)
+    }
   }, [])
 
   // 진단 문항 화면에서 숨김
@@ -132,27 +152,31 @@ export function Sidebar() {
               <span style={{ display: profile.imageUrl ? "none" : "block" }}>{getStageEmoji(profile.typeCode)}</span>
             </div>
             <div style={{ flex: 1, minWidth: 0 }}>
-              <p
-                style={{
-                  margin: 0,
-                  fontFamily: "'Gowun Dodum', sans-serif",
-                  fontSize: 14,
-                  color: "#2A1F14",
-                  overflow: "hidden",
-                  textOverflow: "ellipsis",
-                  whiteSpace: "nowrap",
-                }}
-              >
-                {profile.nickname}
-              </p>
-              <p style={{ margin: "1px 0 0", fontSize: 11, color, fontWeight: 700 }}>
+              <div style={{ display: "flex", alignItems: "center", gap: 6, marginBottom: 2 }}>
+                <p
+                  style={{
+                    margin: 0,
+                    fontFamily: "'Gowun Dodum', sans-serif",
+                    fontSize: 14,
+                    color: "#2A1F14",
+                    overflow: "hidden",
+                    textOverflow: "ellipsis",
+                    whiteSpace: "nowrap",
+                  }}
+                >
+                  {profile.nickname}
+                </p>
+                <span style={{ fontSize: 11, color: "#9A8A76", fontWeight: 600 }}>Lv.{profile.level}</span>
+              </div>
+              <p style={{ margin: 0, fontSize: 11, color, fontWeight: 700 }}>
                 {tribe?.emoji || "🌱"} {familyLabel}
               </p>
             </div>
           </div>
-          <div style={{ display: "flex", justifyContent: "space-between", fontSize: 11, color: "#7A6B58" }}>
+          <div style={{ display: "flex", flexDirection: "column", gap: 3, fontSize: 11, color: "#7A6B58", marginTop: 8 }}>
             <span>🌱 씨앗 {profile.seeds}개</span>
-            <span>Lv.{profile.level}</span>
+            <span>💖 친밀도 {profile.affinity}</span>
+            <span>⭐ 별조각 {profile.starShards}</span>
           </div>
         </div>
 
@@ -376,6 +400,61 @@ export function Sidebar() {
                     </div>
                   </div>
                 ))}
+              </div>
+
+              <div style={{ display: "flex", flexDirection: "column", gap: 8 }}>
+                <button
+                  onClick={() => {
+                    window.location.href = "/diagnosis"
+                  }}
+                  style={{
+                    width: "100%",
+                    padding: "12px",
+                    background: "#F5F0E8",
+                    border: "1px solid #DDD0BC",
+                    borderRadius: 12,
+                    fontSize: 13,
+                    color: "#5A4A3A",
+                    cursor: "pointer",
+                    fontWeight: 500,
+                    transition: "all 0.15s",
+                  }}
+                  onMouseEnter={(e) => {
+                    e.currentTarget.style.background = "#F0EAD8"
+                  }}
+                  onMouseLeave={(e) => {
+                    e.currentTarget.style.background = "#F5F0E8"
+                  }}
+                >
+                  다시 진단하기
+                </button>
+                <button
+                  onClick={() => {
+                    if (confirm("로그아웃하시겠습니까?")) {
+                      window.location.href = "/api/auth/logout"
+                    }
+                  }}
+                  style={{
+                    width: "100%",
+                    padding: "12px",
+                    background: "transparent",
+                    border: "1px solid #DDD0BC",
+                    borderRadius: 12,
+                    fontSize: 13,
+                    color: "#9A8A76",
+                    cursor: "pointer",
+                    fontWeight: 500,
+                    transition: "all 0.15s",
+                  }}
+                  onMouseEnter={(e) => {
+                    e.currentTarget.style.background = "#F0EAD8"
+                  }}
+                  onMouseLeave={(e) => {
+                    e.currentTarget.style.background = "transparent"
+                  }}
+                >
+                  로그아웃
+                </button>
               </div>
             </div>
           </div>
