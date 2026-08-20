@@ -8,9 +8,10 @@
 **브랜치 규칙 (2026-08-19 변경).** A 담당분은 `feat/diagnosis`에 커밋한다. `main`에 직접 커밋하지 않고 PR로만 올린다. `prisma/schema.prisma` 변경분도 이 브랜치에 담고, 머지 여부와 `prisma migrate dev` 실행은 팀이 결정한다.
 
 ## 현재 상태
-- 완료: 미션 41개, 지표 14개 정의, 12문항 + 형용사 문항, `classify()`·`classifySub()`, 무손실 조기 종료, 스냅샷 체크, 화면 3장(진단·결과·홈), 화면 3장 디자인 시스템 적용 + Figma 팔레트·폰트 반영(12장), 진단 API 3종 + 화면 연결, `draft.ts` 제거, **2차 마이그레이션 적용 후 실 DB로 전체 흐름 확인 완료(14장)**
+- 완료: 미션 41개, 지표 14개 정의, 12문항 + 형용사 문항, `classify()`·`classifySub()`, 무손실 조기 종료, 스냅샷 체크, 화면 3장(진단·결과·홈), 화면 3장 디자인 시스템 적용 + Figma 팔레트·폰트 반영(12장), 진단 API 3종 + 화면 연결, `draft.ts` 제거, 2차 마이그레이션 적용 후 실 DB로 전체 흐름 확인(14장), **스킨·치장·가챠 구조 변경을 스키마·실 DB·시드까지 적용(15장)**
 - 진행 중: 없음
 - 미착수: Bedrock 호출 2종, 관리자 교차표, 홈의 펫·미션 실데이터(B·C API 대기)
+- A 담당분이 아니지만 A가 처리한 것: 15장의 스키마 변경과 그에 딸린 `prisma/seed/items.ts`·`scripts/check-reward.ts`(C 소유) 수정. 이유는 15장에 적었다
 
 ## 구현한 파일
 - `lib/types.ts` — 종족·동물·색, 형용사 매핑, 기본 닉네임, 성장 곡선 상수
@@ -618,22 +619,24 @@ model DiagnosisSession {
 
 **E — Amplify ↔ GitHub 연동.** 브라우저 수동 단계라 계정 소유자만 할 수 있다.
 
-**C — `prisma/seed/items.ts` 동물 매핑.** 여우 → `HEALTH_EMOTION`, 고양이 → `INDEPENDENT_LOW_INCOME`, 치장 "라벤더" 3종 이름을 `SPEC.md` 2절의 확정 컬러명(노을 주황·새벽 파랑·이끼 초록)에 맞춘다. **`npm run db:seed`보다 먼저 고쳐야 한다.** upsert 키가 아이템 `name`이라 시드를 한 번 돌린 뒤 이름을 바꾸면 옛 행이 DB에 남는다.
-
 **D — 중복 init 마이그레이션.** `feat/community`의 `prisma/migrations/00000000000000_init/`을 지우고 `main`의 `20260819061857_init/`·`20260819080703_add_subtype/`을 받는다. **8/20 5인 머지 전에 처리해야 한다.** 그대로 머지되면 init이 두 개가 되어 `migrate deploy`가 깨진다.
 
 **B — `GET /api/missions`.** 나오면 홈 미션 미리보기를 그쪽으로 바꾼다.
 
-**C — 종족 외형 스킨으로 전환 (2026-08-20 사용자 결정).** 친밀도 전용 캐릭터(늑대·삵·판다)를 없애고, 진단으로 정해진 동물의 변종 스킨을 별조각으로 파는 구조로 바꾼다. 상세는 15절에 있다. `PetSkin` 테이블은 `priceShards` 한 컬럼만 추가하면 되고, 종족 그룹핑은 기존 `typeCode`가 그대로 담당한다. A는 `app/api/diagnosis/complete/route.ts`의 기본 펫 지급 쿼리(`where: { typeCode, isDefault: true }`)를 그대로 두면 되므로 진단 쪽 변경은 없다.
+**C — 종족 외형 스킨 전환의 남은 코드 5곳 (2026-08-20 팀 합의).** 스키마·실 DB·시드는 A가 적용을 끝냈다. `app/api/pet/cosmetics/route.ts`, `app/api/pet/skins/route.ts`, `app/api/pet/skins/buy/route.ts`, `app/pet/_components/SkinList.tsx`, `scripts/check-pet.ts`가 남았고 전부 `feat/pet`에만 있는 파일이다. 상세와 충돌 목록은 15절에 있다. `main`을 받으면 스키마·시드·마이그레이션에서 충돌하며 **전부 `main` 쪽을 채택하면 된다.** A는 `app/api/diagnosis/complete/route.ts`의 기본 펫 지급 쿼리(`where: { typeCode, isDefault: true }`)를 그대로 두면 되므로 진단 쪽 변경은 없다.
+
+**C — 재진단 시 옛 종족 스킨 정책.** `UserPetSkin`에 남는 옛 종족 스킨을 환불할지 유지할지 정해야 한다. 15절 "남는 문제" 참고. 지금 `UserPetSkin`이 1건뿐이라 정하기 가장 싼 시점이다.
 
 ### 넘겨서 끝난 것 (기록)
 
 - E — 2차 마이그레이션 `20260819080703_add_subtype`: A가 넘긴 DDL 그대로 적용됐다
+- C — `prisma/seed/items.ts` 동물 매핑·치장 이름: 실 DB에는 이미 확정 값이 들어가 있었고 `main`의 시드만 옛 값이었다. 2026-08-20에 스킨·치장 구조 변경과 함께 A가 맞췄다(15절)
 - E — `lib/auth.ts` 지연 초기화: `getVerifier()`로 고쳐졌다
 - E — `app/globals.css`의 종족색 3줄 삭제, `BottomNav`의 "진단결과" 경로 수정, `.env.example` DB 이름 `welli`
 
 ### A가 이어서 할 것
 
+0. `feat/diagnosis` → `main` PR. 스키마·마이그레이션·시드가 들어 있어 5인 전원이 받아야 한다. 머지 후 전원에게 `git pull && npx prisma migrate deploy && npx prisma generate` 공지
 1. 관리자 교차표 (대분류 × 세부유형)
 2. 펫 이미지가 S3에 올라오면 홈·결과의 종족색 원판을 이미지로 교체 (C·E 대기). 자리와 크기는 `styles/tokens.css`의 `.hm-plate__disc`(결과 7.5rem·기본 4.5rem)와 `.hm-tile__face`가 잡아 뒀다
 3. 다른 화면(미션·펫·커뮤니티)도 같은 결로 맞추려면 담당자에게 `design.md`와 `styles/tokens.css`를 알린다. 남의 폴더는 A가 고치지 않는다
