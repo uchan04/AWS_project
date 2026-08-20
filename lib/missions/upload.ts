@@ -92,8 +92,8 @@ export async function verifyS3Object(params: {
       contentType: result.ContentType,
       contentLength: result.ContentLength,
     }
-  } catch (err: any) {
-    if (err.name === "NotFound") {
+  } catch (err) {
+    if (err && typeof err === "object" && "name" in err && err.name === "NotFound") {
       throw new Error("업로드된 파일을 찾을 수 없습니다")
     }
     throw err

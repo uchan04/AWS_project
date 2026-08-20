@@ -1,0 +1,60 @@
+.sidebar {
+  width: 240px;
+  flex-shrink: 0;
+  background: #fdfbf5;
+  border-right: 1px solid #ddd0bc;
+  display: flex;
+  flex-direction: column;
+  height: 100%;
+  position: relative;
+  z-index: 10;
+}
+
+.logo {
+  padding: 28px 24px 20px;
+  border-bottom: 1px solid #ede5d0;
+}
+
+.logoTitle {
+  font-family: "Gowun Dodum", sans-serif;
+  font-size: 18px;
+  color: #2a1f14;
+  margin: 0;
+  line-height: 1.3;
+}
+
+.logoSubtitle {
+  margin: 4px 0 0;
+  font-size: 11px;
+  color: #9a8a76;
+}
+
+.navLabel {
+  margin: 0;
+  font-size: 13px;
+  font-weight: 500;
+  font-family: "Noto Sans KR", sans-serif;
+}
+
+.navDesc {
+  margin: 0;
+  font-size: 10px;
+}
+
+/* 모바일: 아이콘만 표시 */
+@media (max-width: 768px) {
+  .sidebar {
+    width: 64px;
+  }
+
+  .logo {
+    padding: 20px 12px;
+  }
+
+  .logoTitle,
+  .logoSubtitle,
+  .navLabel,
+  .navDesc {
+    display: none;
+  }
+}

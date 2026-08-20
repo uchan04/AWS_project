@@ -42,10 +42,14 @@ export default async function PetPage() {
       select: { item: { select: { name: true } } },
     })
 
+    const evolutionStage = cappedStage(user.level, stageCount)
+    const cloudfront = process.env.CLOUDFRONT_DOMAIN
+    const imageUrl = cloudfront && skin ? `${cloudfront}/${skin.imageKeyBase}-${evolutionStage}.png` : null
+
     state = {
       level: user.level,
       exp: user.exp,
-      evolutionStage: cappedStage(user.level, stageCount),
+      evolutionStage,
       seeds: user.seeds,
       idleSeeds,
       idleCapped: idle.capped,
@@ -60,6 +64,7 @@ export default async function PetPage() {
         skin && skin.effectType !== "NONE" && skin.effectPct > 0
           ? `${EFFECT_LABEL[skin.effectType] ?? "보너스"} +${skin.effectPct}%`
           : null,
+      imageUrl,
     }
   } catch (error) {
     console.error("[/pet]", error)

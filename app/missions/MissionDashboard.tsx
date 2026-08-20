@@ -2,7 +2,7 @@
 
 import { useState, useRef, useEffect, useCallback } from "react"
 import styles from "./mission-ui.module.css"
-import type { DashboardDTO, MissionDTO, StageMissionDTO } from "@/lib/missions/dashboard"
+import type { DashboardDTO, MissionDTO } from "@/lib/missions/dashboard"
 
 // ─── 미션 화면 전용 색상 (Figma 원본) ──────────────────────────────────────
 
@@ -127,7 +127,6 @@ function MissionModal({ mission, color, bg, mascotEmoji, onClose, onComplete }: 
   const fileRef = useRef<HTMLInputElement>(null)
 
   const animType = getMissionAnimType(mission)
-  const animClass = ANIM_CLASS[animType] ?? styles.mascotFloat
   const caption = ANIM_CAPTION[animType] ?? ANIM_CAPTION.default
   const emoji = getEmojiForMission(mission.title)
 
@@ -163,6 +162,8 @@ function MissionModal({ mission, color, bg, mascotEmoji, onClose, onComplete }: 
 
       onComplete()
       onClose()
+      // 사이드바 씨앗 갱신 이벤트
+      window.dispatchEvent(new CustomEvent("mission-completed"))
     } catch {
       setCompleteError("네트워크 오류가 발생했습니다")
     } finally {
@@ -191,6 +192,7 @@ function MissionModal({ mission, color, bg, mascotEmoji, onClose, onComplete }: 
           borderRadius: 32,
           width: "90%",
           maxWidth: 480,
+          maxHeight: "90vh",
           overflow: "hidden",
           boxShadow: "0 32px 80px rgba(0,0,0,0.2)",
           display: "flex",
@@ -216,7 +218,6 @@ function MissionModal({ mission, color, bg, mascotEmoji, onClose, onComplete }: 
             ×
           </button>
           <div
-            className={animClass}
             style={{
               fontSize: 120,
               lineHeight: 1,
@@ -242,7 +243,7 @@ function MissionModal({ mission, color, bg, mascotEmoji, onClose, onComplete }: 
           </div>
         </div>
 
-        <div style={{ padding: "24px 32px 32px" }}>
+        <div style={{ padding: "24px 32px 32px", overflowY: "auto", flex: 1 }}>
           <div style={{ display: "flex", gap: 8, justifyContent: "center", marginBottom: 20 }}>
             <span
               style={{
@@ -428,7 +429,7 @@ interface StepSectionProps {
   onSelect: (m: MissionDTO) => void
 }
 
-function StepSection({ title, subtitle, missions, color, bg, mascotEmoji, unlocked = true, progress, onSelect }: StepSectionProps) {
+function StepSection({ title, subtitle, missions, color, bg, unlocked = true, progress, onSelect }: StepSectionProps) {
   return (
     <section style={{ marginBottom: 36 }}>
       <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: 14 }}>
@@ -505,6 +506,13 @@ function StepSection({ title, subtitle, missions, color, bg, mascotEmoji, unlock
               {m.completed && (
                 <span style={{ fontSize: 11, color, marginTop: 6, display: "block" }}>✓ 완료</span>
               )}
+              {!m.completed && (
+                <div style={{ marginTop: 8, fontSize: 10, color: "#7A6B58", display: "flex", flexWrap: "wrap", gap: 4, justifyContent: "center" }}>
+                  {m.reward.seeds > 0 && <span>🌱 {m.reward.seeds}</span>}
+                  {m.reward.affinity > 0 && <span>💖 {m.reward.affinity}</span>}
+                  {m.reward.starShards > 0 && <span>⭐ {m.reward.starShards}</span>}
+                </div>
+              )}
             </button>
           )
         })}
@@ -571,6 +579,7 @@ function AttendanceCalendar({ cycleDay, claimedToday, attendanceTotal, color, bg
 
       if (res.ok && !json.data.alreadyClaimed) {
         onClaim()
+        window.dispatchEvent(new CustomEvent("mission-completed"))
       }
     } catch {
       // silent
@@ -621,7 +630,7 @@ function AttendanceCalendar({ cycleDay, claimedToday, attendanceTotal, color, bg
         })}
       </div>
       {claimedToday ? (
-        <p style={{ fontSize: 13, color, textAlign: "center", margin: 0 }}>✓ 오늘 출석 완료</p>
+        <p style={{ fontSize: 13, color, textAlign: "center", margin: 0 }}>✓ 오늘 출석은 이미 받았어요</p>
       ) : (
         <button
           onClick={handleClaim}
@@ -653,28 +662,50 @@ export default function MissionDashboard() {
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState<string | null>(null)
   const [selected, setSelected] = useState<MissionDTO | null>(null)
+  const [currentStageIndex, setCurrentStageIndex] = useState(0)
 
   const loadDashboard = useCallback(async () => {
-    setLoading(true)
-    setError(null)
     try {
       const res = await fetch("/api/missions")
       const json = await res.json()
       if (!res.ok) {
         setError(json.error?.message || "미션을 불러올 수 없습니다")
+        setLoading(false)
         return
       }
       setDashboard(json.data)
-    } catch (err) {
+      setLoading(false)
+    } catch {
       setError("네트워크 오류가 발생했습니다")
-    } finally {
       setLoading(false)
     }
   }, [])
 
   useEffect(() => {
-    loadDashboard()
-  }, [loadDashboard])
+    let mounted = true
+    async function load() {
+      try {
+        const res = await fetch("/api/missions")
+        const json = await res.json()
+        if (!mounted) return
+        if (!res.ok) {
+          setError(json.error?.message || "미션을 불러올 수 없습니다")
+          setLoading(false)
+          return
+        }
+        setDashboard(json.data)
+        setLoading(false)
+      } catch {
+        if (!mounted) return
+        setError("네트워크 오류가 발생했습니다")
+        setLoading(false)
+      }
+    }
+    void load()
+    return () => {
+      mounted = false
+    }
+  }, [])
 
   if (loading) {
     return (
@@ -709,7 +740,14 @@ export default function MissionDashboard() {
   if (!dashboard) return null
 
   // TODO: 사용자 캐릭터를 User.typeCode 기반으로 결정
-  const character: CharacterKey = "cat"
+  // typeCode에서 종족 매핑
+  const typeCode = dashboard.userTypeCode
+  let character: CharacterKey = "cat"
+  if (typeCode) {
+    if (typeCode.includes("HEALTH_EMOTION")) character = "fox"
+    else if (typeCode.includes("INDEPENDENT_LOW_INCOME")) character = "cat"
+    else if (typeCode.includes("FAMILY_LIVING")) character = "bear"
+  }
   const color = CHARACTER_COLOR[character]
   const bg = CHARACTER_BG[character]
   const mascotEmoji = CHARACTER_EMOJI[character]
@@ -774,19 +812,95 @@ export default function MissionDashboard() {
         onSelect={setSelected}
       />
 
-      {dashboard.stageMissions.map((sm) => (
-        <StepSection
-          key={sm.stage}
-          title={`단계 ${sm.stage}`}
-          missions={sm.missions}
-          color={color}
-          bg={bg}
-          mascotEmoji={mascotEmoji}
-          unlocked={sm.unlocked}
-          progress={sm.unlocked ? `${sm.completedCount} / 4 완료` : "🔒 잠금"}
-          onSelect={setSelected}
-        />
-      ))}
+      {(() => {
+        // 모든 단계 표시 (잠김 포함)
+        const allMissions = dashboard.stageMissions
+        if (allMissions.length === 0) return null
+
+        const currentMission = allMissions[currentStageIndex]
+        const hasPrev = currentStageIndex > 0
+        const hasNext = currentStageIndex < allMissions.length - 1
+
+        return (
+          <div style={{ marginBottom: 36 }}>
+            <div>
+              <h2
+                style={{
+                  fontFamily: "'Gowun Dodum', sans-serif",
+                  fontSize: 19,
+                  color: "#2A1F14",
+                  margin: "0 0 4px",
+                }}
+              >
+                추가 미션
+              </h2>
+              <p style={{ fontSize: 12, color: "#7A6B58", margin: "0 0 14px" }}>
+                단계를 완료하면 새로운 미션이 열려요
+              </p>
+            </div>
+            <div style={{ position: "relative" }}>
+              {/* 왼쪽 화살표 */}
+              <button
+                onClick={() => setCurrentStageIndex((i) => Math.max(0, i - 1))}
+                disabled={!hasPrev}
+                style={{
+                  position: "absolute",
+                  left: -32,
+                  top: "50%",
+                  transform: "translateY(-50%) scaleX(0.7)",
+                  background: "transparent",
+                  color: hasPrev ? color : "#DDD0BC",
+                  border: "none",
+                  cursor: hasPrev ? "pointer" : "not-allowed",
+                  fontSize: 32,
+                  zIndex: 10,
+                  padding: 0,
+                  lineHeight: 1,
+                }}
+              >
+                ◀
+              </button>
+
+              {/* 오른쪽 화살표 */}
+              <button
+                onClick={() => {
+                  if (hasNext) {
+                    setCurrentStageIndex((i) => Math.min(allMissions.length - 1, i + 1))
+                  }
+                }}
+                disabled={!hasNext}
+                style={{
+                  position: "absolute",
+                  right: -32,
+                  top: "50%",
+                  transform: "translateY(-50%) scaleX(0.7)",
+                  background: "transparent",
+                  color: hasNext ? color : "#DDD0BC",
+                  border: "none",
+                  cursor: hasNext ? "pointer" : "not-allowed",
+                  fontSize: 32,
+                  zIndex: 10,
+                  padding: 0,
+                  lineHeight: 1,
+                }}
+              >
+                ▶
+              </button>
+
+              <StepSection
+                title={`단계 ${currentMission.stage}`}
+                missions={currentMission.missions}
+                color={color}
+                bg={bg}
+                mascotEmoji={mascotEmoji}
+                unlocked={currentMission.unlocked}
+                progress={currentMission.unlocked ? `${currentMission.completedCount} / 4 완료` : "🔒 이전 단계를 먼저 완료해 주세요"}
+                onSelect={setSelected}
+              />
+            </div>
+          </div>
+        )
+      })()}
 
       {selected && (
         <MissionModal

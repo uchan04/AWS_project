@@ -9,8 +9,8 @@ export async function POST() {
     const result = await claimAttendance(user)
 
     return ok(result)
-  } catch (err: any) {
-    if (err.message === "로그인이 필요합니다") {
+  } catch (err) {
+    if (err instanceof Error && err.message === "로그인이 필요합니다") {
       return fail("UNAUTHORIZED", err.message, 401)
     }
     console.error("POST /api/missions/attendance/claim error:", err)
