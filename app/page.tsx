@@ -34,10 +34,14 @@ export default function HomePage() {
 
   useEffect(() => {
     let alive = true
-    setGreeting(greetingFor(new Date().getHours()))
+    // 인사말도 이 콜백 안에서 정한다. 이펙트 본문에서 바로 setState하면
+    // react-hooks/set-state-in-effect가 에러다. greeting은 me가 정해진 뒤에만 쓰이므로
+    // 여기로 옮겨도 화면에 보이는 순서는 같다
     fetchMe()
       .then((next) => {
-        if (alive) setMe(next)
+        if (!alive) return
+        setGreeting(greetingFor(new Date().getHours()))
+        setMe(next)
       })
       .catch(() => {
         if (alive) setMe(null)

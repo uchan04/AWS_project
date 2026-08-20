@@ -1,0 +1,80 @@
+/* 소유자: C. 펫 화면 전용 배치. design.md의 디자인 시스템을 따른다.
+ *
+ * 새 색·폰트·간격 값을 정의하지 않는다. 값의 정본은 styles/tokens.css이고
+ * 여기서는 그 토큰을 조합만 한다. 새 값이 필요해지면 design.md를 먼저 고친다.
+ *
+ * styles/tokens.css에 넣지 않은 이유: 그 파일은 A가 만든 공용 토큰이다.
+ * 파일 끝에 덧붙이면 A도 같은 자리에 덧붙여 머지 충돌이 난다(CLAUDE.md 1절 취지).
+ * .hm-pet* 는 펫 화면에서만 쓰므로 화면 폴더에 둔다.
+ */
+
+.hm-pet {
+  /* 단일 열 화면이라 진단과 같은 폭을 쓴다 (design.md "폭은 화면이 정한다") */
+  --col-max: 42.5rem;
+  display: grid;
+  gap: var(--space-md);
+  align-content: start;
+}
+
+/* 진화 단계별 크기. SPEC.md 5절은 "CSS transform 수준"까지만 요구한다.
+   design.md가 금지하는 것은 scale 애니메이션이고, 단계별 고정 크기는 애니메이션이 아니다.
+   기준은 .hm-plate--hero(7.5rem / 4rem)이고 2단계가 그 값이다. */
+.hm-pet__plate[data-stage="1"] .hm-plate__disc {
+  width: 6rem;
+  height: 6rem;
+  font-size: 3rem;
+}
+.hm-pet__plate[data-stage="3"] .hm-plate__disc {
+  width: 9rem;
+  height: 9rem;
+  font-size: 5rem;
+}
+
+/* 씨앗 투입 버튼 줄. 좁은 화면에서 라벨이 두 줄이 되지 않게 자동으로 한 열이 된다 */
+.hm-pet__acts {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(min(7rem, 100%), 1fr));
+  gap: var(--space-2xs);
+  margin-top: var(--space-2xs);
+}
+
+/* 진화 연출 2초 (SPEC.md 5절). 종이색 한 벌로 덮는다 */
+.hm-pet__evolve {
+  position: fixed;
+  inset: 0;
+  z-index: var(--z-modal);
+  display: grid;
+  place-content: center;
+  justify-items: center;
+  gap: var(--space-sm);
+  padding: var(--space-lg);
+  background: var(--color-paper);
+  text-align: center;
+}
+
+.hm-pet__evolve-title {
+  font-family: var(--font-display);
+  font-size: var(--text-lg);
+  margin: 0;
+}
+
+/* 치장 타일. 버튼이 타일 아래에 붙으므로 위쪽 여백만 준다 */
+.hm-pet__cos .hm-btn {
+  margin-top: var(--space-3xs);
+}
+
+/* 미획득 실루엣 (SPEC.md 5절). 이미지가 없어 지금은 글자를 죽여 둔다.
+   이미지가 오면 아래에 .hm-pet__cos--locked img { filter: brightness(0) opacity(.28) }를
+   더하면 된다 — 새 색 값을 만들지 않고 실루엣이 된다 */
+.hm-pet__cos--locked .hm-tile__title {
+  color: var(--color-muted);
+  font-weight: 400;
+}
+
+/* 착용 중인 치장 줄. 펫 화면에서 원판 아래에 붙는다 */
+.hm-pet__worn {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--space-3xs);
+  justify-content: center;
+}
