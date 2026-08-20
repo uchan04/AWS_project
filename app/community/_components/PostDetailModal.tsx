@@ -43,7 +43,10 @@ export function PostDetailModal({
   const [post, setPost] = useState<DetailPost | null>(null)
   const [comments, setComments] = useState<DetailComment[]>([])
   const [loading, setLoading] = useState(true)
+  // error는 최초 GET 실패 전용(모달 전체를 에러 화면으로 바꾼다).
+  // 좋아요·댓글·삭제 등 액션 실패는 actionError로 분리해 하단에 인라인으로만 띄운다.
   const [error, setError] = useState<string | null>(null)
+  const [actionError, setActionError] = useState<string | null>(null)
   const [likePending, setLikePending] = useState(false)
   const [commentBody, setCommentBody] = useState("")
   const [commentPending, setCommentPending] = useState(false)
@@ -96,11 +99,12 @@ export function PostDetailModal({
   async function handleDelete() {
     if (!post || deletePending) return
     setDeletePending(true)
+    setActionError(null)
     try {
       const res = await fetch(`/api/community/posts/${postId}`, { method: "DELETE" })
       const json = await res.json()
       if (json.error) {
-        setError(json.error.message)
+        setActionError(json.error.message)
         return
       }
       onDeleted()
@@ -112,11 +116,12 @@ export function PostDetailModal({
   async function handleDeleteComment(commentId: string) {
     if (deletingCommentId) return
     setDeletingCommentId(commentId)
+    setActionError(null)
     try {
       const res = await fetch(`/api/community/posts/${postId}/comments/${commentId}`, { method: "DELETE" })
       const json = await res.json()
       if (json.error) {
-        setError(json.error.message)
+        setActionError(json.error.message)
         return
       }
       setComments((prev) => prev.filter((c) => c.id !== commentId))
@@ -131,6 +136,7 @@ export function PostDetailModal({
     if (!trimmed || commentPending) return
     setCommentPending(true)
     setAffinityNotice(null)
+    setActionError(null)
     try {
       const res = await fetch(`/api/community/posts/${postId}/comments`, {
         method: "POST",
@@ -139,7 +145,7 @@ export function PostDetailModal({
       })
       const json = await res.json()
       if (json.error) {
-        setError(json.error.message)
+        setActionError(json.error.message)
         return
       }
       setComments((prev) => [...prev, json.data.comment])
@@ -243,6 +249,7 @@ export function PostDetailModal({
             </div>
 
             <div className="flex flex-col gap-2 border-t border-neutral-200 px-7 py-4">
+              {actionError && <p className="text-xs text-red-500">{actionError}</p>}
               {affinityNotice && <p className="text-xs text-neutral-400">{affinityNotice}</p>}
               <div className="flex gap-2">
                 <input
