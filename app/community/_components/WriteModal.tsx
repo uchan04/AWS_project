@@ -4,8 +4,12 @@ import { useState } from "react"
 import { useRouter } from "next/navigation"
 import type { TypeCode } from "@prisma/client"
 import { TRIBE } from "@/lib/types"
-import { canWriteToGallery, type GalleryTab } from "../_lib/gallery"
+import { type GalleryTab } from "../_lib/gallery"
 import { TOPICS, type WriteTopic } from "../_lib/topics"
+
+// 전체 갤러리는 종족이 없어 TRIBE에 키가 없다. lib/types.ts는 A 소유 공유 파일이라
+// 건드리지 않고, ChatPanel이 NEUTRAL_COLOR를 자기 파일에 둔 것과 같은 방식으로 여기 둔다.
+const NEUTRAL_COLOR = "#9CA3AF"
 
 // 6개 중 3개를 무작위로 고른다. ChatPanel의 pickThreeStarters()와 같은 방식이며
 // 외부 라이브러리를 쓰지 않는다.
@@ -26,26 +30,10 @@ export function WriteModal({ gallery }: { gallery: GalleryTab }) {
   const [pending, setPending] = useState(false)
   const [error, setError] = useState<string | null>(null)
   // 모달을 열 때 한 번만 고른다. 입력 중에는 목록이 바뀌지 않는다.
-  // 훅은 아래 canWriteToGallery 조기 return보다 위에 있어야 한다 —
-  // 아래에 두면 전체 탭에서 훅 개수가 달라져 터진다.
   const [topics, setTopics] = useState<WriteTopic[]>([])
 
-  if (!canWriteToGallery(gallery)) {
-    return (
-      <div className="flex items-center gap-3">
-        <button
-          type="button"
-          disabled
-          className="cursor-not-allowed rounded-xl border border-neutral-200 bg-neutral-100 px-5 py-2.5 text-sm font-semibold text-neutral-400"
-        >
-          ✏️ 글 쓰기
-        </button>
-        <p className="text-xs text-neutral-400">전체 커뮤니티 글쓰기는 준비 중이에요</p>
-      </div>
-    )
-  }
-
-  const tribeColor = TRIBE[gallery].colorHex
+  const isAll = gallery === "ALL"
+  const tribeColor = isAll ? NEUTRAL_COLOR : TRIBE[gallery].colorHex
 
   function close() {
     setIsOpen(false)
@@ -84,7 +72,8 @@ export function WriteModal({ gallery }: { gallery: GalleryTab }) {
       <button
         type="button"
         onClick={() => {
-          setTopics(pickThreeTopics(gallery))
+          // 전체 탭은 유형을 알 수 없어 추천을 띄우지 않는다(TOPICS에 ALL 키가 없다).
+          setTopics(isAll ? [] : pickThreeTopics(gallery))
           setIsOpen(true)
         }}
         className="rounded-xl px-5 py-2.5 text-sm font-semibold text-white transition"
@@ -97,7 +86,9 @@ export function WriteModal({ gallery }: { gallery: GalleryTab }) {
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/35 p-6" onClick={close}>
           <div className="w-full max-w-lg rounded-3xl bg-white p-8 shadow-2xl" onClick={(e) => e.stopPropagation()}>
             <div className="mb-5 flex items-center justify-between">
-              <h2 className="text-base font-bold text-neutral-900">{TRIBE[gallery].animal} 갤러리에 글쓰기</h2>
+              <h2 className="text-base font-bold text-neutral-900">
+                {isAll ? "전체 커뮤니티에 글쓰기" : `${TRIBE[gallery].animal} 갤러리에 글쓰기`}
+              </h2>
               <button
                 type="button"
                 onClick={close}

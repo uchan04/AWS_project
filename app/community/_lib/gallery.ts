@@ -1,12 +1,12 @@
-import type { TypeCode } from "@prisma/client"
+import type { GalleryType, TypeCode } from "@prisma/client"
 import { prisma } from "@/lib/prisma"
 
 /**
- * "전체" 탭은 스키마에 없는 가상 갤러리다. Post.galleryType은 TypeCode 3종뿐이고
- * ALL은 DB 값이 아니라 "갤러리 필터 없음"을 뜻하는 화면 전용 개념이다.
- * 스키마에 실제 공용 게시판 개념이 생기면 이 파일의 galleryTypeFilter()만 고치면 된다.
+ * 갤러리 탭. 스키마의 `GalleryType`(TypeCode 3종 + ALL)과 값이 같아 그대로 쓴다.
+ * 2026-08-20 이전에는 `Post.galleryType`이 `TypeCode`라 ALL이 DB에 없었고,
+ * "ALL" | TypeCode 합성 타입으로 화면 전용 개념을 표현해야 했다.
  */
-export type GalleryTab = "ALL" | TypeCode
+export type GalleryTab = GalleryType
 
 const POST_LIST_LIMIT = 20
 
@@ -22,13 +22,16 @@ export function canAccessGallery(gallery: GalleryTab, myTypeCode: TypeCode | nul
 }
 
 /**
- * 전체 탭은 글쓰기 대상이 없다 — Post.galleryType이 TypeCode enum이라 ALL 값을 저장할 수 없다.
- * 스키마에 공용 게시판 개념이 생기면 이 함수만 고치면 된다.
+ * 모든 갤러리에 글을 쓸 수 있다.
+ * 2026-08-20 해소: `Post.galleryType`이 `GalleryType` enum이 되면서 ALL도 저장할 수 있게 됐다
+ * (마이그레이션 `20260820130000_post_gallery_type_all`, E). 그전에는 전체 탭 글쓰기를 막았다.
+ * 종족 갤러리의 소속 검사는 이 함수가 아니라 canAccessGallery()가 한다.
  */
-export function canWriteToGallery(gallery: GalleryTab): gallery is TypeCode {
-  return gallery !== "ALL"
+export function canWriteToGallery(): boolean {
+  return true
 }
 
+/** 전체 탭은 필터 없이 전부 보여준다 — ALL로 저장된 글과 종족 갤러리 글이 함께 뜬다. */
 function galleryTypeFilter(gallery: GalleryTab) {
   return gallery === "ALL" ? {} : { galleryType: gallery }
 }
