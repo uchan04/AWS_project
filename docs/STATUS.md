@@ -31,23 +31,50 @@
 
 | 담당 | 범위 | 상태 | 비고 |
 |---|---|---|---|
-| A | 진단 + 미션 콘텐츠 | 1단계 완료 (미션 41개, 6문항, 판정 함수, 체크 18개) | `DATABASE_URL` 확보됨, 화면·API 착수 가능 |
+| A | 진단 + 미션 콘텐츠 + 홈 | 미션 41개, 13문항 + 판정 함수, 조기 종료, 화면 3장 + Figma 값·구성 반영, 진단 API 3종(완료·조회·닉네임) + 화면 연결 완료 | 2차 마이그레이션 완료, API 정상 동작. 홈 실데이터는 B·C API 대기 |
 | B | 미션 시스템 + 사진 업로드 | 미착수 | `DATABASE_URL`·S3 버킷 확보됨, 착수 가능 |
-| C | 펫 + 가챠 | `lib/reward.ts` 골격 완료 | `DATABASE_URL` 확보됨, 착수 가능 |
-| D | 커뮤니티 + 챗봇 | 미착수 | `DATABASE_URL`·Bedrock 확인됨, 착수 가능 |
-| E | 인프라 + 인증 | RDS·Cognito·S3+CloudFront·CloudWatch+SNS·Bedrock·auth 실검증·하단 탭 내비 완료 | Amplify GitHub 연동만 남음(브라우저 수동 단계) |
+| C | 펫 + 가챠 | `lib/reward.ts` 골격 완료 | 착수 가능. `prisma/seed/items.ts` 동물 매핑 수정이 먼저 (차단 1) |
+| D | 커뮤니티 + 챗봇 | 구현 중 (`feat/community`에 커뮤니티·챗봇 대량 커밋) | 브랜치에 중복 init 마이그레이션 있음 (차단 4) |
+| E | 인프라 + 인증 | RDS·Cognito·S3+CloudFront·CloudWatch+SNS·Bedrock·auth 실검증·하단 탭 내비 완료, PR #1 머지 + 2차 마이그레이션 + auth 빌드 수정 + 색 토큰 정리 완료 | Amplify GitHub 연동만 남음(브라우저 수동 단계) |
 
 ## 전체 차단 사항
 
 지금 프로젝트를 멈춰 세우는 것만 적는다. 해결되면 즉시 지운다.
 
-(없음 — 전원 착수 가능. `.env`의 `DATABASE_URL`·`COGNITO_*`·`S3_BUCKET`·`CLOUDFRONT_DOMAIN`·`BEDROCK_MODEL_ID`는 E에게 개별 공유받는다)
+인프라 차단은 해소됐다(RDS·Cognito·S3·Bedrock 완료). `.env`의 `DATABASE_URL`·`COGNITO_*`·`S3_BUCKET`·`CLOUDFRONT_DOMAIN`·`BEDROCK_MODEL_ID`는 E에게 개별 공유받는다.
+
+~~2. `SubTypeCode` 2차 마이그레이션~~ — 해소(2026-08-19). `migrate dev --name add_subtype` 실행 완료. **나머지 4인은 `git pull && npx prisma migrate deploy && npx prisma generate`**
+~~3. `lib/auth.ts` 빈 Pool ID로 빌드 깨짐~~ — 해소(2026-08-19). `CognitoJwtVerifier.create()`를 `getCurrentUser()` 안으로 지연 생성하도록 수정. `.env`에 더미 값 우회 넣었던 사람은 지워도 된다
+~~5. 종족 색 이중 정의~~ — 해소(2026-08-19). `app/globals.css`의 `--color-canine/feline/ursine` 세 줄 삭제. 이제 `styles/tokens.css`·`lib/types.ts`(A)가 유일한 출처
+
+남은 것은 아래 2개다.
+
+1. **`prisma/seed/items.ts` 동물 매핑이 옛 값** — 여우↔고양이가 뒤바뀌었고 치장 "라벤더" 3종 이름이 색과 안 맞는다. **`npm run db:seed`보다 먼저 고쳐야 한다.** 안 고치면 뒤바뀐 매핑이 DB에 들어간다. C 담당 파일이라 다른 사람이 못 고친다
+4. **`feat/community`에 중복 init 마이그레이션** — D 브랜치에 `prisma/migrations/00000000000000_init/`이 있고 `main`에는 `20260819061857_init/`·`20260819080703_add_subtype/`이 있다. 머지하면 init이 두 개가 되어 `migrate deploy`가 깨진다(`CLAUDE.md` 5절). D가 자기 브랜치의 `prisma/migrations/`를 지우고 main 것을 받아야 한다
+
+**BottomNav 수정**: "진단결과" 탭이 `/diagnosis`(문항 화면)를 가리키던 버그를 `/diagnosis/result`(결과 화면)로 고쳤다(2026-08-19, E)
+
+**미확정 — 팀 전체 결정 필요**:
+- "결정 변경" 4번(Cognito Google 로그인만)이 `SPEC.md` 10절·`CLAUDE.md` 8절과 충돌한다. 사용자 확인 대기 중이며, 지금 Cognito는 이메일+비밀번호로 이미 구축돼 있다. 방향이 바뀌면 E가 재작업해야 한다
+- "결정 변경" 5번(셀프 머지 금지, main은 PR로만)이 `CLAUDE.md` 4절·`업무분담.md`의 기존 셀프 머지 규칙과 충돌한다. 두 문서가 아직 안 바뀌었다. E는 이 규칙 변경을 인지하기 전에 공유 파일들을 `main`에 직접 push했다(과거 관행대로) — 팀 전체가 어느 쪽으로 갈지 정해야 한다
 
 **남은 수동 단계**: Amplify Hosting ↔ GitHub 연동. GitHub App 설치는 브라우저 OAuth 동의가 필요해 계정 소유자가 직접 눌러야 한다. 절차는 `docs/dev/infra.md` 참고
 
 **보안 재검토 필요**: RDS를 팀원 로컬 개발 편의를 위해 Publicly Accessible=true로 설정했다(포트 5432를 0.0.0.0/0에 개방, 강력한 마스터 비밀번호로만 방어). 발표 전에 팀 전체가 재검토할 것 — 상세 이유는 `docs/dev/infra.md` "결정한 것과 이유" 참고
 
-GitHub 원격은 해결됐다 — https://github.com/uchan04/AWS_project
+GitHub 원격 — https://github.com/uchan04/AWS_project
+
+## 결정 변경 (2026-08-19)
+
+1. **동물·색 교체.** 여우 = 건강·정서취약형(주황 `#E8956A`), 고양이 = 독립거주-저소득형(푸른 `#6A95C8`), 곰 = 가족동거형(녹색 `#7AAE82`). Figma 프로토타입 값으로 맞췄다(옛 `#F59E0B`/`#38BDF8`/`#34D399`는 종이색 배경에서 형광으로 떴다). 값은 `lib/types.ts`의 `TRIBE`와 `styles/tokens.css`의 `[data-tribe]` 두 곳에 있다 — 한쪽만 고치지 않는다
+2. **관리자 세부유형 8개 추가.** 연구보고서 9유형에서 경계선지능청년 제외. 사용자에게는 여전히 동물 3종만 보인다
+3. **아키네이터식 진단.** 문항 13개를 정의하고 유형이 확정되면 조기 종료한다. 무손실이며 실측 평균 9.7문항
+4. **Cognito는 Google 로그인만.** `SPEC.md` 10절("소셜 로그인은 쓰지 않는다")·`CLAUDE.md` 8절과 충돌한다. 두 문서 갱신은 사용자 확인 대기
+5. **브랜치 규칙.** 담당별 브랜치에 커밋하고 `main`은 PR로만 올린다. 셀프 머지 안 한다
+6. **홈 화면 담당은 A**
+7. **화면 디자인 기준은 루트 `design.md`, 토큰은 `styles/tokens.css`.** A가 만들었고 진단·결과·홈 3장에 적용했다. 다른 화면도 같은 결로 맞출 담당자는 이 두 파일을 본다. `app/globals.css`·`app/layout.tsx`(E 소유)는 건드리지 않았고 새 npm 의존성도 없다
+8. **색·폰트 값의 출처는 Figma 프로토타입**(`isol-design_Figma/README.md` "디자인 규칙" 절). 배경 `#F5F0E8` / 카드 `#FDFBF5` / 주색 `#4B7A5B` / 강조 `#A9542A`, 제목 Gowun Dodum · 본문 Noto Sans KR. hex를 그대로 쓰고 OKLCH로 변환하지 않는다. 프로토타입의 6문항 진단·종족명·특성 설명·직접 `seeds` 증감은 가져오지 않는다(명세 위반)
+9. **화면 구성도 Figma에서 가져왔다.** `#EDE5D0` 판 위의 카드(`.hm--canvas` + `.hm-card`), 화면별 폭(진단 680 · 결과·홈 840 · 시작 900px), 넓은 화면 2열 격자, 진행률 바, A·B·C 글자가 붙은 선택지, 결과 마스코트 등장(`bounceIn`), 시작 화면 좌우 분할. 진행률 바의 값은 총 문항 수가 아니라 "유형이 좁혀진 정도"다 — 조기 종료 때문에 총 문항 수를 노출할 수 없다(`SPEC.md` 3절). 통계 카드·출석 캘린더·경험치 바는 가져오지 않았다(데이터 없음. DB 공유 후 채운다)
 
 ## 마일스톤
 

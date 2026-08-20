@@ -1,0 +1,826 @@
+/* Hallmark · genre: editorial · tone: soft · design-system: design.md · designed-as-app
+   · contrast: pass (40–41) · tokens: pass (48) · mobile: pass (34, 49*, 50–57)
+   · 49*: 진단 선택지 라벨은 두 줄 이상으로 감싼다. 한 문장짜리 선택지라 줄이지 못한다.
+     CTA·링크·홈 메뉴 라벨은 모두 한 줄이다.
+   · pre-emit critique: P5 H4 E4 S4 R5 V5 */
+
+/* 색·폰트·모서리 값의 출처는 Figma 프로토타입이다
+   (C:/Users/eonhm/Downloads/isol-design_Figma/README.md "디자인 규칙" 절).
+   hex를 그대로 옮긴다. OKLCH로 변환하면 두 문서의 값이 갈라지고,
+   보조 텍스트 #7A6B58 · 강조 #A9542A는 명암비 4.5:1을 맞추려고 조정한 값이라 건드리면 안 된다. */
+
+/* 웹폰트는 CSS @import로 불러온다. app/layout.tsx는 E 소유라 건드리지 않는다.
+   새 npm 의존성도 추가하지 않는다(CLAUDE.md). */
+@import url("https://fonts.googleapis.com/css2?family=Gowun+Dodum&family=Noto+Sans+KR:wght@300;400;500;700&display=swap");
+
+:root {
+  /* 색 — Figma 팔레트. 순수 흑백은 쓰지 않는다.
+     따뜻한 종이색 + 카드색 + 낮은 채도의 숲색. 채도가 높은 색은 종족색 하나뿐이다. */
+  --color-paper: #f5f0e8; /* 배경 */
+  --color-paper-2: #ede5d0; /* 캔버스. hover·비활성 면 */
+  --color-card: #fdfbf5; /* 카드·행·입력창 */
+  --color-ink: #2a1f14;
+  --color-ink-2: #4a3b29;
+  --color-muted: #7a6b58; /* AA 맞춘 값. 더 밝게 바꾸지 않는다 */
+  --color-rule: #ddd0bc;
+  --color-rule-2: #8f8069; /* 입력창 테두리. 종이색 대비 3.39:1 */
+  --color-accent: #4b7a5b; /* 주색. CTA */
+  --color-accent-2: #3c6349;
+  --color-accent-ink: #fdfbf5;
+  --color-strong: #a9542a; /* 강조. AA 맞춘 값. 더 밝게 바꾸지 않는다 */
+  --color-focus: #1f4d33;
+  --color-error: #b3261e;
+  --shadow-card: 0 4px 20px rgb(75 122 91 / 0.12);
+
+  /* 종족색 기본값. data-tribe가 붙으면 아래에서 덮어쓴다 */
+  --tribe: var(--color-accent);
+  --tribe-ink: var(--color-ink);
+
+  --font-display: "Gowun Dodum", ui-sans-serif, sans-serif;
+  --font-body: "Noto Sans KR", ui-sans-serif, sans-serif;
+
+  /* 4pt 9단 */
+  --space-3xs: 0.25rem;
+  --space-2xs: 0.5rem;
+  --space-xs: 0.75rem;
+  --space-sm: 1rem;
+  --space-md: 1.5rem;
+  --space-lg: 2rem;
+  --space-xl: 3rem;
+  --space-2xl: 4.5rem;
+  --space-3xl: 7rem;
+
+  /* 1.25 배율 */
+  --text-label: 0.8rem;
+  --text-body: 1rem;
+  --text-md: 1.25rem;
+  --text-lg: 1.5625rem;
+  --text-xl: 1.9531rem;
+  --text-display: clamp(2.75rem, 5vw + 1rem, 5.25rem);
+
+  --radius-card: 20px;
+  --radius-input: 12px;
+  --radius-pill: 999px;
+
+  --control-h: 2.75rem; /* 44px. 입력창과 버튼이 같은 높이를 쓴다 */
+
+  --z-base: 0;
+  --z-raised: 10;
+  --z-sticky: 100;
+  --z-overlay: 200;
+  --z-modal: 300;
+  --z-toast: 400;
+
+  --ease-out: cubic-bezier(0.16, 1, 0.3, 1);
+  --ease-in: cubic-bezier(0.7, 0, 0.84, 0);
+  --ease-in-out: cubic-bezier(0.65, 0, 0.35, 1);
+  --dur-micro: 120ms;
+  --dur-short: 220ms;
+  --dur-long: 420ms;
+}
+
+/* 종족색도 Figma 값이다. lib/types.ts의 TRIBE[].colorHex와 같은 값을 쓴다 */
+[data-tribe="HEALTH_EMOTION"] {
+  --tribe: #e8956a;
+}
+[data-tribe="INDEPENDENT_LOW_INCOME"] {
+  --tribe: #6a95c8;
+}
+[data-tribe="FAMILY_LIVING"] {
+  --tribe: #7aae82;
+}
+
+html,
+body {
+  overflow-x: clip;
+}
+
+/* ─────────────────────────────────────────────────────────────
+   기본 골격 — app/globals.css(E 소유)를 고치지 않기 위해 .hm 안으로 범위를 가둔다
+   ───────────────────────────────────────────────────────────── */
+
+.hm {
+  /* 100dvh를 쓰면 하단 탭(E 소유 BottomNav) 높이만큼 항상 스크롤이 생긴다.
+     body가 auto 높이라 100%는 해석되지 않으므로(판이 내용 높이로 쪼그라든다) 탭 높이를 빼 준다.
+     --nav-h는 BottomNav의 py-3 + text-xs 한 줄 + 위쪽 테두리 1px다. 탭 높이가 바뀌면 여기도 바꾼다 */
+  --nav-h: calc(2.5rem + 1px);
+  min-height: calc(100dvh - var(--nav-h));
+  background: var(--color-paper);
+  color: var(--color-ink);
+  font-family: var(--font-body);
+  font-weight: 400;
+  font-size: var(--text-body);
+  line-height: 1.6;
+}
+
+.hm__col {
+  /* 폭은 화면이 정한다. Figma는 진단 680px · 결과 840px · 홈 전체폭을 쓴다 */
+  max-width: var(--col-max, 30rem);
+  width: 100%;
+  margin-inline: auto;
+  padding-inline: max(var(--space-md), env(safe-area-inset-left));
+  padding-block: var(--space-lg) max(var(--space-xl), env(safe-area-inset-bottom));
+}
+
+/* 캔버스 — 카드 한 장이 화면 가운데 뜨는 화면(진단·결과). Figma의 #EDE5D0 판이다 */
+.hm--canvas {
+  display: grid;
+  align-content: center;
+  background: var(--color-paper-2);
+}
+
+/* Figma의 .card — 카드색 면 + 1px 테두리 + 낮은 그림자 */
+.hm-card {
+  display: grid;
+  gap: var(--space-2xs);
+  align-content: start;
+  padding: clamp(var(--space-md), 4vw, var(--space-lg));
+  border: 1px solid var(--color-rule);
+  border-radius: var(--radius-card);
+  background: var(--color-card);
+  box-shadow: var(--shadow-card);
+}
+
+/* 카드 아래에 붙는 버튼. 카드 폭을 다 쓴다 */
+.hm-card__cta {
+  margin-top: var(--space-2xs);
+}
+
+/* 종족색을 종이색으로 희석한 카드. 채도 면적은 여기까지다(design.md) */
+.hm-card--tribe {
+  border-color: color-mix(in oklch, var(--tribe) 33%, var(--color-card));
+  background: color-mix(in oklch, var(--tribe) 22%, var(--color-card));
+}
+
+.hm-card__head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--space-sm);
+}
+
+.hm-card__title {
+  font-family: var(--font-display);
+  font-size: var(--text-md);
+  margin: 0;
+}
+
+/* 진행률 바 — Figma에서 가져왔다. 값은 "좁혀진 정도"다. 총 문항 수를 노출하지 않는다 */
+.hm-bar {
+  height: 6px;
+  border-radius: var(--radius-pill);
+  background: var(--color-rule);
+  overflow: hidden;
+}
+
+.hm-bar__fill {
+  height: 100%;
+  border-radius: var(--radius-pill);
+  background: var(--color-accent);
+  transition: width var(--dur-long) var(--ease-out);
+}
+
+.hm h1,
+.hm h2 {
+  font-family: var(--font-display);
+  /* Gowun Dodum은 굵기가 400 하나뿐이다. 700을 주면 브라우저가 합성해 흐려진다.
+     제목 대비는 글자 크기와 서체 차이로 낸다 */
+  font-weight: 400;
+  letter-spacing: -0.01em;
+  overflow-wrap: anywhere;
+  min-width: 0;
+  margin: 0;
+}
+
+.hm p {
+  margin: 0;
+  max-width: 65ch;
+}
+
+.hm__lede {
+  color: var(--color-ink-2);
+}
+
+.hm__note {
+  font-size: var(--text-label);
+  color: var(--color-muted);
+  letter-spacing: 0.01em;
+}
+
+.hm__rule {
+  height: 1px;
+  border: 0;
+  background: var(--color-rule);
+  margin: 0;
+}
+
+/* 진행률 바 위의 줄. 왼쪽은 지금 몇 번째인지, 오른쪽은 퍼센트.
+   총 문항 수는 조기 종료 때문에 어느 쪽에도 쓰지 않는다 */
+.hm-status {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--space-2xs);
+  margin-bottom: var(--space-2xs);
+}
+
+/* ─────────────────────────────────────────────────────────────
+   선택지·행 — 목록 자체가 버튼이다(Index-First / Conversational FAQ 공통 목소리)
+   ───────────────────────────────────────────────────────────── */
+
+.hm-row {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto;
+  align-items: center;
+  gap: var(--space-sm);
+  width: 100%;
+  min-height: var(--control-h);
+  padding: var(--space-sm) var(--space-sm);
+  border: 1px solid var(--color-rule);
+  border-radius: var(--radius-card);
+  background: var(--color-card);
+  color: inherit;
+  font: inherit;
+  text-align: start;
+  text-decoration: none;
+  cursor: pointer;
+  transition:
+    background-color var(--dur-short) var(--ease-out),
+    box-shadow var(--dur-short) var(--ease-out),
+    transform var(--dur-micro) var(--ease-out);
+}
+
+.hm-row__label {
+  font-weight: 700;
+}
+
+/* 선택지 앞 글자(A·B·C). Figma의 선택지 카드에서 가져왔다. 눈으로 짚는 자리다 */
+.hm-row__key {
+  display: block;
+  font-size: var(--text-label);
+  font-weight: 700;
+  color: var(--color-muted);
+  margin-bottom: var(--space-3xs);
+}
+
+.hm-row__hint {
+  display: block;
+  font-size: var(--text-label);
+  color: var(--color-muted);
+  font-weight: 400;
+  margin-top: var(--space-3xs);
+}
+
+.hm-row__mark {
+  color: var(--color-rule-2);
+  transition: color var(--dur-short) var(--ease-out);
+}
+
+@media (hover: hover) and (pointer: fine) {
+  /* Figma의 .card-hover — 그림자 + 1px 들림 */
+  .hm-row:hover {
+    box-shadow: var(--shadow-card);
+    transform: translateY(-1px);
+  }
+  .hm-row:hover .hm-row__mark {
+    color: var(--color-strong);
+  }
+}
+
+.hm-row:active {
+  transform: translateY(1px);
+}
+
+.hm-row:disabled,
+.hm-row[aria-disabled="true"] {
+  opacity: 0.5;
+  cursor: not-allowed;
+  pointer-events: none;
+}
+
+/* ─────────────────────────────────────────────────────────────
+   버튼·링크
+   ───────────────────────────────────────────────────────────── */
+
+.hm-btn {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  min-height: var(--control-h);
+  padding-inline: var(--space-md);
+  border: 1px solid transparent;
+  border-radius: var(--radius-pill);
+  background: var(--color-accent);
+  color: var(--color-accent-ink);
+  font: inherit;
+  font-weight: 700;
+  text-decoration: none;
+  white-space: nowrap;
+  cursor: pointer;
+  transition:
+    background-color var(--dur-short) var(--ease-out),
+    transform var(--dur-micro) var(--ease-out);
+}
+
+@media (hover: hover) and (pointer: fine) {
+  .hm-btn:hover {
+    background: var(--color-accent-2);
+  }
+}
+
+.hm-btn:active {
+  transform: translateY(1px);
+}
+
+.hm-btn[aria-disabled="true"] {
+  opacity: 0.5;
+  cursor: not-allowed;
+  pointer-events: none;
+}
+
+.hm-btn--ghost {
+  background: transparent;
+  color: var(--color-ink);
+  border-color: var(--color-rule-2);
+}
+
+@media (hover: hover) and (pointer: fine) {
+  .hm-btn--ghost:hover {
+    background: var(--color-paper-2);
+  }
+}
+
+.hm-link {
+  align-self: start;
+  justify-self: start;
+  min-height: var(--control-h);
+  display: inline-flex;
+  align-items: center;
+  color: var(--color-muted);
+  font-size: var(--text-label);
+  text-decoration: underline;
+  text-decoration-thickness: 1px;
+  text-underline-offset: 3px;
+  white-space: nowrap;
+  background: none;
+  border: 0;
+  padding: 0;
+  font-family: inherit;
+  cursor: pointer;
+  transition: color var(--dur-short) var(--ease-out);
+}
+
+@media (hover: hover) and (pointer: fine) {
+  .hm-link:hover {
+    color: var(--color-ink);
+  }
+}
+
+.hm-link:active {
+  color: var(--color-ink);
+}
+
+.hm-link:disabled,
+.hm-link[aria-disabled="true"] {
+  opacity: 0.5;
+  cursor: not-allowed;
+  pointer-events: none;
+}
+
+.hm :focus {
+  outline: none;
+}
+
+.hm :focus-visible {
+  outline: 3px solid var(--color-focus);
+  outline-offset: 2px;
+  border-radius: inherit;
+}
+
+/* ─────────────────────────────────────────────────────────────
+   종족판 — 채도 높은 면적은 원판 하나로 제한한다. 나머지는 종이색으로 희석한다
+   ───────────────────────────────────────────────────────────── */
+
+.hm-plate {
+  display: grid;
+  justify-items: center;
+  gap: var(--space-2xs);
+  padding: var(--space-xl) var(--space-md);
+  border: 1px solid color-mix(in oklch, var(--tribe) 33%, var(--color-card));
+  border-radius: var(--radius-card);
+  background: color-mix(in oklch, var(--tribe) 22%, var(--color-card));
+  color: var(--tribe-ink);
+  text-align: center;
+}
+
+.hm-plate__disc {
+  display: grid;
+  place-items: center;
+  width: 4.5rem;
+  height: 4.5rem;
+  border-radius: var(--radius-pill);
+  background: var(--tribe);
+  color: var(--tribe-ink);
+  font-size: 2.5rem; /* 마스코트 이모지 자리. 펫 이미지가 오면 이미지로 바꾼다 */
+  line-height: 1;
+}
+
+/* 결과 화면의 큰 판. Figma는 마스코트를 100px로 쓴다 */
+.hm-plate--hero {
+  padding-block: var(--space-2xl);
+}
+
+.hm-plate--hero .hm-plate__disc {
+  width: 7.5rem;
+  height: 7.5rem;
+  font-size: 4rem;
+}
+
+.hm-plate--hero .hm-plate__animal {
+  font-size: var(--text-lg);
+}
+
+.hm-plate__eyebrow {
+  font-size: var(--text-label);
+  font-weight: 700;
+  letter-spacing: 0.08em;
+  color: var(--color-ink-2);
+}
+
+.hm-plate__animal {
+  font-family: var(--font-display);
+  font-size: var(--text-md);
+  font-weight: 700;
+}
+
+.hm-plate__caption {
+  font-size: var(--text-label);
+  color: var(--color-ink-2);
+}
+
+/* 종족 배지 — 이름 옆에 붙는 작은 알약. 종족색을 종이색으로 희석해서 쓴다 */
+.hm-pill {
+  display: inline-flex;
+  width: fit-content; /* grid 안에서 가로로 늘어나지 않게 */
+  justify-self: start;
+  align-items: center;
+  gap: var(--space-3xs);
+  padding: var(--space-3xs) var(--space-xs);
+  border-radius: var(--radius-pill);
+  background: color-mix(in oklch, var(--tribe) 26%, var(--color-card));
+  color: var(--color-ink);
+  font-size: var(--text-label);
+  font-weight: 700;
+  white-space: nowrap;
+}
+
+/* ─────────────────────────────────────────────────────────────
+   입력 — 테두리 두께는 어떤 상태에서도 1px로 고정한다. 포커스 링 자리를 미리 비워둔다
+   ───────────────────────────────────────────────────────────── */
+
+.hm-field {
+  display: grid;
+  gap: var(--space-3xs);
+}
+
+.hm-field__label {
+  font-size: var(--text-label);
+  font-weight: 700;
+  color: var(--color-ink-2);
+}
+
+.hm-field__input {
+  width: 100%;
+  min-height: var(--control-h);
+  padding: 0 var(--space-lg) 0 var(--space-sm); /* 오른쪽은 글리프 자리로 비워둔다 */
+  border: 1px solid var(--color-rule-2);
+  border-radius: var(--radius-input);
+  outline: 3px solid transparent; /* 포커스 시 레이아웃이 밀리지 않게 자리를 잡아둔다 */
+  outline-offset: 2px;
+  background: var(--color-card);
+  color: var(--color-ink);
+  font: inherit;
+  transition: background-color var(--dur-short) var(--ease-out);
+}
+
+@media (hover: hover) and (pointer: fine) {
+  .hm-field__input:hover {
+    background: var(--color-paper-2);
+  }
+}
+
+.hm-field__input[aria-invalid="true"] {
+  border-color: var(--color-error);
+}
+
+.hm-field__input:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+}
+
+.hm-field__box {
+  position: relative;
+}
+
+.hm-field__glyph {
+  position: absolute;
+  inset-inline-end: var(--space-xs);
+  inset-block: 0;
+  display: grid;
+  place-items: center;
+  color: var(--color-error);
+  font-size: var(--text-label);
+}
+
+/* 도움말과 오류가 같은 자리를 쓴다. 비어 있어도 한 줄 높이를 잡아 화면이 밀리지 않는다 */
+.hm-field__help {
+  min-height: 1lh;
+  font-size: var(--text-label);
+  color: var(--color-muted);
+}
+
+.hm-field__help--error {
+  color: var(--color-error);
+}
+
+/* ─────────────────────────────────────────────────────────────
+   목록 — 체크 목록(결과 화면)과 타일 격자(홈 미션 미리보기). 둘 다 Figma에서 가져왔다
+   ───────────────────────────────────────────────────────────── */
+
+.hm-check {
+  display: grid;
+  gap: var(--space-2xs);
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+.hm-check li {
+  display: grid;
+  grid-template-columns: auto minmax(0, 1fr);
+  gap: var(--space-2xs);
+  font-size: var(--text-label);
+  color: var(--color-ink-2);
+}
+
+.hm-check__mark {
+  color: var(--color-accent);
+  font-weight: 700;
+}
+
+.hm-tiles {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(min(9rem, 100%), 1fr));
+  gap: var(--space-2xs);
+}
+
+.hm-tile {
+  display: grid;
+  gap: var(--space-3xs);
+  align-content: start;
+  padding: var(--space-sm);
+  border: 1px solid var(--color-paper-2);
+  border-radius: var(--radius-input);
+  background: var(--color-paper);
+}
+
+.hm-tile__title {
+  font-size: var(--text-label);
+  font-weight: 700;
+}
+
+/* 종족 타일 — 진단 전 화면에서 세 종족을 나란히 놓을 때 */
+.hm-tile--tribe {
+  justify-items: center;
+  border-color: color-mix(in oklch, var(--tribe) 33%, var(--color-card));
+  background: color-mix(in oklch, var(--tribe) 22%, var(--color-card));
+  text-align: center;
+}
+
+.hm-tile__face {
+  font-size: var(--text-xl);
+  line-height: 1;
+}
+
+.hm-tile__hint {
+  font-size: var(--text-label);
+  color: var(--color-muted);
+}
+
+/* ─────────────────────────────────────────────────────────────
+   모션 — Figma의 fadeSlideIn·float·bounceIn 세 개를 가져왔다.
+   누름(translateY(1px))과 hover 들림(-1px)까지 합쳐 다섯 가지가 전부다.
+   ───────────────────────────────────────────────────────────── */
+
+@keyframes hm-fade {
+  from {
+    opacity: 0;
+    transform: translateY(10px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+@keyframes hm-float {
+  0%,
+  100% {
+    transform: translateY(0);
+  }
+  50% {
+    transform: translateY(-8px);
+  }
+}
+
+.hm-fade {
+  animation: hm-fade var(--dur-short) var(--ease-out) both;
+}
+
+/* 결과 마스코트 등장 1회. Figma의 bounceIn 값 그대로다.
+   scale을 쓰는 자리는 이 하나뿐이다(design.md) */
+@keyframes hm-bounce {
+  0% {
+    transform: scale(0.4);
+    opacity: 0;
+  }
+  60% {
+    transform: scale(1.08);
+  }
+  80% {
+    transform: scale(0.96);
+  }
+  100% {
+    transform: scale(1);
+    opacity: 1;
+  }
+}
+
+.hm-bounce {
+  animation: hm-bounce 500ms cubic-bezier(0.36, 0.07, 0.19, 0.97) both;
+}
+
+/* 마스코트만 쓴다. 화면에 하나뿐이다 */
+.hm-float {
+  animation: hm-float 3s var(--ease-in-out) infinite;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .hm *,
+  .hm *::before,
+  .hm *::after {
+    animation-duration: 150ms !important;
+    transition-duration: 150ms !important;
+  }
+  .hm-row:active,
+  .hm-btn:active,
+  .hm-row:hover {
+    transform: none;
+  }
+  /* 반복 애니메이션은 짧게 줄이면 오히려 깜빡인다. 아예 끈다 */
+  .hm-float {
+    animation: none !important;
+  }
+}
+
+/* ─────────────────────────────────────────────────────────────
+   페이지별 레이아웃
+   ───────────────────────────────────────────────────────────── */
+
+/* Hallmark · genre: editorial · macrostructure: Conversational FAQ · design-system: design.md · designed-as-app */
+.hm-ask {
+  --col-max: 42.5rem; /* Figma 680px */
+  display: grid;
+  gap: var(--space-lg);
+  align-content: start;
+}
+
+.hm-ask__body {
+  display: grid;
+  gap: var(--space-md);
+}
+
+.hm-ask__question {
+  font-size: clamp(1.5625rem, 3.5vw + 0.75rem, 1.9531rem);
+  line-height: 1.35;
+  text-align: center;
+}
+
+/* Figma는 선택지를 2열 격자로 깐다. 좁은 화면에서는 자동으로 1열이 된다 */
+.hm-ask__choices {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(min(13.75rem, 100%), 1fr));
+  gap: var(--space-2xs);
+  align-items: start;
+}
+
+/* Hallmark · genre: editorial · macrostructure: Photographic · design-system: design.md · designed-as-app */
+.hm-result {
+  --col-max: 52.5rem; /* Figma 840px */
+  display: grid;
+  gap: var(--space-md);
+  align-content: start;
+}
+
+/* 왼쪽 종족판, 오른쪽 설명·이름. 좁은 화면에서는 위아래로 쌓인다 */
+.hm-result__grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(min(18.75rem, 100%), 1fr));
+  gap: var(--space-md);
+  align-items: center;
+}
+
+.hm-result__side {
+  display: grid;
+  gap: var(--space-sm);
+  align-content: start;
+  min-width: 0;
+}
+
+.hm-result__head {
+  display: grid;
+  gap: var(--space-3xs);
+  margin-bottom: var(--space-2xs);
+}
+
+.hm-result__title {
+  font-size: var(--text-lg);
+  line-height: 1.25;
+}
+
+/* 진단 전 시작 화면. Figma 인트로 — 왼쪽 글, 오른쪽 안내 카드 */
+.hm-intro {
+  --col-max: 56.25rem; /* Figma 900px */
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(min(20rem, 100%), 1fr));
+  gap: clamp(var(--space-md), 4vw, var(--space-xl));
+  align-items: center;
+}
+
+.hm-intro__side {
+  display: grid;
+  gap: var(--space-md);
+  justify-items: start;
+  min-width: 0;
+}
+
+.hm-intro__mascot {
+  justify-self: center;
+  font-size: 4.5rem;
+  line-height: 1;
+  margin-bottom: var(--space-2xs);
+}
+
+.hm-trio {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: var(--space-2xs);
+  width: 100%;
+}
+
+/* Hallmark · genre: editorial · macrostructure: Index-First · design-system: design.md · designed-as-app */
+.hm-home {
+  --col-max: 52.5rem;
+  display: grid;
+  gap: var(--space-md);
+  align-content: start;
+}
+
+/* 인사말과 이름은 왼쪽, 마스코트는 오른쪽. Figma 홈 헤더다 */
+.hm-home__head {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: var(--space-sm);
+  flex-wrap: wrap;
+  padding-block-end: var(--space-xs);
+}
+
+.hm-home__who {
+  display: grid;
+  gap: var(--space-2xs);
+  min-width: 0;
+}
+
+.hm-home__mascot {
+  font-size: 3.5rem;
+  line-height: 1;
+}
+
+.hm-home__cards {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(min(17.5rem, 100%), 1fr));
+  gap: var(--space-sm);
+  align-items: start;
+}
+
+.hm-home__name {
+  font-size: var(--text-lg);
+  line-height: 1.25;
+}
+
+.hm-home__foot {
+  display: grid;
+  gap: var(--space-sm);
+  padding-block-start: var(--space-xs);
+}
