@@ -5,16 +5,16 @@
 
 ## 재개 지점
 
-D 쪽 기능 구현은 끝났고, 지금은 `completeMission()`(B) 외부 결과를 기다리는 대기 상태다. AWS 계정·`BEDROCK_MODEL_ID`는 확보되어 챗봇 스트리밍은 완료했다(2026-08-19). origin/main을 머지해 인프라 완료분(Cognito 실검증, `BottomNav`, RDS 마이그레이션 등)도 받았다(2026-08-19). 아래 6개가 남은 막힌 항목이다. 재개할 때 이 표부터 본다.
+D 쪽 기능 구현은 끝났고, 지금은 `completeMission()`(B) 외부 결과를 기다리는 대기 상태다. AWS 계정·`BEDROCK_MODEL_ID`는 확보되어 챗봇 스트리밍은 완료했다(2026-08-19). origin/main을 머지해 인프라 완료분(Cognito 실검증, `BottomNav`, RDS 마이그레이션 등)도 받았다(2026-08-19). 2026-08-20에 `origin/develop`을 두 차례 머지해 A·B·C·E 작업분을 받았고, 챗봇을 전역 오버레이로 이전했다(차단 2 해소). 아래가 남은 막힌 항목이다. 재개할 때 이 표부터 본다.
 
 ### 1. Bedrock 스트리밍 응답 — 완료 (2026-08-19)
 `POST /api/chat/stream`을 새로 만들어 `ConverseStreamCommand`로 응답을 스트리밍하고, 스트림이 `messageStop`까지 정상 종료된 경우에만 `ChatRole.ASSISTANT`로 저장한다. 기존 `app/api/chat/messages/route.ts`(사용자 발화 저장 + 친밀도 지급)는 건드리지 않았다. 자세한 내용은 아래 "구현한 파일"·"결정한 것과 이유" 참고.
 
-### 2. `app/layout.tsx` 전역 마운트 — 아직 안 됨 (정정, 2026-08-19)
-- **정정**: main 머지로 `app/layout.tsx`에 `<BottomNav />`가 추가된 걸 확인했다. `BottomNav`의 "챗봇" 탭은 `<Link href="/chat">`로 **일반 라우트 이동**만 한다 — `ChatPanel`을 전역 오버레이로 띄우는 상태 토글은 아직 없다. D의 임시 라우트(`app/chat/page.tsx`)가 그대로 이동 목적지가 된 것뿐이라, 이 항목은 **완료가 아니다.** 아래 내용은 여전히 유효하다
-- **필요한 것**: E가 `layout.tsx`에 `ChatPanel`을 전역 오버레이로 띄울 자리(예: 하단 탭의 챗봇 진입점)를 만들어야 한다. D는 이 파일을 직접 못 고친다(CLAUDE.md 1절)
-- **고칠 파일**: `app/layout.tsx`(E). 지금은 `app/chat/page.tsx`가 임시 확인용 라우트로 대신하고 있다
-- **조심할 것**: `ChatPanel`은 `nickname`/`typeCode`/`bedrockConfigured`를 props로 받는 구조다 — `layout.tsx`(또는 그 하위 서버 컴포넌트)가 `getCurrentUser()`와 `process.env.BEDROCK_MODEL_ID`를 읽어 그대로 넘겨주면 된다. `onClose`도 실제로 닫히게 연결해야 한다(`app/chat/page.tsx`는 `onClose` 없이 렌더링 중이라 닫기 버튼이 안 보인다). 오버레이로 바뀌면 `ChatPanel`의 `fixed inset-0 z-50` 래퍼가 `BottomNav`의 `z-10`과 겹치는지도 같이 확인할 것(별도 작업, 이번엔 안 건드림)
+### 2. `app/layout.tsx` 전역 마운트 — 해소 (2026-08-20)
+- `app/chat/_components/ChatLauncher.tsx`(신규, 클라이언트)가 열림 상태를 갖고, `app/layout.tsx`는 import 한 줄 + `<ChatLauncher />` 한 줄만 추가했다. E와 사전 공유했고 `layout.tsx` 변경은 **PR 리뷰를 받는다**
+- 임시 라우트 `app/chat/page.tsx`는 삭제했다(`/chat`은 이제 404). `app/chat/_components/`·`app/chat/_lib/`·`app/api/chat/`은 그대로다
+- `ChatPanel`이 받던 `nickname`/`typeCode`/`bedrockConfigured` props는 없앴다. 자세한 이유는 아래 "결정한 것과 이유" 참고
+- 남은 확인: 패널 열기·닫기 상호작용은 브라우저로 직접 확인하지 못했다(확장 미연결). SSR HTML과 API 응답까지만 검증했다
 
 ### 3. `app/chat/` 폴더 소유 확정 — `CLAUDE.md` 2절 표에 없음
 - **필요한 것**: 팀 전원 합의로 `CLAUDE.md` 2절의 폴더 소유 표에 `app/chat/` D를 정식으로 추가
@@ -48,9 +48,9 @@ D 쪽 기능 구현은 끝났고, 지금은 `completeMission()`(B) 외부 결과
 ---
 
 ## 현재 상태
-- 완료: 갤러리 목록 화면, 상세 오버레이, 좋아요 토글, 댓글 작성, 글쓰기 모달, 본인 글 삭제, 본인 댓글 삭제, 친밀도 지급 헬퍼, 챗봇 시스템 프롬프트, 챗봇 메시지 저장 API(GET/POST, 친밀도 지급까지), 챗봇 패널 UI(개발용 `/chat` 라우트), Bedrock 스트리밍 응답 연결(`POST /api/chat/stream`), 타이핑 인디케이터, **유형별 챗봇 추천 문구 6개씩·3개 랜덤 노출(LLM 아님, 정적 상수)**
+- 완료: 갤러리 목록 화면, 상세 오버레이, 좋아요 토글, 댓글 작성, 글쓰기 모달, 본인 글 삭제, 본인 댓글 삭제, 친밀도 지급 헬퍼, 챗봇 시스템 프롬프트, 챗봇 메시지 저장 API(GET/POST, 친밀도 지급까지), 챗봇 패널 UI, Bedrock 스트리밍 응답 연결(`POST /api/chat/stream`), 타이핑 인디케이터, 유형별 챗봇 추천 문구 6개씩·3개 랜덤 노출(LLM 아님, 정적 상수), **챗봇 전역 오버레이 이전(`ChatLauncher` + `layout.tsx`, 임시 `/chat` 라우트 폐기)**
 - 진행 중: 없음
-- 미착수: LLM 주제 추천 실제 연동, 이미지 업로드, `ChatPanel`을 `layout.tsx`의 전역 오버레이로 이전(E 대기)
+- 미착수: LLM 주제 추천 실제 연동, 이미지 업로드
 - 보류(다음 세션 이전 필요 조건): 전체 탭 글쓰기(스키마에 ALL 값 없음), LLM 주제 추천(SPEC 8절, 이번 세션 범위 아님), 글쓰기 시 일일 미션(`DAILY_COMMUNITY_POST`) 완료 처리(B와 협의 필요), `ChatPanel`의 `layout.tsx` 이전(E 소유 파일이라 D가 직접 못 건드림) — 전부 아래 "결정한 것과 이유"에 근거 남김
 
 ## 구현한 파일
@@ -82,15 +82,19 @@ D 쪽 기능 구현은 끝났고, 지금은 `completeMission()`(B) 외부 결과
 - `app/community/_components/PostDetailModal.tsx` — `DetailComment`에 `isOwn` 추가, `deletingCommentId` state와 `handleDeleteComment()` 추가. 본인 댓글에만 작은 삭제 버튼(`text-[11px]`, 헤더의 글 삭제 버튼과 같은 계열) 노출
 
 - `app/chat/_lib/systemPrompt.ts` — 챗봇 "마음 친구" 시스템 프롬프트. 공통 원칙(조언·해결책·진단·평가 금지, 유형명 노출 금지, 자해·죽음 언급 시 안전 예외) + 유형별 페르소나 레이어. `buildSystemPrompt(typeCode, nickname)`을 `app/api/chat/messages/route.ts`와 `app/api/chat/stream/route.ts`가 참조
+- `app/chat/_components/ChatLauncher.tsx` — **이번 세션에 추가.** 전역 오버레이 진입점(클라이언트). `useState`로 열림 상태를 갖고, 닫혀 있으면 우상단 플로팅 버튼(`fixed top-4 right-4 z-40`, `aria-label="마음 친구 열기"`)만, 열리면 `<ChatPanel onClose={...} />`를 렌더한다. `usePathname()`으로 `/diagnosis`에서는 `null`을 반환해 숨긴다(`Sidebar`가 같은 경로에서 같은 방식으로 숨는다). 별도 로그인 라우트는 아직 없어서(`app/(auth)/` 미생성) 제외 경로는 `/diagnosis` 하나다
 - `app/chat/_lib/starters.ts` — **이번 세션에 추가.** `CHAT_STARTERS: Record<TypeCode, string[]>`. 빈 화면 추천 문구를 유형별 6개씩 정적 상수로 둔다. `TypeCode`는 `@prisma/client`에서 그대로 import(새로 정의하지 않음). LLM 호출 없음
 - `app/api/chat/messages/route.ts` — GET(대화 이력 조회, 최근 50개, `createdAt asc`, 이제 `affinityToday`도 응답에 포함) + POST(사용자 메시지 저장 + 친밀도 지급). 진단 전(`typeCode` 없음)이면 400 `NO_TYPE_CODE`
 - `app/api/chat/stream/route.ts` — **이번 세션에 추가.** POST. 사용자 메시지 저장 이후 클라이언트가 이어서 호출한다. 최근 20개 대화 이력을 Converse 형식으로 변환해 `ConverseStreamCommand`로 호출하고, 토큰을 `text/plain` 스트림으로 그대로 흘린다. 스트림이 `messageStop`까지 정상 종료됐고 내용이 비어있지 않을 때만 `ChatRole.ASSISTANT`로 저장한다. 메시지 저장·친밀도 지급·미션 완료는 이 라우트에서 하지 않는다(모두 `app/api/chat/messages/route.ts` 소관, 이중 지급 방지). `BEDROCK_MODEL_ID`가 없으면 500 `BEDROCK_NOT_CONFIGURED`로 막는다(클라이언트는 `bedrockConfigured`가 false면 애초에 이 라우트를 호출하지 않는다)
 - `app/chat/_components/ChatPanel.tsx` — 우측 460px 슬라이드 패널(클라이언트). 헤더(아바타·진행 바·ℹ 친밀도 안내·✕), 빈 상태(인사말 + 유형별 추천 문구 3개), 메시지 목록(USER 우측 컬러 말풍선 / ASSISTANT 좌측 말풍선), 입력창(Enter 전송·Shift+Enter 줄바꿈). `BEDROCK_MODEL_ID` 없을 때만 개발 모드 배너 노출. `onClose`는 선택 prop — 없으면 ✕·배경 클릭 닫기를 렌더링하지 않음. 이전 세션에 사용자 메시지 저장 성공 직후 `streamAssistantReply()`를 호출해 `/api/chat/stream`을 스트리밍으로 소비하도록 연결(첫 토큰 전엔 타이핑 인디케이터, 이후엔 텍스트가 자라나는 말풍선, 스트리밍 중 입력창·전송 버튼 비활성화)했다. **이번 세션에 수정**: 하드코딩된 `SUGGESTIONS` 배열을 지우고, `CHAT_STARTERS[typeCode]` 6개 중 3개를 뽑는 `pickThreeStarters()`(Fisher-Yates, 외부 라이브러리 없이 직접 구현)를 추가. 결과는 `useState(() => typeCode ? pickThreeStarters(typeCode) : [])` 초기화 함수 안에서 한 번만 계산해 `starters` state로 보관 — 리렌더마다 다시 섞이지 않고, 컴포넌트가 새로 마운트될 때(패널 재진입)만 새로 뽑힌다
-- `app/chat/page.tsx` — 개발 확인용 라우트. 서버 컴포넌트에서 `getCurrentUser()`로 `nickname`/`typeCode`를, `process.env.BEDROCK_MODEL_ID`로 `bedrockConfigured`를 읽어 `ChatPanel`에 props로 넘김. `onClose` 없이 렌더링. `export const dynamic = "force-dynamic"` 필수(아래 이유 참고)
+- `app/chat/_components/ChatPanel.tsx` — **2026-08-20 수정.** `nickname`/`typeCode`/`bedrockConfigured` props를 없애고 `onClose` 하나만 받는다. 세 값은 이미 호출하던 GET `/api/chat/messages` 응답에서 state로 채운다(요청 횟수 그대로). `typeCode` 초기값 `null` → 로딩 중엔 기존대로 `NEUTRAL_COLOR`. `pickThreeStarters()`는 GET 성공 시점에 `typeCode`가 있을 때만 한 번 호출한다. GET이 401이면 `unauthorized` state로 로그인 안내만 띄우고 입력을 막는다. `onClose`가 항상 넘어오므로 `router.back()` 폴백과 `useRouter` import를 지웠다
+- `app/layout.tsx` — **2026-08-20 수정(E 소유 공유 파일, PR 리뷰 예정).** import 한 줄 + `</div>` 뒤 `<ChatLauncher />` 한 줄. `Sidebar`·flex 구조·배경색·`overflowY`는 손대지 않았다
+- `app/api/chat/messages/route.ts` — **2026-08-20 수정.** GET 응답에 `nickname`·`typeCode`·`bedrockConfigured` 3필드 추가(additive). `BEDROCK_MODEL_ID` 값 자체는 내보내지 않고 `Boolean()`으로 설정 여부만 내린다. POST 로직과 친밀도 지급은 그대로
 
 **`app/chat/` 폴더 소유 — 팀 확인 대기.** `CLAUDE.md` 2절의 폴더 소유 표(`app/diagnosis/` A, `app/missions/` B, `app/pet/` C, `app/community/` D, `app/(auth)/` E)에는 `app/chat/`이 없다. `업무분담.md`의 D 항목에 "AI 상담 챗봇"과 `/api/chat/*`가 D 담당으로 명시돼 있어 D 소유로 보고 진행했지만, `CLAUDE.md` 갱신은 전원 합의가 필요하므로 다음 통합 때 팀에 확인해 `CLAUDE.md` 2절에 정식으로 추가해야 한다.
 
 ## 삭제한 파일
+- `app/chat/page.tsx` — **2026-08-20 삭제.** `layout.tsx`를 못 고쳐서 만들었던 임시 확인용 라우트. 전역 오버레이(`ChatLauncher`)로 대체돼 `/chat`은 이제 404다. `app/chat/_components/`·`app/chat/_lib/`·`app/api/chat/`은 그대로 둔다
 - `app/community/[type]/page.tsx` — URL로 다른 종족 갤러리에 접근 가능했던 예전 동적 라우트. 팀 디자인 시안 반영으로 갤러리 탭이 "전체/나의 종족" 2개로 바뀌면서 제거
 
 ## 결정한 것과 이유
@@ -140,6 +144,17 @@ D 쪽 기능 구현은 끝났고, 지금은 `completeMission()`(B) 외부 결과
 - **셔플은 Fisher-Yates를 직접 구현했다.** lodash 같은 새 라이브러리를 추가하지 않는다는 지시에 따름(`package.json`에 이미 있는 것만 사용)
 - **`typeCode`가 `null`이면 `starters`도 빈 배열(`[]`)이 된다.** 렌더 쪽의 `{typeCode && (...)}` 가드는 그대로 유지했다 — 이미 있던 "진단 미완료 안내" 동작을 건드리지 않기 위해 이중으로 막아둔 것이지 새로 만든 로직은 아니다
 
+### 전역 오버레이 이전 (2026-08-20)
+- **열림 상태는 `ChatLauncher`(클라이언트)가 갖는다.** `layout.tsx`는 서버 컴포넌트라 `useState`를 못 쓴다. 래퍼를 하나 두면 `layout.tsx` diff가 두 줄로 끝나고, E가 리뷰할 공유 파일 변경 폭이 최소가 된다
+- **`ChatPanel`의 세 props를 없애고 GET 응답을 넓혔다.** 전역 오버레이가 되면서 props를 넘겨줄 서버 컴포넌트가 사라졌다. 대안 두 개를 검토하고 버렸다 — (1) `layout.tsx`를 `async`로 만들어 `getCurrentUser()`를 부르는 방법은 진단·로그인 화면처럼 유저가 없는 경로에서 레이아웃이 `UnauthorizedError`로 터지고, 모든 페이지가 동적 렌더링이 되며, E 소유 파일의 변경 폭이 커져 리뷰가 어렵다. (2) props를 optional로 바꾸는 건 값의 출처 문제를 미루기만 한다. 그래서 D 소유 라우트인 GET `/api/chat/messages`에 `nickname`·`typeCode`·`bedrockConfigured`를 additive로 얹었다 — 패널이 이미 마운트 시 호출하던 엔드포인트라 **요청 횟수는 그대로다**
+- **`BEDROCK_MODEL_ID` 값은 응답에 넣지 않는다.** `Boolean(...)`으로 설정 여부만 내린다. 모델 ID는 서버 전용 값이고 화면에 필요한 건 배너를 띄울지 여부뿐이다
+- **개발 모드 배너는 `!loading`일 때만 띄운다.** `bedrockConfigured` 초기값이 `false`라 로딩 중에 배너가 잠깐 번쩍이는 것을 막는다(props로 받던 때는 첫 렌더부터 확정값이라 이 문제가 없었다)
+- **`pickThreeStarters()`는 GET 성공 시점에 한 번만 호출한다.** `typeCode`가 채워진 뒤라야 호출할 수 있고, `useState` 초기화 함수 자리에서는 아직 `null`이다. 리렌더마다 다시 섞이지 않는다는 기존 성질은 그대로다
+- **401은 진단 안내가 아니라 로그인 안내를 띄운다.** 둘 다 `typeCode`가 `null`이라 구분 없이 두면 로그인이 안 된 사용자에게 "진단을 먼저 완료해야" 라고 잘못 안내한다. `unauthorized` state로 갈라 로그인 안내만 띄우고 입력을 막는다(크래시 없음)
+- **`/diagnosis`에서는 플로팅 버튼을 숨긴다.** `Sidebar`가 같은 경로에서 같은 방식(`usePathname()`)으로 숨는다 — 진단 문항 화면의 몰입을 깨지 않기 위한 기존 결정에 동작을 맞췄다. 로그인 라우트는 아직 없어서(`app/(auth)/` 미생성) 제외 경로는 `/diagnosis` 하나뿐이다. 로그인 화면이 생기면 여기에 함께 추가한다
+- **`router.back()` 폴백을 지웠다.** `/chat` 라우트로 직접 들어오는 경우를 위한 코드였는데 그 라우트를 없앴고, `ChatLauncher`가 항상 `onClose`를 넘긴다. `useRouter` import도 다른 데서 안 써서 같이 정리했다
+- **`BottomNav.tsx`는 그대로 뒀다.** `layout.tsx`가 더 이상 쓰지 않는 죽은 파일이지만 D 소유가 아니다(삭제 판단은 E). `docs/STATUS.md` 차단 10번에 E 항목으로 이미 올라가 있다
+
 ## 막힌 것
 - 없음 (로컬 DB가 `prisma migrate`로 관리되지 않고 있던 것을 발견해 베이스라인 마이그레이션(`prisma/migrations/00000000000000_init`)을 만들어 해결. 기존 시드 데이터(미션 41개, 펫스킨 6개)는 유지됨. 스키마 담당과 공유 필요)
 
@@ -147,5 +162,6 @@ D 쪽 기능 구현은 끝났고, 지금은 `completeMission()`(B) 외부 결과
 - LLM 주제 추천 3가지 이상 연동 — `BEDROCK_MODEL_ID` 확보됐으니 `WriteModal`의 TODO 자리에 구현 가능. `app/api/chat/stream/route.ts`의 `ConverseStreamCommand` 호출 패턴을 참고할 것(단, 이건 비스트리밍 단발 호출이라 `ConverseCommand`가 더 맞을 수 있음)
 - 전체 탭 글쓰기 — 스키마에 ALL(또는 공용 게시판) 개념이 추가되면 `_lib/gallery.ts`의 `canWriteToGallery()`만 고치면 됨
 - `DAILY_COMMUNITY_POST` 일일 미션 완료 처리 — B와 담당 경계 협의 필요
-- **`ChatPanel`을 `app/chat/page.tsx`(개발용)에서 `layout.tsx`의 전역 오버레이로 이전 — E와 조율 필요.** `layout.tsx`는 E 소유라 D가 직접 못 고친다. 이전할 때 `nickname`/`typeCode`/`bedrockConfigured` props를 넘기는 방식과 `onClose` 연결(전역에서는 실제로 닫을 수 있어야 함)을 그대로 유지할 것
+- **`layout.tsx` 변경분 PR 리뷰 — E.** 전역 오버레이 이전은 끝났고(2026-08-20) E와 사전 공유했다. 공유 파일이므로 머지 전 PR 리뷰를 받는다. diff는 import 한 줄 + `<ChatLauncher />` 한 줄뿐이다
+- **패널 열기·닫기 브라우저 확인 — 미완.** 이번 세션엔 브라우저 확장이 연결되지 않아 SSR HTML(네 화면에 버튼 있음 / `/diagnosis`에 없음)과 API 응답까지만 확인했다. 실제 클릭으로 열림·✕·배경 딤 닫힘을 한 번 눌러볼 것
 - `app/chat/` 폴더 소유를 `CLAUDE.md` 2절에 정식 반영 — 팀 확인 대기 (계속 남아있는 이월 항목)
