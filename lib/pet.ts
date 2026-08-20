@@ -78,19 +78,21 @@ export function expProgress(level: number, exp: number): number {
 //
 // 이미지 9장이 아직 없어 원판·배지 자리에 동물 이모지를 쓴다 (design.md).
 // 기본 3종은 lib/types.ts의 TRIBE가 정본이라 여기 다시 적지 않는다.
-// 친밀도 전용 캐릭터 3종은 TRIBE에 없으므로 여기만 따로 둔다.
 // 화면 두 곳(PetView·SkinList)이 같이 쓰므로 컴포넌트가 아니라 여기에 둔다.
 
-const AFFINITY_EMOJI: Record<string, string> = { 늑대: "🐺", 삵: "🐆", 판다: "🐼" }
+export const ANIMAL_EMOJI: Record<string, string> = Object.fromEntries(
+  Object.values(TRIBE).map((tribe) => [tribe.animal, tribe.emoji]),
+)
 
-export const ANIMAL_EMOJI: Record<string, string> = {
-  ...Object.fromEntries(Object.values(TRIBE).map((tribe) => [tribe.animal, tribe.emoji])),
-  ...AFFINITY_EMOJI,
-}
-
-/** 이름을 모르는 동물이 와도 화면이 비지 않게 발자국을 쓴다 */
+/**
+ * 변종 스킨은 어미가 종족의 동물명이다(북극여우·샴고양이·북극곰). 이모지가 3종뿐이므로
+ * 어미로 찾아 기본 동물 이모지를 그대로 쓴다 — 변종마다 이모지를 새로 적으면 스킨이
+ * 늘 때마다 여기도 고쳐야 하고, 안 고치면 조용히 발자국이 뜬다.
+ * 어미도 모르는 이름이 오면 화면이 비지 않게 발자국을 쓴다.
+ */
 export function animalEmoji(animal: string): string {
-  return ANIMAL_EMOJI[animal] ?? "🐾"
+  const base = Object.keys(ANIMAL_EMOJI).find((name) => animal.endsWith(name))
+  return base ? ANIMAL_EMOJI[base] : "🐾"
 }
 
 // ── 치장 목록 정렬 (SPEC.md 5절) ──────────────────────────────────────────────
