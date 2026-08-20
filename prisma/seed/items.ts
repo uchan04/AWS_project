@@ -36,7 +36,7 @@ const PET_SKINS: Prisma.PetSkinCreateInput[] = [
     stageCount: 1,
     effectType: "SEED",
     effectPct: 15,
-    priceAffinity: 300,
+    priceShards: 300,
     imageKeyBase: "pets/wolf",
   },
   {
@@ -45,7 +45,7 @@ const PET_SKINS: Prisma.PetSkinCreateInput[] = [
     stageCount: 1,
     effectType: "SHARD",
     effectPct: 10,
-    priceAffinity: 300,
+    priceShards: 300,
     imageKeyBase: "pets/leopardcat",
   },
   {
@@ -54,32 +54,32 @@ const PET_SKINS: Prisma.PetSkinCreateInput[] = [
     stageCount: 1,
     effectType: "AFFINITY",
     effectPct: 20,
-    priceAffinity: 300,
+    priceShards: 300,
     imageKeyBase: "pets/panda",
   },
 ]
 
 // 가챠 풀 9종. 등급 분포는 일반 3 / 희귀 3 / 영웅 2 / 전설 1 (SPEC.md 5절).
-// 컬러는 tribeColor로 표현한다. AMBER=개과, LAVENDER=고양잇과, SAGE=곰과
+// AMBER=개과, LAVENDER=고양잇과, SAGE=곰과 (이름으로만 구분, 별도 컬러 필드 없음)
 const GACHA_COSMETICS: Prisma.CosmeticItemCreateInput[] = [
-  { name: "앰버 모자", slot: "HAT", rarity: "COMMON", tribeColor: "INDEPENDENT_LOW_INCOME", imageKey: "cosmetics/hat-amber.png" },
-  { name: "라벤더 모자", slot: "HAT", rarity: "RARE", tribeColor: "HEALTH_EMOTION", imageKey: "cosmetics/hat-lavender.png" },
-  { name: "세이지 모자", slot: "HAT", rarity: "EPIC", tribeColor: "FAMILY_LIVING", imageKey: "cosmetics/hat-sage.png" },
+  { name: "앰버 모자", slot: "HAT", rarity: "COMMON", imageKey: "cosmetics/hat-amber.png" },
+  { name: "라벤더 모자", slot: "HAT", rarity: "RARE", imageKey: "cosmetics/hat-lavender.png" },
+  { name: "세이지 모자", slot: "HAT", rarity: "EPIC", imageKey: "cosmetics/hat-sage.png" },
 
-  { name: "라벤더 목도리", slot: "SCARF", rarity: "COMMON", tribeColor: "HEALTH_EMOTION", imageKey: "cosmetics/scarf-lavender.png" },
-  { name: "세이지 목도리", slot: "SCARF", rarity: "RARE", tribeColor: "FAMILY_LIVING", imageKey: "cosmetics/scarf-sage.png" },
-  { name: "앰버 목도리", slot: "SCARF", rarity: "LEGENDARY", tribeColor: "INDEPENDENT_LOW_INCOME", imageKey: "cosmetics/scarf-amber.png" },
+  { name: "라벤더 목도리", slot: "SCARF", rarity: "COMMON", imageKey: "cosmetics/scarf-lavender.png" },
+  { name: "세이지 목도리", slot: "SCARF", rarity: "RARE", imageKey: "cosmetics/scarf-sage.png" },
+  { name: "앰버 목도리", slot: "SCARF", rarity: "LEGENDARY", imageKey: "cosmetics/scarf-amber.png" },
 
-  { name: "세이지 배경", slot: "BACKGROUND", rarity: "COMMON", tribeColor: "FAMILY_LIVING", imageKey: "cosmetics/bg-sage.png" },
-  { name: "앰버 배경", slot: "BACKGROUND", rarity: "RARE", tribeColor: "INDEPENDENT_LOW_INCOME", imageKey: "cosmetics/bg-amber.png" },
-  { name: "라벤더 배경", slot: "BACKGROUND", rarity: "EPIC", tribeColor: "HEALTH_EMOTION", imageKey: "cosmetics/bg-lavender.png" },
+  { name: "세이지 배경", slot: "BACKGROUND", rarity: "COMMON", imageKey: "cosmetics/bg-sage.png" },
+  { name: "앰버 배경", slot: "BACKGROUND", rarity: "RARE", imageKey: "cosmetics/bg-amber.png" },
+  { name: "라벤더 배경", slot: "BACKGROUND", rarity: "EPIC", imageKey: "cosmetics/bg-lavender.png" },
 ]
 
 // 친밀도 상점 전용 3종. affinityOnly=true이므로 가챠 추첨 풀에서 반드시 제외한다.
 const AFFINITY_COSMETICS: Prisma.CosmeticItemCreateInput[] = [
-  { name: "밤별 모자", slot: "HAT", rarity: "EPIC", tribeColor: "HEALTH_EMOTION", affinityOnly: true, priceAffinity: 200, imageKey: "cosmetics/hat-night.png" },
-  { name: "밤별 목도리", slot: "SCARF", rarity: "EPIC", tribeColor: "HEALTH_EMOTION", affinityOnly: true, priceAffinity: 200, imageKey: "cosmetics/scarf-night.png" },
-  { name: "밤별 배경", slot: "BACKGROUND", rarity: "EPIC", tribeColor: "HEALTH_EMOTION", affinityOnly: true, priceAffinity: 200, imageKey: "cosmetics/bg-night.png" },
+  { name: "밤별 모자", slot: "HAT", rarity: "EPIC", affinityOnly: true, priceAffinity: 200, imageKey: "cosmetics/hat-night.png" },
+  { name: "밤별 목도리", slot: "SCARF", rarity: "EPIC", affinityOnly: true, priceAffinity: 200, imageKey: "cosmetics/scarf-night.png" },
+  { name: "밤별 배경", slot: "BACKGROUND", rarity: "EPIC", affinityOnly: true, priceAffinity: 200, imageKey: "cosmetics/bg-night.png" },
 ]
 
 export async function seedItems(prisma: PrismaClient) {

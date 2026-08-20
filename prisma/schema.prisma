@@ -17,6 +17,15 @@ enum TypeCode {
   FAMILY_LIVING // 가족동거형 / 곰과 / 곰
 }
 
+// Post.galleryType 전용. TypeCode 3종 + 커뮤니티 "전체" 탭 글쓰기용 ALL.
+// 값 이름은 TypeCode와 동일하게 맞춘다 — 기존 데이터가 이름 그대로 매핑된다.
+enum GalleryType {
+  INDEPENDENT_LOW_INCOME
+  HEALTH_EMOTION
+  FAMILY_LIVING
+  ALL
+}
+
 // 관리자 전용 세부유형. 연구보고서 9유형에서 경계선지능청년을 뺀 8개다.
 // (IQ 71~84는 자기보고로 측정할 수 없고 묻는 것 자체가 낙인이다)
 // 절대 화면에 노출하지 않는다. 관리자 화면은 TypeCode × SubTypeCode 교차표로 본다.
@@ -98,9 +107,6 @@ model User {
   activePetSkinId String?
   activePetSkin   PetSkin? @relation("ActiveSkin", fields: [activePetSkinId], references: [id])
 
-  heroPity   Int @default(0)
-  legendPity Int @default(0)
-
   streakCount    Int       @default(0)
   lastStreakDate DateTime?
 
@@ -114,7 +120,6 @@ model User {
   missions     UserMission[]
   petSkins     UserPetSkin[]
   cosmetics    UserCosmetic[]
-  gachaPulls   GachaPull[]
   posts        Post[]
   comments     Comment[]
   likes        PostLike[]
@@ -177,13 +182,13 @@ model PetSkin {
   typeCode TypeCode // 기본 펫 매칭용. 캐릭터 구매 제한에는 쓰지 않는다
 
   isDefault  Boolean @default(false)
-  stageCount Int     @default(1) // 기본 펫은 3, 친밀도 캐릭터는 1
+  stageCount Int     @default(3) // 기본 펫은 3, 친밀도 캐릭터는 1
 
   effectType EffectType @default(NONE)
   effectPct  Int        @default(0) // 15 = +15%
 
-  priceAffinity Int? // 친밀도 구매가. 기본 펫은 null
-  imageKeyBase  String // S3 prefix. stageCount가 3이면 뒤에 -1 -2 -3을 붙인다
+  priceShards  Int? // 별조각 구매가. 기본 펫은 null
+  imageKeyBase String // S3 prefix. stageCount가 3이면 뒤에 -1 -2 -3을 붙인다
 
   owners      UserPetSkin[]
   activeUsers User[]        @relation("ActiveSkin")
@@ -207,8 +212,6 @@ model CosmeticItem {
   slot   Slot
   rarity Rarity
 
-  tribeColor TypeCode // 컬러 계열. 3컬러를 TypeCode로 표현한다
-
   // true면 친밀도 전용 상점 아이템이며 가챠 추첨 풀에서 제외한다.
   affinityOnly  Boolean @default(false)
   priceAffinity Int?
@@ -216,7 +219,6 @@ model CosmeticItem {
   imageKey String
 
   owners UserCosmetic[]
-  pulls  GachaPull[]
 }
 
 model UserCosmetic {
@@ -230,24 +232,6 @@ model UserCosmetic {
   item CosmeticItem @relation(fields: [itemId], references: [id])
 
   @@unique([userId, itemId])
-}
-
-model GachaPull {
-  id       String   @id @default(cuid())
-  userId   String
-  itemId   String
-  rarity   Rarity
-  wasPity  Boolean  @default(false)
-  pulledAt DateTime @default(now())
-
-  // 이미 보유한 아이템이 나온 경우. UserCosmetic은 만들지 않고 별조각을 환급한다.
-  wasDuplicate Boolean @default(false)
-  refundShards Int     @default(0)
-
-  user User         @relation(fields: [userId], references: [id])
-  item CosmeticItem @relation(fields: [itemId], references: [id])
-
-  @@index([userId, pulledAt])
 }
 
 model AttendanceClaim {
@@ -265,7 +249,8 @@ model Post {
   id String @id @default(cuid())
 
   // 작성 시점의 갤러리를 그대로 보관한다. 재진단으로 유형이 바뀌어도 글은 이동하지 않는다.
-  galleryType TypeCode
+  // ALL은 "전체" 탭에 쓴 글. TypeCode가 아니라 GalleryType이라 전체 탭도 저장할 수 있다.
+  galleryType GalleryType
 
   userId       String
   title        String
