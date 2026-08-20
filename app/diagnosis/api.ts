@@ -42,6 +42,17 @@ export async function fetchMe(): Promise<DiagnosisView | null> {
   return read<DiagnosisView | null>(response)
 }
 
+/**
+ * 결과 화면의 판정 근거 3줄. 없으면 null이다 —
+ * 진단 전, 미인증, Bedrock 실패가 전부 null로 온다(화면은 카드를 빼면 된다).
+ */
+export async function fetchReason(): Promise<string[] | null> {
+  const response = await fetch("/api/diagnosis/reason")
+  if (!response.ok) return null
+  const body: ApiBody<{ lines: string[] } | null> = await response.json().catch(() => ({}))
+  return body.data?.lines ?? null
+}
+
 export async function saveNickname(nickname: string): Promise<string> {
   const response = await fetch("/api/diagnosis/nickname", {
     method: "PATCH",
