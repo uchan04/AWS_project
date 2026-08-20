@@ -55,10 +55,11 @@ export function PostDetailModal({
   // 어느 댓글이 처리 중인지 구분한다. 단일 boolean이면 삭제 중에 모든 댓글 버튼이 같이 비활성화된다.
   const [deletingCommentId, setDeletingCommentId] = useState<string | null>(null)
 
+  // 마운트 시 한 번만 로드한다. loading=true / error=null은 useState 초기값이 이미 그 상태라
+  // 이펙트 본문에서 다시 세팅하지 않는다(react-hooks/set-state-in-effect).
+  // PostList가 key={selectedPostId}로 렌더하므로 다른 글을 열면 컴포넌트가 새로 마운트된다.
   useEffect(() => {
     let ignore = false
-    setLoading(true)
-    setError(null)
 
     fetch(`/api/community/posts/${postId}`)
       .then((res) => res.json())
