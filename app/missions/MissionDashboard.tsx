@@ -823,78 +823,105 @@ export default function MissionDashboard() {
 
         return (
           <div style={{ marginBottom: 36 }}>
-            <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: 14 }}>
-              <div>
-                <h2
-                  style={{
-                    fontFamily: "'Gowun Dodum', sans-serif",
-                    fontSize: 19,
-                    color: "#2A1F14",
-                    margin: 0,
-                  }}
-                >
-                  추가 미션
-                </h2>
-                <p style={{ fontSize: 12, color: "#7A6B58", margin: "4px 0 0" }}>
-                  단계를 완료하면 새로운 미션이 열려요
-                </p>
-              </div>
-              <div style={{ display: "flex", gap: 8 }}>
-                <button
-                  onClick={() => setCurrentStageIndex((i) => Math.max(0, i - 1))}
-                  disabled={!hasPrev}
-                  style={{
-                    width: 36,
-                    height: 36,
-                    borderRadius: "50%",
-                    background: hasPrev ? color : "#F5F0E8",
-                    color: hasPrev ? "white" : "#DDD0BC",
-                    border: "none",
-                    cursor: hasPrev ? "pointer" : "not-allowed",
-                    fontSize: 18,
-                    display: "flex",
-                    alignItems: "center",
-                    justifyContent: "center",
-                  }}
-                >
-                  ←
-                </button>
-                <button
-                  onClick={() => {
-                    if (hasNext) {
-                      setCurrentStageIndex((i) => Math.min(incompleteMissions.length - 1, i + 1))
-                    } else {
-                      alert("아직 단계 " + currentMission.stage + "을 완료하지 않았어요")
-                    }
-                  }}
-                  style={{
-                    width: 36,
-                    height: 36,
-                    borderRadius: "50%",
-                    background: color,
-                    color: "white",
-                    border: "none",
-                    cursor: "pointer",
-                    fontSize: 18,
-                    display: "flex",
-                    alignItems: "center",
-                    justifyContent: "center",
-                  }}
-                >
-                  →
-                </button>
-              </div>
+            <div>
+              <h2
+                style={{
+                  fontFamily: "'Gowun Dodum', sans-serif",
+                  fontSize: 19,
+                  color: "#2A1F14",
+                  margin: "0 0 4px",
+                }}
+              >
+                추가 미션
+              </h2>
+              <p style={{ fontSize: 12, color: "#7A6B58", margin: "0 0 14px" }}>
+                단계를 완료하면 새로운 미션이 열려요
+              </p>
             </div>
-            <StepSection
-              title={`단계 ${currentMission.stage}`}
-              missions={currentMission.missions}
-              color={color}
-              bg={bg}
-              mascotEmoji={mascotEmoji}
-              unlocked={currentMission.unlocked}
-              progress={`${currentMission.completedCount} / 4 완료`}
-              onSelect={setSelected}
-            />
+            <div style={{ position: "relative" }}>
+              {/* 왼쪽 화살표 */}
+              <button
+                onClick={() => setCurrentStageIndex((i) => Math.max(0, i - 1))}
+                disabled={!hasPrev}
+                style={{
+                  position: "absolute",
+                  left: -12,
+                  top: "50%",
+                  transform: "translateY(-50%)",
+                  width: 40,
+                  height: 40,
+                  background: hasPrev ? color : "#F5F0E8",
+                  color: hasPrev ? "white" : "#DDD0BC",
+                  border: "none",
+                  borderRadius: "50%",
+                  cursor: hasPrev ? "pointer" : "not-allowed",
+                  fontSize: 20,
+                  display: "flex",
+                  alignItems: "center",
+                  justifyContent: "center",
+                  zIndex: 10,
+                  boxShadow: hasPrev ? "0 4px 12px rgba(0,0,0,0.15)" : "none",
+                }}
+              >
+                ◀
+              </button>
+
+              {/* 오른쪽 화살표 */}
+              <button
+                onClick={() => {
+                  if (hasNext) {
+                    setCurrentStageIndex((i) => Math.min(incompleteMissions.length - 1, i + 1))
+                  }
+                }}
+                disabled={!hasNext}
+                title={!hasNext ? `아직 단계 ${currentMission.stage}을 완료하지 않았어요` : ""}
+                style={{
+                  position: "absolute",
+                  right: -12,
+                  top: "50%",
+                  transform: "translateY(-50%)",
+                  width: 40,
+                  height: 40,
+                  background: hasNext ? color : "#F5F0E8",
+                  color: hasNext ? "white" : "#DDD0BC",
+                  border: "none",
+                  borderRadius: "50%",
+                  cursor: hasNext ? "pointer" : "not-allowed",
+                  fontSize: 20,
+                  display: "flex",
+                  alignItems: "center",
+                  justifyContent: "center",
+                  zIndex: 10,
+                  boxShadow: hasNext ? "0 4px 12px rgba(0,0,0,0.15)" : "none",
+                }}
+              >
+                {hasNext ? "▶" : "🔒"}
+              </button>
+
+              <StepSection
+                title={`단계 ${currentMission.stage}`}
+                missions={currentMission.missions}
+                color={color}
+                bg={bg}
+                mascotEmoji={mascotEmoji}
+                unlocked={currentMission.unlocked}
+                progress={`${currentMission.completedCount} / 4 완료`}
+                onSelect={setSelected}
+              />
+
+              {!hasNext && (
+                <p
+                  style={{
+                    fontSize: 12,
+                    color: "#9A8A76",
+                    textAlign: "center",
+                    margin: "12px 0 0",
+                  }}
+                >
+                  🔒 아직 단계 {currentMission.stage}을 완료하지 않았어요
+                </p>
+              )}
+            </div>
           </div>
         )
       })()}
