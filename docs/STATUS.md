@@ -2,8 +2,8 @@
 
 **모든 세션은 이 문서부터 읽는다.** 그다음 아래 "지금 읽어야 할 문서"만 읽고 시작한다.
 
-최종 갱신: 2026-08-19 (C 펫 기능 완료 반영)
-현재 단계: **D2 — 인프라 완료, 기능 5개 병렬 착수 (8/19 중간 체크포인트)**
+최종 갱신: 2026-08-20 (origin 전 브랜치 재확인 + 실 DB 마이그레이션 확인)
+현재 단계: **D2 — 인프라 완료, 기능 5개 병렬 착수 (8/20 기능 동결 예정일)**
 
 팀원 인수인계용 단일 문서는 [`docs/인수인계.md`](인수인계.md)에 있다. 새로 합류하거나 노션으로 공유할 때는 그 문서를 쓴다.
 
@@ -32,9 +32,9 @@
 | 담당 | 범위 | 상태 | 비고 |
 |---|---|---|---|
 | A | 진단 + 미션 콘텐츠 + 홈 | 미션 41개, 13문항 + 판정 함수, 조기 종료, 화면 3장 + Figma 값·구성 반영, 진단 API 3종(완료·조회·닉네임) + 화면 연결 완료 | 2차 마이그레이션 완료, API 정상 동작. 홈 실데이터는 B·C API 대기 |
-| B | 미션 시스템 + 사진 업로드 | 미착수 | `DATABASE_URL`·S3 버킷 확보됨, 착수 가능 |
-| C | 펫 | **`SPEC.md` 5절 기능 완료.** 성장·씨앗 투입·진화 연출, 방치형 자동 획득, 치장 착용·해제, 친밀도 캐릭터 구매·전환 + 화면 3장 | 런타임 검증은 공유 DB 쓰기 승인 대기(차단 1). 치장 획득 경로 팀 결정 필요(차단 8). 가챠 DROP 마이그레이션은 E(차단 6) |
-| D | 커뮤니티 + 챗봇 | 구현 중 (`feat/community`에 커뮤니티·챗봇 대량 커밋) | 브랜치에 중복 init 마이그레이션 있음 (차단 4) |
+| B | 미션 시스템 + 사진 업로드 | **착수했다** (2026-08-20 확인). `feat/missions`에 1단계 미션 대시보드 UI, 사진 모달 Figma 정렬, 사진 미션 검증 스펙 문서 | `main`에 아직 없다. `completeMission()`을 D가 기다리는 중 |
+| C | 펫 | **`SPEC.md` 5절 기능 완료.** 성장·씨앗 투입·진화 연출, 방치형 자동 획득, 치장 착용·해제, 친밀도 캐릭터 구매·전환 + 화면 3장 | `feat/pet` 20커밋이 `main`에 없다(PR 여부 팀 결정 대기). 런타임 검증은 공유 DB 쓰기 승인 대기(차단 1). 치장 획득 경로 팀 결정 필요(차단 8). 가챠 DROP 마이그레이션은 E(차단 6) |
+| D | 커뮤니티 + 챗봇 | 기능 구현 끝. 챗봇 Bedrock 스트리밍 연결 완료, `docs/SETUP.md`(로컬 개발환경 가이드) 추가. 미션 완료 연동 호출부(`completeMission`)는 주석으로 준비만 해 둠 | `main`에 아직 없다. `completeMission()`(B) 대기. 세부는 `docs/dev/community.md` "재개 지점" |
 | E | 인프라 + 인증 | RDS·Cognito·S3+CloudFront·CloudWatch+SNS·Bedrock·auth 실검증·하단 탭 내비 완료, PR #1 머지 + 2차 마이그레이션 + auth 빌드 수정 + 색 토큰 정리 완료 | Amplify GitHub 연동만 남음(브라우저 수동 단계) |
 
 ## 전체 차단 사항
@@ -43,9 +43,11 @@
 
 인프라 차단은 해소됐다(RDS·Cognito·S3·Bedrock 완료). `.env`의 `DATABASE_URL`·`COGNITO_*`·`S3_BUCKET`·`CLOUDFRONT_DOMAIN`·`BEDROCK_MODEL_ID`는 E에게 개별 공유받는다.
 
-~~2. `SubTypeCode` 2차 마이그레이션~~ — 해소(2026-08-19). `migrate dev --name add_subtype` 실행 완료. **나머지 4인은 `git pull && npx prisma migrate deploy && npx prisma generate`**
+~~2. `SubTypeCode` 2차 마이그레이션~~ — 해소(2026-08-19), **2026-08-20 실 DB로 재확인**. E가 `7d86546`으로 `prisma/migrations/20260819080703_add_subtype/`을 `main`에 올렸고, RDS `_prisma_migrations`에 `20260819061857_init`(08-19 06:19)·`20260819080703_add_subtype`(08-19 08:07) 두 행이 `finished_at`까지 찍혀 있다. `npx prisma migrate status` = "Database schema is up to date", `User.subTypeCode`·`DiagnosisSession.subTypeCode`·`indicators` 컬럼 실재 확인. **나머지 4인은 `git pull && npx prisma migrate deploy && npx prisma generate`**
 ~~3. `lib/auth.ts` 빈 Pool ID로 빌드 깨짐~~ — 해소(2026-08-19). `CognitoJwtVerifier.create()`를 `getCurrentUser()` 안으로 지연 생성하도록 수정. `.env`에 더미 값 우회 넣었던 사람은 지워도 된다
 ~~5. 종족 색 이중 정의~~ — 해소(2026-08-19). `app/globals.css`의 `--color-canine/feline/ursine` 세 줄 삭제. 이제 `styles/tokens.css`·`lib/types.ts`(A)가 유일한 출처
+
+~~4. `feat/community`에 중복 init 마이그레이션~~ — 해소(2026-08-20 확인). D가 `ff6c492`에서 `origin/main`을 머지해 `00000000000000_init/`을 폐기했다. 이제 `origin/feat/community`의 `prisma/migrations/`는 `main`과 동일한 2개(`20260819061857_init`·`20260819080703_add_subtype`)다
 
 남은 것은 아래 5개다.
 
@@ -55,8 +57,9 @@
    - 유저 `밤바다` 1명이 `typeCode=INDEPENDENT_LOW_INCOME`인데 활성 펫이 **여우**다. 재시드하면 여우가 `HEALTH_EMOTION`이 되어 유형↔펫이 어긋난다. 고양이로 재지정이 필요하다(`User.activePetSkinId` + `UserPetSkin`). 진행도는 전부 0이라 손실 없음
 
    고친 시드를 한 번 더 돌리면 펫 6종은 `upsert`가 교정하고 치장 9종은 `renameLegacyCosmetics()`가 이름을 이관한다(실행 후 `CosmeticItem`이 12행인지 확인). **공유 DB 쓰기라 실행 승인 대기 중.**
-4. **`feat/community`에 중복 init 마이그레이션** — D 브랜치에 `prisma/migrations/00000000000000_init/`이 있고 `main`에는 `20260819061857_init/`·`20260819080703_add_subtype/`이 있다. 머지하면 init이 두 개가 되어 `migrate deploy`가 깨진다(`CLAUDE.md` 5절). D가 자기 브랜치의 `prisma/migrations/`를 지우고 main 것을 받아야 한다
-6. **가챠 삭제 결정에 따른 스키마 드리프트** — 가챠는 삭제로 결정했다(2026-08-19). `schema.prisma`에서는 `7b0bcd0`에 제거했고 `feat/pet`에 그 상태로 머지했다. 그런데 **RDS에는 `GachaPull` 테이블(0행)과 `User.heroPity`·`legendPity` 컬럼이 아직 있다.** 다음 `migrate dev`를 실행하는 사람이 의도치 않은 DROP 마이그레이션을 자동 생성하게 된다. `CLAUDE.md` 5절대로 마이그레이션은 스키마 담당 1인(E)만 만든다 — **E가 DROP 마이그레이션 1개를 만들어야 한다.** C는 만들지 않았다
+4. **클라이언트가 `Authorization` 헤더를 싣지 않는다 (E 담당, D가 보고)** — `lib/auth.ts` 서버 검증은 완료됐지만 화면에서 토큰을 실어 보내지 않는다. 이대로 배포하면 전 API가 401이다. 로그인 화면·토큰 보관 방식이 E 담당이고 방식 확정 대기
+6. **가챠 삭제 결정에 따른 스키마 드리프트 — 아직 그대로다 (2026-08-20 실 DB 재확인)** — 가챠는 삭제로 결정했다(2026-08-19). `schema.prisma`에서는 `7b0bcd0`에 제거했고 `feat/pet`에 그 상태로 머지했다. 그런데 **RDS에는 `GachaPull` 테이블(0행)과 `User.heroPity`·`legendPity` 컬럼이 여전히 있다.** `origin`의 어느 브랜치에도 DROP 마이그레이션이 없다(마이그레이션은 전 브랜치 통틀어 2개뿐). 다음 `migrate dev`를 실행하는 사람이 의도치 않은 DROP 마이그레이션을 자동 생성하게 된다. `CLAUDE.md` 5절대로 마이그레이션은 스키마 담당 1인(E)만 만든다 — **E가 DROP 마이그레이션 1개를 만들어야 한다.** C는 만들지 않았다
+   - `migrate status`는 이 드리프트를 잡지 못한다("up to date"로 나온다). 히스토리 테이블만 비교하기 때문이다
 7. **`npm run db:seed`가 지금 그대로는 실패한다** — `tsx`는 `.env`를 자동으로 읽지 않아 `DATABASE_URL not found`로 죽는다. `npx prisma db seed`(Prisma CLI가 `.env`를 읽는다)나 `tsx --env-file=.env`로 돌려야 한다. `package.json`·`prisma/seed.ts`는 E 소유라 C가 고치지 않았다
 8. **치장 획득 경로와 별조각 소모처가 없다 (팀 결정 필요)** — 가챠가 유일한 경로였고 컷됐다(2026-08-19). C가 치장 착용·해제 화면과 수집 진행률을 다 만들었지만 **획득 경로가 없어 화면이 늘 "미획득"으로 보인다.** 발표에 이 화면을 쓸 거라면 경로를 정해야 한다 (예: 씨앗 상점, 단계 미션 보상으로 직접 지급). 별조각도 같은 이유로 소모처가 없다
 
@@ -73,6 +76,22 @@
 **보안 재검토 필요**: RDS를 팀원 로컬 개발 편의를 위해 Publicly Accessible=true로 설정했다(포트 5432를 0.0.0.0/0에 개방, 강력한 마스터 비밀번호로만 방어). 발표 전에 팀 전체가 재검토할 것 — 상세 이유는 `docs/dev/infra.md` "결정한 것과 이유" 참고
 
 GitHub 원격 — https://github.com/uchan04/AWS_project
+
+## origin 브랜치 상태 (2026-08-20 확인)
+
+`main`은 8/19 이후 움직이지 않았다. **기능 4개가 전부 자기 브랜치에만 있다** — 8/22 마감까지 통합이 남은 최대 위험이다.
+
+| 브랜치 | 최신 | `main` 미반영 | 비고 |
+|---|---|---|---|
+| `origin/main` | `12ff359` (8/19) | — | A(진단)·E(인프라)만 들어가 있다 |
+| `origin/feat/pet` | `82b692a` (8/19) | 20커밋 | `origin/main`을 머지한 상태. 마이그레이션 충돌 없음 |
+| `origin/feat/community` | `70a4e0c` (8/20) | 커뮤니티·챗봇 20파일 + `docs/SETUP.md` | `origin/main` 머지 완료, 중복 init 폐기됨(차단 4 해소) |
+| `origin/feat/missions` | `65308c4` (8/19) | 4커밋 | `origin/main` 머지 완료 |
+| `origin/feat/diagnosis` | `4e552a4` (8/19) | 1커밋(docs) | 코드는 PR #1로 이미 머지됨 |
+| `origin/feat/infra` | `a7dece8` (8/17) | 0 | E는 `main`에 직접 push해 왔다. 이 브랜치는 낡았다 |
+| `origin/develop` | `a7dece8` (8/17) | 0 | 쓰이지 않는다 |
+
+**머지 순서 주의**: `feat/pet`·`feat/community` 둘 다 `docs/STATUS.md`를 고쳤고, D의 버전은 8/19 이전 STATUS를 기준으로 해서 C 담당 줄이 "펫 + 가챠 / reward.ts 골격 완료"로 낡아 있다. 나중에 머지하는 쪽이 이 파일에서 충돌을 받는다 — 담당별 줄만 살려 손으로 합친다. 코드 파일은 폴더가 갈려 충돌하지 않는다.
 
 ## 결정 변경 (2026-08-19)
 

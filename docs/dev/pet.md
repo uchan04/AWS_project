@@ -211,6 +211,19 @@ E가 `origin/main`(`12ff359`)의 **옛** `prisma/seed/items.ts`로 `db:seed`를 
 
 `CLAUDE.md` 5절대로 마이그레이션은 스키마 담당 1인(E)만 만든다. **C는 만들지 않았고, `docs/STATUS.md` 차단 6번에 E 할 일로 적었다.** 지울 데이터는 0행이라 손실이 없다.
 
+**2026-08-20 재확인 — 아직 안 됐다.** 실 DB를 읽었고 `GachaPull` 테이블과 `User.heroPity`·`legendPity`가 그대로 있다. `origin`의 어느 브랜치에도 DROP 마이그레이션이 없다(전 브랜치 마이그레이션 2개: `init`·`add_subtype`). E에게 다시 요청해야 한다.
+
+확인 방법 (읽기 전용):
+
+```bash
+npx prisma migrate status                     # 히스토리만 본다 → 드리프트는 "up to date"로 나온다
+# 드리프트는 information_schema를 직접 봐야 한다
+#   select table_name from information_schema.tables where table_schema='public';
+#   select column_name from information_schema.columns where table_schema='public' and table_name='User';
+```
+
+`migrate status`만 보고 "정리됐다"고 판단하면 안 된다. 히스토리 테이블과 `prisma/migrations/`만 비교하기 때문에 스키마↔DB 드리프트는 통과한다.
+
 **2. `SEED_TO_EXP` 변경이 A 소유 파일에 있다**
 
 `lib/types.ts:63`을 `1` → `10`으로 고쳤다. `origin/main`은 아직 `1`이고, A가 그 줄을 건드리지 않아 **auto-merge 된다**(`git merge-tree`로 확인). 충돌은 없지만 A가 모르는 변경이라 통보가 필요하다.
@@ -250,7 +263,7 @@ E가 `origin/main`(`12ff359`)의 **옛** `prisma/seed/items.ts`로 `db:seed`를 
 
 `SPEC.md`는 가챠 서술이 이미 "컷" 기록 3줄만 남아 정리할 것이 없었다(5절 188행, 재화 표 163행, 12절 355행). 세 줄 모두 삭제 사실을 남기는 기록이라 유지한다.
 
-**주의**: D가 `feat/community`에 올린 마이그레이션(`18640a7`)에는 `GachaPull` 테이블과 `heroPity`·`legendPity` 컬럼이 아직 들어 있다. 8/19에 **폐기 확정**했다 — 실행 절차와 D가 로컬에서 할 일은 `docs/STATUS.md` "D 마이그레이션 폐기" 절에 있다.
+~~**주의**: D가 `feat/community`에 올린 마이그레이션(`18640a7`)에는 `GachaPull` 테이블과 `heroPity`·`legendPity` 컬럼이 아직 들어 있다.~~ **해소(2026-08-20 확인).** D가 `ff6c492`에서 `origin/main`을 머지해 그 마이그레이션을 폐기했다. `origin/feat/community`의 `prisma/migrations/`는 이제 `main`과 동일한 2개다.
 
 ## TypeCode ↔ 종족 매핑 + 컬러명 변경 (`6fecded`, 컬러명은 후속 커밋)
 
@@ -283,6 +296,7 @@ A의 `feat/diagnosis`에서 매핑이 맞바뀌었고 8/19 팀 확인으로 의�
   - `capAffinity`/`AFFINITY_DAILY_CAP=100`이 SPEC 5절 수치와 일치
   - 결론: `lib/reward.ts` 자체는 빠진 것 없음
 - 확인 안 된 것(다른 담당 영역): 미션·커뮤니티·챗봇 라우트가 `user.seeds += n` 없이 `calculateReward()`를 통과하는지는 그 라우트들이 미착수라 검증 불가. B·D가 착수하면 재확인
+  - **2026-08-20**: B·D 둘 다 착수해 `feat/missions`·`feat/community`에 라우트가 올라왔다. 아직 `main`에 없어 `feat/pet`에서는 보이지 않는다. 머지된 뒤 `calculateReward()` 우회 여부를 확인한다
 
 ## 다음 할 일
 
