@@ -740,7 +740,14 @@ export default function MissionDashboard() {
   if (!dashboard) return null
 
   // TODO: 사용자 캐릭터를 User.typeCode 기반으로 결정
-  const character: CharacterKey = "cat"
+  // typeCode에서 종족 매핑
+  const typeCode = dashboard.userTypeCode
+  let character: CharacterKey = "cat"
+  if (typeCode) {
+    if (typeCode.includes("HEALTH_EMOTION")) character = "fox"
+    else if (typeCode.includes("INDEPENDENT_LOW_INCOME")) character = "cat"
+    else if (typeCode.includes("FAMILY_LIVING")) character = "bear"
+  }
   const color = CHARACTER_COLOR[character]
   const bg = CHARACTER_BG[character]
   const mascotEmoji = CHARACTER_EMOJI[character]
