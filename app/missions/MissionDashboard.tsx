@@ -845,22 +845,17 @@ export default function MissionDashboard() {
                 disabled={!hasPrev}
                 style={{
                   position: "absolute",
-                  left: -12,
+                  left: -8,
                   top: "50%",
                   transform: "translateY(-50%)",
-                  width: 40,
-                  height: 40,
-                  background: hasPrev ? color : "#F5F0E8",
-                  color: hasPrev ? "white" : "#DDD0BC",
+                  background: "transparent",
+                  color: hasPrev ? color : "#DDD0BC",
                   border: "none",
-                  borderRadius: "50%",
                   cursor: hasPrev ? "pointer" : "not-allowed",
-                  fontSize: 20,
-                  display: "flex",
-                  alignItems: "center",
-                  justifyContent: "center",
+                  fontSize: 32,
                   zIndex: 10,
-                  boxShadow: hasPrev ? "0 4px 12px rgba(0,0,0,0.15)" : "none",
+                  padding: 0,
+                  lineHeight: 1,
                 }}
               >
                 ◀
@@ -876,22 +871,17 @@ export default function MissionDashboard() {
                 disabled={!hasNext}
                 style={{
                   position: "absolute",
-                  right: -12,
+                  right: -8,
                   top: "50%",
                   transform: "translateY(-50%)",
-                  width: 40,
-                  height: 40,
-                  background: hasNext ? color : "#F5F0E8",
-                  color: hasNext ? "white" : "#DDD0BC",
+                  background: "transparent",
+                  color: hasNext ? color : "#DDD0BC",
                   border: "none",
-                  borderRadius: "50%",
                   cursor: hasNext ? "pointer" : "not-allowed",
-                  fontSize: 20,
-                  display: "flex",
-                  alignItems: "center",
-                  justifyContent: "center",
+                  fontSize: 32,
                   zIndex: 10,
-                  boxShadow: hasNext ? "0 4px 12px rgba(0,0,0,0.15)" : "none",
+                  padding: 0,
+                  lineHeight: 1,
                 }}
               >
                 ▶
