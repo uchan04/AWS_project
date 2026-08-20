@@ -139,10 +139,35 @@ function MissionModal({ mission, color, bg, mascotEmoji, onClose, onComplete }: 
     reader.readAsDataURL(file)
   }
 
-  function handleComplete() {
-    // TODO: stage 4에서 POST /api/missions/{missionId}/complete 연결
-    onComplete()
-    onClose()
+  const [completing, setCompleting] = useState(false)
+  const [completeError, setCompleteError] = useState<string | null>(null)
+
+  async function handleComplete() {
+    if (mission.completionMode === "EVENT") return
+    if (mission.requiresPhoto && mission.completionMode === "PHOTO") {
+      // TODO: stage 6·7에서 upload → verify 연결
+      return
+    }
+
+    setCompleting(true)
+    setCompleteError(null)
+
+    try {
+      const res = await fetch(`/api/missions/${mission.id}/complete`, { method: "POST" })
+      const json = await res.json()
+
+      if (!res.ok) {
+        setCompleteError(json.error?.message || "완료 중 오류가 발생했습니다")
+        return
+      }
+
+      onComplete()
+      onClose()
+    } catch {
+      setCompleteError("네트워크 오류가 발생했습니다")
+    } finally {
+      setCompleting(false)
+    }
   }
 
   return (
@@ -359,9 +384,13 @@ function MissionModal({ mission, color, bg, mascotEmoji, onClose, onComplete }: 
                 </>
               )}
 
+              {completeError && (
+                <p style={{ fontSize: 13, color: "#A9542A", marginBottom: 12, textAlign: "center" }}>{completeError}</p>
+              )}
+
               <button
                 onClick={handleComplete}
-                disabled={mission.requiresPhoto && !proofImage}
+                disabled={completing || (mission.requiresPhoto && !proofImage)}
                 style={{
                   width: "100%",
                   background: color,
@@ -371,11 +400,11 @@ function MissionModal({ mission, color, bg, mascotEmoji, onClose, onComplete }: 
                   padding: "14px",
                   fontSize: 15,
                   fontWeight: 700,
-                  cursor: mission.requiresPhoto && !proofImage ? "not-allowed" : "pointer",
-                  opacity: mission.requiresPhoto && !proofImage ? 0.4 : 1,
+                  cursor: completing || (mission.requiresPhoto && !proofImage) ? "not-allowed" : "pointer",
+                  opacity: completing || (mission.requiresPhoto && !proofImage) ? 0.4 : 1,
                 }}
               >
-                완료했어요 ✓
+                {completing ? "완료 중..." : "완료했어요 ✓"}
               </button>
             </>
           )}
