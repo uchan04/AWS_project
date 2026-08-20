@@ -98,9 +98,6 @@ model User {
   activePetSkinId String?
   activePetSkin   PetSkin? @relation("ActiveSkin", fields: [activePetSkinId], references: [id])
 
-  heroPity   Int @default(0)
-  legendPity Int @default(0)
-
   streakCount    Int       @default(0)
   lastStreakDate DateTime?
 
@@ -114,7 +111,6 @@ model User {
   missions     UserMission[]
   petSkins     UserPetSkin[]
   cosmetics    UserCosmetic[]
-  gachaPulls   GachaPull[]
   posts        Post[]
   comments     Comment[]
   likes        PostLike[]
@@ -173,17 +169,17 @@ model UserMission {
 
 model PetSkin {
   id       String   @id @default(cuid())
-  name     String   @unique // 여우 / 고양이 / 곰 / 늑대 / 삵 / 판다. 시드 upsert 키
-  typeCode TypeCode // 기본 펫 매칭용. 캐릭터 구매 제한에는 쓰지 않는다
+  name     String   @unique // 여우 / 북극여우 / 고양이 / 샴고양이 … 어미가 종족명이다. 시드 upsert 키
+  typeCode TypeCode // 종족. 같은 값이면 같은 동물이고, 스킨 구매는 자기 종족으로 제한한다
 
-  isDefault  Boolean @default(false)
-  stageCount Int     @default(1) // 기본 펫은 3, 친밀도 캐릭터는 1
+  isDefault  Boolean @default(false) // 진단으로 지급되는 기본 외형
+  stageCount Int     @default(3) // 외형만 바뀌므로 변종도 기본 외형과 같은 3단이다
 
-  effectType EffectType @default(NONE)
+  effectType EffectType @default(NONE) // 외형 스킨은 전부 NONE
   effectPct  Int        @default(0) // 15 = +15%
 
-  priceAffinity Int? // 친밀도 구매가. 기본 펫은 null
-  imageKeyBase  String // S3 prefix. stageCount가 3이면 뒤에 -1 -2 -3을 붙인다
+  priceShards  Int? // 별조각 구매가. 스킨은 별조각 전용이다. 기본 외형은 null
+  imageKeyBase String // S3 prefix. stageCount가 3이면 뒤에 -1 -2 -3을 붙인다
 
   owners      UserPetSkin[]
   activeUsers User[]        @relation("ActiveSkin")
@@ -205,18 +201,15 @@ model CosmeticItem {
   id     String @id @default(cuid())
   name   String @unique // 시드 upsert 키
   slot   Slot
-  rarity Rarity
+  rarity Rarity // 추첨 확률이 아니라 가격 기준이다. COMMON 50 / RARE 100 / EPIC 200 / LEGENDARY 400
 
-  tribeColor TypeCode // 컬러 계열. 3컬러를 TypeCode로 표현한다
-
-  // true면 친밀도 전용 상점 아이템이며 가챠 추첨 풀에서 제외한다.
+  // 치장 아이템은 종족 구분이 없다. 전부 친밀도 전용이라 이 값은 항상 true다.
   affinityOnly  Boolean @default(false)
   priceAffinity Int?
 
   imageKey String
 
   owners UserCosmetic[]
-  pulls  GachaPull[]
 }
 
 model UserCosmetic {
@@ -230,24 +223,6 @@ model UserCosmetic {
   item CosmeticItem @relation(fields: [itemId], references: [id])
 
   @@unique([userId, itemId])
-}
-
-model GachaPull {
-  id       String   @id @default(cuid())
-  userId   String
-  itemId   String
-  rarity   Rarity
-  wasPity  Boolean  @default(false)
-  pulledAt DateTime @default(now())
-
-  // 이미 보유한 아이템이 나온 경우. UserCosmetic은 만들지 않고 별조각을 환급한다.
-  wasDuplicate Boolean @default(false)
-  refundShards Int     @default(0)
-
-  user User         @relation(fields: [userId], references: [id])
-  item CosmeticItem @relation(fields: [itemId], references: [id])
-
-  @@index([userId, pulledAt])
 }
 
 model AttendanceClaim {

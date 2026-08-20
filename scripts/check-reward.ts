@@ -14,7 +14,7 @@ function skin(effectType: PetSkin["effectType"], effectPct: number): PetSkin {
     stageCount: 1,
     effectType,
     effectPct,
-    priceAffinity: null,
+    priceShards: null,
     imageKeyBase: "pets/test",
   }
 }
