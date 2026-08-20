@@ -1,10 +1,12 @@
 import type { PetSkin, User } from "@prisma/client"
-import { headers } from "next/headers"
+import { cookies } from "next/headers"
 import { CognitoJwtVerifier } from "aws-jwt-verify"
 import { prisma } from "@/lib/prisma"
 
 // 소유자: E. 모든 API Route Handler의 첫 줄에서 호출한다.
-// 클라이언트는 Cognito 액세스 토큰을 `Authorization: Bearer <token>` 헤더로 보낸다.
+// 로그인(app/api/auth/*)이 Cognito 액세스 토큰을 `access_token` httpOnly 쿠키에 담아 두고,
+// 여기서는 그 쿠키만 읽는다. Authorization 헤더는 문서 내비게이션(링크 클릭, 주소창 이동)에
+// 붙지 않아 서버 컴포넌트 페이지를 인증할 수 없어서 쓰지 않는다.
 
 export class UnauthorizedError extends Error {
   constructor() {
@@ -40,8 +42,7 @@ export async function getCurrentUser(): Promise<User> {
     })
   }
 
-  const authHeader = (await headers()).get("authorization")
-  const token = authHeader?.startsWith("Bearer ") ? authHeader.slice(7) : null
+  const token = (await cookies()).get("access_token")?.value ?? null
   if (!token) throw new UnauthorizedError()
 
   try {
@@ -67,4 +68,19 @@ export async function getCurrentUserWithSkin(): Promise<User & { activePetSkin: 
     include: { activePetSkin: true },
   })
   return full
+}
+
+/** app/api/auth/* 가 로그인 성공 후 이 쿠키를 심는다. 이메일·Google 로그인 모두 동일하게 쓴다. */
+export async function setSessionCookie(accessToken: string, expiresInSeconds: number) {
+  ;(await cookies()).set("access_token", accessToken, {
+    httpOnly: true,
+    secure: process.env.NODE_ENV === "production",
+    sameSite: "lax",
+    path: "/",
+    maxAge: expiresInSeconds,
+  })
+}
+
+export async function clearSessionCookie() {
+  ;(await cookies()).delete("access_token")
 }
