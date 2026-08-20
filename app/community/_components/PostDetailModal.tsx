@@ -86,10 +86,14 @@ export function PostDetailModal({
   async function handleLike() {
     if (!post || likePending) return
     setLikePending(true)
+    setActionError(null)
     try {
       const res = await fetch(`/api/community/posts/${postId}/like`, { method: "POST" })
       const json = await res.json()
-      if (json.error) return
+      if (json.error) {
+        setActionError(json.error.message)
+        return
+      }
       setPost((prev) => (prev ? { ...prev, likedByMe: json.data.liked, likeCount: json.data.likeCount } : prev))
     } finally {
       setLikePending(false)
