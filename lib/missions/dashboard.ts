@@ -158,10 +158,11 @@ export async function buildDashboard(user: User): Promise<DashboardDTO> {
   const weeklyTotal = Math.min(daysPassed * 5, 35)
 
   // 출석
+  const todayDate = getToday()
   const claimedToday = await prisma.attendanceClaim.count({
     where: {
       userId: user.id,
-      claimDate: new Date(today),
+      claimDate: todayDate,
     },
   })
 
