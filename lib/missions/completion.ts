@@ -76,7 +76,6 @@ export async function completeMission(params: {
         where: { id: actor.id },
         data: {
           seeds: { increment: effectiveReward.seeds || 0 },
-          exp: { increment: effectiveReward.seeds || 0 },
           starShards: { increment: effectiveReward.starShards || 0 },
           affinity: { increment: affinityToGive },
           affinityToday: { increment: affinityToGive },
