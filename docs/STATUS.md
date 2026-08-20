@@ -2,8 +2,8 @@
 
 **모든 세션은 이 문서부터 읽는다.** 그다음 아래 "지금 읽어야 할 문서"만 읽고 시작한다.
 
-최종 갱신: 2026-08-20
-현재 단계: **D2 — 인프라 완료, 기능 5개 병렬 착수 (8/19 중간 체크포인트)**
+최종 갱신: 2026-08-20 (`develop` ↔ `feat/diagnosis` 머지. C·D·E는 이미 머지 완료)
+현재 단계: **D2 — 인프라 완료, 기능 5개 병렬 착수 (8/20 기능 동결 예정일)**
 
 팀원 인수인계용 단일 문서는 [`docs/인수인계.md`](인수인계.md)에 있다. 새로 합류하거나 노션으로 공유할 때는 그 문서를 쓴다.
 
@@ -32,9 +32,9 @@
 | 담당 | 범위 | 상태 | 비고 |
 |---|---|---|---|
 | A | 진단 + 미션 콘텐츠 + 홈 | 미션 41개, 13문항 + 판정 함수, 조기 종료, 화면 3장 + Figma 값·구성 반영, 진단 API 3종(완료·조회·닉네임) + 화면 연결, **실 DB로 진단→결과→홈 전체 흐름 확인 완료** | A 담당 기능은 4단계(Bedrock)·관리자 교차표만 남았다. 홈의 펫·미션 실데이터는 B·C API 대기 |
-| B | 미션 시스템 + 사진 업로드 | 미착수 | `DATABASE_URL`·S3 버킷 확보됨, 착수 가능 |
-| C | 펫 + 스킨 | `feat/pet`에 펫·치장·캐릭터 구현 있음. 스킨·치장 구조 변경은 스키마·DB·시드까지 반영됨(2026-08-20, A) | 남은 것은 `app/api/pet/*` 3개 + `SkinList.tsx` + `check-pet.ts` 5곳과 `SPEC.md`·`docs/dev/pet.md` 갱신. **`main`을 받으면 스키마·시드·마이그레이션에서 충돌한다 — 전부 `main` 쪽 채택.** 목록은 `docs/dev/diagnosis.md` 15절 |
-| D | 커뮤니티 + 챗봇 | 구현 중 (`feat/community`에 커뮤니티·챗봇 대량 커밋) | 브랜치에 중복 init 마이그레이션 있음 (차단 4) |
+| B | 미션 시스템 + 사진 업로드 | **착수했다** (2026-08-20 확인). `feat/missions`에 1단계 미션 대시보드 UI, 사진 모달 Figma 정렬, 사진 미션 검증 스펙 문서 | `main`에 아직 없다. `completeMission()`을 D가 기다리는 중 |
+| C | 펫 + 스킨 | **`SPEC.md` 5절 기능 완료.** 성장·씨앗 투입·진화 연출, 방치형 자동 획득, 치장 착용·해제, 스킨 구매·전환 + 화면 3장. 스킨·치장 구조 변경(종족 전용 외형 / 치장 종족 무관 / 가챠 삭제)은 스키마·실 DB·시드·API·화면까지 반영 완료(2026-08-20, A) | 남은 것은 **치장 구매 라우트**(차단 9)와 `SPEC.md` 2·5·6·11절·`docs/dev/pet.md`·`docs/인수인계.md` 갱신, `scripts/check-pet.ts` 어미 단정 추가. 목록은 `docs/dev/diagnosis.md` 15절 |
+| D | 커뮤니티 + 챗봇 | 기능 구현 끝. 챗봇 Bedrock 스트리밍 연결 완료(2026-08-19). 미션 완료 연동 호출부(`completeMission`)는 주석으로 준비만 해둠 | `completeMission()`(B) 대기 상태. 막힌 항목 5개와 주의사항은 `docs/dev/community.md` 상단 "재개 지점" 참고 |
 | E | 인프라 + 인증 | RDS·Cognito·S3+CloudFront·CloudWatch+SNS·Bedrock·auth 실검증·하단 탭 내비 완료, PR #1 머지 + 2차 마이그레이션 + auth 빌드 수정 + 색 토큰 정리 완료 | Amplify GitHub 연동만 남음(브라우저 수동 단계) |
 
 ## 전체 차단 사항
@@ -43,19 +43,30 @@
 
 인프라 차단은 해소됐다(RDS·Cognito·S3·Bedrock 완료). `.env`의 `DATABASE_URL`·`COGNITO_*`·`S3_BUCKET`·`CLOUDFRONT_DOMAIN`·`BEDROCK_MODEL_ID`는 E에게 개별 공유받는다.
 
-~~2. `SubTypeCode` 2차 마이그레이션~~ — 해소(2026-08-19). `migrate dev --name add_subtype` 실행 완료. **나머지 4인은 `git pull && npx prisma migrate deploy && npx prisma generate`**
+~~2. `SubTypeCode` 2차 마이그레이션~~ — 해소(2026-08-19), **2026-08-20 실 DB로 재확인**. E가 `7d86546`으로 `prisma/migrations/20260819080703_add_subtype/`을 `main`에 올렸고, RDS `_prisma_migrations`에 `20260819061857_init`(08-19 06:19)·`20260819080703_add_subtype`(08-19 08:07) 두 행이 `finished_at`까지 찍혀 있다. `npx prisma migrate status` = "Database schema is up to date", `User.subTypeCode`·`DiagnosisSession.subTypeCode`·`indicators` 컬럼 실재 확인. **나머지 4인은 `git pull && npx prisma migrate deploy && npx prisma generate`**
 ~~3. `lib/auth.ts` 빈 Pool ID로 빌드 깨짐~~ — 해소(2026-08-19). `CognitoJwtVerifier.create()`를 `getCurrentUser()` 안으로 지연 생성하도록 수정. `.env`에 더미 값 우회 넣었던 사람은 지워도 된다
 ~~5. 종족 색 이중 정의~~ — 해소(2026-08-19). `app/globals.css`의 `--color-canine/feline/ursine` 세 줄 삭제. 이제 `styles/tokens.css`·`lib/types.ts`(A)가 유일한 출처
 
-~~1. `prisma/seed/items.ts` 동물 매핑이 옛 값~~ — 해소(2026-08-20). 스킨·치장 구조 변경과 함께 시드를 확정 값으로 맞췄다. 실 DB에는 이미 확정 매핑이 들어가 있었고 `main`의 시드만 옛 값이었다. 상세는 `docs/dev/diagnosis.md` 15절
+~~4. `feat/community`에 중복 init 마이그레이션~~ — 해소(2026-08-20 확인). D가 `ff6c492`에서 `origin/main`을 머지해 `00000000000000_init/`을 폐기했다. 이제 `origin/feat/community`의 `prisma/migrations/`는 `main`과 동일한 2개(`20260819061857_init`·`20260819080703_add_subtype`)다
 
-남은 것은 아래 1개다.
+~~1. 공유 DB에 옛 동물 매핑이 이미 들어가 있다~~ — 해소(2026-08-20, A). 실 DB를 다시 읽어 보니 확정 매핑과 새 이름(노을·새벽·이끼)이 이미 들어가 있었고 `main`의 시드 *파일*만 옛 값이었다. 스킨·치장 구조 변경과 함께 시드를 확정 값으로 맞췄고, 유저 `밤바다`는 `typeCode=INDEPENDENT_LOW_INCOME` / 활성 펫 **고양이**로 이미 일치해 손댈 것이 없었다. 상세는 `docs/dev/diagnosis.md` 15절
 
-4. **`feat/community`에 중복 init 마이그레이션** — D 브랜치에 `prisma/migrations/00000000000000_init/`이 있고 `main`에는 `20260819061857_init/`·`20260819080703_add_subtype/`이 있다. 머지하면 init이 두 개가 되어 `migrate deploy`가 깨진다(`CLAUDE.md` 5절). D가 자기 브랜치의 `prisma/migrations/`를 지우고 main 것을 받아야 한다. **8/20 5인 머지 전에 처리해야 한다**
+~~6. 가챠 삭제 결정에 따른 스키마 드리프트~~ — 해소(2026-08-20, A). `20260820120000_skin_tribe_and_drop_gacha` 마이그레이션이 `GachaPull` 테이블과 `User.heroPity`·`legendPity`를 실 DB에서 DROP했다. `prisma migrate diff --exit-code`로 드리프트 없음 확인
 
-**8/20 5인 머지 예정.** 각자 머지 전에 `git merge main`을 먼저 자기 브랜치에서 하고 `npm run build`가 통과하는지 확인한다(`CLAUDE.md` 4절). A의 `feat/diagnosis`는 `main`(`12ff359`)을 받아 빌드·실 DB 흐름까지 확인해 둔 상태다. 머지 순서에서 D를 마지막에 두거나, 차단 4를 먼저 해소한 뒤 넣는다.
+~~7. `npm run db:seed`가 실패한다~~ — 재현되지 않는다(2026-08-20 확인). `npm run db:seed`가 `.env`를 읽고 그대로 통과한다(`스킨 6종, 치장 12종 반영 / 미션 41개 반영 / seed 완료`). `tsx` 4.x가 `.env`를 자동으로 읽는다. `package.json`은 그대로 둔다
+
+~~8. 치장 획득 경로와 별조각 소모처가 없다~~ — **경로는 정해졌다**(2026-08-20 팀 결정). 치장은 친밀도 전용 상점에서 등급 가격으로 산다(COMMON 50 / RARE 100 / EPIC 200 / LEGENDARY 400). 별조각은 종족 변종 스킨 상점(변종 50)이 소모처다. 결정 변경 13번 참고. **구현은 스킨 쪽만 끝났다** — 아래 9번
+
+남은 것은 아래 2개다.
+
+4. **클라이언트가 `Authorization` 헤더를 싣지 않는다 (E 담당, D가 보고)** — `lib/auth.ts` 서버 검증은 완료됐지만 화면에서 토큰을 실어 보내지 않는다. 이대로 배포하면 전 API가 401이다. 로그인 화면·토큰 보관 방식이 E 담당이고 방식 확정 대기
+9. **치장 구매 라우트가 없다 (C 담당)** — 가격은 시드·DB에 다 들어갔고 `GET /api/pet/cosmetics`가 `priceAffinity`를 내려주지만 `POST /api/pet/cosmetics/buy`가 없다. 그래서 치장 화면은 여전히 전부 "미획득"으로 보인다. 스킨 쪽(`POST /api/pet/skins/buy`)은 별조각 결제로 고쳐 두었으니 그 파일을 그대로 베끼면 된다 — 친밀도 차감, 종족 검사 없음, `affinityOnly && priceAffinity !== null`만 확인
+
+**8/20 5인 머지 진행 중.** C·D·E는 `develop`에 머지 완료. A의 `feat/diagnosis`는 `develop`(`d8edf2b`)을 받아 충돌 3건(`prisma/schema.prisma`·`prisma/seed/items.ts`·`docs/STATUS.md`)을 해결하고 빌드를 확인했다. 남은 것은 B(`feat/missions`)다.
 
 **BottomNav 수정**: "진단결과" 탭이 `/diagnosis`(문항 화면)를 가리키던 버그를 `/diagnosis/result`(결과 화면)로 고쳤다(2026-08-19, E)
+
+**`npm run lint` 에러 — A 것은 고쳤고 D 것이 1건 남았다 (2026-08-20)**: `app/page.tsx:37`의 `setGreeting(...)`은 `fetchMe().then()` 안으로 옮겨 해소했다(A). 남은 에러는 `app/community/_components/PostDetailModal.tsx:54`의 `setLoading(true)`로 같은 `react-hooks/set-state-in-effect`다 — D 소유 파일이라 A는 고치지 않았다(`CLAUDE.md` 2절). 빌드는 통과하므로 Amplify 배포는 막히지 않는다. 경고 2건(`_request` 미사용, D)도 남아 있다
 
 **미확정 — 팀 전체 결정 필요**:
 - "결정 변경" 4번(Cognito Google 로그인만)이 `SPEC.md` 10절·`CLAUDE.md` 8절과 충돌한다. 사용자 확인 대기 중이며, 지금 Cognito는 이메일+비밀번호로 이미 구축돼 있다. 방향이 바뀌면 E가 재작업해야 한다
@@ -65,7 +76,25 @@
 
 **보안 재검토 필요**: RDS를 팀원 로컬 개발 편의를 위해 Publicly Accessible=true로 설정했다(포트 5432를 0.0.0.0/0에 개방, 강력한 마스터 비밀번호로만 방어). 발표 전에 팀 전체가 재검토할 것 — 상세 이유는 `docs/dev/infra.md` "결정한 것과 이유" 참고
 
+**클라이언트 Authorization 헤더 — 로그인 화면·토큰 보관은 E 담당, 방식 확정 대기**: `lib/auth.ts` 서버 검증은 완료됐으나 클라이언트가 토큰을 싣지 않는다. 이대로 배포하면 전 API가 401이다.
+
 GitHub 원격 — https://github.com/uchan04/AWS_project
+
+## origin 브랜치 상태 (2026-08-20 재확인)
+
+통합 지점을 `main`이 아니라 **`develop`**으로 잡았다. `main`은 `12ff359`에서 멈춰 있고 통합은 `develop`에서 한다.
+
+| 브랜치 | 최신 | `develop` 미반영 | 비고 |
+|---|---|---|---|
+| `origin/develop` | `d8edf2b` (8/20) | — | 통합 지점. C·D·E 머지 완료 |
+| `origin/main` | `12ff359` (8/19) | 0 | A(진단)·E(인프라)만. `develop` 안정화 후 한 번에 올린다 |
+| `origin/feat/pet` | `82b692a` (8/19) | 0 | `develop`에 머지됨 |
+| `origin/feat/community` | `460679b` (8/20) | 0 | `develop`에 머지됨. 중복 init 폐기됨(차단 4 해소) |
+| `origin/feat/diagnosis` | `203462e` (8/20) | 6커밋 | 이 브랜치에서 `develop`을 머지해 충돌 3건 해결 중 |
+| `origin/feat/missions` | `f1cc8d5` (8/20) | 5커밋 | **아직 `develop`에 없다.** 남은 마지막 머지 |
+| `origin/feat/infra` | `a7dece8` (8/17) | 0 | E는 `main`·`develop`에 직접 push해 왔다. 이 브랜치는 낡았다 |
+
+**머지 순서 주의**: `docs/STATUS.md`는 5인이 전부 고치므로 머지할 때마다 충돌한다. 담당별 줄과 차단 항목만 살려 손으로 합친다. 코드 파일은 폴더가 갈려 충돌하지 않지만, **`prisma/schema.prisma`와 `prisma/seed/items.ts`는 8/20 스킨·치장 구조 변경 때문에 충돌한다 — 전부 `develop` 쪽(구조 변경 반영분)을 채택한다.**
 
 ## 결정 변경 (2026-08-19)
 

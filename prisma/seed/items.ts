@@ -4,6 +4,19 @@ import type { Prisma, PrismaClient, Rarity } from "@prisma/client"
 // 이미지는 아직 없다. imageKey는 아래 규칙으로 미리 고정했으니 같은 이름으로 S3에 올린다.
 //   펫:   pets/{base}-{1|2|3}.png
 //   치장: cosmetics/{key}.png
+//
+// TypeCode ↔ 종족 매핑 (2026-08-19 팀 확인, A의 feat/diagnosis 기준):
+//   HEALTH_EMOTION         = 개과   / 여우   / 노을 주황 #E8956A
+//   INDEPENDENT_LOW_INCOME = 고양잇과 / 고양이 / 새벽 파랑 #6A95C8
+//   FAMILY_LIVING          = 곰과   / 곰     / 이끼 초록 #7AAE82
+// 출처는 A의 lib/types.ts TRIBE와 styles/tokens.css [data-tribe]다(둘이 일치함).
+// 이 파일은 위 새 매핑을 따른다. 아래 값을 고칠 때 동물·컬러가 아니라
+// TypeCode만 보고 고치면 조용히 틀린다. 반드시 동물·컬러 기준으로 맞춘다.
+// 주의: SPEC.md 2절 표는 아직 옛 매핑이다. 머지 후 이 표로 맞춰야 한다(A 담당).
+//
+// 경고: 아래 upsert는 name을 유니크 키로 쓴다. 시드를 이미 돌린 DB에서 name을 바꾸면
+// 옛 이름 행이 갱신되지 않고 새 행이 추가된다. 이름 변경은 반드시 첫 db:seed 전에 끝낸다.
+// (2026-08-19 앰버·라벤더·세이지 → 노을·새벽·이끼 이관은 실 DB에 적용 완료. 이관 코드는 지웠다)
 
 // 스킨은 진단으로 정해진 종족 안에서만 고른다. 어미가 종족명이면 같은 종족이고,
 // 그룹핑은 typeCode가 담당한다(어미 문자열은 scripts/check-pet.ts에서 단정만 한다).
@@ -71,6 +84,7 @@ const COSMETICS: CosmeticSeed[] = [
 ]
 
 export async function seedItems(prisma: PrismaClient) {
+  // 스킨 6종은 이름이 그대로라 upsert가 typeCode를 알아서 고친다.
   for (const skin of PET_SKINS) {
     await prisma.petSkin.upsert({ where: { name: skin.name }, update: skin, create: skin })
   }
