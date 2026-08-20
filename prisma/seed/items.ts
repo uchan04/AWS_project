@@ -54,11 +54,15 @@ export const PET_SKINS: Prisma.PetSkinCreateInput[] = [
   // 고양잇과 — 독립거주-저소득형
   { name: "고양이", typeCode: "INDEPENDENT_LOW_INCOME", isDefault: true, stageCount: 3, imageKeyBase: "pets/cat" },
   {
-    name: "샴고양이",
+    // 2026-08-20: 샴고양이 → 북극고양이로 개명. 북극여우·북극곰과 어휘를 맞췄다.
+    // 실 DB는 시드 재실행이 아니라 UPDATE로 제자리 변경했다(위 17~19줄 경고 참고) —
+    // 시드를 다시 돌려도 옛 행이 남지 않는다. imageKeyBase도 같이 바꿨다.
+    // 이미지가 아직 없어서 지금은 공짜지만, 올린 뒤에 바꾸면 S3 키가 어긋난다.
+    name: "북극고양이",
     typeCode: "INDEPENDENT_LOW_INCOME",
     stageCount: 3,
     priceShards: VARIANT_PRICE_SHARDS,
-    imageKeyBase: "pets/cat-siamese",
+    imageKeyBase: "pets/cat-arctic",
   },
 
   // 곰과 — 가족동거형
