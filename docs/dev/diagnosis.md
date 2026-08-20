@@ -866,13 +866,18 @@ DELETE FROM "CosmeticItem" WHERE "name" IN (
 |---|---|
 | ~~`prisma/seed/items.ts`~~ | **완료(A, 2026-08-20).** `tribeColor` 삭제, 늑대·삵·판다를 북극여우·샴고양이·북극곰으로 교체(`stageCount: 3`, `priceShards: 50`, `effectType: NONE`), 치장 12종에 `affinityOnly: true` + 등급에서 파생시킨 `priceAffinity`. 가격은 `PRICE_BY_RARITY` 한 곳에서 나온다 |
 | ~~`scripts/check-reward.ts`~~ | **완료(A, 2026-08-20).** 더미 `PetSkin`의 `priceAffinity: null`을 `priceShards: null`로 |
-| `app/api/pet/cosmetics/route.ts` | 응답에서 `tribeColor: item.tribeColor,` 한 줄 삭제(35행) |
-| `app/api/pet/skins/route.ts` | `findMany`에 `where: { typeCode: user.typeCode }`를 넣어 자기 종족만 노출한다. `user.typeCode`가 `null`(진단 전)이면 빈 목록을 돌려준다 |
-| `app/api/pet/skins/buy/route.ts` | `skin.typeCode !== user.typeCode`면 400으로 거른다. 가격을 `skin.priceAffinity`에서 `skin.priceShards`로, 차감 대상을 `affinity`에서 `starShards`로 바꾼다(`NOT_FOR_SALE` 판정도 `priceShards === null` 기준으로). 연타 방어용 조건부 `updateMany` 패턴은 그대로 유지한다 |
-| `app/pet/_components/SkinList.tsx` | 묶음을 "기본 외형 / 상점 외형"으로 바꾸고, 고유 효과 표기를 지운다. 그룹 헤더의 동물명은 `lib/types.ts`의 `TRIBE[typeCode]`에서 가져온다 |
-| `scripts/check-pet.ts` | 어미 = 종족명 단정 추가 |
+| ~~`app/api/pet/cosmetics/route.ts`~~ | **완료(A, 2026-08-20 머지 시).** 응답에서 `tribeColor` 삭제 |
+| ~~`app/api/pet/skins/route.ts`~~ | **완료(A).** `findMany`에 `where: { typeCode: user.typeCode }`, `user.typeCode`가 `null`(진단 전)이면 빈 목록. 응답의 `affinity`·`priceAffinity`를 `starShards`·`priceShards`로 |
+| ~~`app/api/pet/skins/buy/route.ts`~~ | **완료(A).** `skin.typeCode !== user.typeCode`면 `WRONG_TRIBE`로 400. 가격은 `priceShards`, 차감은 `starShards`(`NOT_ENOUGH_SHARDS`). 연타 방어용 조건부 `updateMany` 패턴은 그대로 유지 |
+| ~~`app/pet/skins/page.tsx`~~ | **완료(A).** 서버 쪽 목록도 같은 종족 필터. `starShards`를 넘긴다 |
+| ~~`app/pet/_components/SkinList.tsx`~~ | **완료(A).** 묶음을 "기본 외형 / 상점"으로, 고유 효과 표기 삭제, 가격 표기를 "별조각 N"으로 |
+| ~~`lib/pet.ts`~~ | **완료(A).** `animalEmoji()`가 완전일치로만 찾아 변종 3종이 전부 🐾로 떴다. `endsWith`로 어미를 찾아 기본 동물 이모지를 쓰고, 없어진 캐릭터의 `AFFINITY_EMOJI`를 지웠다 |
+| `scripts/check-pet.ts` | 어미 = 종족명 단정 추가 — **남음(C)** |
+| `app/api/pet/cosmetics/buy/route.ts` | 치장 구매 라우트가 없다 — **남음(C)**. 아래 "남는 문제" |
 
-`lib/reward.ts`·`lib/pet.ts`·`UserPetSkin`·`app/api/pet/skins/activate/route.ts`는 손대지 않아도 된다.
+`lib/reward.ts`·`UserPetSkin`·`app/api/pet/skins/activate/route.ts`는 손대지 않았다.
+
+**파일 소유 규칙을 넘었다.** 위 6개 파일은 전부 C 소유다(`CLAUDE.md` 2절). `develop`을 머지하니 이 파일들이 삭제된 컬럼을 참조해 `npm run build`가 깨졌고, 빌드 깨진 커밋을 `develop`에 올리면 5인 전원의 Amplify 배포가 막힌다(`CLAUDE.md` 3절). 사용자 승인을 받고 A가 최소 수정만 했다. 소유는 그대로 C다.
 
 ### 갱신할 문서
 
@@ -899,20 +904,20 @@ DELETE FROM "CosmeticItem" WHERE "name" IN (
 2. ~~마이그레이션 생성·적용~~ — 완료. `20260820120000_skin_tribe_and_drop_gacha`. 나머지 4인은 `git pull && npx prisma migrate deploy && npx prisma generate`
 3. ~~늑대·삵·판다 `DELETE` → `npm run db:seed`~~ — 완료. 스킨 6종 / 치장 12종(합 1,850 친밀도) 확인
 4. ~~`prisma/seed/items.ts`·`scripts/check-reward.ts`~~ — 완료. `npm run build`, `npm run check:reward` 통과
-5. **남음** — C가 `app/api/pet/cosmetics|skins|skins/buy/route.ts`, `app/pet/_components/SkinList.tsx`, `scripts/check-pet.ts` 5곳을 고친다. 그 파일들은 `feat/pet`에만 있다
-6. **남음** — `SPEC.md`·`docs/dev/pet.md`·`docs/인수인계.md`·`업무분담.md` 갱신(아래 표)
+5. ~~`app/api/pet/*` 3개 + `app/pet/skins/page.tsx` + `SkinList.tsx` + `lib/pet.ts`~~ — 완료. `develop` 머지 때 A가 고쳤다. `npm run build`·`check:reward`·`check:diagnosis`·`check:pet` 통과, `/pet/skins` 화면과 `GET /api/pet/skins`·`/api/pet/cosmetics` 실 응답까지 확인
+6. **남음** — `scripts/check-pet.ts` 어미 단정, 치장 구매 라우트, `SPEC.md`·`docs/dev/pet.md`·`docs/인수인계.md`·`업무분담.md` 갱신(위 표)
 
-### `feat/pet` 머지 시 충돌 예고
+### `develop` 머지 실제 결과 (2026-08-20)
 
-C의 브랜치는 아직 가챠·늑대·삵·판다·`tribeColor`를 들고 있다. `main`을 받으면 아래에서 충돌한다. **전부 `main` 쪽을 채택하면 된다.**
+`main`이 아니라 `develop`을 통합 지점으로 잡았고, C·D·E가 먼저 머지한 뒤 A가 `git merge origin/develop`(`d8edf2b`)을 했다. 예고했던 대로 3개 파일이 충돌했다. `prisma/migrations/`는 A만 갖고 있어 충돌 없이 그대로 들어갔다.
 
-| 파일 | 충돌 내용 |
+| 파일 | 해결 |
 |---|---|
-| `prisma/schema.prisma` | C는 가챠만 지웠고 `main`은 가챠 + `tribeColor` + `priceAffinity`까지 지우고 `priceShards`를 넣었다 |
-| `prisma/seed/items.ts` | C는 늑대·삵·판다 + `tribeColor`를 유지, `main`은 변종 스킨 + 등급별 가격 |
-| `prisma/migrations/` | C에게는 이 마이그레이션이 없다. `main` 것을 받는다 |
+| `prisma/schema.prisma` | HEAD(`tribeColor` 삭제) 채택. develop 쪽을 택하면 실 DB에 없는 컬럼을 Prisma가 select해 `CosmeticItem` 전 쿼리가 P2022로 죽는다 |
+| `prisma/seed/items.ts` | HEAD 구조 채택. develop의 `TypeCode ↔ 종족` 매핑 주석과 "upsert 키는 name" 경고는 남겼다. `renameLegacyCosmetics()`와 `RENAMED_COSMETICS`는 실 DB 이관이 끝나 no-op이므로 지웠다 |
+| `docs/STATUS.md` | 손으로 합쳤다. develop의 담당별 최신 상태·origin 브랜치 표를 살리고, 구조 변경으로 해소된 차단 1·6·8과 재현되지 않는 7을 해소 표시로 바꿨다 |
 
-`app/api/pet/*`·`app/pet/*`은 `main`에 없으므로 충돌하지 않고, C가 5절대로 고치면 된다.
+`npm run db:seed`는 develop STATUS의 차단 7과 달리 그냥 통과한다(`tsx` 4.x가 `.env`를 읽는다). `npm run lint`는 `app/page.tsx`의 `setGreeting`을 `fetchMe().then()` 안으로 옮겨 A 쪽 에러를 없앴다. 남은 에러 1건은 D의 `PostDetailModal.tsx:54`다.
 
 ### 뒤집히는 기존 결정
 
@@ -927,6 +932,8 @@ C의 브랜치는 아직 가챠·늑대·삵·판다·`tribeColor`를 들고 있
 
 ### 남는 문제
 
+**치장 구매 라우트가 없다 (C).** 가격은 시드·실 DB에 다 들어갔고 `GET /api/pet/cosmetics`가 `affinityOnly`·`priceAffinity`를 내려주지만 `POST /api/pet/cosmetics/buy`가 없다. 그래서 치장 화면은 여전히 전부 "미획득"으로 보인다. `app/api/pet/skins/buy/route.ts`를 그대로 베끼면 된다 — 친밀도를 차감하고, 종족 검사는 없고(치장은 종족 무관), `affinityOnly && priceAffinity !== null`만 확인한다. `calculateReward()`는 통과하지 않는다(획득이 아니라 소모다).
+
 **재진단하면 옛 종족 스킨이 유령이 된다.** `app/api/diagnosis/complete/route.ts`가 새 `typeCode`의 기본 외형으로 `activePetSkinId`를 다시 심으므로 화면은 깨지지 않는다. 다만 `UserPetSkin`에 남은 옛 종족 스킨은 상점·목록 어디에도 안 보인 채로 소유 기록만 남는다. 별조각 환불이든 유지든 정책이 필요하다. 지금 `UserPetSkin`이 1건뿐이라 정하기에 가장 싼 시점이다.
 
-**이 작업은 `feat/pet` 머지가 먼저다.** 위 파일 전부 C 브랜치에만 있고 `main`에는 없다.
+~~**이 작업은 `feat/pet` 머지가 먼저다.**~~ — `feat/pet`은 `develop`에 들어갔고 A도 `develop`을 받았다. 위 파일들은 이제 `feat/diagnosis`에 다 있다.
