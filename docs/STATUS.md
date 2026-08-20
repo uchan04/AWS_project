@@ -2,7 +2,7 @@
 
 **모든 세션은 이 문서부터 읽는다.** 그다음 아래 "지금 읽어야 할 문서"만 읽고 시작한다.
 
-최종 갱신: 2026-08-20 (C·D 머지 완료. 차단 9·12 해소 + 별조각 60 해소 확인. 남은 것은 B의 3커밋)
+최종 갱신: 2026-08-20 (A·B·C·D·E 5인 전원 `develop` 머지 완료. 차단 9·12·16·18 해소. 남은 것은 13·14·17 + 새로 찾은 19·20)
 현재 단계: **D2 — 인프라 완료, 기능 5개 병렬 착수 (8/20 기능 동결 예정일)**
 
 팀원 인수인계용 단일 문서는 [`docs/인수인계.md`](인수인계.md)에 있다. 새로 합류하거나 노션으로 공유할 때는 그 문서를 쓴다.
@@ -31,8 +31,8 @@
 
 | 담당 | 범위 | 상태 | 비고 |
 |---|---|---|---|
-| A | 진단 + 미션 콘텐츠 + 홈 | **`develop`에 머지 완료**(`a098c61`, 2026-08-20). 미션 41개, 13문항 + 판정 함수, 조기 종료, 화면 3장 + Figma 값·구성 반영, 진단 API 3종(완료·조회·닉네임) + 화면 연결, **실 DB로 진단→결과→홈 전체 흐름 확인 완료**, 홈 미션을 `GET /api/missions`로 교체(`bdcef94`), 결과 화면 판정 근거 3줄(`298ab56`) | **A 담당 기능은 남은 것이 없다.** 근거 3줄의 Bedrock 실호출만 E의 IAM 키·`BEDROCK_MODEL_ID` 공유 대기다(실패해도 카드만 빠지고 화면은 뜬다). 관리자 교차표와 LLM 2종은 컷 |
-| B | 미션 시스템 + 사진 업로드 | 미션 API 3종, 사진 업로드 presign·verify, 미션 대시보드, 출석, `lib/missions/` 8개 파일. 재화는 `calculateReward()`를 경유한다. 모바일 아이콘 레일·S3 펫 이미지·일일 완주 보너스는 A의 머지로 `develop`에 복구됐다 | 하단 탭을 사이드바로 교체한 것도 B다(결정 9번은 E 배정이었다). 남은 것은 **`origin/feat/missions`의 3커밋**(`1dfbefc`·`79ea4e6`·`6495f37`)을 `develop`에 올리는 것 + lint 에러 11건 + **차단 17번**(`completion.ts:124`가 `calculateReward()`를 우회한다) |
+| A | 진단 + 미션 콘텐츠 + 홈 | **`develop`에 머지 완료**(`a098c61`, 2026-08-20). 미션 41개, 13문항 + 판정 함수, 조기 종료, 화면 3장 + Figma 값·구성 반영, 진단 API 3종(완료·조회·닉네임) + 화면 연결, **실 DB로 진단→결과→홈 전체 흐름 확인 완료**, 홈 미션을 `GET /api/missions`로 교체(`bdcef94`), 결과 화면 판정 근거 3줄(`298ab56`), 친밀도 이중 지급 제거(`5a2753e`) | **A 담당 기능은 남은 것이 없다.** 근거 3줄의 Bedrock 실호출만 E의 IAM 키·`BEDROCK_MODEL_ID` 공유 대기다(실패해도 카드만 빠지고 화면은 뜬다). 관리자 교차표와 LLM 2종은 컷 |
+| B | 미션 시스템 + 사진 업로드 | **`develop`에 머지 완료**(`90b386f`, 2026-08-20). 미션 API 3종, 사진 업로드 presign·verify, 미션 대시보드, 출석, `lib/missions/` 8개 파일. 재화는 `calculateReward()`를 경유한다. 마지막 6커밋으로 `exp` 직접 증가 제거(`6495f37`) + `getToday()` UTC 자정 통일(`62340e5`·`d0fa3cb`·`1e4a46d`) + 미션 화살표 위치까지 들어왔다 | 하단 탭을 사이드바로 교체한 것도 B다(결정 9번은 E 배정이었다). 남은 것은 lint 에러 11건 + **차단 17번**(`completion.ts:123`이 `calculateReward()`를 우회한다) |
 | C | 펫 + 스킨 | **`SPEC.md` 5절 기능 전부 완료 + `develop`에 머지 완료**(2026-08-20). 성장·씨앗 투입·진화 연출, 방치형 자동 획득, 치장 **구매**·착용·해제, 스킨 구매·전환 + 화면 3장. 구조 변경(종족 전용 외형 / 치장 종족 무관 / 가챠 삭제 / **치장 12종 → 배경 6종**) 반영 완료. `docs/dev/diagnosis.md` 15·17절이 넘긴 C 몫도 전부 처리(치장 구매 라우트, `check-pet` 어미 단정, 시드 가격 확정값, `SPEC.md` 2·5·6·11절, `docs/dev/pet.md`, `docs/인수인계.md`, `업무분담.md`) | **코드에 남은 것 없음.** 재화 가격·수급량 확정값까지 시드·`check:pet`·문서·**실 DB**에 반영했다. 고양잇과 변종 스킨은 `샴고양이` → **`북극고양이`**로 개명(2026-08-20). 남은 것은 런타임 검증 4흐름(공유 DB 쓰기 승인 대기), 데모 계정 재화 시드값(8/21), 재진단 후 옛 종족 스킨 처리 정책(팀 결정) |
 | D | 커뮤니티 + 챗봇 | **`develop`에 머지 완료**(2026-08-20). 기능 구현 끝 — 챗봇 Bedrock 스트리밍(2026-08-19), 챗봇 전역 오버레이 런처 전환(`f149243`, 임시 `/chat` 라우트 폐기), 본인 댓글 삭제, 미인증 500 수정(`13f3a6a`), 글쓰기 주제 추천(고정 문구), 전체 탭 글쓰기(`GalleryType` 반영). 미션 완료 연동 호출부(`completeMission`)는 주석으로 준비만 해둠 | **대기 상태가 아니다** — `completeMissionByCode({ actor, code })`가 `develop`에 이미 있다(C 확인, 2026-08-20). 다만 주석의 `completeMission(user.id, "DAILY_CHAT")`과 시그니처가 다르니 그대로 풀지 말 것. `app/layout.tsx`(E 소유) 2줄 변경이 들어 있다 — 차단 13번과 같은 사안. 세부는 `docs/dev/community.md` "재개 지점" |
 | E | 인프라 + 인증 | RDS·Cognito·S3+CloudFront·CloudWatch+SNS·Bedrock·auth 실검증·하단 탭 내비 완료, PR #1 머지 + 2차 마이그레이션 + auth 빌드 수정 + 색 토큰 정리 완료. 로그인 화면(이메일+비밀번호/Google) + 쿠키 기반 인증 전환 + `amplify.yml` 완료(2026-08-20) | Amplify GitHub 연동, Google IdP 자격증명(아래 참고) 남음 |
@@ -49,7 +49,7 @@
 
 **`.env.example`의 `DATABASE_URL` 샘플에 `sslmode=require`가 없다 (E에게 알림, 2026-08-20 C 확인)**: 샘플은 `?schema=public`으로 끝나는데 실제 RDS는 SSL을 요구한다. `cp .env.example .env`로 시작한 사람은 접속에 실패한다. 동작하는 형태는 `...:5432/welli?schema=public&sslmode=require`다. `.env.example`은 E 소유라 C가 고치지 않았다
 
-해소된 항목(1·2·3·**4**·5·6·7·8·**9**·10·**11**·**12**·**15**번)은 이 목록에서 지웠다. 이력이 필요하면 `git log docs/STATUS.md`를 본다. 남은 것은 아래 5개(13·14·16·17·18)다.
+해소된 항목(1·2·3·**4**·5·6·7·8·**9**·10·**11**·**12**·**15**·**16**·**18**번)은 이 목록에서 지웠다. 이력이 필요하면 `git log docs/STATUS.md`를 본다. 남은 것은 아래 5개(13·14·17·19·20)다.
 
 **차단 4번(인증) 해소** — E가 `lib/auth.ts`를 `cookies()`로 바꾸고 로그인·회원가입 화면과 `/api/auth/*` 5종을 붙였다(`ba9287a`). 서버 컴포넌트 5개와 API가 같은 경로로 인증된다.
 **차단 11번(모바일) 해소** — `app/components/Sidebar.module.css`의 `768px` 미디어 쿼리로 아이콘 레일이 붙었다(B의 `468f17f`). A의 머지로 `develop`에 들어왔다.
@@ -73,18 +73,20 @@
 
 ~~12. 프로덕션에서 `/community`·`/chat`이 500이다~~ — 해소(2026-08-20, D). `/community`는 `getCurrentUser()`~`listGalleryPosts()`를 `try/catch`로 감싸 "로그인이 필요해요" 안내를 렌더한다(C의 `app/pet/page.tsx`와 같은 패턴, `export const dynamic = "force-dynamic"` 포함). `/chat`은 임시 라우트였고 전역 오버레이(`ChatLauncher`)로 대체하며 삭제했다 — 이제 404다
 
+**차단 16번(확정 경제 수치 어긋남) 해소** — 세 갈래가 다 닫혔다. C 몫(스킨 2500 / 배경 COMMON 600)은 `53c23ed`, A·D 몫(글 1개 친밀도 40)은 A가 미션 시드 `rewardAffinity`를 0으로 내려 지급 지점을 D의 `POST_AFFINITY = 20`·`CHAT_TURN_AFFINITY = 5` 한 곳으로 모았다(`5a2753e`, 실 DB 2행도 같이 갱신). B 몫(`exp` 직접 증가)은 `6495f37`이 들어오며 사라졌다.
+**차단 18번(강제 push로 되감긴 `develop`) 해소** — B가 `feat/missions`를 다시 머지했다(`90b386f`). `origin/feat/missions`는 이제 `develop` 미반영 0건이다. **공유 브랜치(`main`·`develop`)에 `--force`를 쓰지 않는다**는 규칙만 남는다.
+
 남은 것은 아래 5개다.
 
 13. **내비 교체 잔여 2건** — (E) 고아가 된 `app/components/BottomNav.tsx` 삭제. `app/layout.tsx`에서 빠졌고 아무도 import하지 않는다(레포 전체 검색으로 확인). `docs/dev/infra.md`에는 아직 "동결"로 적혀 있어 문서도 함께 갱신해야 한다. (B·E) **소유권 결정 필요** — B가 E 소유 공유 파일 3개(`app/layout.tsx`·`app/globals.css`·`.env.example`)를 브랜치에서 고쳤다(`CLAUDE.md` 1절 위반). 충돌은 안 났지만 사이드바를 누가 갖는지 정해야 남은 이틀 동안 둘이 같은 파일을 각자 고치지 않는다
 14. **배포 설정이 검증되지 않았다 (E 담당)** — `amplify.yml`은 들어왔다(`f0a8634`). 다만 Amplify가 `main`에 연결되지 않아 이 파일로 실제 빌드가 도는 것은 아직 확인되지 않았다. `BEDROCK_VISION_MODEL_ID`도 Amplify 환경변수에 등록되지 않았다(`.env.example`에는 있다. `lib/missions/vision.ts:7`이 폴백하므로 죽지는 않는다)
-16. **확정된 경제 수치가 코드와 어긋난 곳이 둘 남았다 (A·D 중 한쪽, 그리고 B)** — C 몫(시드 스킨 가격 50 → 2500, 배경 등급 통일 → 전부 COMMON 600)은 해소했다(`53c23ed`). 남은 것은,
-    - (A·D) **커뮤니티 글 1개에 친밀도가 40 들어간다** — `prisma/seed/missions.ts`의 미션 보상(A)과 `grantAffinity()`(D)가 각각 20을 준다. 확정값은 글 하나당 20이므로 한쪽을 0으로 만들어야 한다. 어느 쪽을 남길지는 A·D가 정한다. 상세는 `docs/dev/diagnosis.md` 17절
-    - (B) `lib/missions/attendance.ts:82`·`lib/missions/completion.ts:79`가 `exp: { increment: 씨앗수 }`로 씨앗과 경험치를 동시에 준다. 씨앗 투입 없이 펫이 자라고 비율이 1:1이라 `SEED_TO_EXP = 10`(SPEC 5절)을 우회한다. 차단 18번의 `6495f37`이 이걸 없애는 커밋이므로 그 3커밋을 올리면 같이 풀린다
-    - 둘 다 B·D·A 소유 파일이라 C는 고치지 않았다(`CLAUDE.md` 2절)
-17. **일일 완주 보너스가 `calculateReward()`를 우회한다 (B 담당)** — `lib/missions/completion.ts:124`가 `starShards: { increment: 60 }`으로 직접 증감한다. `CLAUDE.md` 2절 위반이다. 스킨 고유 효과가 없어진 지금은 배율이 1이라 값 자체는 맞지만, 규칙을 열어두면 다음 사람이 같은 방식으로 씨앗·친밀도를 직접 증감한다
-18. **`develop`이 강제 push로 되감겼다 — B의 3커밋이 아직 빠져 있다 (B 담당)** — `git reflog show origin/develop`에 `081918d → cb16959: forced-update`가 남아 있다. E의 로컬 `develop`이 뒤진 상태로 `main`을 머지해 밀어 넣어 B의 커밋 14개가 사라졌다. A의 머지(`a098c61`)로 11개가 복구됐고, 남은 3개는 `origin/feat/missions`(`6495f37`)에 있다. `git merge origin/feat/missions`는 충돌 0건이다(실측). 특히 `6495f37`이 미션·출석의 `exp` 직접 증가를 없애는 커밋이라 지금 `lib/missions/attendance.ts:82`·`completion.ts:79`에 그 코드가 남아 있다. **공유 브랜치(`main`·`develop`)에는 `--force`를 쓰지 않는다**
+17. **일일 완주 보너스가 `calculateReward()`를 우회한다 (B 담당)** — `lib/missions/completion.ts:123`이 `starShards: { increment: 60 }`으로 직접 증감한다. `CLAUDE.md` 2절 위반이다. 스킨 고유 효과가 없어진 지금은 배율이 1이라 값 자체는 맞지만, 규칙을 열어두면 다음 사람이 같은 방식으로 씨앗·친밀도를 직접 증감한다
+19. **북극곰 스킨 이미지 키가 S3에 없는 경로를 가리킨다 (C 담당, 확인 후 처리로 미룸)** — `prisma/seed/items.ts`의 `imageKeyBase`가 `pets/bear-polar`인데 CloudFront에 올라간 파일은 그 이름이 아니다. 여우·고양이는 `pets/fox-arctic`·`pets/cat-arctic`으로 맞는다. 곰만 어긋나 변종을 사면 이미지가 깨진다. 시드 파일 한 줄이라 고치는 비용은 없고, **S3에 실제로 올라간 파일명을 먼저 확인해야** 어느 쪽을 맞출지 정해진다(2026-08-20 판단 보류). `docs/dev/pet.md:110`의 "cat-arctic 9장 다 아직 없어서 지금은 공짜다"도 사실과 다르다 — `pets/cat-arctic-1.png`·`-3.png`는 200이다
+20. **로그인·회원가입 화면에 챗봇 버튼이 뜬다 (D 담당)** — `app/chat/_components/ChatLauncher.tsx`가 `/diagnosis`만 숨기고, 주석은 "별도의 로그인 라우트는 아직 없다"고 적혀 있다. E가 `app/(auth)/login`·`signup`을 만든 뒤라 실측하면 두 화면 다 "마음 친구 열기" 버튼이 1개 렌더된다(`curl /login | grep -c`). 미인증 상태라 누르면 401이다. 숨김 목록에 두 경로를 넣으면 끝난다
 
-**8/20 5인 머지 — A·B·C·D·E가 전부 들어갔다.** A는 `develop`(`d8edf2b`)을 받아 충돌 3건을 해결하고 올렸고(`f9314a5`), B가 `feat/missions`를 머지했고(`3adbea5` → `cb16959`), E가 `develop`을 `main`에 올린 뒤 `main`을 다시 머지했다(`152dbae`). 이어 A가 진단 근거 3줄과 B 복구분을 올렸다(`a098c61`). D가 `feat/community`를 머지했고(`563ab15`), C가 그 위에 `feat/pet`을 머지했다. **남은 것은 B의 3커밋(차단 18번)뿐이다.** `docs/STATUS.md`가 매번 충돌하는데, 코드는 아직 한 번도 충돌하지 않았다 — 이 문서만 손으로 합치면 된다.
+**8/20 5인 머지 — A·B·C·D·E가 전부 들어갔다.** A는 `develop`(`d8edf2b`)을 받아 충돌 3건을 해결하고 올렸고(`f9314a5`), B가 `feat/missions`를 머지했고(`3adbea5` → `cb16959`), E가 `develop`을 `main`에 올린 뒤 `main`을 다시 머지했다(`152dbae`). 이어 A가 진단 근거 3줄과 B 복구분을 올렸다(`a098c61`). D가 `feat/community`를 머지했고(`563ab15`), C가 그 위에 `feat/pet`을 머지했고, B가 마지막 6커밋을 올렸다(`90b386f` → `773262d`). **다섯 브랜치 전부 `develop` 미반영 0건이다.** `docs/STATUS.md`가 매번 충돌하는데, 코드는 아직 한 번도 충돌하지 않았다 — 이 문서만 손으로 합치면 된다.
+
+**5인 머지본 검토 결과 (2026-08-20, A)**: 충돌 마커 0건, `npm run build` 통과, `check:diagnosis`·`check:pet`·`check:reward` 통과, 마이그레이션 4개 중복 없음, 실 DB 드리프트 없음(`migrate diff --exit-code`). 기능 상으로 발견한 실제 결함은 두 개뿐이고 둘 다 아래 차단 19·20에 적었다(북극곰 이미지 키, 로그인 화면의 챗봇 버튼). 그 외 잔가지: `app/community/_lib/gallery.ts`의 `canWriteToGallery()`는 호출부가 0건인 죽은 export이고, `app/api/community/posts/route.ts:56`·`app/api/chat/messages/route.ts:62`의 `completeMission` 호출은 아직 주석이다(`completeMissionByCode({ actor, code })`로 시그니처가 다르니 그대로 풀지 말 것).
 
 **통합 검증 결과 (2026-08-20, A)**: 충돌 마커 0건, `npm run build` 통과(라우트 31개), 마이그레이션 3개 중복 없음, 실 DB 드리프트 없음(`migrate diff --exit-code`), `check:diagnosis`·`check:pet`·`check:reward` 통과, 화면 7장·API 6종 200 + 실데이터 렌더, 재화 증감은 B도 `calculateReward()` 경유, 유형명 UI 노출 없음, 브라우저 콘솔 에러 0건. **기능은 깨끗하게 합쳐졌다.** `develop`은 각자 받아서 작업해도 안전하다
 
@@ -130,10 +132,10 @@ GitHub 원격 — https://github.com/uchan04/AWS_project
 
 | 브랜치 | 최신 | `develop` 미반영 | 비고 |
 |---|---|---|---|
-| `origin/develop` | (C 머지 커밋, 8/20) | — | 통합 지점. A·B·C·D·E 머지 완료 |
-| `origin/main` | `f0a8634` (8/20) | 0 | `develop`에 포함됨. 배포 시점에 `develop`을 다시 올린다 |
+| `origin/develop` | `773262d` (8/20) | — | 통합 지점. A·B·C·D·E 머지 완료 |
+| `origin/main` | `f0a8634` (8/20) | 0 | `develop`에 포함됨. 다만 **`develop`이 `main`보다 129커밋 앞선다** — Amplify는 `main`에서 빌드하므로 배포 전에 `develop`을 `main`에 올려야 한다 |
 | `origin/feat/pet` | (8/20) | 0 | `develop`과 동일. 치장 구매 API·배경 6종 확정 가격·`북극고양이` 개명이 들어갔다 |
-| `origin/feat/missions` | `6495f37` (8/20) | **3커밋** | `1dfbefc`·`79ea4e6`·`6495f37`. 충돌 0건(실측). 차단 18번 |
+| `origin/feat/missions` | `6495f37` (8/20) | 0 | `develop`에 머지 완료(`90b386f`). 차단 18번 해소 |
 | `origin/feat/diagnosis` | `a098c61` (8/20) | 0 | `develop`과 동일 |
 | `origin/feat/community` | (8/20) | 0 | `develop`에 머지 완료(`563ab15`) |
 | ~~`origin/feat/infra`~~ | — | — | 원격에서 삭제됐다. E는 `main`·`develop`에 직접 push해 왔다 |
@@ -163,7 +165,7 @@ GitHub 원격 — https://github.com/uchan04/AWS_project
 16. **치장은 배경 6종이다.** 12종(모자·목도리·배경 각 4개)에서 배경만 6종(`배경1`~`배경6`) 남겼다. 치장 이미지 12장을 8/22까지 만들 수 없고, 슬롯이 하나면 "슬롯당 1개"가 곧 "배경 하나 고르기"가 되어 화면도 단순해진다. 등급은 6종 전부 `COMMON`이다 — 서로 대체재인 배경에 가격 차이를 두면 유저가 얻는 정보가 없다. 가격은 아래 17번(각 600, 합계 3600). `Slot` enum은 그대로 둬서 마이그레이션이 없다
 
 17. **재화 가격과 수급량을 확정했다.** 스킨 = **별조각 2500**, 배경 = **각 친밀도 600**(합 3600), **일일 미션 전체 완료 = 별조각 60**, 글 작성 = 친밀도 20 · 일 상한 100. 수급은 별조각 약 63.6/일(스킨 **39일**), 친밀도 최대 100/일(배경 하나 6일 · 전부 **36일**)로 두 상점 속도를 비슷하게 맞췄다. 실사용자가 없는 데모 프로젝트이므로 이 곡선은 시연 화면이 아니라 "설계가 성립하는가"를 보이는 값이고, 8/26 녹화는 데모 계정 시드로 찍는다. 씨앗은 3단 진화(1,050) 이후 소모처가 없고 그대로 둔다 — 스킨·치장이 둘 다 씨앗을 받지 않는다. 등급 표는 COMMON만 올리면 RARE가 더 싸지므로 전부 10배로 올렸다(600/1000/1800/2800). **별조각 60은 B의 `447957d`로 구현됐다** — 39일 수급이 실제로 성립한다
-18. **친밀도가 글 1개에 40 들어간다.** 미션 보상(`prisma/seed/missions.ts`, A)과 커뮤니티 지급(`app/community/_lib/affinity.ts`, D)이 각각 20을 준다. 확정값은 20이므로 한쪽을 0으로 만들어야 한다 — 어느 쪽을 지울지 팀이 정한다. 차단 16번
+18. **친밀도 지급 지점은 커뮤니티·챗봇 한 곳이다.** 미션 보상(`prisma/seed/missions.ts`, A)과 커뮤니티 지급(`app/community/_lib/affinity.ts`, D)이 각각 20을 줘서 글 1개에 40이 들어갔다. **미션 시드 쪽을 0으로 내렸다**(2026-08-20, `5a2753e`). 미션 보상은 하루 한 번만 나가는데 두 번째 글·대화 턴에도 친밀도가 붙어야 하므로, 남길 쪽은 매번 도는 커뮤니티/챗봇이다. 확정값은 글 `POST_AFFINITY = 20` · 대화 턴 `CHAT_TURN_AFFINITY = 5` · 일 상한 100. `Mission.rewardAffinity`는 컬럼만 남고 값이 0인 상태다 — 나중에 친밀도를 주는 미션을 넣을 때 D의 지급과 겹치지 않는지 먼저 본다
 
 **스키마 담당 규칙 예외.** `CLAUDE.md` 5절은 마이그레이션을 1인(E)만 실행하라고 한다. 이번에는 팀 합의 후 A가 `prisma/schema.prisma` 수정과 `migrate deploy`까지 실행했다. 마이그레이션은 `20260820120000_skin_tribe_and_drop_gacha` 하나뿐이고 히스토리는 갈라지지 않았다. **나머지 4인은 `git pull && npx prisma migrate deploy && npx prisma generate`만 실행한다.** 다음 스키마 변경은 다시 E가 맡는다
 

@@ -678,7 +678,7 @@ model DiagnosisSession {
 
 사용자 결정 3건을 한 번에 반영한다.
 
-1. **스킨은 종족 전용이다.** 진단으로 정해진 동물은 고정이고, 상점에서 사는 것은 같은 동물의 변종 외형뿐이다. 여우는 북극여우·사막여우, 고양이는 샴고양이·페르시안고양이, 곰은 북극곰·반달가슴곰처럼 어미에 종족명이 붙는다. 능력치는 바뀌지 않고 **외형만** 바뀐다
+1. **스킨은 종족 전용이다.** 진단으로 정해진 동물은 고정이고, 상점에서 사는 것은 같은 동물의 변종 외형뿐이다. 어미에 종족의 동물명이 붙는다 — 실제로 들어간 3종은 북극여우·북극고양이·북극곰이다(2026-08-20, C가 `샴고양이`를 `북극고양이`로 개명해 셋을 "북극"으로 맞췄다). 능력치는 바뀌지 않고 **외형만** 바뀐다
 2. **치장 아이템은 종족 구분을 없앤다.** 모든 치장 아이템을 종족과 무관하게 쓸 수 있다. 등급(`rarity`)은 유지한다
 3. **화폐를 전용으로 갈라놓는다.** 스킨은 **별조각 전용**, 치장 아이템(옷·배경 등)은 **친밀도 전용**이다. 한 품목을 두 화폐로 살 수 있게 두지 않는다
 
@@ -801,7 +801,7 @@ git pull && npx prisma migrate deploy && npx prisma generate
 | 스킨 | 별조각 |
 |---|---|
 | 기본 외형(여우·고양이·곰) | `null` (진단으로 지급) |
-| 변종 외형(북극여우·샴고양이·북극곰) | **2,500** |
+| 변종 외형(북극여우·북극고양이·북극곰) | **2,500** |
 
 **시드가 아직 50이다.** `prisma/seed/items.ts`의 `VARIANT_PRICE_SHARDS`를 2500으로 바꾸고 `npm run db:seed`를 돌려야 실 DB가 맞는다 — C 소유 파일이라 A가 고치지 않았다.
 
@@ -830,7 +830,7 @@ const stage = pet.stageCount > 1 ? Math.min(pet.evolutionStage, 3) : 2
 여우      HEALTH_EMOTION          isDefault    stage3  pets/fox
 북극여우  HEALTH_EMOTION          별조각 2500  stage3  pets/fox-arctic
 고양이    INDEPENDENT_LOW_INCOME  isDefault    stage3  pets/cat
-샴고양이  INDEPENDENT_LOW_INCOME  별조각 2500  stage3  pets/cat-siamese
+북극고양이  INDEPENDENT_LOW_INCOME  별조각 2500  stage3  pets/cat-arctic
 곰        FAMILY_LIVING           isDefault    stage3  pets/bear
 북극곰    FAMILY_LIVING           별조각 2500  stage3  pets/bear-polar
 ```
@@ -875,7 +875,7 @@ DELETE FROM "CosmeticItem" WHERE "name" IN (
 
 | 파일 | 변경 |
 |---|---|
-| ~~`prisma/seed/items.ts`~~ | **완료(A, 2026-08-20).** `tribeColor` 삭제, 늑대·삵·판다를 북극여우·샴고양이·북극곰으로 교체(`stageCount: 3`, `priceShards: 50`, `effectType: NONE`), 치장 12종에 `affinityOnly: true` + 등급에서 파생시킨 `priceAffinity`. 가격은 `PRICE_BY_RARITY` 한 곳에서 나온다 |
+| ~~`prisma/seed/items.ts`~~ | **완료(A, 2026-08-20).** `tribeColor` 삭제, 늑대·삵·판다를 북극여우·샴고양이·북극곰으로 교체(`stageCount: 3`, `effectType: NONE`), 치장에 `affinityOnly: true` + 등급에서 파생시킨 `priceAffinity`. 가격은 `PRICE_BY_RARITY` 한 곳에서 나온다. **이후 C가 확정값으로 마무리했다** — 변종 2,500 / 배경 600, 치장 12종을 배경 6종으로 줄임, `샴고양이` → `북극고양이` 개명 |
 | ~~`scripts/check-reward.ts`~~ | **완료(A, 2026-08-20).** 더미 `PetSkin`의 `priceAffinity: null`을 `priceShards: null`로 |
 | ~~`app/api/pet/cosmetics/route.ts`~~ | **완료(A, 2026-08-20 머지 시).** 응답에서 `tribeColor` 삭제 |
 | ~~`app/api/pet/skins/route.ts`~~ | **완료(A).** `findMany`에 `where: { typeCode: user.typeCode }`, `user.typeCode`가 `null`(진단 전)이면 빈 목록. 응답의 `affinity`·`priceAffinity`를 `starShards`·`priceShards`로 |
@@ -1086,6 +1086,6 @@ A 소유 문서에서 폐기된 기획을 지웠다. 아래 4곳은 C 소유라 
 ### 미결
 
 1. **성장 단계가 3단인가 4단인가** — 시트에는 단계가 4개 그려져 있고 스키마·시드·`lib/pet.ts`는 3단이다. E가 지금 올리고 있으므로 오늘 정해야 한다. 4단으로 가면 `stageCount`(전원 합의)와 `lib/pet.ts`(C)를 함께 고쳐야 한다
-2. **고양이 변종 이름** — 시드는 `샴고양이`, 시트는 북극 계열이다. `check:pet`의 어미 단정은 둘 다 통과한다
+2. ~~**고양이 변종 이름**~~ — 해소(2026-08-20, C). `북극고양이`로 개명했고 `imageKeyBase`도 `pets/cat-arctic`이다. 시트와 맞는다
 3. **모자·목도리 가격** — 배경만 600으로 정해졌다
 4. **치장 시트의 두 항목** — 앰버 모자에 여우 귀가 붙어 있어 "종족 무관" 규칙과 어긋난다. 라벤더 모자·목도리는 진열대에 놓인 그림이라 캐릭터에 겹칠 수 없다
