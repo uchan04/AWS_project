@@ -662,21 +662,31 @@ model DiagnosisSession {
 
 ---
 
-## 15. 종족 외형 스킨 구조 — C에게 넘기는 확정안 (2026-08-20)
+## 15. 스킨·치장·가챠 구조 변경 — C에게 넘기는 확정안 (2026-08-20)
 
-사용자 결정으로 펫 스킨 모델이 바뀐다. "진단으로 정해진 동물은 고정이고, 상점에서 사는 것은 같은 동물의 변종 외형뿐이다." 여우는 북극여우·사막여우, 고양이는 샴고양이·페르시안고양이, 곰은 북극곰·반달가슴곰처럼 어미에 종족명이 붙는다. 능력치는 바뀌지 않고 **외형만** 바뀐다.
+사용자 결정 4건을 한 번에 반영한다.
+
+1. **스킨은 종족 전용이다.** 진단으로 정해진 동물은 고정이고, 상점에서 사는 것은 같은 동물의 변종 외형뿐이다. 여우는 북극여우·사막여우, 고양이는 샴고양이·페르시안고양이, 곰은 북극곰·반달가슴곰처럼 어미에 종족명이 붙는다. 능력치는 바뀌지 않고 **외형만** 바뀐다
+2. **치장 아이템은 종족 구분을 없앤다.** 모든 치장 아이템을 종족과 무관하게 쓸 수 있다. 등급(`rarity`)은 유지한다
+3. **화폐를 전용으로 갈라놓는다.** 스킨은 **별조각 전용**, 치장 아이템(옷·배경 등)은 **친밀도 전용**이다. 한 품목을 두 화폐로 살 수 있게 두지 않는다. 상점 가격은 등급에 따라 다르게 매긴다
+4. **가챠를 스키마에서 지운다.** `GachaPull` 모델, `User.heroPity`, `User.legendPity`를 삭제한다
 
 A가 실 DB와 `feat/pet`을 읽고 구조 적합성을 검토한 결과를 여기 남긴다. 구현은 C 담당이다(`prisma/seed/items.ts`, `app/api/pet/*`, `app/pet/*`). `prisma/schema.prisma`는 전원 합의 파일이므로 A가 손대지 않았다.
 
 ### 결론
 
-`PetSkin` 테이블은 거의 그대로 쓸 수 있다. 새 컬럼은 `priceShards` 하나뿐이다. 종족 그룹핑에 별도 `species` 열거형이나 `baseSkinId` 자기참조는 필요하지 않다 — `TypeCode` 1개가 동물 1종에 정확히 대응하므로 기존 `typeCode`가 그대로 종족 키가 된다. 단, 이 전제는 늑대·삵·판다를 없앤다는 결정에 의존한다. 같은 `typeCode` 안에 서로 다른 동물이 공존하면 `typeCode`만으로는 종족을 식별할 수 없다.
+`PetSkin`·`CosmeticItem` 두 테이블 다 거의 그대로 쓸 수 있다. 추가는 `PetSkin.priceShards` 하나, 삭제는 `PetSkin.priceAffinity`와 `CosmeticItem.tribeColor` 둘이다.
+
+종족 그룹핑에 별도 `species` 열거형이나 `baseSkinId` 자기참조는 필요하지 않다 — `TypeCode` 1개가 동물 1종에 정확히 대응하므로 기존 `typeCode`가 그대로 종족 키가 된다. 단, 이 전제는 늑대·삵·판다를 없앤다는 결정에 의존한다. 같은 `typeCode` 안에 서로 다른 동물이 공존하면 `typeCode`만으로는 종족을 식별할 수 없다.
 
 ### 결정한 것 (2026-08-20 사용자)
 
 1. **늑대·삵·판다는 변종 스킨으로 대체한다.** 친밀도 전용 캐릭터와 고유 효과(씨앗 +15% / 별조각 +10% / 친밀도 +20%)는 없어진다. 외형만 바뀌는 스킨과 능력이 붙은 캐릭터가 한 목록에 섞이면 "외형만 바뀐다"는 규칙이 깨진다
-2. **구매 화폐는 별조각.** 가챠 컷으로 별조각이 소모처를 잃은 상태였다(3단계 미션 12개가 총 60개를 지급하는데 쓸 곳이 없다). 스킨 상점이 그 구멍에 맞는다. 스킨 = 별조각, 치장 아이템 = 친밀도로 두 화폐의 역할이 갈린다
+2. **스킨은 별조각 전용, 치장 아이템은 친밀도 전용.** 가챠 컷으로 별조각이 소모처를 잃은 상태였다(3단계 미션 12개가 총 60개를 지급하는데 쓸 곳이 없다). 스킨 상점이 그 구멍에 맞는다. 전용이므로 `PetSkin.priceAffinity`는 지운다 — 컬럼이 남아 있으면 "친밀도로도 살 수 있나"가 코드마다 다시 갈린다. 실 DB에서 기본 3종은 이 값이 `null`이고 값이 든 늑대·삵·판다는 삭제 대상이라 잃는 데이터가 없다
 3. **변종은 종족당 1개로 시작한다.** 이미지 장수가 곧 작업량이다. 기본 9장(3동물 × 3단) + 변종 9장 = 18장. 구조는 개수 제한이 없으므로 발표 후 시드만 추가하면 늘어난다
+4. **치장 아이템에서 종족 구분을 없앤다.** `CosmeticItem.tribeColor`를 지운다. 종족 소속감은 기본 펫과 종족 배지가 담당하고, 치장은 12종을 누구나 쓴다. 실 DB의 `tribeColor`는 여우↔고양이가 뒤바뀐 옛 매핑을 그대로 물고 있었고, 밤별 3종은 셋 다 한 종족 색으로 고정돼 있었다 — 컬럼을 지우면 두 문제가 함께 사라진다
+5. **치장 아이템의 등급(`rarity`)은 유지한다.** 가챠가 없어져 등급이 추첨 확률로 쓰이지 않으므로, 등급을 그대로 **가격 기준**으로 쓴다. 스키마 변경 없이 시드 값만 채우면 된다
+6. **가챠는 스키마에서도 지운다.** `GachaPull` 0행, `User.heroPity`·`legendPity` 값 전부 0인 지금이 데이터를 잃지 않고 지울 수 있는 시점이다
 
 ### 스키마 변경
 
@@ -692,23 +702,88 @@ model PetSkin {
   effectType EffectType @default(NONE) // 외형 스킨은 전부 NONE
   effectPct  Int        @default(0)
 
-  priceShards   Int? // 신규. 별조각 구매가. 기본 외형은 null
-  priceAffinity Int? // 유지. 지금은 쓰지 않는다
-  imageKeyBase  String
+  priceShards  Int? // 신규. 별조각 구매가. 기본 외형은 null
+  imageKeyBase String
+  // priceAffinity 삭제. 스킨은 별조각 전용이다
 
   owners      UserPetSkin[]
   activeUsers User[]        @relation("ActiveSkin")
 }
 ```
 
-마이그레이션은 비파괴 2줄이다.
+`effectType`·`effectPct`는 지우지 않는다. `calculateReward()`가 `NONE`이면 그대로 통과시키므로 남겨도 무해하고, 지우면 `lib/reward.ts`(C 소유 공유 함수)의 시그니처가 흔들린다. 나중에 능력치 스킨을 되살릴 여지도 남는다.
+
+`CosmeticItem`에서는 `tribeColor` 한 줄만 빠진다. `slot`·`rarity`·`affinityOnly`·`priceAffinity`는 그대로다.
+
+```prisma
+model CosmeticItem {
+  id     String @id @default(cuid())
+  name   String @unique
+  slot   Slot
+  rarity Rarity // 추첨 확률이 아니라 가격·희소도 표기로 쓴다
+
+  affinityOnly  Boolean @default(false)
+  priceAffinity Int?
+  imageKey      String
+
+  owners UserCosmetic[]
+}
+```
+
+`User`에서 `heroPity`·`legendPity`·`gachaPulls`를 지우고, `model GachaPull`을 통째로 지운다. 이 세 줄은 `feat/pet`에 이미 반영돼 있으나 **대응 마이그레이션이 없어 스키마와 실 DB가 갈라진 상태다.** 이번 마이그레이션이 그 드리프트를 닫는다.
+
+### 마이그레이션
+
+**파괴적 작업 4개가 들어 있다.** `GachaPull` 테이블 삭제, `CosmeticItem.tribeColor` 컬럼 삭제, `PetSkin.priceAffinity` 컬럼 삭제, `User.heroPity`·`legendPity` 컬럼 삭제다. 지금은 `GachaPull` 0행 / `UserCosmetic` 0행 / pity 값 전부 0 / `priceAffinity`에 값이 든 3행은 삭제 대상이라 잃는 데이터가 없다. 행이 쌓인 뒤에는 이 순서로 지울 수 없다.
+
+`npx prisma migrate dev`는 **스키마 담당 1인(E)만** 실행한다(`CLAUDE.md` 5절).
+
+```bash
+npx prisma migrate dev --name skin_tribe_and_drop_gacha
+```
+
+생성될 SQL:
 
 ```sql
 ALTER TABLE "PetSkin" ADD COLUMN "priceShards" INTEGER;
+ALTER TABLE "PetSkin" DROP COLUMN "priceAffinity";
 ALTER TABLE "PetSkin" ALTER COLUMN "stageCount" SET DEFAULT 3;
+ALTER TABLE "CosmeticItem" DROP COLUMN "tribeColor";
+DROP TABLE "GachaPull";
+ALTER TABLE "User" DROP COLUMN "heroPity", DROP COLUMN "legendPity";
 ```
 
-`effectType`·`effectPct`는 지우지 않는다. `calculateReward()`가 `NONE`이면 그대로 통과시키므로 남겨도 무해하고, 지우면 `lib/reward.ts`(C 소유 공유 함수)의 시그니처가 흔들린다. 나중에 능력치 스킨을 되살릴 여지도 남는다.
+나머지 4인은 공지를 받고 이것만 실행한다.
+
+```bash
+git pull && npx prisma migrate deploy && npx prisma generate
+```
+
+### 치장 아이템 — 등급을 가격으로 쓴다
+
+가챠가 없어지면 `rarity`는 추첨 확률로 쓰이지 않는다. 그런데 실 DB에서 치장 12종 중 **가격이 있는 것은 밤별 3종(친밀도 200)뿐이고, 나머지 9종은 `priceAffinity`가 `null`이라 획득 경로가 없다.** 등급을 그대로 가격 기준으로 쓰면 스키마 변경 없이 이 구멍이 닫힌다.
+
+| 등급 | 친밀도 가격 | 실 DB 개수 |
+|---|---|---|
+| COMMON | 50 | 3 |
+| RARE | 100 | 3 |
+| EPIC | 200 | 5 (밤별 3종 포함) |
+| LEGENDARY | 400 | 1 |
+
+12종 전부 모으면 1,850 친밀도다. 친밀도는 하루 최대 100까지만 지급되므로(`SPEC.md` 5절) 약 19일 분량이다. 밤별 3종이 이미 EPIC 200이라 값이 그대로 맞아 떨어진다.
+
+부작용 하나. 12종이 전부 친밀도 구매가 되면 **`affinityOnly` 플래그가 항상 `true`가 되어 의미를 잃는다.** 그래도 **컬럼은 지우지 않고 12종 전부 `true`로 채운다.** `CosmeticList.tsx:132`가 `item.affinityOnly && item.priceAffinity`로 가격을 그리므로, 값만 채우면 코드를 한 줄도 고치지 않고 12종 전부에 가격이 뜬다. 컬럼을 지우면 `route.ts`·`page.tsx`·`CosmeticList.tsx` 3개를 함께 고쳐야 한다 — 마감 이틀 전에 살 이유가 없는 변경이다.
+
+### 스킨 — 별조각 가격
+
+`PetSkin`에는 `rarity`가 없다. 종족당 변종이 1개뿐인 지금은 등급 차등이 표현할 것이 없으므로 **균일 별조각 50**으로 둔다. 3단계 미션 12개가 주는 별조각 총량이 60이라, 자기 종족 변종 1개를 정확히 살 수 있는 값이다.
+
+| 스킨 | 별조각 |
+|---|---|
+| 기본 외형(여우·고양이·곰) | `null` (진단으로 지급) |
+| 변종 외형(북극여우·샴고양이·북극곰) | 50 |
+
+나중에 변종이 늘어 등급을 매기고 싶어지면 `priceShards`를 행마다 다르게 넣으면 된다. `rarity` 컬럼 추가는 필요하지 않다.
 
 ### `stageCount`를 3으로 올려야 하는 이유
 
@@ -729,11 +804,11 @@ const stage = pet.stageCount > 1 ? Math.min(pet.evolutionStage, 3) : 2
 
 ```
 여우      HEALTH_EMOTION          isDefault  stage3  pets/fox
-북극여우  HEALTH_EMOTION          별조각 N   stage3  pets/fox-arctic
+북극여우  HEALTH_EMOTION          별조각 50  stage3  pets/fox-arctic
 고양이    INDEPENDENT_LOW_INCOME  isDefault  stage3  pets/cat
-샴고양이  INDEPENDENT_LOW_INCOME  별조각 N   stage3  pets/cat-siamese
+샴고양이  INDEPENDENT_LOW_INCOME  별조각 50  stage3  pets/cat-siamese
 곰        FAMILY_LIVING           isDefault  stage3  pets/bear
-북극곰    FAMILY_LIVING           별조각 N   stage3  pets/bear-polar
+북극곰    FAMILY_LIVING           별조각 50  stage3  pets/bear-polar
 ```
 
 `imageKeyBase`는 그대로 쓸 수 있다. `stageCount`가 3이면 뒤에 `-1 -2 -3`을 붙이는 기존 규칙을 변종도 그대로 따른다.
@@ -748,18 +823,53 @@ for (const skin of SKINS)
   )
 ```
 
+치장 12종은 `tribeColor` 필드를 빼고, 12종 전부에 `affinityOnly: true`와 등급별 `priceAffinity`를 채운다.
+
 **시드만 고쳐서는 늑대·삵·판다가 DB에서 사라지지 않는다.** 시드는 `name`을 키로 upsert하므로 목록에서 뺀 행은 그대로 남는다. 실 DB에 이미 3행이 들어가 있다(A가 2026-08-20에 확인). 명시적으로 지워야 한다. 지금은 안전한 시점이다 — `UserPetSkin` 1건은 여우를 가리키고, `GachaPull`의 FK는 `CosmeticItem` 쪽이라 `PetSkin`을 참조하지 않는다.
 
-### 코드 변경 (C 담당 4곳)
+```sql
+DELETE FROM "PetSkin" WHERE "name" IN ('늑대', '삵', '판다');
+```
+
+그다음 `npm run db:seed`를 돌린다. C의 `RENAMED_COSMETICS` 이관 로직이 옛 치장 이름(앰버·라벤더·세이지)을 확정 컬러명으로 바꾸고, 여우↔고양이 뒤바뀐 매핑도 함께 정리된다.
+
+### 코드 변경 (C 담당 6곳)
 
 | 파일 | 변경 |
 |---|---|
+| `prisma/seed/items.ts` | `tribeColor` 필드 전부 삭제. 늑대·삵·판다를 북극여우·샴고양이·북극곰으로 교체(`stageCount: 3`, `priceShards: 50`, `effectType: NONE`, `priceAffinity` 필드 제거). 치장 12종에 `affinityOnly: true` + 등급별 `priceAffinity` 채우기 |
+| `app/api/pet/cosmetics/route.ts` | 응답에서 `tribeColor: item.tribeColor,` 한 줄 삭제(35행) |
 | `app/api/pet/skins/route.ts` | `findMany`에 `where: { typeCode: user.typeCode }`를 넣어 자기 종족만 노출한다. `user.typeCode`가 `null`(진단 전)이면 빈 목록을 돌려준다 |
-| `app/api/pet/skins/buy/route.ts` | `skin.typeCode !== user.typeCode`면 400으로 거른다. 차감 대상을 `affinity`에서 `starShards`로 바꾼다. 연타 방어용 조건부 `updateMany` 패턴은 그대로 유지한다 |
+| `app/api/pet/skins/buy/route.ts` | `skin.typeCode !== user.typeCode`면 400으로 거른다. 가격을 `skin.priceAffinity`에서 `skin.priceShards`로, 차감 대상을 `affinity`에서 `starShards`로 바꾼다(`NOT_FOR_SALE` 판정도 `priceShards === null` 기준으로). 연타 방어용 조건부 `updateMany` 패턴은 그대로 유지한다 |
 | `app/pet/_components/SkinList.tsx` | 묶음을 "기본 외형 / 상점 외형"으로 바꾸고, 고유 효과 표기를 지운다. 그룹 헤더의 동물명은 `lib/types.ts`의 `TRIBE[typeCode]`에서 가져온다 |
-| `SPEC.md` 5절 | "친밀도 전용 캐릭터" 절을 "종족 외형 스킨"으로 재작성한다. 고유 효과 표와 **"구매 제한을 두지 않는다"** 단락을 지우고, 별조각 소모처를 "미정"에서 "종족 외형 스킨 구매"로 바꾼다 |
+| `scripts/check-pet.ts` | 어미 = 종족명 단정 추가 |
 
 `lib/reward.ts`·`lib/pet.ts`·`UserPetSkin`·`app/api/pet/skins/activate/route.ts`는 손대지 않아도 된다.
+
+### 갱신할 문서
+
+| 문서 | 절 | 변경 | 담당 |
+|---|---|---|---|
+| `SPEC.md` | 5 | 가챠 절 삭제(`feat/pet`에 이미 반영). "친밀도 전용 캐릭터"를 "종족 외형 스킨"으로 재작성하고 고유 효과 표를 지운다. 별조각 소모처를 "미정"에서 "종족 외형 스킨 구매"로. 치장 절에 등급별 가격표 추가, "가챠 추첨 풀에서 제외" 문구 삭제 | C |
+| `SPEC.md` | 6 | `calculateReward()` 통과 목록에서 "가챠 중복 환급" 삭제 | C |
+| `SPEC.md` | 11 | `GachaPull.wasDuplicate`·`refundShards` 줄 삭제, `affinityOnly` 설명에서 가챠 언급 삭제, `tribeColor` 삭제. `rarity`는 남기고 설명을 "가챠 등급"에서 "가격·희소도 표기"로 | C |
+| `SPEC.md` | 2 | 치장 컬러명(노을·새벽·이끼)이 더 이상 종족과 대응하지 않음을 명시 | C |
+| `docs/dev/pet.md` | 전체 | 제목 "펫·가챠" → "펫", 가챠 항목 삭제, 스킨·치장 구조 반영 | C |
+| `docs/STATUS.md` | 담당별 상태 | C 범위 "펫 + 가챠" → "펫 + 스킨" | C |
+| `docs/STATUS.md` | 결정 변경 | 스킨 종족 전용 / 치장 종족 무관 / 가챠 스키마 삭제 3건 추가 | C |
+| `docs/인수인계.md` | C 절 | `/api/gacha/*`와 가챠 서술 삭제 | C |
+| `업무분담.md` | C 절, 데모 순서 | 가챠 항목 삭제 | C |
+| `docs/dev/diagnosis.md` | 15 | 이 절 | A (완료) |
+
+`CLAUDE.md`는 가챠 언급이 없어 손댈 것이 없다.
+
+### 적용 순서
+
+1. `feat/pet` → `develop` 머지 (가챠 스키마 삭제분이 여기 있다)
+2. `prisma/schema.prisma` 수정 → E가 `migrate dev` 1회 → 나머지 4인 `migrate deploy`
+3. 늑대·삵·판다 `DELETE` → `npm run db:seed`
+4. C 코드 6곳 + 문서
+5. `npm run build`, `npm run check:pet`
 
 ### 뒤집히는 기존 결정
 
