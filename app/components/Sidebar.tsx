@@ -5,6 +5,7 @@ import Link from "next/link"
 import { usePathname } from "next/navigation"
 import { TRIBE } from "@/lib/types"
 import type { TypeCode } from "@prisma/client"
+import styles from "./Sidebar.module.css"
 
 type ProfileData = {
   nickname: string
@@ -12,6 +13,7 @@ type ProfileData = {
   seeds: number
   level: number
   createdAt: string
+  imageUrl: string | null
 }
 
 function getBgColor(hex: string): string {
@@ -24,11 +26,9 @@ function getBgColor(hex: string): string {
   return map[hex] || "#F5F0E8"
 }
 
-function getStageEmoji(typeCode: TypeCode | null, level: number): string {
+function getStageEmoji(typeCode: TypeCode | null): string {
   if (!typeCode) return "🌱"
   const tribe = TRIBE[typeCode]
-  const stage = level >= 15 ? 2 : level >= 5 ? 1 : 0
-  // 임시: emoji만 반환 (S3 이미지 전까지)
   return tribe.emoji
 }
 
@@ -55,6 +55,7 @@ export function Sidebar() {
           seeds: petData.data?.seeds || 0,
           level: petData.data?.level || 1,
           createdAt: diagData.data?.createdAt || new Date().toISOString(),
+          imageUrl: petData.data?.imageUrl || null,
         })
       })
       .catch(() => {
@@ -64,6 +65,7 @@ export function Sidebar() {
           seeds: 0,
           level: 1,
           createdAt: new Date().toISOString(),
+          imageUrl: null,
         })
       })
       .finally(() => setLoading(false))
@@ -90,33 +92,11 @@ export function Sidebar() {
 
   return (
     <>
-      <aside
-        style={{
-          width: 240,
-          flexShrink: 0,
-          background: "#FDFBF5",
-          borderRight: "1px solid #DDD0BC",
-          display: "flex",
-          flexDirection: "column",
-          height: "100%",
-          position: "relative",
-          zIndex: 10,
-        }}
-      >
+      <aside className={styles.sidebar}>
         {/* Logo */}
-        <div style={{ padding: "28px 24px 20px", borderBottom: "1px solid #EDE5D0" }}>
-          <h1
-            style={{
-              fontFamily: "'Gowun Dodum', sans-serif",
-              fontSize: 18,
-              color: "#2A1F14",
-              margin: 0,
-              lineHeight: 1.3,
-            }}
-          >
-            함께 걷는 하루
-          </h1>
-          <p style={{ margin: "4px 0 0", fontSize: 11, color: "#9A8A76" }}>작은 한 걸음, 매일</p>
+        <div className={styles.logo}>
+          <h1 className={styles.logoTitle}>함께 걷는 하루</h1>
+          <p className={styles.logoSubtitle}>작은 한 걸음, 매일</p>
         </div>
 
         {/* Profile card */}
@@ -132,9 +112,24 @@ export function Sidebar() {
                 alignItems: "center",
                 justifyContent: "center",
                 fontSize: 22,
+                overflow: "hidden",
               }}
             >
-              {getStageEmoji(profile.typeCode, profile.level)}
+              {profile.imageUrl ? (
+                // eslint-disable-next-line @next/next/no-img-element
+                <img
+                  src={profile.imageUrl}
+                  alt="펫"
+                  style={{ width: "100%", height: "100%", objectFit: "cover" }}
+                  onError={(e) => {
+                    e.currentTarget.style.display = "none"
+                    if (e.currentTarget.nextSibling) {
+                      ;(e.currentTarget.nextSibling as HTMLElement).style.display = "block"
+                    }
+                  }}
+                />
+              ) : null}
+              <span style={{ display: profile.imageUrl ? "none" : "block" }}>{getStageEmoji(profile.typeCode)}</span>
             </div>
             <div style={{ flex: 1, minWidth: 0 }}>
               <p
@@ -194,17 +189,17 @@ export function Sidebar() {
                 <span style={{ fontSize: 18, width: 24, textAlign: "center", flexShrink: 0 }}>{emoji}</span>
                 <div>
                   <p
+                    className={styles.navLabel}
                     style={{
-                      margin: 0,
-                      fontSize: 13,
                       fontWeight: active ? 700 : 500,
                       color: active ? "white" : "#2A1F14",
-                      fontFamily: "'Noto Sans KR', sans-serif",
                     }}
                   >
                     {label}
                   </p>
-                  <p style={{ margin: 0, fontSize: 10, color: active ? "rgba(255,255,255,0.75)" : "#9A8A76" }}>{desc}</p>
+                  <p className={styles.navDesc} style={{ color: active ? "rgba(255,255,255,0.75)" : "#9A8A76" }}>
+                    {desc}
+                  </p>
                 </div>
               </Link>
             )
@@ -321,7 +316,34 @@ export function Sidebar() {
                   gap: 16,
                 }}
               >
-                <div style={{ fontSize: 52 }}>{tribe?.emoji || "🌱"}</div>
+                <div
+                  style={{
+                    width: 52,
+                    height: 52,
+                    display: "flex",
+                    alignItems: "center",
+                    justifyContent: "center",
+                    fontSize: 52,
+                    overflow: "hidden",
+                    borderRadius: "50%",
+                  }}
+                >
+                  {profile.imageUrl ? (
+                    // eslint-disable-next-line @next/next/no-img-element
+                    <img
+                      src={profile.imageUrl}
+                      alt="펫"
+                      style={{ width: "100%", height: "100%", objectFit: "cover" }}
+                      onError={(e) => {
+                        e.currentTarget.style.display = "none"
+                        if (e.currentTarget.nextSibling) {
+                          ;(e.currentTarget.nextSibling as HTMLElement).style.display = "block"
+                        }
+                      }}
+                    />
+                  ) : null}
+                  <span style={{ display: profile.imageUrl ? "none" : "block" }}>{tribe?.emoji || "🌱"}</span>
+                </div>
                 <div style={{ textAlign: "left" }}>
                   <p style={{ fontFamily: "'Gowun Dodum', sans-serif", fontSize: 18, color: "#2A1F14", margin: "0 0 3px" }}>
                     {profile.nickname}
@@ -355,10 +377,6 @@ export function Sidebar() {
                   </div>
                 ))}
               </div>
-
-              <p style={{ fontSize: 12, color: "#9A8A76", textAlign: "center" }}>
-                실제 사용자 정보는 추후 API 연결 예정
-              </p>
             </div>
           </div>
         </div>

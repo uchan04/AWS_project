@@ -14,12 +14,19 @@ export async function GET() {
     // 지급은 POST /api/pet/idle 만 한다 — 조회에 쓰기를 섞지 않는다
     const idle = idleAccrual(user.lastIdleClaimAt, new Date())
 
+    const evolutionStage = cappedStage(user.level, stageCount)
+
+    // S3 이미지 URL 생성
+    const cloudfront = process.env.CLOUDFRONT_DOMAIN
+    const imageUrl =
+      cloudfront && user.activePetSkin
+        ? `${cloudfront}/${user.activePetSkin.imageKeyBase}-${evolutionStage}.png`
+        : null
+
     return ok({
       level: user.level,
       exp: user.exp,
-      // 저장값이 레벨과 어긋나 있어도 화면은 레벨 기준으로 보여준다.
-      // (미션 보상이 씨앗만 올리고 진화 단계를 갱신하지 않은 경우 등)
-      evolutionStage: cappedStage(user.level, stageCount),
+      evolutionStage,
       seeds: user.seeds,
       idle: {
         seeds: calculateReward(user.activePetSkin, { seeds: idle.seeds }).seeds ?? 0,
@@ -28,6 +35,7 @@ export async function GET() {
       },
       typeCode: user.typeCode,
       nickname: user.nickname,
+      imageUrl,
       skin: user.activePetSkin
         ? {
             name: user.activePetSkin.name,

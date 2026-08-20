@@ -137,8 +137,8 @@ export async function completeMission(params: {
         affinity: mission.rewardAffinity,
       },
     }
-  } catch (err: any) {
-    if (err.code === "P2002") {
+  } catch (err) {
+    if (err && typeof err === "object" && "code" in err && err.code === "P2002") {
       // 중복 완료 → 추가 보상 0
       return {
         newlyCompleted: false,

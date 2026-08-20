@@ -33,12 +33,14 @@ export async function POST(req: Request) {
     })
 
     return ok(result)
-  } catch (err: any) {
-    if (err.message === "로그인이 필요합니다") {
-      return fail("UNAUTHORIZED", err.message, 401)
-    }
-    if (err.message.includes("허용되지 않은") || err.message.includes("초과")) {
-      return fail("INVALID_FILE", err.message, 400)
+  } catch (err) {
+    if (err instanceof Error) {
+      if (err.message === "로그인이 필요합니다") {
+        return fail("UNAUTHORIZED", err.message, 401)
+      }
+      if (err.message.includes("허용되지 않은") || err.message.includes("초과")) {
+        return fail("INVALID_FILE", err.message, 400)
+      }
     }
     console.error("POST /api/upload/presign error:", err)
     return fail("INTERNAL_ERROR", "업로드 URL 생성 중 오류가 발생했습니다", 500)

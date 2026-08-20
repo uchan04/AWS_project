@@ -2,7 +2,7 @@
 
 import { useState, useRef, useEffect, useCallback } from "react"
 import styles from "./mission-ui.module.css"
-import type { DashboardDTO, MissionDTO, StageMissionDTO } from "@/lib/missions/dashboard"
+import type { DashboardDTO, MissionDTO } from "@/lib/missions/dashboard"
 
 // ─── 미션 화면 전용 색상 (Figma 원본) ──────────────────────────────────────
 
@@ -428,7 +428,7 @@ interface StepSectionProps {
   onSelect: (m: MissionDTO) => void
 }
 
-function StepSection({ title, subtitle, missions, color, bg, mascotEmoji, unlocked = true, progress, onSelect }: StepSectionProps) {
+function StepSection({ title, subtitle, missions, color, bg, unlocked = true, progress, onSelect }: StepSectionProps) {
   return (
     <section style={{ marginBottom: 36 }}>
       <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: 14 }}>
@@ -655,26 +655,47 @@ export default function MissionDashboard() {
   const [selected, setSelected] = useState<MissionDTO | null>(null)
 
   const loadDashboard = useCallback(async () => {
-    setLoading(true)
-    setError(null)
     try {
       const res = await fetch("/api/missions")
       const json = await res.json()
       if (!res.ok) {
         setError(json.error?.message || "미션을 불러올 수 없습니다")
+        setLoading(false)
         return
       }
       setDashboard(json.data)
-    } catch (err) {
+      setLoading(false)
+    } catch {
       setError("네트워크 오류가 발생했습니다")
-    } finally {
       setLoading(false)
     }
   }, [])
 
   useEffect(() => {
-    loadDashboard()
-  }, [loadDashboard])
+    let mounted = true
+    async function load() {
+      try {
+        const res = await fetch("/api/missions")
+        const json = await res.json()
+        if (!mounted) return
+        if (!res.ok) {
+          setError(json.error?.message || "미션을 불러올 수 없습니다")
+          setLoading(false)
+          return
+        }
+        setDashboard(json.data)
+        setLoading(false)
+      } catch {
+        if (!mounted) return
+        setError("네트워크 오류가 발생했습니다")
+        setLoading(false)
+      }
+    }
+    void load()
+    return () => {
+      mounted = false
+    }
+  }, [])
 
   if (loading) {
     return (
