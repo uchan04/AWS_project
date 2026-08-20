@@ -8,8 +8,9 @@
 //
 // 스타일은 design.md가 정한다. Hallmark · macrostructure: Conversational FAQ.
 
+import Link from "next/link"
 import { useRouter } from "next/navigation"
-import { useMemo, useState } from "react"
+import { useEffect, useMemo, useState } from "react"
 import {
   TAIL_QUESTION_CODES,
   canDecide,
@@ -18,7 +19,7 @@ import {
 } from "@/lib/diagnosis/adaptive"
 import type { Answer } from "@/lib/diagnosis/indicators"
 import "@/styles/tokens.css"
-import { completeDiagnosis } from "./api"
+import { checkAuth, completeDiagnosis } from "./api"
 
 /**
  * 진행률. 총 문항 수는 사람마다 달라서 쓸 수 없으므로 "좁혀진 정도"로 센다.
@@ -43,6 +44,26 @@ export default function DiagnosisPage() {
   const [answers, setAnswers] = useState<Answer[]>([])
   // 완료 API 실패 시 답변을 잃지 않는다. 같은 답변으로 다시 보낼 수 있게 화면을 유지한다
   const [error, setError] = useState<string | null>(null)
+  // 문항을 그리기 전에 로그인을 확인한다. 미인증이면 완료 API가 401을 내는데,
+  // 그때는 이미 문항을 다 푼 뒤라 3분을 쓰고 나서야 로그인이 필요하다는 걸 알게 된다
+  const [authState, setAuthState] = useState<"checking" | "authed" | "guest">("checking")
+
+  useEffect(() => {
+    let ignore = false
+    // setState는 비동기 콜백 안에서만 부른다(react-hooks/set-state-in-effect)
+    checkAuth()
+      .then((authed) => {
+        if (!ignore) setAuthState(authed ? "authed" : "guest")
+      })
+      .catch(() => {
+        // 확인에 실패하면 막는 쪽으로 둔다. 통과시켰다가 완료 시점에 401이 나면
+        // 답변을 다 하고 나서 로그인 안내를 받게 되는데, 그게 이 게이트가 없애려는 상황이다
+        if (!ignore) setAuthState("guest")
+      })
+    return () => {
+      ignore = true
+    }
+  }, [])
 
   const question = useMemo(() => nextQuestion(answers), [answers])
   const almostDone = useMemo(() => canDecide(answers), [answers])
@@ -65,6 +86,35 @@ export default function DiagnosisPage() {
     setAnswers(next)
     if (nextQuestion(next)) return
     void submit(next)
+  }
+
+  if (authState === "checking") {
+    return (
+      <main className="hm hm--canvas">
+        <div className="hm__col hm-ask">
+          <p className="hm__note">로그인 상태를 확인하고 있어요…</p>
+        </div>
+      </main>
+    )
+  }
+
+  // 문항을 시작하기 전에 막는다. 답을 다 한 뒤에 401을 받는 것보다 낫다
+  if (authState === "guest") {
+    return (
+      <main className="hm hm--canvas">
+        <div className="hm__col hm-ask">
+          <div className="hm-card">
+            <p>로그인이 필요합니다</p>
+            <button type="button" onClick={() => router.push("/signup")} className="hm-btn hm-card__cta">
+              회원가입하러 가기
+            </button>
+            <Link href="/login" className="hm-link">
+              이미 계정이 있으신가요? 로그인
+            </Link>
+          </div>
+        </div>
+      </main>
+    )
   }
 
   // 마지막 답변 직후. 결과 화면으로 넘어가는 사이에 보인다
