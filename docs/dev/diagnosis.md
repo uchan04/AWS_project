@@ -94,7 +94,7 @@ DB가 아직 없다(`DATABASE_URL` 미공유). **DB가 필요 없는 것부터 �
 - Bedrock 연결 확인 미완 (E 대기). 4단계(자유 입력 enum 변환·근거 3줄 요약)에서 필요하고, 그전까지 진단은 선택지 버튼만으로 끝까지 동작한다
 - `prisma/seed/items.ts`의 펫 3종이 아직 옛 동물 매핑이다. **C 담당 파일이라 내가 못 고친다.** 첫 `npm run db:seed`보다 먼저 고쳐야 한다. 그래서 `activePetSkinId`가 아직 `null`이고 홈·결과의 마스코트는 이모지다
 - 홈 미션 미리보기가 아직 `prisma/seed/missions.ts`의 `DAILY` 배열을 읽는다. B가 `GET /api/missions`를 올리면 그쪽으로 바꾼다(2장 마지막 항목)
-- 하단 탭 제거 + 사이드바 단일 구조가 아직 적용되지 않았다. E 작업분이고, 적용되면 A가 `styles/tokens.css`의 `--nav-h`를 되돌린다(12장)
+- ~~하단 탭 제거 + 사이드바 단일 구조가 아직 적용되지 않았다~~ — 적용됐다(2026-08-20). E가 아니라 **B**가 `app/components/Sidebar.tsx`를 만들고 `app/layout.tsx`에서 `BottomNav`를 뺐다(`65308c4`). A는 그에 맞춰 `styles/tokens.css`의 `--nav-h`를 지우고 `min-height: 100dvh`로 되돌렸다. 남은 뒷정리는 A 몫이 아니다 — 15장 "머지 후 발견한 문제" 참고
 - Google 로그인 전용 결정이 `SPEC.md` 10절("소셜 로그인은 쓰지 않는다")과 `CLAUDE.md` 8절과 충돌한다. 둘 다 공유 문서라 임의로 안 고친다
 
 ---
@@ -937,3 +937,24 @@ DELETE FROM "CosmeticItem" WHERE "name" IN (
 **재진단하면 옛 종족 스킨이 유령이 된다.** `app/api/diagnosis/complete/route.ts`가 새 `typeCode`의 기본 외형으로 `activePetSkinId`를 다시 심으므로 화면은 깨지지 않는다. 다만 `UserPetSkin`에 남은 옛 종족 스킨은 상점·목록 어디에도 안 보인 채로 소유 기록만 남는다. 별조각 환불이든 유지든 정책이 필요하다. 지금 `UserPetSkin`이 1건뿐이라 정하기에 가장 싼 시점이다.
 
 ~~**이 작업은 `feat/pet` 머지가 먼저다.**~~ — `feat/pet`은 `develop`에 들어갔고 A도 `develop`을 받았다. 위 파일들은 이제 `feat/diagnosis`에 다 있다.
+
+### 머지 후 발견한 문제 (2026-08-20, `feat/missions` 머지 뒤 검증)
+
+B가 `feat/missions`를 `develop`에 머지해(`3adbea5`) 5인 중 4인이 통합됐다. D만 5커밋 남았고 예측 충돌은 `docs/STATUS.md` 1건뿐이다. 통합 검증은 전부 통과했다 — 충돌 마커 0건, `npm run build` 통과(라우트 31개), 마이그레이션 3개 중복 없음, 실 DB 드리프트 없음, 체크 스크립트 3종 통과, 화면 7장·API 6종 200 + 실데이터, 재화 증감은 B도 `calculateReward()`를 경유한다.
+
+기능은 합쳐졌지만 내비 교체 때문에 다음이 남았다. **번호별 담당은 커밋 작성자로 확인했다**(`Yoon` = B, `uchan04` = E, `centreject` = A).
+
+| # | 문제 | 고칠 사람 |
+|---|---|---|
+| 1 | `app/components/Sidebar.tsx:8`의 `TEMP_SIDEBAR_PROFILE`이 하드코딩이다. 화면엔 "고요한 고양이 / 씨앗 42개 / Lv.3", 실제 `GET /api/pet`은 "밤바다 / 씨앗 0 / Lv.1". 발표 시연에서 그대로 보인다 | B |
+| 2 | 같은 파일이 `CHARACTER_COLOR`·`CHARACTER_LABEL`을 다시 정의해 종족 색·표시명이 3중 정의가 됐다(8/19에 닫은 차단 5번과 같은 문제). 출처는 `lib/types.ts`의 `TRIBE`다 | B |
+| 3 | `app/layout.tsx:16`이 `<main>`을 열고 A·C 화면도 `<main className="hm">`을 열어 `/`·`/diagnosis`에 `<main>`이 2개다. 유효하지 않은 HTML이고 랜드마크가 중복된다. layout 한 곳에서 `<div>`로 바꾸는 것이 화면 6장을 고치는 것보다 싸다 | E |
+| 4 | 결정 9번이 정한 "진단 문항 화면에서 내비 숨김"이 빠졌다. `Sidebar.tsx`에 `usePathname`은 이미 있고 경로 분기만 없다 | B |
+| 5 | ~~죽은 `--nav-h`~~ 고쳤다(아래). 고아가 된 `app/components/BottomNav.tsx`는 아무도 import하지 않는다 — 삭제는 E 몫 | A(완료) / E |
+| 6 | `BEDROCK_VISION_MODEL_ID`가 Amplify 환경변수에 없다. `lib/missions/vision.ts:7`이 `us.amazon.nova-2-lite-v1:0`으로 폴백해 죽지는 않는다 | E |
+
+**5번 A 몫은 처리했다.** `styles/tokens.css`에서 `--nav-h: calc(2.5rem + 1px)`와 `min-height: calc(100dvh - var(--nav-h))`를 `min-height: 100dvh`로 되돌렸다. 근거는 `app/layout.tsx`이 화면 전체를 flex로 잡고 본문 칸에 `overflow-y: auto`를 걸어 그 칸의 높이가 정확히 뷰포트이기 때문이다. 실측으로 `--nav-h`가 사라졌고 `.hm`의 `min-height`(709.6px)가 스크롤 칸 높이(710px)와 맞는 것을 확인했다.
+
+**B가 E 소유 공유 파일 4개를 브랜치에서 고쳤다** — `app/layout.tsx`·`app/globals.css`(`65308c4`), `.env.example`(`7890af4`), 그리고 내비인 `Sidebar.tsx` 신규. `CLAUDE.md` 1절이 금지한 것이다. E가 같은 기간에 그 파일들을 안 건드려 충돌은 안 났다. 결정 9번은 사이드바를 E에게 배정했는데 B가 먼저 구현한 상태라, **소유권을 E에게 되돌릴지 사이드바만 B에게 넘길지 팀이 정해야 한다.** 안 정하면 남은 이틀 동안 둘이 같은 파일을 각자 고친다.
+
+`npm run lint` 에러는 12건으로 늘었다 — B 11건(`any` 8, `set-state-in-effect` 1 등), D 1건(`PostDetailModal.tsx:54`). A는 0건이다. 빌드는 통과하므로 Amplify 배포는 막히지 않는다.
