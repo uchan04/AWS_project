@@ -5,13 +5,17 @@ import Link from "next/link"
 import { usePathname } from "next/navigation"
 import { TRIBE } from "@/lib/types"
 import type { TypeCode } from "@prisma/client"
+import styles from "./Sidebar.module.css"
 
 type ProfileData = {
   nickname: string
   typeCode: TypeCode | null
   seeds: number
+  affinity: number
+  starShards: number
   level: number
   createdAt: string
+  imageUrl: string | null
 }
 
 function getBgColor(hex: string): string {
@@ -24,11 +28,9 @@ function getBgColor(hex: string): string {
   return map[hex] || "#F5F0E8"
 }
 
-function getStageEmoji(typeCode: TypeCode | null, level: number): string {
+function getStageEmoji(typeCode: TypeCode | null): string {
   if (!typeCode) return "🌱"
   const tribe = TRIBE[typeCode]
-  const stage = level >= 15 ? 2 : level >= 5 ? 1 : 0
-  // 임시: emoji만 반환 (S3 이미지 전까지)
   return tribe.emoji
 }
 
@@ -44,29 +46,60 @@ export function Sidebar() {
   const [showAccount, setShowAccount] = useState(false)
   const [profile, setProfile] = useState<ProfileData | null>(null)
   const [loading, setLoading] = useState(true)
+  const [compact, setCompact] = useState(false)
 
   useEffect(() => {
-    Promise.all([fetch("/api/pet"), fetch("/api/diagnosis/me")])
-      .then(([petRes, diagRes]) => Promise.all([petRes.json(), diagRes.json()]))
-      .then(([petData, diagData]) => {
-        setProfile({
-          nickname: diagData.data?.nickname || "익명",
-          typeCode: diagData.data?.typeCode || null,
-          seeds: petData.data?.seeds || 0,
-          level: petData.data?.level || 1,
-          createdAt: diagData.data?.createdAt || new Date().toISOString(),
+    function loadProfile() {
+      Promise.all([fetch("/api/pet"), fetch("/api/diagnosis/me")])
+        .then(([petRes, diagRes]) => Promise.all([petRes.json(), diagRes.json()]))
+        .then(([petData, diagData]) => {
+          setProfile({
+            nickname: diagData.data?.nickname || "익명",
+            typeCode: diagData.data?.typeCode || null,
+            seeds: petData.data?.seeds || 0,
+            affinity: petData.data?.affinity || 0,
+            starShards: petData.data?.starShards || 0,
+            level: petData.data?.level || 1,
+            createdAt: diagData.data?.createdAt || new Date().toISOString(),
+            imageUrl: petData.data?.imageUrl || null,
+          })
         })
-      })
-      .catch(() => {
-        setProfile({
-          nickname: "익명",
-          typeCode: null,
-          seeds: 0,
-          level: 1,
-          createdAt: new Date().toISOString(),
+        .catch(() => {
+          setProfile({
+            nickname: "익명",
+            typeCode: null,
+            seeds: 0,
+            affinity: 0,
+            starShards: 0,
+            level: 1,
+            createdAt: new Date().toISOString(),
+            imageUrl: null,
+          })
         })
-      })
-      .finally(() => setLoading(false))
+        .finally(() => setLoading(false))
+    }
+
+    loadProfile()
+
+    // 미션 완료 시 씨앗 갱신
+    function handleMissionComplete() {
+      loadProfile()
+    }
+    window.addEventListener("mission-completed", handleMissionComplete)
+
+    return () => {
+      window.removeEventListener("mission-completed", handleMissionComplete)
+    }
+  }, [])
+
+  // 화면 크기 감지
+  useEffect(() => {
+    function checkWidth() {
+      setCompact(window.innerWidth <= 768)
+    }
+    checkWidth()
+    window.addEventListener("resize", checkWidth)
+    return () => window.removeEventListener("resize", checkWidth)
   }, [])
 
   // 진단 문항 화면에서 숨김
@@ -90,38 +123,25 @@ export function Sidebar() {
 
   return (
     <>
-      <aside
-        style={{
-          width: 240,
-          flexShrink: 0,
-          background: "#FDFBF5",
-          borderRight: "1px solid #DDD0BC",
-          display: "flex",
-          flexDirection: "column",
-          height: "100%",
-          position: "relative",
-          zIndex: 10,
-        }}
-      >
+      <aside className={styles.sidebar}>
         {/* Logo */}
-        <div style={{ padding: "28px 24px 20px", borderBottom: "1px solid #EDE5D0" }}>
-          <h1
-            style={{
-              fontFamily: "'Gowun Dodum', sans-serif",
-              fontSize: 18,
-              color: "#2A1F14",
-              margin: 0,
-              lineHeight: 1.3,
-            }}
-          >
-            함께 걷는 하루
-          </h1>
-          <p style={{ margin: "4px 0 0", fontSize: 11, color: "#9A8A76" }}>작은 한 걸음, 매일</p>
+        <div className={styles.logo}>
+          <h1 className={styles.logoTitle}>함께 걷는 하루</h1>
+          <p className={styles.logoSubtitle}>작은 한 걸음, 매일</p>
         </div>
 
         {/* Profile card */}
-        <div style={{ margin: "16px 16px 8px", background: bg, borderRadius: 16, padding: "16px" }}>
-          <div style={{ display: "flex", alignItems: "center", gap: 10, marginBottom: 10 }}>
+        {compact ? (
+          <div
+            style={{
+              margin: "8px",
+              background: bg,
+              borderRadius: 12,
+              padding: "12px 8px",
+              display: "flex",
+              justifyContent: "center",
+            }}
+          >
             <div
               style={{
                 width: 40,
@@ -132,37 +152,90 @@ export function Sidebar() {
                 alignItems: "center",
                 justifyContent: "center",
                 fontSize: 22,
+                overflow: "hidden",
               }}
             >
-              {getStageEmoji(profile.typeCode, profile.level)}
+              {profile.imageUrl ? (
+                // eslint-disable-next-line @next/next/no-img-element
+                <img
+                  src={profile.imageUrl}
+                  alt="펫"
+                  style={{ width: "100%", height: "100%", objectFit: "cover" }}
+                  onError={(e) => {
+                    e.currentTarget.style.display = "none"
+                    if (e.currentTarget.nextSibling) {
+                      ;(e.currentTarget.nextSibling as HTMLElement).style.display = "block"
+                    }
+                  }}
+                />
+              ) : null}
+              <span style={{ display: profile.imageUrl ? "none" : "block" }}>{getStageEmoji(profile.typeCode)}</span>
             </div>
-            <div style={{ flex: 1, minWidth: 0 }}>
-              <p
+          </div>
+        ) : (
+          <div style={{ margin: "16px 16px 8px", background: bg, borderRadius: 16, padding: "16px" }}>
+            <div style={{ display: "flex", alignItems: "center", gap: 10, marginBottom: 10 }}>
+              <div
                 style={{
-                  margin: 0,
-                  fontFamily: "'Gowun Dodum', sans-serif",
-                  fontSize: 14,
-                  color: "#2A1F14",
+                  width: 40,
+                  height: 40,
+                  borderRadius: "50%",
+                  background: "white",
+                  display: "flex",
+                  alignItems: "center",
+                  justifyContent: "center",
+                  fontSize: 22,
                   overflow: "hidden",
-                  textOverflow: "ellipsis",
-                  whiteSpace: "nowrap",
                 }}
               >
-                {profile.nickname}
-              </p>
-              <p style={{ margin: "1px 0 0", fontSize: 11, color, fontWeight: 700 }}>
-                {tribe?.emoji || "🌱"} {familyLabel}
-              </p>
+                {profile.imageUrl ? (
+                  // eslint-disable-next-line @next/next/no-img-element
+                  <img
+                    src={profile.imageUrl}
+                    alt="펫"
+                    style={{ width: "100%", height: "100%", objectFit: "cover" }}
+                    onError={(e) => {
+                      e.currentTarget.style.display = "none"
+                      if (e.currentTarget.nextSibling) {
+                        ;(e.currentTarget.nextSibling as HTMLElement).style.display = "block"
+                      }
+                    }}
+                  />
+                ) : null}
+                <span style={{ display: profile.imageUrl ? "none" : "block" }}>{getStageEmoji(profile.typeCode)}</span>
+              </div>
+              <div style={{ flex: 1, minWidth: 0 }}>
+                <div style={{ display: "flex", alignItems: "center", gap: 6, marginBottom: 2 }}>
+                  <p
+                    style={{
+                      margin: 0,
+                      fontFamily: "'Gowun Dodum', sans-serif",
+                      fontSize: 14,
+                      color: "#2A1F14",
+                      overflow: "hidden",
+                      textOverflow: "ellipsis",
+                      whiteSpace: "nowrap",
+                    }}
+                  >
+                    {profile.nickname}
+                  </p>
+                  <span style={{ fontSize: 11, color: "#9A8A76", fontWeight: 600 }}>Lv.{profile.level}</span>
+                </div>
+                <p style={{ margin: 0, fontSize: 11, color, fontWeight: 700 }}>
+                  {tribe?.emoji || "🌱"} {familyLabel}
+                </p>
+              </div>
+            </div>
+            <div style={{ display: "flex", flexDirection: "column", gap: 3, fontSize: 11, color: "#7A6B58", marginTop: 8 }}>
+              <span>🌱 씨앗 {profile.seeds}개</span>
+              <span>💖 친밀도 {profile.affinity}</span>
+              <span>⭐ 별조각 {profile.starShards}</span>
             </div>
           </div>
-          <div style={{ display: "flex", justifyContent: "space-between", fontSize: 11, color: "#7A6B58" }}>
-            <span>🌱 씨앗 {profile.seeds}개</span>
-            <span>Lv.{profile.level}</span>
-          </div>
-        </div>
+        )}
 
         {/* Nav */}
-        <nav style={{ flex: 1, padding: "8px 12px", overflowY: "auto" }}>
+        <nav style={{ flex: 1, padding: compact ? "8px 4px" : "8px 12px", overflowY: "auto" }}>
           {TABS.map(({ href, label, emoji, desc }) => {
             const active = pathname === href
             return (
@@ -173,8 +246,9 @@ export function Sidebar() {
                   width: "100%",
                   display: "flex",
                   alignItems: "center",
-                  gap: 12,
-                  padding: "10px 12px",
+                  justifyContent: compact ? "center" : "flex-start",
+                  gap: compact ? 0 : 12,
+                  padding: compact ? "10px 8px" : "10px 12px",
                   border: "none",
                   borderRadius: 12,
                   background: active ? color : "transparent",
@@ -191,36 +265,43 @@ export function Sidebar() {
                   if (!active) e.currentTarget.style.background = "transparent"
                 }}
               >
-                <span style={{ fontSize: 18, width: 24, textAlign: "center", flexShrink: 0 }}>{emoji}</span>
-                <div>
-                  <p
-                    style={{
-                      margin: 0,
-                      fontSize: 13,
-                      fontWeight: active ? 700 : 500,
-                      color: active ? "white" : "#2A1F14",
-                      fontFamily: "'Noto Sans KR', sans-serif",
-                    }}
-                  >
-                    {label}
-                  </p>
-                  <p style={{ margin: 0, fontSize: 10, color: active ? "rgba(255,255,255,0.75)" : "#9A8A76" }}>{desc}</p>
-                </div>
+                {compact ? (
+                  <span style={{ fontSize: 20 }}>{emoji}</span>
+                ) : (
+                  <>
+                    <span style={{ fontSize: 18, width: 24, textAlign: "center", flexShrink: 0 }}>{emoji}</span>
+                    <div>
+                      <p
+                        className={styles.navLabel}
+                        style={{
+                          fontWeight: active ? 700 : 500,
+                          color: active ? "white" : "#2A1F14",
+                        }}
+                      >
+                        {label}
+                      </p>
+                      <p className={styles.navDesc} style={{ color: active ? "rgba(255,255,255,0.75)" : "#9A8A76" }}>
+                        {desc}
+                      </p>
+                    </div>
+                  </>
+                )}
               </Link>
             )
           })}
         </nav>
 
         {/* Footer — 내 계정 */}
-        <div style={{ padding: "12px 16px 20px", borderTop: "1px solid #EDE5D0" }}>
+        <div style={{ padding: compact ? "8px 4px 12px" : "12px 16px 20px", borderTop: "1px solid #EDE5D0" }}>
           <button
             onClick={() => setShowAccount(true)}
             style={{
               width: "100%",
               display: "flex",
               alignItems: "center",
-              gap: 10,
-              padding: "10px 12px",
+              justifyContent: compact ? "center" : "flex-start",
+              gap: compact ? 0 : 10,
+              padding: compact ? "10px 8px" : "10px 12px",
               border: "1px solid #DDD0BC",
               borderRadius: 12,
               background: "transparent",
@@ -236,16 +317,18 @@ export function Sidebar() {
             }}
           >
             <span style={{ fontSize: 16 }}>👤</span>
-            <span
-              style={{
-                fontSize: 13,
-                color: "#5A4A3A",
-                fontFamily: "'Noto Sans KR', sans-serif",
-                fontWeight: 500,
-              }}
-            >
-              내 계정
-            </span>
+            {!compact && (
+              <span
+                style={{
+                  fontSize: 13,
+                  color: "#5A4A3A",
+                  fontFamily: "'Noto Sans KR', sans-serif",
+                  fontWeight: 500,
+                }}
+              >
+                내 계정
+              </span>
+            )}
           </button>
         </div>
       </aside>
@@ -321,7 +404,34 @@ export function Sidebar() {
                   gap: 16,
                 }}
               >
-                <div style={{ fontSize: 52 }}>{tribe?.emoji || "🌱"}</div>
+                <div
+                  style={{
+                    width: 52,
+                    height: 52,
+                    display: "flex",
+                    alignItems: "center",
+                    justifyContent: "center",
+                    fontSize: 52,
+                    overflow: "hidden",
+                    borderRadius: "50%",
+                  }}
+                >
+                  {profile.imageUrl ? (
+                    // eslint-disable-next-line @next/next/no-img-element
+                    <img
+                      src={profile.imageUrl}
+                      alt="펫"
+                      style={{ width: "100%", height: "100%", objectFit: "cover" }}
+                      onError={(e) => {
+                        e.currentTarget.style.display = "none"
+                        if (e.currentTarget.nextSibling) {
+                          ;(e.currentTarget.nextSibling as HTMLElement).style.display = "block"
+                        }
+                      }}
+                    />
+                  ) : null}
+                  <span style={{ display: profile.imageUrl ? "none" : "block" }}>{tribe?.emoji || "🌱"}</span>
+                </div>
                 <div style={{ textAlign: "left" }}>
                   <p style={{ fontFamily: "'Gowun Dodum', sans-serif", fontSize: 18, color: "#2A1F14", margin: "0 0 3px" }}>
                     {profile.nickname}
@@ -356,9 +466,62 @@ export function Sidebar() {
                 ))}
               </div>
 
-              <p style={{ fontSize: 12, color: "#9A8A76", textAlign: "center" }}>
-                실제 사용자 정보는 추후 API 연결 예정
-              </p>
+              <div style={{ display: "flex", flexDirection: "column", gap: 8 }}>
+                <button
+                  onClick={() => {
+                    window.location.href = "/diagnosis"
+                  }}
+                  style={{
+                    width: "100%",
+                    padding: "12px",
+                    background: "#F5F0E8",
+                    border: "1px solid #DDD0BC",
+                    borderRadius: 12,
+                    fontSize: 13,
+                    color: "#5A4A3A",
+                    cursor: "pointer",
+                    fontWeight: 500,
+                    transition: "all 0.15s",
+                  }}
+                  onMouseEnter={(e) => {
+                    e.currentTarget.style.background = "#F0EAD8"
+                  }}
+                  onMouseLeave={(e) => {
+                    e.currentTarget.style.background = "#F5F0E8"
+                  }}
+                >
+                  다시 진단하기
+                </button>
+                <button
+                  onClick={() => {
+                    if (confirm("로그아웃하시겠습니까?")) {
+                      // TODO: Cognito 로그아웃 API 구현 필요 (E 담당)
+                      alert("로그아웃 기능은 인증 시스템 연동 후 활성화됩니다")
+                      // window.location.href = "/api/auth/logout"
+                    }
+                  }}
+                  style={{
+                    width: "100%",
+                    padding: "12px",
+                    background: "transparent",
+                    border: "1px solid #DDD0BC",
+                    borderRadius: 12,
+                    fontSize: 13,
+                    color: "#9A8A76",
+                    cursor: "pointer",
+                    fontWeight: 500,
+                    transition: "all 0.15s",
+                  }}
+                  onMouseEnter={(e) => {
+                    e.currentTarget.style.background = "#F0EAD8"
+                  }}
+                  onMouseLeave={(e) => {
+                    e.currentTarget.style.background = "transparent"
+                  }}
+                >
+                  로그아웃
+                </button>
+              </div>
             </div>
           </div>
         </div>

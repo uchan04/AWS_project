@@ -13,7 +13,7 @@ import Link from "next/link"
 import { useEffect, useState } from "react"
 import { NICKNAME_MAX, TRIBE, isValidNickname } from "@/lib/types"
 import "@/styles/tokens.css"
-import { type DiagnosisView, fetchMe, saveNickname } from "../api"
+import { type DiagnosisView, fetchMe, fetchReason, saveNickname } from "../api"
 
 type View = { status: "loading" } | { status: "empty" } | { status: "ok"; me: DiagnosisView }
 
@@ -25,6 +25,8 @@ export default function DiagnosisResultPage() {
   const [touched, setTouched] = useState(false)
   const [saving, setSaving] = useState(false)
   const [saveError, setSaveError] = useState<string | null>(null)
+  // 판정 근거 3줄. undefined = 아직 읽는 중, null = 못 만들었다(카드를 뺀다)
+  const [reason, setReason] = useState<string[] | null | undefined>(undefined)
 
   useEffect(() => {
     let alive = true
@@ -41,6 +43,16 @@ export default function DiagnosisResultPage() {
       .catch(() => {
         if (alive) setView({ status: "empty" })
       })
+
+    // 근거는 Bedrock 왕복이라 결과 화면보다 늦게 온다. 화면을 붙잡아 두지 않는다
+    fetchReason()
+      .then((lines) => {
+        if (alive) setReason(lines)
+      })
+      .catch(() => {
+        if (alive) setReason(null)
+      })
+
     return () => {
       alive = false
     }
@@ -113,6 +125,26 @@ export default function DiagnosisResultPage() {
           </div>
 
           <div className="hm-result__side">
+            {/* 판정 근거 3줄(SPEC 3절). 사용자가 고른 답을 되돌려 읽어주는 문장이며,
+                유형을 설명하지 않는다. 만들지 못했으면 이 카드만 빠진다 */}
+            {reason === undefined ? (
+              <p className="hm__note">방금 한 이야기를 정리하고 있어요…</p>
+            ) : reason ? (
+              <div className="hm-card hm-card--tribe">
+                <p className="hm__note">이렇게 들었어요</p>
+                <ul className="hm-check">
+                  {reason.map((line) => (
+                    <li key={line}>
+                      <span className="hm-check__mark" aria-hidden="true">
+                        ·
+                      </span>
+                      <span>{line}</span>
+                    </li>
+                  ))}
+                </ul>
+              </div>
+            ) : null}
+
             {/* 종족의 성격을 설명하지 않는다. 유형 설명은 낙인이 된다(SPEC 2절).
                 서비스가 무엇을 하는지만 적는다 */}
             <div className="hm-card">

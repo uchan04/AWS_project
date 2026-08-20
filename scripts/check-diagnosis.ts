@@ -4,6 +4,7 @@ import { canDecide, nextQuestion, possibleTypes } from "../lib/diagnosis/adaptiv
 import { classify } from "../lib/diagnosis/classify"
 import type { Answer } from "../lib/diagnosis/indicators"
 import { INDICATOR_QUESTIONS } from "../lib/diagnosis/questions"
+import { REASON_LINES, validateReasonLines } from "../lib/diagnosis/reason"
 
 // npm run check:diagnosis
 //
@@ -339,7 +340,28 @@ assert.equal(
   "Q1 + 형용사만으로도 판정된다",
 )
 
+// 근거 3줄(SPEC 3절)의 출력 검사. Bedrock 없이 도는 부분만 여기서 고정한다.
+// 낙인 단어 차단이 이 기능의 유일한 안전장치이므로 모델의 선의에 맡기지 않는다
+const GOOD = [
+  "고지서 날짜가 마음에 걸린다고 하셨죠. 작은 일부터 함께 챙겨볼게요.",
+  "혼자 지내고 있다고 하셨어요. 같은 종족과 익명으로 이야기할 수 있어요.",
+  "아침이 무겁다고 하셨죠. 오늘은 커튼 하나 여는 것부터 해볼까요.",
+]
+assert.equal(validateReasonLines(GOOD).length, REASON_LINES, "정상 3줄은 통과한다")
+assert.throws(() => validateReasonLines(GOOD.slice(0, 2)), /줄 수/, "2줄은 막는다")
+assert.throws(() => validateReasonLines([...GOOD.slice(0, 2), "  "]), /길이/, "빈 줄은 막는다")
+assert.throws(
+  () => validateReasonLines([...GOOD.slice(0, 2), "저소득 상황이시군요. 함께 해볼게요."]),
+  /쓸 수 없는 단어/,
+  "낙인 단어는 막는다",
+)
+assert.throws(
+  () => validateReasonLines([...GOOD.slice(0, 2), "당신은 건강·정서취약형 유형입니다."]),
+  /쓸 수 없는 단어/,
+  "유형명은 막는다",
+)
+
 const average = (totalAsked / SCENARIOS.length).toFixed(1)
 console.log(
-  `diagnosis 체크 통과 (시나리오 ${SCENARIOS.length}개, 경계쌍 3, 이상 입력 4) — 실제 문항 수 평균 ${average}개, 최대 ${maxAsked}개`,
+  `diagnosis 체크 통과 (시나리오 ${SCENARIOS.length}개, 경계쌍 3, 이상 입력 4, 근거 검사 5) — 실제 문항 수 평균 ${average}개, 최대 ${maxAsked}개`,
 )

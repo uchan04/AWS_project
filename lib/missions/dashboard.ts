@@ -1,4 +1,4 @@
-import type { TypeCode, User } from "@prisma/client"
+import type { User } from "@prisma/client"
 import { prisma } from "@/lib/prisma"
 import { getTodayKey } from "./reset"
 import { getStageProgress } from "./stages"
@@ -43,6 +43,7 @@ export type DashboardDTO = {
     claimedToday: boolean
     attendanceTotal: number
   }
+  userTypeCode: string | null
 }
 
 function getCompletionMode(mission: { code: string; requiresPhoto: boolean }): CompletionMode {
@@ -181,6 +182,7 @@ export async function buildDashboard(user: User): Promise<DashboardDTO> {
       claimedToday: claimedToday > 0,
       attendanceTotal: user.attendanceTotal,
     },
+    userTypeCode: user.typeCode,
   }
 }
 

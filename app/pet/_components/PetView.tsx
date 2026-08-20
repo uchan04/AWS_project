@@ -40,6 +40,8 @@ export type PetState = {
   effectLabel: string | null
   // 진단 전이면 null이다. data-tribe를 붙이지 않아 --tribe가 accent로 남는다
   typeCode: TypeCode | null
+  /** S3 펫 이미지 URL. CloudFront 도메인이 없거나 스킨이 없으면 null */
+  imageUrl: string | null
 }
 
 export default function PetView({ initial }: { initial: PetState }) {
@@ -79,6 +81,7 @@ export default function PetView({ initial }: { initial: PetState }) {
         exp: next.exp,
         evolutionStage: next.evolutionStage,
         seeds: next.seeds,
+        imageUrl: next.imageUrl ?? prev.imageUrl,
       }))
 
       // 진화 풀스크린 연출 2초 (SPEC.md 5절)
@@ -126,7 +129,21 @@ export default function PetView({ initial }: { initial: PetState }) {
 
         <div className="hm-plate hm-plate--hero hm-pet__plate" data-stage={stage}>
           <span className="hm-plate__disc hm-float" aria-hidden="true">
-            {emoji}
+            {pet.imageUrl ? (
+              // eslint-disable-next-line @next/next/no-img-element
+              <img
+                src={pet.imageUrl}
+                alt=""
+                style={{ width: "100%", height: "100%", objectFit: "cover", borderRadius: "50%" }}
+                onError={(e) => {
+                  e.currentTarget.style.display = "none"
+                  if (e.currentTarget.nextSibling) {
+                    ;(e.currentTarget.nextSibling as HTMLElement).style.display = "block"
+                  }
+                }}
+              />
+            ) : null}
+            <span style={{ display: pet.imageUrl ? "none" : "block" }}>{emoji}</span>
           </span>
           <span className="hm-plate__animal">{pet.animal}</span>
           <span className="hm-plate__caption">
@@ -241,7 +258,21 @@ export default function PetView({ initial }: { initial: PetState }) {
       {evolvedTo ? (
         <div className="hm-pet__evolve" role="status">
           <span className="hm-plate__disc hm-bounce" aria-hidden="true">
-            {emoji}
+            {pet.imageUrl ? (
+              // eslint-disable-next-line @next/next/no-img-element
+              <img
+                src={pet.imageUrl}
+                alt=""
+                style={{ width: "100%", height: "100%", objectFit: "cover", borderRadius: "50%" }}
+                onError={(e) => {
+                  e.currentTarget.style.display = "none"
+                  if (e.currentTarget.nextSibling) {
+                    ;(e.currentTarget.nextSibling as HTMLElement).style.display = "block"
+                  }
+                }}
+              />
+            ) : null}
+            <span style={{ display: pet.imageUrl ? "none" : "block" }}>{emoji}</span>
           </span>
           <p className="hm-pet__evolve-title">{evolvedTo}단계로 진화했어요</p>
           <p className="hm__note">{pet.skinName}가 한 단계 자랐습니다</p>
