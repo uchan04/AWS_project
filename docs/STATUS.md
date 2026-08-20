@@ -2,7 +2,7 @@
 
 **모든 세션은 이 문서부터 읽는다.** 그다음 아래 "지금 읽어야 할 문서"만 읽고 시작한다.
 
-최종 갱신: 2026-08-20 (`develop` ↔ `feat/diagnosis` 머지. C·D·E는 이미 머지 완료)
+최종 갱신: 2026-08-20 (`feat/diagnosis`를 `develop`에 머지 완료. 남은 것은 B)
 현재 단계: **D2 — 인프라 완료, 기능 5개 병렬 착수 (8/20 기능 동결 예정일)**
 
 팀원 인수인계용 단일 문서는 [`docs/인수인계.md`](인수인계.md)에 있다. 새로 합류하거나 노션으로 공유할 때는 그 문서를 쓴다.
@@ -62,7 +62,9 @@
 4. **클라이언트가 `Authorization` 헤더를 싣지 않는다 (E 담당, D가 보고)** — `lib/auth.ts` 서버 검증은 완료됐지만 화면에서 토큰을 실어 보내지 않는다. 이대로 배포하면 전 API가 401이다. 로그인 화면·토큰 보관 방식이 E 담당이고 방식 확정 대기
 9. **치장 구매 라우트가 없다 (C 담당)** — 가격은 시드·DB에 다 들어갔고 `GET /api/pet/cosmetics`가 `priceAffinity`를 내려주지만 `POST /api/pet/cosmetics/buy`가 없다. 그래서 치장 화면은 여전히 전부 "미획득"으로 보인다. 스킨 쪽(`POST /api/pet/skins/buy`)은 별조각 결제로 고쳐 두었으니 그 파일을 그대로 베끼면 된다 — 친밀도 차감, 종족 검사 없음, `affinityOnly && priceAffinity !== null`만 확인
 
-**8/20 5인 머지 진행 중.** C·D·E는 `develop`에 머지 완료. A의 `feat/diagnosis`는 `develop`(`d8edf2b`)을 받아 충돌 3건(`prisma/schema.prisma`·`prisma/seed/items.ts`·`docs/STATUS.md`)을 해결하고 빌드를 확인했다. 남은 것은 B(`feat/missions`)다.
+**8/20 5인 머지 — A까지 끝났다.** C·D·E에 이어 A의 `feat/diagnosis`도 `develop`에 들어갔다(`f9314a5`). `develop`(`d8edf2b`)을 받아 충돌 3건(`prisma/schema.prisma`·`prisma/seed/items.ts`·`docs/STATUS.md`)을 해결하고 빌드·`db:seed`·실 API·실 화면까지 확인한 뒤 fast-forward로 올렸다. **남은 것은 B(`feat/missions`) 하나다.**
+
+**전원 실행 필요**: `git pull && npx prisma migrate deploy && npx prisma generate`. `develop`에 마이그레이션 `20260820120000_skin_tribe_and_drop_gacha`가 들어갔다(스킨 종족 전용 + 치장 종족 무관 + 가챠 삭제).
 
 **BottomNav 수정**: "진단결과" 탭이 `/diagnosis`(문항 화면)를 가리키던 버그를 `/diagnosis/result`(결과 화면)로 고쳤다(2026-08-19, E)
 
@@ -86,15 +88,15 @@ GitHub 원격 — https://github.com/uchan04/AWS_project
 
 | 브랜치 | 최신 | `develop` 미반영 | 비고 |
 |---|---|---|---|
-| `origin/develop` | `d8edf2b` (8/20) | — | 통합 지점. C·D·E 머지 완료 |
+| `origin/develop` | `f9314a5` (8/20) | — | 통합 지점. A·C·D·E 머지 완료 |
 | `origin/main` | `12ff359` (8/19) | 0 | A(진단)·E(인프라)만. `develop` 안정화 후 한 번에 올린다 |
 | `origin/feat/pet` | `82b692a` (8/19) | 0 | `develop`에 머지됨 |
 | `origin/feat/community` | `460679b` (8/20) | 0 | `develop`에 머지됨. 중복 init 폐기됨(차단 4 해소) |
-| `origin/feat/diagnosis` | `203462e` (8/20) | 6커밋 | 이 브랜치에서 `develop`을 머지해 충돌 3건 해결 중 |
+| `origin/feat/diagnosis` | `f9314a5` (8/20) | 0 | `develop`에 머지됨(fast-forward). `develop`과 같은 커밋 |
 | `origin/feat/missions` | `f1cc8d5` (8/20) | 5커밋 | **아직 `develop`에 없다.** 남은 마지막 머지 |
 | `origin/feat/infra` | `a7dece8` (8/17) | 0 | E는 `main`·`develop`에 직접 push해 왔다. 이 브랜치는 낡았다 |
 
-**머지 순서 주의**: `docs/STATUS.md`는 5인이 전부 고치므로 머지할 때마다 충돌한다. 담당별 줄과 차단 항목만 살려 손으로 합친다. 코드 파일은 폴더가 갈려 충돌하지 않지만, **`prisma/schema.prisma`와 `prisma/seed/items.ts`는 8/20 스킨·치장 구조 변경 때문에 충돌한다 — 전부 `develop` 쪽(구조 변경 반영분)을 채택한다.**
+**B가 머지할 때 주의**: `docs/STATUS.md`는 5인이 전부 고치므로 충돌한다. 담당별 줄과 차단 항목만 살려 손으로 합친다. 코드 파일은 폴더가 갈려 충돌하지 않지만, **`prisma/schema.prisma`와 `prisma/seed/items.ts`는 8/20 스킨·치장 구조 변경 때문에 충돌한다 — 구조 변경분이 `develop`에 있으므로 전부 `develop` 쪽을 채택한다.** 채택 뒤 `npx prisma migrate deploy && npx prisma generate`를 돌리고 `npm run build`로 확인한다.
 
 ## 결정 변경 (2026-08-19)
 
