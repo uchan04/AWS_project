@@ -5,6 +5,7 @@ import Link from "next/link"
 import { usePathname } from "next/navigation"
 import { TRIBE } from "@/lib/types"
 import type { TypeCode } from "@prisma/client"
+import styles from "./Sidebar.module.css"
 
 type ProfileData = {
   nickname: string
@@ -90,33 +91,11 @@ export function Sidebar() {
 
   return (
     <>
-      <aside
-        style={{
-          width: 240,
-          flexShrink: 0,
-          background: "#FDFBF5",
-          borderRight: "1px solid #DDD0BC",
-          display: "flex",
-          flexDirection: "column",
-          height: "100%",
-          position: "relative",
-          zIndex: 10,
-        }}
-      >
+      <aside className={styles.sidebar}>
         {/* Logo */}
-        <div style={{ padding: "28px 24px 20px", borderBottom: "1px solid #EDE5D0" }}>
-          <h1
-            style={{
-              fontFamily: "'Gowun Dodum', sans-serif",
-              fontSize: 18,
-              color: "#2A1F14",
-              margin: 0,
-              lineHeight: 1.3,
-            }}
-          >
-            함께 걷는 하루
-          </h1>
-          <p style={{ margin: "4px 0 0", fontSize: 11, color: "#9A8A76" }}>작은 한 걸음, 매일</p>
+        <div className={styles.logo}>
+          <h1 className={styles.logoTitle}>함께 걷는 하루</h1>
+          <p className={styles.logoSubtitle}>작은 한 걸음, 매일</p>
         </div>
 
         {/* Profile card */}
@@ -194,17 +173,17 @@ export function Sidebar() {
                 <span style={{ fontSize: 18, width: 24, textAlign: "center", flexShrink: 0 }}>{emoji}</span>
                 <div>
                   <p
+                    className={styles.navLabel}
                     style={{
-                      margin: 0,
-                      fontSize: 13,
                       fontWeight: active ? 700 : 500,
                       color: active ? "white" : "#2A1F14",
-                      fontFamily: "'Noto Sans KR', sans-serif",
                     }}
                   >
                     {label}
                   </p>
-                  <p style={{ margin: 0, fontSize: 10, color: active ? "rgba(255,255,255,0.75)" : "#9A8A76" }}>{desc}</p>
+                  <p className={styles.navDesc} style={{ color: active ? "rgba(255,255,255,0.75)" : "#9A8A76" }}>
+                    {desc}
+                  </p>
                 </div>
               </Link>
             )
@@ -355,10 +334,6 @@ export function Sidebar() {
                   </div>
                 ))}
               </div>
-
-              <p style={{ fontSize: 12, color: "#9A8A76", textAlign: "center" }}>
-                실제 사용자 정보는 추후 API 연결 예정
-              </p>
             </div>
           </div>
         </div>
