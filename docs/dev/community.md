@@ -48,9 +48,9 @@ D 쪽 기능 구현은 끝났고, 지금은 `completeMission()`(B) 외부 결과
 ---
 
 ## 현재 상태
-- 완료: 갤러리 목록 화면, 상세 오버레이, 좋아요 토글, 댓글 작성, 글쓰기 모달, 본인 글 삭제, 친밀도 지급 헬퍼, 챗봇 시스템 프롬프트, 챗봇 메시지 저장 API(GET/POST, 친밀도 지급까지), 챗봇 패널 UI(개발용 `/chat` 라우트), Bedrock 스트리밍 응답 연결(`POST /api/chat/stream`), 타이핑 인디케이터, **유형별 챗봇 추천 문구 6개씩·3개 랜덤 노출(LLM 아님, 정적 상수)**
+- 완료: 갤러리 목록 화면, 상세 오버레이, 좋아요 토글, 댓글 작성, 글쓰기 모달, 본인 글 삭제, 본인 댓글 삭제, 친밀도 지급 헬퍼, 챗봇 시스템 프롬프트, 챗봇 메시지 저장 API(GET/POST, 친밀도 지급까지), 챗봇 패널 UI(개발용 `/chat` 라우트), Bedrock 스트리밍 응답 연결(`POST /api/chat/stream`), 타이핑 인디케이터, **유형별 챗봇 추천 문구 6개씩·3개 랜덤 노출(LLM 아님, 정적 상수)**
 - 진행 중: 없음
-- 미착수: 본인 댓글 삭제, LLM 주제 추천 실제 연동, 이미지 업로드, `ChatPanel`을 `layout.tsx`의 전역 오버레이로 이전(E 대기)
+- 미착수: LLM 주제 추천 실제 연동, 이미지 업로드, `ChatPanel`을 `layout.tsx`의 전역 오버레이로 이전(E 대기)
 - 보류(다음 세션 이전 필요 조건): 전체 탭 글쓰기(스키마에 ALL 값 없음), LLM 주제 추천(SPEC 8절, 이번 세션 범위 아님), 글쓰기 시 일일 미션(`DAILY_COMMUNITY_POST`) 완료 처리(B와 협의 필요), `ChatPanel`의 `layout.tsx` 이전(E 소유 파일이라 D가 직접 못 건드림) — 전부 아래 "결정한 것과 이유"에 근거 남김
 
 ## 구현한 파일
@@ -66,6 +66,7 @@ D 쪽 기능 구현은 끝났고, 지금은 `completeMission()`(B) 외부 결과
 - `app/api/community/posts/[id]/route.ts` — GET. 상세 + 댓글 목록 + `likedByMe`
 - `app/api/community/posts/[id]/like/route.ts` — POST. `PostLike` 토글 + `Post.likeCount`를 `$transaction`으로 함께 갱신. `@@unique([postId, userId])` 충돌(P2002)은 동시 클릭으로 보고 현재 값을 그대로 반환
 - `app/api/community/posts/[id]/comments/route.ts` — POST. `Comment` 생성 + `Post.commentCount` 증가를 `$transaction`으로 묶고, 성공 후에만 `grantAffinity` 호출. 응답에 `granted` 포함
+- `app/api/community/posts/[id]/comments/[commentId]/route.ts` — DELETE. 본인 댓글 소프트 삭제. `Comment.deletedAt` 설정 + `Post.commentCount` 감소를 `$transaction`으로 묶음(댓글 작성의 create + increment와 대칭). 소유자 검사 앞에 `comment.postId !== id`를 먼저 확인한다
 
 - `app/community/_components/WriteModal.tsx` — 글쓰기 버튼 + 모달을 한 컴포넌트로 통합(트리거가 이번 세션에 새로 생기는 것이라 지시된 파일 목록에도 이 컴포넌트만 있고 별도 트리거 컴포넌트는 없었음). `gallery` prop이 `"ALL"`이면 버튼을 비활성화하고 "전체 커뮤니티 글쓰기는 준비 중이에요" 안내만 노출, 종족 갤러리일 때만 모달이 동작. `_lib/gallery.ts`의 `canWriteToGallery()`로 판단(클라이언트 쪽은 UX용 차단이고, 실제 차단은 서버가 함)
 
@@ -76,7 +77,9 @@ D 쪽 기능 구현은 끝났고, 지금은 `completeMission()`(B) 외부 결과
 - `app/community/_components/PostDetailModal.tsx` — `isOwn`일 때만 "삭제" 버튼 노출, 삭제 성공 시 `onDeleted` 콜백 호출
 - `app/community/page.tsx` — 헤더에 `WriteModal` 배치(전체/종족 탭 공통, 내부에서 분기)
 - `app/api/community/posts/route.ts` — POST 추가(글쓰기)
-- `app/api/community/posts/[id]/route.ts` — DELETE 추가(본인 글 소프트 삭제), GET 응답에 `isOwn` 추가
+- `app/api/community/posts/[id]/route.ts` — DELETE 추가(본인 글 소프트 삭제), GET 응답에 `isOwn` 추가. GET의 `comments`도 prisma 결과 그대로 내리지 않고 `{ id, body, createdAt, user, isOwn }`으로 매핑(`userId`·`postId`·`deletedAt` 미노출)
+- `app/api/community/posts/[id]/comments/route.ts` — POST 응답의 `comment`를 GET 상세와 같은 형태(`{ id, body, createdAt, user, isOwn: true }`)로 매핑. 트랜잭션·`grantAffinity`·`COMMENT_AFFINITY` 로직은 그대로 둠
+- `app/community/_components/PostDetailModal.tsx` — `DetailComment`에 `isOwn` 추가, `deletingCommentId` state와 `handleDeleteComment()` 추가. 본인 댓글에만 작은 삭제 버튼(`text-[11px]`, 헤더의 글 삭제 버튼과 같은 계열) 노출
 
 - `app/chat/_lib/systemPrompt.ts` — 챗봇 "마음 친구" 시스템 프롬프트. 공통 원칙(조언·해결책·진단·평가 금지, 유형명 노출 금지, 자해·죽음 언급 시 안전 예외) + 유형별 페르소나 레이어. `buildSystemPrompt(typeCode, nickname)`을 `app/api/chat/messages/route.ts`와 `app/api/chat/stream/route.ts`가 참조
 - `app/chat/_lib/starters.ts` — **이번 세션에 추가.** `CHAT_STARTERS: Record<TypeCode, string[]>`. 빈 화면 추천 문구를 유형별 6개씩 정적 상수로 둔다. `TypeCode`는 `@prisma/client`에서 그대로 import(새로 정의하지 않음). LLM 호출 없음
@@ -108,6 +111,12 @@ D 쪽 기능 구현은 끝났고, 지금은 `completeMission()`(B) 외부 결과
 - **LLM 주제 추천은 보류.** `BEDROCK_MODEL_ID`가 비어 있어 구현 불가. `WriteModal`에 비활성 영역만 두고 `// TODO: Bedrock 주제 추천 — BEDROCK_MODEL_ID 확보 후 구현 (SPEC 8절)` 주석만 남김. 가짜 추천 문구는 하드코딩하지 않음
 - **일일 미션(`DAILY_COMMUNITY_POST`) 완료 처리는 보류.** `UserMission`은 B의 도메인이라 직접 만들지 않음. 작성 API에 `// TODO: DAILY_COMMUNITY_POST 완료 처리 — 담당 B와 협의 중` 주석만 남김
 - 삭제는 소프트 삭제(`deletedAt`)이며 친밀도를 회수하지 않는다. `affinityToday`가 이미 누적돼 있어 삭제 후 재작성으로 하루 상한을 넘길 수 없음
+- **댓글 삭제도 친밀도를 회수하지 않는다.** 글 삭제와 같은 이유다 — `affinityToday`가 이미 누적돼 있어 지웠다 다시 써도 하루 상한 100을 넘길 수 없다. `grantAffinity`·`calculateReward`를 아예 부르지 않으므로 댓글 DELETE는 `getCurrentUserWithSkin()`이 아니라 `getCurrentUser()`를 쓴다(`activePetSkin`이 필요 없음)
+- **댓글 DELETE는 트랜잭션 전에 `deletedAt`을 먼저 검사한다.** 이 검사를 빼면 이미 삭제된 댓글에 DELETE를 한 번 더 보낼 때 `commentCount`가 계속 감소해 음수가 된다. 같은 이유로 `comment.postId !== id`(URL의 글과 댓글 불일치)도 먼저 막는다 — 그냥 진행하면 엉뚱한 글의 `commentCount`를 깎는다
+- **댓글 DELETE에 `canAccessGallery()` 검사는 넣지 않는다.** 본인 댓글이라는 조건이 갤러리 접근 권한보다 강하고, 글 DELETE도 소유자 검사만 한다 — 두 라우트의 구조를 맞췄다
+- **댓글 응답에서 `userId`를 `isOwn`으로 바꿨다.** 기존 GET은 prisma 결과를 그대로 내려 `userId`가 클라이언트에 노출됐다. 글(`post`)이 이미 `isOwn`을 쓰고 있어 형태를 통일했다. POST(댓글 작성) 응답도 같이 맞췄다 — 작성 직후 돌아온 댓글이 목록에 바로 붙는 구조라, 안 맞추면 방금 쓴 댓글에만 삭제 버튼이 안 보이고 새로고침해야 생기는 버그가 된다
+- **삭제 진행 상태는 `deletingCommentId: string | null`로 든다.** 단일 boolean을 쓰면 한 댓글을 지우는 동안 다른 댓글의 삭제 버튼까지 전부 비활성화된다
+- **댓글 삭제에 `window.confirm`을 쓰지 않는다.** 글 삭제도 확인창 없이 바로 지운다 — 패턴을 맞췄다
 - 글쓰기 API는 `galleryType`을 요청 바디로 받되, `canAccessGallery(galleryType, user.typeCode)`로 본인 종족과 다르면 차단 → `canWriteToGallery(galleryType)`로 `ALL`을 차단하는 순서로 검증(먼저 소속 확인, 그다음 쓰기 가능 여부)
 - 삭제 후 화면 갱신은 페이지 새로고침이 아니라 `next/navigation`의 `useRouter().refresh()`로 처리. 서버 컴포넌트(`page.tsx`)의 데이터만 다시 가져오고 모달이 닫히는 클라이언트 상태는 유지됨
 - **(지난 세션) 챗봇 메시지 API는 실제 Bedrock 호출 없이 "사용자 메시지 저장" 부분만 완성했었다.** 이번 세션에 AWS 계정·`BEDROCK_MODEL_ID`가 확보되어 실제 연결을 완료했다(아래 항목들).
@@ -135,7 +144,6 @@ D 쪽 기능 구현은 끝났고, 지금은 `completeMission()`(B) 외부 결과
 - 없음 (로컬 DB가 `prisma migrate`로 관리되지 않고 있던 것을 발견해 베이스라인 마이그레이션(`prisma/migrations/00000000000000_init`)을 만들어 해결. 기존 시드 데이터(미션 41개, 펫스킨 6개)는 유지됨. 스키마 담당과 공유 필요)
 
 ## 다음 할 일
-- 본인 댓글 삭제
 - LLM 주제 추천 3가지 이상 연동 — `BEDROCK_MODEL_ID` 확보됐으니 `WriteModal`의 TODO 자리에 구현 가능. `app/api/chat/stream/route.ts`의 `ConverseStreamCommand` 호출 패턴을 참고할 것(단, 이건 비스트리밍 단발 호출이라 `ConverseCommand`가 더 맞을 수 있음)
 - 전체 탭 글쓰기 — 스키마에 ALL(또는 공용 게시판) 개념이 추가되면 `_lib/gallery.ts`의 `canWriteToGallery()`만 고치면 됨
 - `DAILY_COMMUNITY_POST` 일일 미션 완료 처리 — B와 담당 경계 협의 필요
