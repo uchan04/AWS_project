@@ -12,6 +12,7 @@ type DetailComment = {
   body: string
   createdAt: string
   user: DetailUser
+  isOwn: boolean
 }
 
 type DetailPost = {
@@ -48,6 +49,8 @@ export function PostDetailModal({
   const [commentPending, setCommentPending] = useState(false)
   const [affinityNotice, setAffinityNotice] = useState<string | null>(null)
   const [deletePending, setDeletePending] = useState(false)
+  // 어느 댓글이 처리 중인지 구분한다. 단일 boolean이면 삭제 중에 모든 댓글 버튼이 같이 비활성화된다.
+  const [deletingCommentId, setDeletingCommentId] = useState<string | null>(null)
 
   useEffect(() => {
     let ignore = false
@@ -103,6 +106,23 @@ export function PostDetailModal({
       onDeleted()
     } finally {
       setDeletePending(false)
+    }
+  }
+
+  async function handleDeleteComment(commentId: string) {
+    if (deletingCommentId) return
+    setDeletingCommentId(commentId)
+    try {
+      const res = await fetch(`/api/community/posts/${postId}/comments/${commentId}`, { method: "DELETE" })
+      const json = await res.json()
+      if (json.error) {
+        setError(json.error.message)
+        return
+      }
+      setComments((prev) => prev.filter((c) => c.id !== commentId))
+      setPost((prev) => (prev ? { ...prev, commentCount: Math.max(0, prev.commentCount - 1) } : prev))
+    } finally {
+      setDeletingCommentId(null)
     }
   }
 
@@ -204,6 +224,16 @@ export function PostDetailModal({
                       <div className="mb-1 flex items-center gap-2">
                         <span className="text-sm font-semibold text-neutral-900">{authorText(comment.user)}</span>
                         <span className="text-xs text-neutral-400">{timeAgo(new Date(comment.createdAt))}</span>
+                        {comment.isOwn && (
+                          <button
+                            type="button"
+                            onClick={() => handleDeleteComment(comment.id)}
+                            disabled={deletingCommentId === comment.id}
+                            className="ml-auto rounded-lg border border-neutral-300 px-2 py-1 text-[11px] text-neutral-500 hover:bg-white disabled:opacity-60"
+                          >
+                            삭제
+                          </button>
+                        )}
                       </div>
                       <p className="text-sm leading-relaxed text-neutral-700">{comment.body}</p>
                     </div>
