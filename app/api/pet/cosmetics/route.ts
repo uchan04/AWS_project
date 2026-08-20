@@ -8,10 +8,11 @@ import { prisma } from "@/lib/prisma"
 //   GET  — 전체 치장 목록 + 보유·착용 여부 + 수집 진행률
 //   POST — { itemId, equipped } 로 착용·해제. 슬롯당 1개만 착용된다
 //
-// 재화가 오가지 않으므로 calculateReward()와 무관하다. 구매는 이 라우트가 하지 않는다.
-// 치장은 친밀도 전용 상점에서 등급 가격으로 산다(2026-08-20 결정. COMMON 50 / RARE 100 /
-// EPIC 200 / LEGENDARY 400). 구매 라우트는 아직 없다 — 그때까지 화면은 전부 "미획득"으로
-// 보인다. 버그가 아니다. 치장은 종족 구분이 없어 누구나 살 수 있다(tribeColor 삭제).
+// 재화가 오가지 않으므로 calculateReward()와 무관하다. 구매는 이 라우트가 하지 않는다 —
+// POST /api/pet/cosmetics/buy 가 따로 한다. 치장은 친밀도 전용 상점에서 등급 가격으로 산다
+// (2026-08-20 확정). 가격을 여기에 다시 적지 않는다 — 유일한 출처는 prisma/seed/items.ts의
+// PRICE_BY_RARITY이고, 이 라우트는 DB 행의 priceAffinity를 그대로 내려준다.
+// 치장은 종족 구분이 없어 누구나 살 수 있다(tribeColor 삭제).
 
 export async function GET() {
   try {
@@ -42,7 +43,13 @@ export async function GET() {
 
     // 별도 도감 화면을 만들지 않고 이 진행률로 겸용한다 (SPEC.md 5절 "제외한 것").
     // 분모는 하드코딩하지 않는다 — 시드가 늘면 자동으로 따라간다
-    return ok({ items: list, progress: { owned: owned.length, total: items.length } })
+    //
+    // affinity는 상점 잔액이다. GET /api/pet/skins가 starShards를 내려주는 것과 같은 형태다
+    return ok({
+      affinity: user.affinity,
+      items: list,
+      progress: { owned: owned.length, total: items.length },
+    })
   } catch (error) {
     if (error instanceof UnauthorizedError) return fail("UNAUTHORIZED", error.message, 401)
     console.error("[GET /api/pet/cosmetics]", error)

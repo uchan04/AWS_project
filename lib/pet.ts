@@ -20,7 +20,8 @@ export type GrowthResult = Growth & {
 
 /**
  * 진화 단계는 레벨로 정해지지만 스킨이 가진 단계 수를 넘지 못한다.
- * 친밀도 전용 캐릭터(늑대·삵·판다)는 stageCount = 1이라 진화하지 않는다. (SPEC.md 5절)
+ * 지금 스킨은 전부 stageCount = 3이지만(외형만 바뀐다. SPEC.md 5절), 단계 수가 다른
+ * 스킨이 들어와도 저장값이 stageCount를 넘지 않게 여기서 자른다.
  */
 export function cappedStage(level: number, stageCount: number): number {
   return Math.min(evolutionStageFor(level), Math.max(1, stageCount))
