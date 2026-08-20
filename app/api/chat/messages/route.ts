@@ -17,7 +17,16 @@ export async function GET(_request: NextRequest) {
       take: 50,
     })
 
-    return ok({ messages: recent.reverse(), affinityToday: user.affinityToday })
+    // 패널이 전역 오버레이가 되면서 서버 컴포넌트가 props를 넘겨줄 자리가 없어졌다.
+    // 화면에 필요한 값을 이 GET 하나로 같이 내린다(요청 횟수는 그대로다).
+    // BEDROCK_MODEL_ID 값 자체는 내보내지 않는다 — 설정 여부(boolean)만 내린다.
+    return ok({
+      messages: recent.reverse(),
+      affinityToday: user.affinityToday,
+      nickname: user.nickname,
+      typeCode: user.typeCode,
+      bedrockConfigured: Boolean(process.env.BEDROCK_MODEL_ID),
+    })
   } catch (error) {
     if (error instanceof UnauthorizedError) return fail("UNAUTHORIZED", error.message, 401)
     throw error

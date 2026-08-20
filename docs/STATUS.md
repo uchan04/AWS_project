@@ -2,7 +2,7 @@
 
 **모든 세션은 이 문서부터 읽는다.** 그다음 아래 "지금 읽어야 할 문서"만 읽고 시작한다.
 
-최종 갱신: 2026-08-20 (C 머지 완료. 차단 9 해소 + 별조각 60 해소 확인. 남은 것은 D의 브랜치와 B의 3커밋)
+최종 갱신: 2026-08-20 (C·D 머지 완료. 차단 9·12 해소 + 별조각 60 해소 확인. 남은 것은 B의 3커밋)
 현재 단계: **D2 — 인프라 완료, 기능 5개 병렬 착수 (8/20 기능 동결 예정일)**
 
 팀원 인수인계용 단일 문서는 [`docs/인수인계.md`](인수인계.md)에 있다. 새로 합류하거나 노션으로 공유할 때는 그 문서를 쓴다.
@@ -34,7 +34,7 @@
 | A | 진단 + 미션 콘텐츠 + 홈 | **`develop`에 머지 완료**(`a098c61`, 2026-08-20). 미션 41개, 13문항 + 판정 함수, 조기 종료, 화면 3장 + Figma 값·구성 반영, 진단 API 3종(완료·조회·닉네임) + 화면 연결, **실 DB로 진단→결과→홈 전체 흐름 확인 완료**, 홈 미션을 `GET /api/missions`로 교체(`bdcef94`), 결과 화면 판정 근거 3줄(`298ab56`) | **A 담당 기능은 남은 것이 없다.** 근거 3줄의 Bedrock 실호출만 E의 IAM 키·`BEDROCK_MODEL_ID` 공유 대기다(실패해도 카드만 빠지고 화면은 뜬다). 관리자 교차표와 LLM 2종은 컷 |
 | B | 미션 시스템 + 사진 업로드 | 미션 API 3종, 사진 업로드 presign·verify, 미션 대시보드, 출석, `lib/missions/` 8개 파일. 재화는 `calculateReward()`를 경유한다. 모바일 아이콘 레일·S3 펫 이미지·일일 완주 보너스는 A의 머지로 `develop`에 복구됐다 | 하단 탭을 사이드바로 교체한 것도 B다(결정 9번은 E 배정이었다). 남은 것은 **`origin/feat/missions`의 3커밋**(`1dfbefc`·`79ea4e6`·`6495f37`)을 `develop`에 올리는 것 + lint 에러 11건 + **차단 17번**(`completion.ts:124`가 `calculateReward()`를 우회한다) |
 | C | 펫 + 스킨 | **`SPEC.md` 5절 기능 전부 완료 + `develop`에 머지 완료**(2026-08-20). 성장·씨앗 투입·진화 연출, 방치형 자동 획득, 치장 **구매**·착용·해제, 스킨 구매·전환 + 화면 3장. 구조 변경(종족 전용 외형 / 치장 종족 무관 / 가챠 삭제 / **치장 12종 → 배경 6종**) 반영 완료. `docs/dev/diagnosis.md` 15·17절이 넘긴 C 몫도 전부 처리(치장 구매 라우트, `check-pet` 어미 단정, 시드 가격 확정값, `SPEC.md` 2·5·6·11절, `docs/dev/pet.md`, `docs/인수인계.md`, `업무분담.md`) | **코드에 남은 것 없음.** 재화 가격·수급량 확정값까지 시드·`check:pet`·문서·**실 DB**에 반영했다. 고양잇과 변종 스킨은 `샴고양이` → **`북극고양이`**로 개명(2026-08-20). 남은 것은 런타임 검증 4흐름(공유 DB 쓰기 승인 대기), 데모 계정 재화 시드값(8/21), 재진단 후 옛 종족 스킨 처리 정책(팀 결정) |
-| D | 커뮤니티 + 챗봇 | **`develop`에 미반영**(`origin/feat/community` = `fd583cb`). 기능 구현 끝. 챗봇 Bedrock 스트리밍 연결 완료(2026-08-19), 미인증 500 수정(`13f3a6a`), 챗봇을 전역 런처로 전환(`f149243`). 미션 완료 연동 호출부(`completeMission`)는 주석으로 준비만 해둠 | 머지 시 충돌은 `docs/STATUS.md` 1건뿐이고 코드는 충돌하지 않는다(실측). **`completeMissionByCode({ actor, code })`가 `develop`에 이미 있다** — 대기 상태가 아니다. 주석의 `completeMission(user.id, "DAILY_CHAT")`과 시그니처가 다르니 그대로 풀지 말 것. `app/layout.tsx`(E 소유)를 브랜치에서 고쳤다 — 차단 13번과 같은 사안 |
+| D | 커뮤니티 + 챗봇 | **`develop`에 머지 완료**(2026-08-20). 기능 구현 끝 — 챗봇 Bedrock 스트리밍(2026-08-19), 챗봇 전역 오버레이 런처 전환(`f149243`, 임시 `/chat` 라우트 폐기), 본인 댓글 삭제, 미인증 500 수정(`13f3a6a`), 글쓰기 주제 추천(고정 문구), 전체 탭 글쓰기(`GalleryType` 반영). 미션 완료 연동 호출부(`completeMission`)는 주석으로 준비만 해둠 | **대기 상태가 아니다** — `completeMissionByCode({ actor, code })`가 `develop`에 이미 있다(C 확인, 2026-08-20). 다만 주석의 `completeMission(user.id, "DAILY_CHAT")`과 시그니처가 다르니 그대로 풀지 말 것. `app/layout.tsx`(E 소유) 2줄 변경이 들어 있다 — 차단 13번과 같은 사안. 세부는 `docs/dev/community.md` "재개 지점" |
 | E | 인프라 + 인증 | RDS·Cognito·S3+CloudFront·CloudWatch+SNS·Bedrock·auth 실검증·하단 탭 내비 완료, PR #1 머지 + 2차 마이그레이션 + auth 빌드 수정 + 색 토큰 정리 완료. 로그인 화면(이메일+비밀번호/Google) + 쿠키 기반 인증 전환 + `amplify.yml` 완료(2026-08-20) | Amplify GitHub 연동, Google IdP 자격증명(아래 참고) 남음 |
 
 ## 전체 차단 사항
@@ -49,7 +49,7 @@
 
 **`.env.example`의 `DATABASE_URL` 샘플에 `sslmode=require`가 없다 (E에게 알림, 2026-08-20 C 확인)**: 샘플은 `?schema=public`으로 끝나는데 실제 RDS는 SSL을 요구한다. `cp .env.example .env`로 시작한 사람은 접속에 실패한다. 동작하는 형태는 `...:5432/welli?schema=public&sslmode=require`다. `.env.example`은 E 소유라 C가 고치지 않았다
 
-해소된 항목(1·2·3·**4**·5·6·7·8·10·**11**·**15**번)은 이 목록에서 지웠다. 이력이 필요하면 `git log docs/STATUS.md`를 본다. 남은 것은 아래 6개다.
+해소된 항목(1·2·3·**4**·5·6·7·8·**9**·10·**11**·**12**·**15**번)은 이 목록에서 지웠다. 이력이 필요하면 `git log docs/STATUS.md`를 본다. 남은 것은 아래 5개(13·14·16·17·18)다.
 
 **차단 4번(인증) 해소** — E가 `lib/auth.ts`를 `cookies()`로 바꾸고 로그인·회원가입 화면과 `/api/auth/*` 5종을 붙였다(`ba9287a`). 서버 컴포넌트 5개와 API가 같은 경로로 인증된다.
 **차단 11번(모바일) 해소** — `app/components/Sidebar.module.css`의 `768px` 미디어 쿼리로 아이콘 레일이 붙었다(B의 `468f17f`). A의 머지로 `develop`에 들어왔다.
@@ -71,9 +71,10 @@
 
 ~~별조각 60(일일 미션 전체 완료)이 미구현이다~~ — 해소(2026-08-20, B의 `447957d`). `lib/missions/completion.ts`가 일일 미션을 전부 완료한 순간 `starShards: { increment: 60 }`을 준다. 하루 한 번만 걸린다(`UserMission` 유니크 제약이 재완료를 막는다). **이걸로 별조각 수급 63.6/일이 성립하고 스킨 2500이 39일이 된다** — 그전까지는 출석 3.6/일뿐이라 약 700일이었다. 단 이 증감이 `calculateReward()`를 우회한다 → 차단 17번
 
-남은 것은 아래 6개다.
+~~12. 프로덕션에서 `/community`·`/chat`이 500이다~~ — 해소(2026-08-20, D). `/community`는 `getCurrentUser()`~`listGalleryPosts()`를 `try/catch`로 감싸 "로그인이 필요해요" 안내를 렌더한다(C의 `app/pet/page.tsx`와 같은 패턴, `export const dynamic = "force-dynamic"` 포함). `/chat`은 임시 라우트였고 전역 오버레이(`ChatLauncher`)로 대체하며 삭제했다 — 이제 404다
 
-12. **프로덕션에서 `/community`·`/chat`이 500이다 (D 담당)** — `DEV_AUTH_BYPASS`를 끄고 프로덕션 빌드를 띄워 실측했다. 두 페이지가 서버에서 `getCurrentUser()`를 부르는데 감싸지 않아 `UnauthorizedError`가 그대로 터진다(서버 로그 `⨯ Error: 로그인이 필요합니다`). C의 `app/pet/page.tsx`는 `try/catch`로 감싸 안내 화면을 띄우기 때문에 200이다. 인증이 붙기 전까지는 같은 방식으로 감싸는 것이 안전하다
+남은 것은 아래 5개다.
+
 13. **내비 교체 잔여 2건** — (E) 고아가 된 `app/components/BottomNav.tsx` 삭제. `app/layout.tsx`에서 빠졌고 아무도 import하지 않는다(레포 전체 검색으로 확인). `docs/dev/infra.md`에는 아직 "동결"로 적혀 있어 문서도 함께 갱신해야 한다. (B·E) **소유권 결정 필요** — B가 E 소유 공유 파일 3개(`app/layout.tsx`·`app/globals.css`·`.env.example`)를 브랜치에서 고쳤다(`CLAUDE.md` 1절 위반). 충돌은 안 났지만 사이드바를 누가 갖는지 정해야 남은 이틀 동안 둘이 같은 파일을 각자 고치지 않는다
 14. **배포 설정이 검증되지 않았다 (E 담당)** — `amplify.yml`은 들어왔다(`f0a8634`). 다만 Amplify가 `main`에 연결되지 않아 이 파일로 실제 빌드가 도는 것은 아직 확인되지 않았다. `BEDROCK_VISION_MODEL_ID`도 Amplify 환경변수에 등록되지 않았다(`.env.example`에는 있다. `lib/missions/vision.ts:7`이 폴백하므로 죽지는 않는다)
 16. **확정된 경제 수치가 코드와 어긋난 곳이 둘 남았다 (A·D 중 한쪽, 그리고 B)** — C 몫(시드 스킨 가격 50 → 2500, 배경 등급 통일 → 전부 COMMON 600)은 해소했다(`53c23ed`). 남은 것은,
@@ -83,7 +84,7 @@
 17. **일일 완주 보너스가 `calculateReward()`를 우회한다 (B 담당)** — `lib/missions/completion.ts:124`가 `starShards: { increment: 60 }`으로 직접 증감한다. `CLAUDE.md` 2절 위반이다. 스킨 고유 효과가 없어진 지금은 배율이 1이라 값 자체는 맞지만, 규칙을 열어두면 다음 사람이 같은 방식으로 씨앗·친밀도를 직접 증감한다
 18. **`develop`이 강제 push로 되감겼다 — B의 3커밋이 아직 빠져 있다 (B 담당)** — `git reflog show origin/develop`에 `081918d → cb16959: forced-update`가 남아 있다. E의 로컬 `develop`이 뒤진 상태로 `main`을 머지해 밀어 넣어 B의 커밋 14개가 사라졌다. A의 머지(`a098c61`)로 11개가 복구됐고, 남은 3개는 `origin/feat/missions`(`6495f37`)에 있다. `git merge origin/feat/missions`는 충돌 0건이다(실측). 특히 `6495f37`이 미션·출석의 `exp` 직접 증가를 없애는 커밋이라 지금 `lib/missions/attendance.ts:82`·`completion.ts:79`에 그 코드가 남아 있다. **공유 브랜치(`main`·`develop`)에는 `--force`를 쓰지 않는다**
 
-**8/20 5인 머지 — A·B·C·E가 들어갔다.** A는 `develop`(`d8edf2b`)을 받아 충돌 3건을 해결하고 올렸고(`f9314a5`), B가 `feat/missions`를 머지했고(`3adbea5` → `cb16959`), E가 `develop`을 `main`에 올린 뒤 `main`을 다시 머지했다(`152dbae`). 이어 A가 진단 근거 3줄과 B 복구분을 올렸다(`a098c61`). **남은 것은 D의 브랜치와 B의 3커밋이다.**
+**8/20 5인 머지 — A·B·C·D·E가 전부 들어갔다.** A는 `develop`(`d8edf2b`)을 받아 충돌 3건을 해결하고 올렸고(`f9314a5`), B가 `feat/missions`를 머지했고(`3adbea5` → `cb16959`), E가 `develop`을 `main`에 올린 뒤 `main`을 다시 머지했다(`152dbae`). 이어 A가 진단 근거 3줄과 B 복구분을 올렸다(`a098c61`). D가 `feat/community`를 머지했고(`563ab15`), C가 그 위에 `feat/pet`을 머지했다. **남은 것은 B의 3커밋(차단 18번)뿐이다.** `docs/STATUS.md`가 매번 충돌하는데, 코드는 아직 한 번도 충돌하지 않았다 — 이 문서만 손으로 합치면 된다.
 
 **통합 검증 결과 (2026-08-20, A)**: 충돌 마커 0건, `npm run build` 통과(라우트 31개), 마이그레이션 3개 중복 없음, 실 DB 드리프트 없음(`migrate diff --exit-code`), `check:diagnosis`·`check:pet`·`check:reward` 통과, 화면 7장·API 6종 200 + 실데이터 렌더, 재화 증감은 B도 `calculateReward()` 경유, 유형명 UI 노출 없음, 브라우저 콘솔 에러 0건. **기능은 깨끗하게 합쳐졌다.** `develop`은 각자 받아서 작업해도 안전하다
 
@@ -95,7 +96,7 @@
 | **500** | `/community` `/chat` |
 | **401** | `/api/pet` `/api/missions` — 전 API |
 
-**이 실측은 차단 4번(Bearer 헤더) 시절 것이다.** E의 쿠키 전환(`ba9287a`)으로 원인은 없어졌고 로그인 화면도 붙었다. 다만 로그인해서 200이 뜨는지는 아직 실측하지 않았다 — 다시 재보고 이 표를 갱신할 것. `/community`·`/chat`의 500은 차단 12번(D의 `try/catch` 누락)이라 인증과 별개로 남아 있다
+**이 실측은 차단 4번(Bearer 헤더) 시절 것이다.** E의 쿠키 전환(`ba9287a`)으로 원인은 없어졌고 로그인 화면도 붙었다. 다만 로그인해서 200이 뜨는지는 아직 실측하지 않았다 — 다시 재보고 이 표를 갱신할 것. 위 표의 `/community` 500은 D의 `try/catch`로 해소됐고(차단 12), `/chat`은 라우트 자체가 없어져 404다
 
 **전원 실행 필요 — `develop` 받는 절차**
 
@@ -129,15 +130,15 @@ GitHub 원격 — https://github.com/uchan04/AWS_project
 
 | 브랜치 | 최신 | `develop` 미반영 | 비고 |
 |---|---|---|---|
-| `origin/develop` | (C 머지 커밋, 8/20) | — | 통합 지점. A·B·C·E 머지 완료 |
+| `origin/develop` | (C 머지 커밋, 8/20) | — | 통합 지점. A·B·C·D·E 머지 완료 |
 | `origin/main` | `f0a8634` (8/20) | 0 | `develop`에 포함됨. 배포 시점에 `develop`을 다시 올린다 |
 | `origin/feat/pet` | (8/20) | 0 | `develop`과 동일. 치장 구매 API·배경 6종 확정 가격·`북극고양이` 개명이 들어갔다 |
 | `origin/feat/missions` | `6495f37` (8/20) | **3커밋** | `1dfbefc`·`79ea4e6`·`6495f37`. 충돌 0건(실측). 차단 18번 |
 | `origin/feat/diagnosis` | `a098c61` (8/20) | 0 | `develop`과 동일 |
-| `origin/feat/community` | `fd583cb` (8/20) | **미반영** | **아직 `develop`에 없다.** 남은 마지막 머지. 충돌은 `docs/STATUS.md` 1건뿐이고 코드는 충돌하지 않는다(실측). D가 받은 `develop`은 옛 것이라 머지 전에 `origin/develop`을 다시 받아야 한다 |
+| `origin/feat/community` | (8/20) | 0 | `develop`에 머지 완료(`563ab15`) |
 | ~~`origin/feat/infra`~~ | — | — | 원격에서 삭제됐다. E는 `main`·`develop`에 직접 push해 왔다 |
 
-**D가 머지할 때 주의**: 예측 충돌은 이 문서 하나다. 담당별 줄과 차단 항목만 살려 손으로 합친다. `prisma/` 파일은 D가 안 건드려 충돌하지 않는다. 머지 뒤 `npx prisma migrate deploy && npx prisma generate`를 돌리고 `npm run build`로 확인한다.
+**머지할 때 주의**: 예측 충돌은 이 문서 하나다. 담당별 줄과 차단 항목만 살려 손으로 합친다. 8/20 머지 4회에서 코드 충돌은 0건이었다. 머지 뒤 `npx prisma migrate deploy && npx prisma generate`를 돌리고 `npm run build`로 확인한다. **`develop`에 `--force`를 쓰지 않는다**(차단 18번) — push가 거절되면 `git fetch origin` 후 자기 브랜치에서 `git merge origin/develop`으로 다시 합친다.
 
 ## 결정 변경 (2026-08-19)
 
