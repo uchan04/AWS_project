@@ -78,9 +78,9 @@
 
 남은 것은 아래 5개다.
 
-13. **내비 교체 잔여 2건** — (E) 고아가 된 `app/components/BottomNav.tsx` 삭제. `app/layout.tsx`에서 빠졌고 아무도 import하지 않는다(레포 전체 검색으로 확인). `docs/dev/infra.md`에는 아직 "동결"로 적혀 있어 문서도 함께 갱신해야 한다. (B·E) **소유권 결정 필요** — B가 E 소유 공유 파일 3개(`app/layout.tsx`·`app/globals.css`·`.env.example`)를 브랜치에서 고쳤다(`CLAUDE.md` 1절 위반). 충돌은 안 났지만 사이드바를 누가 갖는지 정해야 남은 이틀 동안 둘이 같은 파일을 각자 고치지 않는다
+13. ~~고아가 된 `app/components/BottomNav.tsx` 삭제~~ — 해소(2026-08-20, E). 파일 삭제 완료, `docs/dev/infra.md`도 같이 갱신했다. **남은 것**: (B·E) **소유권 결정 필요** — B가 E 소유 공유 파일 3개(`app/layout.tsx`·`app/globals.css`·`.env.example`)를 브랜치에서 고쳤다(`CLAUDE.md` 1절 위반). 충돌은 안 났지만 사이드바를 누가 갖는지 정해야 남은 이틀 동안 둘이 같은 파일을 각자 고치지 않는다
 14. **배포 설정이 검증되지 않았다 (E 담당)** — `amplify.yml`은 들어왔다(`f0a8634`). 다만 Amplify가 `main`에 연결되지 않아 이 파일로 실제 빌드가 도는 것은 아직 확인되지 않았다. `BEDROCK_VISION_MODEL_ID`도 Amplify 환경변수에 등록되지 않았다(`.env.example`에는 있다. `lib/missions/vision.ts:7`이 폴백하므로 죽지는 않는다)
-17. **일일 완주 보너스가 `calculateReward()`를 우회한다 (B 담당)** — `lib/missions/completion.ts:123`이 `starShards: { increment: 60 }`으로 직접 증감한다. `CLAUDE.md` 2절 위반이다. 스킨 고유 효과가 없어진 지금은 배율이 1이라 값 자체는 맞지만, 규칙을 열어두면 다음 사람이 같은 방식으로 씨앗·친밀도를 직접 증감한다
+~~17. 일일 완주 보너스가 `calculateReward()`를 우회한다~~ — 해소(2026-08-20, E). `lib/missions/completion.ts`가 `starShards: { increment: 60 }` 직접 증감 대신 `calculateReward(actor.activePetSkin, { starShards: 60 })`을 거치도록 고쳤다. 값은 그대로 60이지만(스킨 고유 효과 없음), 앞으로 별조각 배율 스킨이 생기면 이 보너스에도 자동 적용된다
 19. **북극곰 스킨 이미지 키가 S3에 없는 경로를 가리킨다 (C 담당, 확인 후 처리로 미룸)** — `prisma/seed/items.ts`의 `imageKeyBase`가 `pets/bear-polar`인데 CloudFront에 올라간 파일은 그 이름이 아니다. 여우·고양이는 `pets/fox-arctic`·`pets/cat-arctic`으로 맞는다. 곰만 어긋나 변종을 사면 이미지가 깨진다. 시드 파일 한 줄이라 고치는 비용은 없고, **S3에 실제로 올라간 파일명을 먼저 확인해야** 어느 쪽을 맞출지 정해진다(2026-08-20 판단 보류). `docs/dev/pet.md:110`의 "cat-arctic 9장 다 아직 없어서 지금은 공짜다"도 사실과 다르다 — `pets/cat-arctic-1.png`·`-3.png`는 200이다
 20. **로그인·회원가입 화면에 챗봇 버튼이 뜬다 (D 담당)** — `app/chat/_components/ChatLauncher.tsx`가 `/diagnosis`만 숨기고, 주석은 "별도의 로그인 라우트는 아직 없다"고 적혀 있다. E가 `app/(auth)/login`·`signup`을 만든 뒤라 실측하면 두 화면 다 "마음 친구 열기" 버튼이 1개 렌더된다(`curl /login | grep -c`). 미인증 상태라 누르면 401이다. 숨김 목록에 두 경로를 넣으면 끝난다
 
