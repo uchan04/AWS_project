@@ -671,7 +671,9 @@ model DiagnosisSession {
 3. **화폐를 전용으로 갈라놓는다.** 스킨은 **별조각 전용**, 치장 아이템(옷·배경 등)은 **친밀도 전용**이다. 한 품목을 두 화폐로 살 수 있게 두지 않는다. 상점 가격은 등급에 따라 다르게 매긴다
 4. **가챠를 스키마에서 지운다.** `GachaPull` 모델, `User.heroPity`, `User.legendPity`를 삭제한다
 
-A가 실 DB와 `feat/pet`을 읽고 구조 적합성을 검토한 결과를 여기 남긴다. 구현은 C 담당이다(`prisma/seed/items.ts`, `app/api/pet/*`, `app/pet/*`). `prisma/schema.prisma`는 전원 합의 파일이므로 A가 손대지 않았다.
+**2026-08-20 팀 합의 후 DB·스키마·시드까지 적용 완료.** 마이그레이션 이름은 `20260820120000_skin_tribe_and_drop_gacha`다. 남은 것은 C 브랜치에만 있는 코드 4곳(`app/api/pet/*`, `app/pet/*`)과 `SPEC.md`·`docs/dev/pet.md` 갱신이다. 아래 "적용 순서"에 무엇이 끝났고 무엇이 남았는지 표시해 뒀다.
+
+A가 실 DB와 `feat/pet`을 읽고 구조 적합성을 검토한 결과를 여기 남긴다. 원래 구현은 C 담당이지만(`prisma/seed/items.ts`, `app/api/pet/*`, `app/pet/*`), 스키마 변경이 `prisma/seed/items.ts`와 `scripts/check-reward.ts`의 타입을 깨서 빌드가 통과하지 않았다. 빌드가 깨진 채로 둘 수 없어 그 두 파일까지 A가 함께 고쳤다. `app/api/pet/*`·`app/pet/*`은 `main`에 없어 손대지 않았다.
 
 ### 결론
 
@@ -736,21 +738,29 @@ model CosmeticItem {
 
 **파괴적 작업 4개가 들어 있다.** `GachaPull` 테이블 삭제, `CosmeticItem.tribeColor` 컬럼 삭제, `PetSkin.priceAffinity` 컬럼 삭제, `User.heroPity`·`legendPity` 컬럼 삭제다. 지금은 `GachaPull` 0행 / `UserCosmetic` 0행 / pity 값 전부 0 / `priceAffinity`에 값이 든 3행은 삭제 대상이라 잃는 데이터가 없다. 행이 쌓인 뒤에는 이 순서로 지울 수 없다.
 
-`npx prisma migrate dev`는 **스키마 담당 1인(E)만** 실행한다(`CLAUDE.md` 5절).
+`prisma migrate dev`는 대화형 명령이라 이 환경에서 실행할 수 없다(`Prisma Migrate has detected that the environment is non-interactive`). SQL을 `migrate diff`로 뽑아 마이그레이션 디렉터리에 직접 넣고 `migrate deploy`로 적용했다.
 
 ```bash
-npx prisma migrate dev --name skin_tribe_and_drop_gacha
+npx prisma migrate diff --from-schema-datasource prisma/schema.prisma \
+  --to-schema-datamodel prisma/schema.prisma --script
+# 출력을 prisma/migrations/20260820120000_skin_tribe_and_drop_gacha/migration.sql 로 저장
+npx prisma migrate deploy
+npx prisma generate
 ```
 
-생성될 SQL:
+적용 후 `migrate diff --exit-code`가 "No difference detected"를 돌려주는 것까지 확인했다.
+
+적용된 SQL:
 
 ```sql
-ALTER TABLE "PetSkin" ADD COLUMN "priceShards" INTEGER;
-ALTER TABLE "PetSkin" DROP COLUMN "priceAffinity";
-ALTER TABLE "PetSkin" ALTER COLUMN "stageCount" SET DEFAULT 3;
+ALTER TABLE "GachaPull" DROP CONSTRAINT "GachaPull_itemId_fkey";
+ALTER TABLE "GachaPull" DROP CONSTRAINT "GachaPull_userId_fkey";
 ALTER TABLE "CosmeticItem" DROP COLUMN "tribeColor";
-DROP TABLE "GachaPull";
+ALTER TABLE "PetSkin" DROP COLUMN "priceAffinity",
+ADD COLUMN     "priceShards" INTEGER,
+ALTER COLUMN "stageCount" SET DEFAULT 3;
 ALTER TABLE "User" DROP COLUMN "heroPity", DROP COLUMN "legendPity";
+DROP TABLE "GachaPull";
 ```
 
 나머지 4인은 공지를 받고 이것만 실행한다.
@@ -831,13 +841,28 @@ for (const skin of SKINS)
 DELETE FROM "PetSkin" WHERE "name" IN ('늑대', '삵', '판다');
 ```
 
-그다음 `npm run db:seed`를 돌린다. C의 `RENAMED_COSMETICS` 이관 로직이 옛 치장 이름(앰버·라벤더·세이지)을 확정 컬러명으로 바꾸고, 여우↔고양이 뒤바뀐 매핑도 함께 정리된다.
+그다음 `npm run db:seed`를 돌린다.
 
-### 코드 변경 (C 담당 6곳)
+**여기서 사고가 하나 났다. 기록해 둔다.** `main`의 `prisma/seed/items.ts`는 옛 치장 이름(앰버·라벤더·세이지)을 들고 있었지만 **실 DB는 이미 C의 확정 컬러명(노을·새벽·이끼)으로 재시드된 상태였다.** 시드의 upsert 키가 `name`이라, 옛 이름 목록으로 시드를 돌리자 기존 9행이 갱신되는 대신 옛 이름 9행이 새로 생겨 치장이 21종이 됐다. `UserCosmetic`이 0행이라 지우는 것으로 정리했다.
+
+```sql
+DELETE FROM "CosmeticItem" WHERE "name" IN (
+  '앰버 모자', '라벤더 모자', '세이지 모자',
+  '라벤더 목도리', '세이지 목도리', '앰버 목도리',
+  '세이지 배경', '앰버 배경', '라벤더 배경'
+);
+```
+
+`main`의 시드 목록을 확정 컬러명으로 맞춰 두었으므로 이제 다시 돌려도 12종을 유지한다. C의 `RENAMED_COSMETICS` 이관 표는 이미 이관이 끝났으므로 `feat/pet`을 머지할 때 함께 지워도 된다.
+
+동물 매핑(여우 = 개과 = `HEALTH_EMOTION`)도 실 DB에는 이미 반영돼 있었다. `main`의 시드만 옛 값이었고, 이번에 함께 맞췄다.
+
+### 코드 변경
 
 | 파일 | 변경 |
 |---|---|
-| `prisma/seed/items.ts` | `tribeColor` 필드 전부 삭제. 늑대·삵·판다를 북극여우·샴고양이·북극곰으로 교체(`stageCount: 3`, `priceShards: 50`, `effectType: NONE`, `priceAffinity` 필드 제거). 치장 12종에 `affinityOnly: true` + 등급별 `priceAffinity` 채우기 |
+| ~~`prisma/seed/items.ts`~~ | **완료(A, 2026-08-20).** `tribeColor` 삭제, 늑대·삵·판다를 북극여우·샴고양이·북극곰으로 교체(`stageCount: 3`, `priceShards: 50`, `effectType: NONE`), 치장 12종에 `affinityOnly: true` + 등급에서 파생시킨 `priceAffinity`. 가격은 `PRICE_BY_RARITY` 한 곳에서 나온다 |
+| ~~`scripts/check-reward.ts`~~ | **완료(A, 2026-08-20).** 더미 `PetSkin`의 `priceAffinity: null`을 `priceShards: null`로 |
 | `app/api/pet/cosmetics/route.ts` | 응답에서 `tribeColor: item.tribeColor,` 한 줄 삭제(35행) |
 | `app/api/pet/skins/route.ts` | `findMany`에 `where: { typeCode: user.typeCode }`를 넣어 자기 종족만 노출한다. `user.typeCode`가 `null`(진단 전)이면 빈 목록을 돌려준다 |
 | `app/api/pet/skins/buy/route.ts` | `skin.typeCode !== user.typeCode`면 400으로 거른다. 가격을 `skin.priceAffinity`에서 `skin.priceShards`로, 차감 대상을 `affinity`에서 `starShards`로 바꾼다(`NOT_FOR_SALE` 판정도 `priceShards === null` 기준으로). 연타 방어용 조건부 `updateMany` 패턴은 그대로 유지한다 |
@@ -860,16 +885,31 @@ DELETE FROM "PetSkin" WHERE "name" IN ('늑대', '삵', '판다');
 | `docs/인수인계.md` | C 절 | `/api/gacha/*`와 가챠 서술 삭제 | C |
 | `업무분담.md` | C 절, 데모 순서 | 가챠 항목 삭제 | C |
 | `docs/dev/diagnosis.md` | 15 | 이 절 | A (완료) |
+| `prisma/schema.prisma` | — | 스키마 변경 + 마이그레이션 | A (완료) |
+| `docs/STATUS.md` | 차단 사항 | 차단 1(시드 동물 매핑) 해소 | A (완료) |
 
 `CLAUDE.md`는 가챠 언급이 없어 손댈 것이 없다.
 
 ### 적용 순서
 
-1. `feat/pet` → `develop` 머지 (가챠 스키마 삭제분이 여기 있다)
-2. `prisma/schema.prisma` 수정 → E가 `migrate dev` 1회 → 나머지 4인 `migrate deploy`
-3. 늑대·삵·판다 `DELETE` → `npm run db:seed`
-4. C 코드 6곳 + 문서
-5. `npm run build`, `npm run check:pet`
+1. ~~`prisma/schema.prisma` 수정~~ — 완료. `feat/diagnosis`의 `4934868`
+2. ~~마이그레이션 생성·적용~~ — 완료. `20260820120000_skin_tribe_and_drop_gacha`. 나머지 4인은 `git pull && npx prisma migrate deploy && npx prisma generate`
+3. ~~늑대·삵·판다 `DELETE` → `npm run db:seed`~~ — 완료. 스킨 6종 / 치장 12종(합 1,850 친밀도) 확인
+4. ~~`prisma/seed/items.ts`·`scripts/check-reward.ts`~~ — 완료. `npm run build`, `npm run check:reward` 통과
+5. **남음** — C가 `app/api/pet/cosmetics|skins|skins/buy/route.ts`, `app/pet/_components/SkinList.tsx`, `scripts/check-pet.ts` 5곳을 고친다. 그 파일들은 `feat/pet`에만 있다
+6. **남음** — `SPEC.md`·`docs/dev/pet.md`·`docs/인수인계.md`·`업무분담.md` 갱신(아래 표)
+
+### `feat/pet` 머지 시 충돌 예고
+
+C의 브랜치는 아직 가챠·늑대·삵·판다·`tribeColor`를 들고 있다. `main`을 받으면 아래에서 충돌한다. **전부 `main` 쪽을 채택하면 된다.**
+
+| 파일 | 충돌 내용 |
+|---|---|
+| `prisma/schema.prisma` | C는 가챠만 지웠고 `main`은 가챠 + `tribeColor` + `priceAffinity`까지 지우고 `priceShards`를 넣었다 |
+| `prisma/seed/items.ts` | C는 늑대·삵·판다 + `tribeColor`를 유지, `main`은 변종 스킨 + 등급별 가격 |
+| `prisma/migrations/` | C에게는 이 마이그레이션이 없다. `main` 것을 받는다 |
+
+`app/api/pet/*`·`app/pet/*`은 `main`에 없으므로 충돌하지 않고, C가 5절대로 고치면 된다.
 
 ### 뒤집히는 기존 결정
 
