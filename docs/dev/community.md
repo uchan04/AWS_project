@@ -26,10 +26,10 @@ D 쪽 기능 구현은 끝났고, 지금은 `completeMission()`(B) 외부 결과
 - **고칠 파일**: `prisma/schema.prisma`(전원 합의) 변경 후 `app/community/_lib/gallery.ts`의 `galleryTypeFilter()`와 `canWriteToGallery()` 두 함수만 고치면 된다 — ALL 관련 로직을 전부 이 파일에 모아둔 설계라 나머지(목록 API, 글쓰기 API, `WriteModal`)는 자동으로 맞춰진다
 - **조심할 것**: 같은 파일의 `canAccessGallery()`도 접근 제어를 담당하니 같이 재검토할 것
 
-### 5. LLM 글쓰기 주제 추천 (SPEC 8절)
-- **필요한 것**: AWS 계정 / `BEDROCK_MODEL_ID`는 확보됐다(2026-08-19). 더 이상 외부 요인에 막혀 있지 않고, 아직 구현하지 않았을 뿐이다 — 2026-08-19 세션(추천 문구 유형별 분리 작업)은 이 항목이 아니다. 다음 D 세션에서 착수
-- **고칠 파일**: `app/community/_components/WriteModal.tsx:90`의 TODO 자리
-- **조심할 것**: 가짜 추천 문구를 하드코딩하지 말 것. SPEC 8절은 "3가지 이상 추천"을 요구하며 실제 LLM 호출이어야 한다. `app/api/chat/stream/route.ts`의 `ConverseStreamCommand` 호출 패턴을 참고할 것(단, 이건 스트리밍이 필요 없는 단발 호출이라 `ConverseCommand`가 더 맞을 수 있음)
+### 5. 글쓰기 주제 추천 — 고정 문구로 구현 (2026-08-20)
+- `app/community/_lib/topics.ts`(유형별 6개, `{ title, draft }`)에서 3개를 랜덤으로 뽑아 `WriteModal`에 카드로 띄운다. 클릭하면 제목·본문이 채워진다
+- **SPEC 8절이 명시한 LLM 추천은 아니다.** 일정상 고정 문구로 갔고, 구조는 `topics.ts` 교체만으로 LLM 전환이 되도록 열어뒀다. 근거는 아래 "결정한 것과 이유" 참고
+- **발표에서 AI 생성이라고 소개하지 않는다**
 
 ### 6. `completeMission()` — B 작업 중
 - **필요한 것**: B가 `completeMission(userId, code)`의 모듈 경로, 반환값(`void` 또는 `{completed, rewardSeeds, rewardAffinity}` 등), 중복 완료 시 동작(`completed: false`로 반환하는지)을 확정해야 한다
@@ -50,14 +50,15 @@ D 쪽 기능 구현은 끝났고, 지금은 `completeMission()`(B) 외부 결과
 ## 현재 상태
 - 완료: 갤러리 목록 화면, 상세 오버레이, 좋아요 토글, 댓글 작성, 글쓰기 모달, 본인 글 삭제, 본인 댓글 삭제, 친밀도 지급 헬퍼, 챗봇 시스템 프롬프트, 챗봇 메시지 저장 API(GET/POST, 친밀도 지급까지), 챗봇 패널 UI, Bedrock 스트리밍 응답 연결(`POST /api/chat/stream`), 타이핑 인디케이터, 유형별 챗봇 추천 문구 6개씩·3개 랜덤 노출(LLM 아님, 정적 상수), **챗봇 전역 오버레이 이전(`ChatLauncher` + `layout.tsx`, 임시 `/chat` 라우트 폐기)**
 - 진행 중: 없음
-- 미착수: LLM 주제 추천 실제 연동, 이미지 업로드
-- 보류(다음 세션 이전 필요 조건): 전체 탭 글쓰기(스키마에 ALL 값 없음), LLM 주제 추천(SPEC 8절, 이번 세션 범위 아님), 글쓰기 시 일일 미션(`DAILY_COMMUNITY_POST`) 완료 처리(B와 협의 필요), `ChatPanel`의 `layout.tsx` 이전(E 소유 파일이라 D가 직접 못 건드림) — 전부 아래 "결정한 것과 이유"에 근거 남김
+- 미착수: 이미지 업로드, LLM 주제 추천(고정 문구로 대체됨 — 아래 "결정한 것과 이유" 참고)
+- 보류(다음 세션 이전 필요 조건): 전체 탭 글쓰기(스키마에 ALL 값 없음), 글쓰기 시 일일 미션(`DAILY_COMMUNITY_POST`) 완료 처리(B와 협의 필요), `ChatPanel`의 `layout.tsx` 이전(E 소유 파일이라 D가 직접 못 건드림) — 전부 아래 "결정한 것과 이유"에 근거 남김
 
 ## 구현한 파일
 - `app/community/page.tsx` — 목록 화면. 서버 컴포넌트, `searchParams`의 `tab`으로 갤러리 결정
 - `app/community/_lib/gallery.ts` — `GalleryTab`("ALL" | TypeCode), `resolveGallery()`, `canAccessGallery()`, `listGalleryPosts()`. "ALL" 관련 로직을 전부 여기 모음
 - `app/community/_components/GalleryTabs.tsx` — 탭 2개(전체 커뮤니티 / 나의 종족). 종족 탭은 진단 완료 유저에게만 노출
 - `app/community/_components/PostCard.tsx` — 카드 그리드용 게시글 카드. 종족 배지는 전체 탭에서만 노출
+- `app/community/_lib/topics.ts` — **2026-08-20 추가.** 글쓰기 주제 추천 문구. `TOPICS: Record<TypeCode, WriteTopic[]>`, 유형별 6개씩 `{ title, draft }`. `app/chat/_lib/starters.ts`와 같은 구조·같은 톤의 주석을 쓴다. `TypeCode`는 `@prisma/client`에서 그대로 import. LLM 호출 없음
 - `app/community/_lib/format.ts` — `timeAgo()` 상대 시각 표기 (디자인 시안의 타임어고 방식으로 교체, 절대 날짜 포맷은 폐기)
 - `app/api/community/posts/route.ts` — GET. 목록 화면과 동일한 `gallery.ts` 헬퍼를 공유해 로직 중복 없음
 - `app/community/_lib/affinity.ts` — 친밀도 지급의 유일한 경로. `grantAffinity(user, base)` 하나로 통일(글/댓글/챗봇 전용 래퍼를 따로 만들지 않음). **챗봇 세션에서도 이 함수를 그대로 재사용할 것** — `COMMENT_AFFINITY`처럼 `CHAT_TURN_AFFINITY` 상수도 이미 정의돼 있음
@@ -78,6 +79,7 @@ D 쪽 기능 구현은 끝났고, 지금은 `completeMission()`(B) 외부 결과
 - `app/community/page.tsx` — 헤더에 `WriteModal` 배치(전체/종족 탭 공통, 내부에서 분기). **2026-08-20**: `getCurrentUser()`~`listGalleryPosts()`를 `try/catch`로 감싸고 실패 시 "로그인이 필요해요" 안내를 렌더한다. `export const dynamic = "force-dynamic"` 추가
 - `app/community/_components/PostList.tsx` — **2026-08-20**: `<PostDetailModal>`에 `key={selectedPostId}` 추가. 다른 글을 열면 컴포넌트가 새로 마운트되도록 보장한다
 - `app/community/_components/PostDetailModal.tsx` — **2026-08-20**: 상세 로드 `useEffect` 본문의 `setLoading(true)`·`setError(null)` 두 줄 삭제(lint `react-hooks/set-state-in-effect` 해소)
+- `app/community/_components/WriteModal.tsx` — **2026-08-20**: TODO 주석과 "주제 추천 준비 중이에요" 박스를 주제 추천 카드 3개로 교체. `topics` state와 `pickThreeTopics()`(모듈 스코프, Fisher-Yates 직접 구현) 추가. 글쓰기 버튼 `onClick`에서 뽑고 카드 클릭 시 `setTitle`·`setBody`로 두 입력창을 채운다. 종족 색은 기존 `tribeColor`를 그대로 쓴다
 - `app/api/community/posts/route.ts` — POST 추가(글쓰기)
 - `app/api/community/posts/[id]/route.ts` — DELETE 추가(본인 글 소프트 삭제), GET 응답에 `isOwn` 추가. GET의 `comments`도 prisma 결과 그대로 내리지 않고 `{ id, body, createdAt, user, isOwn }`으로 매핑(`userId`·`postId`·`deletedAt` 미노출)
 - `app/api/community/posts/[id]/comments/route.ts` — POST 응답의 `comment`를 GET 상세와 같은 형태(`{ id, body, createdAt, user, isOwn: true }`)로 매핑. 트랜잭션·`grantAffinity`·`COMMENT_AFFINITY` 로직은 그대로 둠
@@ -114,7 +116,12 @@ D 쪽 기능 구현은 끝났고, 지금은 `completeMission()`(B) 외부 결과
 - 좋아요는 친밀도 지급 대상이 아님(SPEC.md 8절에 명시)
 - 좋아요·댓글 API의 종족 갤러리 접근 차단은 지난 세션의 `canAccessGallery()`를 그대로 재사용(새로 안 만듦)
 - **전체 탭 글쓰기는 보류.** `Post.galleryType`이 `TypeCode` enum이라 `ALL` 값을 저장할 수 없음. 클라이언트(`WriteModal`)와 서버(POST 라우트) 양쪽에서 `canWriteToGallery()`로 막음 — 버튼만 비활성화하면 API 직접 호출로 뚫리기 때문에 서버 차단이 필수
-- **LLM 주제 추천은 보류.** `BEDROCK_MODEL_ID`가 비어 있어 구현 불가. `WriteModal`에 비활성 영역만 두고 `// TODO: Bedrock 주제 추천 — BEDROCK_MODEL_ID 확보 후 구현 (SPEC 8절)` 주석만 남김. 가짜 추천 문구는 하드코딩하지 않음
+- **(지난 세션) LLM 주제 추천은 보류였다.** `WriteModal`에 비활성 영역과 TODO 주석만 남겼었다. 2026-08-20에 고정 문구로 구현하며 이 자리를 교체했다(아래 항목).
+- **주제 추천을 LLM이 아니라 고정 문구로 구현했다(2026-08-20).** `SPEC.md` 8절은 "LLM이 사용자 성향에 맞는 작성 주제·초안을 3가지 이상 추천"을 명시하지만, 남은 일정상 Bedrock 연동 대신 유형별 고정 문구를 택했다. 챗봇의 `app/chat/_lib/starters.ts`가 이미 같은 방식으로 돌아가고 있어 패턴을 그대로 본떴다. **구조는 LLM 전환이 열려 있다** — `WriteModal`은 `TOPICS[gallery]`에서 3개를 받아 쓰기만 하므로, 나중에 `topics.ts`를 Bedrock 호출로 바꾸면 컴포넌트는 그대로 둘 수 있다. **발표에서 이 기능을 AI 생성이라고 소개하지 않는다**
+- **문구 작성 규칙을 지켰다.** 오늘 하루 안에서 쓸 수 있는 가벼운 소재만 쓰고, 인생 계획·목표 같은 무거운 주제와 "~해보세요" 같은 권유형을 넣지 않았다(소재를 주는 것이지 조언이 아니다). 유형명을 문구에 드러내지 않고, 자해·죽음·질병 진단은 소재로 삼지 않았다. 유형별로는 혼자 보낸 시간의 작은 장면(`INDEPENDENT_LOW_INCOME`) / 아무것도 못 한 하루도 그대로 쓸 수 있는 주제(`HEALTH_EMOTION`) / 집 안에서 혼자 느낀 감정(`FAMILY_LIVING`)으로 방향을 갈랐다 — 각각 돈·일, 운동·습관 개선, 가족 평가·대화 권유를 소재에서 뺐다
+- **`pickThreeTopics()`는 모달을 열 때 호출한다.** `useState` 초기화 함수에 두면 페이지 로드 시 한 번 뽑혀 모달을 다시 열어도 같은 목록이 나오고, 렌더 중에 뽑으면 입력하는 동안 목록이 바뀐다. 글쓰기 버튼의 `onClick`에서 `setTopics(...)` + `setIsOpen(true)`를 함께 호출해 "열 때 한 번만"을 만족시켰다. 셔플은 `ChatPanel.pickThreeStarters()`와 같은 Fisher-Yates 직접 구현이다(외부 라이브러리 없음)
+- **`topics` state는 `canWriteToGallery()` 조기 return보다 위에 선언한다.** 아래에 두면 전체 탭에서 훅 호출 개수가 달라져 React가 터진다
+- **전체 탭에서는 추천 영역을 아예 렌더하지 않는다.** `gallery`가 `"ALL"`이면 `TypeCode`를 알 수 없어 `TOPICS[gallery]`를 못 쓴다. 전체 탭은 어차피 글쓰기가 막혀 있어 이 경로를 타지 않지만, `topics.length > 0` 조건으로 방어적으로 막아뒀다
 - **일일 미션(`DAILY_COMMUNITY_POST`) 완료 처리는 보류.** `UserMission`은 B의 도메인이라 직접 만들지 않음. 작성 API에 `// TODO: DAILY_COMMUNITY_POST 완료 처리 — 담당 B와 협의 중` 주석만 남김
 - 삭제는 소프트 삭제(`deletedAt`)이며 친밀도를 회수하지 않는다. `affinityToday`가 이미 누적돼 있어 삭제 후 재작성으로 하루 상한을 넘길 수 없음
 - **댓글 삭제도 친밀도를 회수하지 않는다.** 글 삭제와 같은 이유다 — `affinityToday`가 이미 누적돼 있어 지웠다 다시 써도 하루 상한 100을 넘길 수 없다. `grantAffinity`·`calculateReward`를 아예 부르지 않으므로 댓글 DELETE는 `getCurrentUserWithSkin()`이 아니라 `getCurrentUser()`를 쓴다(`activePetSkin`이 필요 없음)
@@ -167,7 +174,7 @@ D 쪽 기능 구현은 끝났고, 지금은 `completeMission()`(B) 외부 결과
 - 없음 (로컬 DB가 `prisma migrate`로 관리되지 않고 있던 것을 발견해 베이스라인 마이그레이션(`prisma/migrations/00000000000000_init`)을 만들어 해결. 기존 시드 데이터(미션 41개, 펫스킨 6개)는 유지됨. 스키마 담당과 공유 필요)
 
 ## 다음 할 일
-- LLM 주제 추천 3가지 이상 연동 — `BEDROCK_MODEL_ID` 확보됐으니 `WriteModal`의 TODO 자리에 구현 가능. `app/api/chat/stream/route.ts`의 `ConverseStreamCommand` 호출 패턴을 참고할 것(단, 이건 비스트리밍 단발 호출이라 `ConverseCommand`가 더 맞을 수 있음)
+- ~~LLM 주제 추천 3가지 이상 연동~~ — **고정 문구로 대체했다(2026-08-20).** `app/community/_lib/topics.ts`의 유형별 6개 중 3개를 `WriteModal`이 카드로 보여준다. 나중에 LLM으로 전환한다면 `topics.ts`만 Bedrock 호출로 바꾸면 되고 컴포넌트는 그대로 둘 수 있다(비스트리밍 단발 호출이라 `ConverseCommand`가 맞다). SPEC 8절과의 차이와 발표 시 주의는 "결정한 것과 이유" 참고
 - 전체 탭 글쓰기 — 스키마에 ALL(또는 공용 게시판) 개념이 추가되면 `_lib/gallery.ts`의 `canWriteToGallery()`만 고치면 됨
 - `DAILY_COMMUNITY_POST` 일일 미션 완료 처리 — B와 담당 경계 협의 필요
 - **`layout.tsx` 변경분 PR 리뷰 — E.** 전역 오버레이 이전은 끝났고(2026-08-20) E와 사전 공유했다. 공유 파일이므로 머지 전 PR 리뷰를 받는다. diff는 import 한 줄 + `<ChatLauncher />` 한 줄뿐이다
