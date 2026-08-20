@@ -8,10 +8,10 @@ export function getTodayKey(): string {
   return new Date().toLocaleString("sv-SE", { timeZone: TZ }).split(" ")[0]
 }
 
-/** 날짜 비교용 Date 객체 */
+/** 날짜 비교용 Date 객체 (UTC 자정) */
 export function getToday(): Date {
   const str = getTodayKey()
-  return new Date(`${str}T00:00:00.000+09:00`)
+  return new Date(`${str}T00:00:00.000Z`)
 }
 
 /**
