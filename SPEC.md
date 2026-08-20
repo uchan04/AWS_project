@@ -285,14 +285,15 @@ export function calculateReward(skin: PetSkin | null, base: RewardInput): Reward
 |---|---|---|
 | Amplify Hosting | Next.js 빌드·배포·HTTPS·CDN. `main` push 시 자동 배포 | 서버리스 SSR + CloudFront, 유휴 비용 0 |
 | RDS Postgres `db.t4g.micro` | 데이터베이스. Prisma ORM | 자동 백업 7일 보존으로 데이터 소실 방지 |
-| Cognito | 이메일 + 비밀번호 인증 | 인증·토큰 관리를 관리형 서비스에 위임 |
+| Cognito | 이메일 + 비밀번호 인증, Google 로그인(Hosted UI) | 인증·토큰 관리를 관리형 서비스에 위임 |
 | Bedrock (us-east-1, Claude Sonnet 단일) | 진단 질문 다듬기, enum 변환, 챗봇, 주제 추천 | 모델 분기 없음 = 버그 표면 최소 |
 | CloudWatch + SNS | CPU·에러율 대시보드, 알람 1개 | 운영 모니터링 |
 | S3 + CloudFront | 사진 미션 업로드, 펫·치장 이미지 | presigned URL 직업로드, 정적 자원 분리 |
 
 - 서버 로직은 Next.js Route Handler로 구현한다. 별도 API Gateway·Lambda 레포를 만들지 않는다.
 - Bedrock 모델 접근은 확인 완료(Playground 응답 정상). 정확한 모델 ID는 콘솔에서 복사해 `.env`로 관리한다.
-- 소셜 로그인은 쓰지 않는다. 이메일 인증 코드도 끄고 즉시 가입시킨다(SES 검증 대기 회피).
+- 이메일+비밀번호와 Google 로그인을 함께 지원한다(결정 변경, `docs/STATUS.md` 참고). 이메일 인증 코드는 끄고 `AdminCreateUser`로 즉시 가입시킨다(SES 검증 대기 회피).
+- 이메일 로그인은 `app/api/auth/{signup,login}`이 Cognito Admin API를 직접 호출한다. Google은 `app/api/auth/google`이 Cognito Hosted UI(Domain: `welli-auth-185236887369`)로 리다이렉트하고 `app/api/auth/callback`이 code를 토큰으로 교환한다. 로그인 성공 시 `access_token`을 httpOnly 쿠키에 담아 `lib/auth.ts`가 그 쿠키만 읽는다(Authorization 헤더는 문서 내비게이션에 안 붙어서 쓰지 않는다).
 
 ### 채택하지 않은 것
 

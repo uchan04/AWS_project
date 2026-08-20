@@ -35,7 +35,7 @@
 | B | 미션 시스템 + 사진 업로드 | **`develop`에 머지 완료**(`3adbea5`, 2026-08-20). 미션 API 3종, 사진 업로드 presign·verify, 미션 대시보드, 출석, `lib/missions/` 8개 파일. 재화는 `calculateReward()`를 경유한다 | 하단 탭을 사이드바로 교체한 것도 B다(결정 9번은 E 배정이었다). 차단 10번 4건 + lint 에러 11건 남음 |
 | C | 펫 + 스킨 | **`SPEC.md` 5절 기능 완료.** 성장·씨앗 투입·진화 연출, 방치형 자동 획득, 치장 착용·해제, 스킨 구매·전환 + 화면 3장. 스킨·치장 구조 변경(종족 전용 외형 / 치장 종족 무관 / 가챠 삭제)은 스키마·실 DB·시드·API·화면까지 반영 완료(2026-08-20, A) | 남은 것은 **치장 구매 라우트**(차단 9)와 `SPEC.md` 2·5·6·11절·`docs/dev/pet.md`·`docs/인수인계.md` 갱신, `scripts/check-pet.ts` 어미 단정 추가. 목록은 `docs/dev/diagnosis.md` 15절 |
 | D | 커뮤니티 + 챗봇 | **`develop`에 5커밋 미반영**(본인 댓글 삭제, 모달 버그 2건, 문서 2건). 예측 충돌은 `docs/STATUS.md` 1건뿐이고 코드는 충돌하지 않는다. 기능 구현 끝. 챗봇 Bedrock 스트리밍 연결 완료(2026-08-19). 미션 완료 연동 호출부(`completeMission`)는 주석으로 준비만 해둠 | `completeMission()`(B) 대기 상태. 막힌 항목 5개와 주의사항은 `docs/dev/community.md` 상단 "재개 지점" 참고 |
-| E | 인프라 + 인증 | RDS·Cognito·S3+CloudFront·CloudWatch+SNS·Bedrock·auth 실검증·하단 탭 내비 완료, PR #1 머지 + 2차 마이그레이션 + auth 빌드 수정 + 색 토큰 정리 완료 | Amplify GitHub 연동만 남음(브라우저 수동 단계) |
+| E | 인프라 + 인증 | RDS·Cognito·S3+CloudFront·CloudWatch+SNS·Bedrock·auth 실검증·하단 탭 내비 완료, PR #1 머지 + 2차 마이그레이션 + auth 빌드 수정 + 색 토큰 정리 완료. 로그인 화면(이메일+비밀번호/Google) + 쿠키 기반 인증 전환 + `amplify.yml` 완료(2026-08-20) | Amplify GitHub 연동, Google IdP 자격증명(아래 참고) 남음 |
 
 ## 전체 차단 사항
 
@@ -113,7 +113,7 @@ GitHub 원격 — https://github.com/uchan04/AWS_project
 1. **동물·색 교체.** 여우 = 건강·정서취약형(주황 `#E8956A`), 고양이 = 독립거주-저소득형(푸른 `#6A95C8`), 곰 = 가족동거형(녹색 `#7AAE82`). Figma 프로토타입 값으로 맞췄다(옛 `#F59E0B`/`#38BDF8`/`#34D399`는 종이색 배경에서 형광으로 떴다). 값은 `lib/types.ts`의 `TRIBE`와 `styles/tokens.css`의 `[data-tribe]` 두 곳에 있다 — 한쪽만 고치지 않는다
 2. **관리자 세부유형 8개 추가.** 연구보고서 9유형에서 경계선지능청년 제외. 사용자에게는 여전히 동물 3종만 보인다
 3. **아키네이터식 진단.** 문항 13개를 정의하고 유형이 확정되면 조기 종료한다. 무손실이며 실측 평균 9.7문항
-4. **Cognito는 Google 로그인만.** `SPEC.md` 10절("소셜 로그인은 쓰지 않는다")·`CLAUDE.md` 8절과 충돌한다. 두 문서 갱신은 사용자 확인 대기
+4. **Cognito는 이메일+비밀번호와 Google을 함께 지원한다** (확정, 2026-08-20). `SPEC.md` 10절·`CLAUDE.md` 8절 갱신 완료. `lib/auth.ts`가 `Authorization` 헤더 대신 `access_token` httpOnly 쿠키를 읽도록 바뀌었다 — 헤더 방식은 문서 내비게이션(링크 클릭·주소창 이동)에 커스텀 헤더가 안 붙어서 서버 컴포넌트 페이지를 인증할 수 없었다(`feat/pet`·`feat/community`의 서버 컴포넌트 페이지 5개가 여기 해당). Google 로그인은 Cognito Domain(`welli-auth-185236887369`)까지 만들어졌고, Google Cloud Console에서 발급받은 OAuth Client ID/Secret을 Cognito Identity Provider로 연결하는 마지막 단계만 남았다 — 콜백 URL은 `https://welli-auth-185236887369.auth.us-east-1.amazoncognito.com/oauth2/idpresponse`.
 5. **브랜치 규칙.** 담당별 브랜치에 커밋하고 `main`은 PR로만 올린다. 셀프 머지 안 한다
 6. **홈 화면 담당은 A**
 7. **화면 디자인 기준은 루트 `design.md`, 토큰은 `styles/tokens.css`.** A가 만들었고 진단·결과·홈 3장에 적용했다. 다른 화면도 같은 결로 맞출 담당자는 이 두 파일을 본다. `app/globals.css`·`app/layout.tsx`(E 소유)는 건드리지 않았고 새 npm 의존성도 없다
@@ -130,6 +130,15 @@ GitHub 원격 — https://github.com/uchan04/AWS_project
 15. **가챠를 스키마에서 지웠다.** `GachaPull` 테이블과 `User.heroPity`·`legendPity`를 삭제했다. `feat/pet`에 스키마 삭제분만 있고 마이그레이션이 없어 실 DB와 갈라져 있던 드리프트도 이번에 닫혔다
 
 **스키마 담당 규칙 예외.** `CLAUDE.md` 5절은 마이그레이션을 1인(E)만 실행하라고 한다. 이번에는 팀 합의 후 A가 `prisma/schema.prisma` 수정과 `migrate deploy`까지 실행했다. 마이그레이션은 `20260820120000_skin_tribe_and_drop_gacha` 하나뿐이고 히스토리는 갈라지지 않았다. **나머지 4인은 `git pull && npx prisma migrate deploy && npx prisma generate`만 실행한다.** 다음 스키마 변경은 다시 E가 맡는다
+
+## 외부 피드백 검증 (2026-08-20)
+
+팀원이 아닌 곳에서 인프라 점검 피드백 5건을 받아 코드·AWS·전체 브랜치를 직접 대조했다. 다시 확인하지 않아도 되도록 결과만 남긴다.
+
+- 로그인 화면 없음(#2)·`amplify.yml` 없음(#5): 맞음 → 이번에 해결(위 참고)
+- `Authorization: Bearer` 헤더로는 서버 컴포넌트를 인증할 수 없다는 지적(#1): 맞음. main에는 아직 영향 없지만 `feat/pet`·`feat/community`에 이미 서버 컴포넌트로 `getCurrentUser()`를 부르는 페이지 5개가 있어 머지 시점에 터질 문제였다 → 쿠키 방식으로 전환해 해결
+- **`app/components/BottomNav.tsx`가 고아라는 지적(#3)은 틀렸다.** `app/layout.tsx`에서 실제로 import·렌더링 중이며 하단 탭 내비게이션 자체다. 문서의 "동결"은 "다른 담당자가 건드리지 말라"는 뜻이었다. **삭제하지 않았다.**
+- `lib/missions/vision.ts`·`BEDROCK_VISION_MODEL_ID`(#4): main과 4개 feature 브랜치 어디에도 존재하지 않는다. 처리 대상 없음 — 작성자 로컬의 미푸시 코드로 보인다.
 
 ## 마일스톤
 
