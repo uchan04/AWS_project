@@ -624,6 +624,8 @@ model DiagnosisSession {
 
 **B — `GET /api/missions`.** 나오면 홈 미션 미리보기를 그쪽으로 바꾼다.
 
+**C — 종족 외형 스킨으로 전환 (2026-08-20 사용자 결정).** 친밀도 전용 캐릭터(늑대·삵·판다)를 없애고, 진단으로 정해진 동물의 변종 스킨을 별조각으로 파는 구조로 바꾼다. 상세는 15절에 있다. `PetSkin` 테이블은 `priceShards` 한 컬럼만 추가하면 되고, 종족 그룹핑은 기존 `typeCode`가 그대로 담당한다. A는 `app/api/diagnosis/complete/route.ts`의 기본 펫 지급 쿼리(`where: { typeCode, isDefault: true }`)를 그대로 두면 되므로 진단 쪽 변경은 없다.
+
 ### 넘겨서 끝난 것 (기록)
 
 - E — 2차 마이그레이션 `20260819080703_add_subtype`: A가 넘긴 DDL 그대로 적용됐다
@@ -657,3 +659,121 @@ model DiagnosisSession {
 `npm run build`와 `npm run check:diagnosis` 모두 통과한다. 남은 것은 마스코트(펫 이미지 대기)와 미션 완료 여부 표시(B API 대기)뿐이다.
 
 **빌드 캐시 주의.** `next start`는 캐시된 빌드를 내보낸다. 코드를 고쳤으면 `npm run build`를 다시 돌리고 서버를 재시작해야 화면에 반영된다.
+
+---
+
+## 15. 종족 외형 스킨 구조 — C에게 넘기는 확정안 (2026-08-20)
+
+사용자 결정으로 펫 스킨 모델이 바뀐다. "진단으로 정해진 동물은 고정이고, 상점에서 사는 것은 같은 동물의 변종 외형뿐이다." 여우는 북극여우·사막여우, 고양이는 샴고양이·페르시안고양이, 곰은 북극곰·반달가슴곰처럼 어미에 종족명이 붙는다. 능력치는 바뀌지 않고 **외형만** 바뀐다.
+
+A가 실 DB와 `feat/pet`을 읽고 구조 적합성을 검토한 결과를 여기 남긴다. 구현은 C 담당이다(`prisma/seed/items.ts`, `app/api/pet/*`, `app/pet/*`). `prisma/schema.prisma`는 전원 합의 파일이므로 A가 손대지 않았다.
+
+### 결론
+
+`PetSkin` 테이블은 거의 그대로 쓸 수 있다. 새 컬럼은 `priceShards` 하나뿐이다. 종족 그룹핑에 별도 `species` 열거형이나 `baseSkinId` 자기참조는 필요하지 않다 — `TypeCode` 1개가 동물 1종에 정확히 대응하므로 기존 `typeCode`가 그대로 종족 키가 된다. 단, 이 전제는 늑대·삵·판다를 없앤다는 결정에 의존한다. 같은 `typeCode` 안에 서로 다른 동물이 공존하면 `typeCode`만으로는 종족을 식별할 수 없다.
+
+### 결정한 것 (2026-08-20 사용자)
+
+1. **늑대·삵·판다는 변종 스킨으로 대체한다.** 친밀도 전용 캐릭터와 고유 효과(씨앗 +15% / 별조각 +10% / 친밀도 +20%)는 없어진다. 외형만 바뀌는 스킨과 능력이 붙은 캐릭터가 한 목록에 섞이면 "외형만 바뀐다"는 규칙이 깨진다
+2. **구매 화폐는 별조각.** 가챠 컷으로 별조각이 소모처를 잃은 상태였다(3단계 미션 12개가 총 60개를 지급하는데 쓸 곳이 없다). 스킨 상점이 그 구멍에 맞는다. 스킨 = 별조각, 치장 아이템 = 친밀도로 두 화폐의 역할이 갈린다
+3. **변종은 종족당 1개로 시작한다.** 이미지 장수가 곧 작업량이다. 기본 9장(3동물 × 3단) + 변종 9장 = 18장. 구조는 개수 제한이 없으므로 발표 후 시드만 추가하면 늘어난다
+
+### 스키마 변경
+
+```prisma
+model PetSkin {
+  id       String   @id @default(cuid())
+  name     String   @unique // 여우 / 북극여우 / 사막여우. 어미가 종족명이다
+  typeCode TypeCode        // 종족. 같은 값이면 같은 동물이다
+
+  isDefault  Boolean @default(false) // 진단으로 지급되는 기본 외형
+  stageCount Int     @default(3)     // 1에서 3으로. 외형만 바뀌므로 변종도 3단이다
+
+  effectType EffectType @default(NONE) // 외형 스킨은 전부 NONE
+  effectPct  Int        @default(0)
+
+  priceShards   Int? // 신규. 별조각 구매가. 기본 외형은 null
+  priceAffinity Int? // 유지. 지금은 쓰지 않는다
+  imageKeyBase  String
+
+  owners      UserPetSkin[]
+  activeUsers User[]        @relation("ActiveSkin")
+}
+```
+
+마이그레이션은 비파괴 2줄이다.
+
+```sql
+ALTER TABLE "PetSkin" ADD COLUMN "priceShards" INTEGER;
+ALTER TABLE "PetSkin" ALTER COLUMN "stageCount" SET DEFAULT 3;
+```
+
+`effectType`·`effectPct`는 지우지 않는다. `calculateReward()`가 `NONE`이면 그대로 통과시키므로 남겨도 무해하고, 지우면 `lib/reward.ts`(C 소유 공유 함수)의 시그니처가 흔들린다. 나중에 능력치 스킨을 되살릴 여지도 남는다.
+
+### `stageCount`를 3으로 올려야 하는 이유
+
+지금 친밀도 캐릭터는 `stageCount = 1`이고, 코드가 그 값으로 진화 단계를 깎는다.
+
+```ts
+// app/api/pet/skins/activate/route.ts
+const evolutionStage = cappedStage(user.level, mine.petSkin.stageCount)
+
+// app/pet/_components/PetView.tsx
+const stage = pet.stageCount > 1 ? Math.min(pet.evolutionStage, 3) : 2
+// 표시도 "단일 형태"로 바뀐다
+```
+
+15레벨 3단 펫이 `stageCount = 1` 스킨으로 갈아타면 `evolutionStage`가 1로 떨어진다. 외형만 바뀌어야 하니 변종도 3단이어야 한다. 전부 3이 되면 위 분기는 자동으로 무해해지고, 지금 있는 퇴화 동작이 함께 사라진다.
+
+### 시드
+
+```
+여우      HEALTH_EMOTION          isDefault  stage3  pets/fox
+북극여우  HEALTH_EMOTION          별조각 N   stage3  pets/fox-arctic
+고양이    INDEPENDENT_LOW_INCOME  isDefault  stage3  pets/cat
+샴고양이  INDEPENDENT_LOW_INCOME  별조각 N   stage3  pets/cat-siamese
+곰        FAMILY_LIVING           isDefault  stage3  pets/bear
+북극곰    FAMILY_LIVING           별조각 N   stage3  pets/bear-polar
+```
+
+`imageKeyBase`는 그대로 쓸 수 있다. `stageCount`가 3이면 뒤에 `-1 -2 -3`을 붙이는 기존 규칙을 변종도 그대로 따른다.
+
+**어미 규칙은 스키마로 강제하지 않는다.** 접미사 문자열 매칭을 런타임 그룹핑에 쓰면 오타 한 번에 그룹이 깨진다. 그룹핑은 `typeCode`가 하고, 어미는 `npm run check:pet`에 단정 한 줄로 못 박는다.
+
+```ts
+for (const skin of SKINS)
+  assert(
+    skin.name.endsWith(TRIBE[skin.typeCode].animal),
+    `${skin.name}의 어미가 ${skin.typeCode} 종족명과 다르다`
+  )
+```
+
+**시드만 고쳐서는 늑대·삵·판다가 DB에서 사라지지 않는다.** 시드는 `name`을 키로 upsert하므로 목록에서 뺀 행은 그대로 남는다. 실 DB에 이미 3행이 들어가 있다(A가 2026-08-20에 확인). 명시적으로 지워야 한다. 지금은 안전한 시점이다 — `UserPetSkin` 1건은 여우를 가리키고, `GachaPull`의 FK는 `CosmeticItem` 쪽이라 `PetSkin`을 참조하지 않는다.
+
+### 코드 변경 (C 담당 4곳)
+
+| 파일 | 변경 |
+|---|---|
+| `app/api/pet/skins/route.ts` | `findMany`에 `where: { typeCode: user.typeCode }`를 넣어 자기 종족만 노출한다. `user.typeCode`가 `null`(진단 전)이면 빈 목록을 돌려준다 |
+| `app/api/pet/skins/buy/route.ts` | `skin.typeCode !== user.typeCode`면 400으로 거른다. 차감 대상을 `affinity`에서 `starShards`로 바꾼다. 연타 방어용 조건부 `updateMany` 패턴은 그대로 유지한다 |
+| `app/pet/_components/SkinList.tsx` | 묶음을 "기본 외형 / 상점 외형"으로 바꾸고, 고유 효과 표기를 지운다. 그룹 헤더의 동물명은 `lib/types.ts`의 `TRIBE[typeCode]`에서 가져온다 |
+| `SPEC.md` 5절 | "친밀도 전용 캐릭터" 절을 "종족 외형 스킨"으로 재작성한다. 고유 효과 표와 **"구매 제한을 두지 않는다"** 단락을 지우고, 별조각 소모처를 "미정"에서 "종족 외형 스킨 구매"로 바꾼다 |
+
+`lib/reward.ts`·`lib/pet.ts`·`UserPetSkin`·`app/api/pet/skins/activate/route.ts`는 손대지 않아도 된다.
+
+### 뒤집히는 기존 결정
+
+`app/api/pet/skins/route.ts`의 주석이 지금은 이렇게 되어 있다.
+
+```
+구매 제한을 두지 않는다 — 유형과 무관하게 3종 모두 살 수 있다(SPEC.md 5절).
+자기 과로 제한하면 유저당 1개뿐이라 "고르고 전환한다"가 사라진다.
+```
+
+새 구조는 이 판단을 뒤집는다. 다만 **C의 원래 근거는 자동으로 해소된다** — 종족당 변종이 여러 개 생기므로 자기 종족으로 제한해도 고를 것이 남는다.
+
+### 남는 문제
+
+**재진단하면 옛 종족 스킨이 유령이 된다.** `app/api/diagnosis/complete/route.ts`가 새 `typeCode`의 기본 외형으로 `activePetSkinId`를 다시 심으므로 화면은 깨지지 않는다. 다만 `UserPetSkin`에 남은 옛 종족 스킨은 상점·목록 어디에도 안 보인 채로 소유 기록만 남는다. 별조각 환불이든 유지든 정책이 필요하다. 지금 `UserPetSkin`이 1건뿐이라 정하기에 가장 싼 시점이다.
+
+**이 작업은 `feat/pet` 머지가 먼저다.** 위 파일 전부 C 브랜치에만 있고 `main`에는 없다.
