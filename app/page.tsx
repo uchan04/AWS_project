@@ -2,7 +2,8 @@
 
 // 소유자: A. 홈. 종족·펫·오늘 미션 진입점.
 //
-// 진단 결과는 GET /api/diagnosis/me에서 읽는다. 펫·미션 실데이터는 B·C의 API가 나온 뒤에 붙인다.
+// 진단 결과는 GET /api/diagnosis/me, 오늘 미션은 GET /api/missions에서 읽는다.
+// 미션 문구를 홈에 복사하거나 시드 배열을 직접 읽지 않는다 — 원본은 DB다(결정 10번).
 // 진단 전에는 진단 화면으로 보내는 것 하나만 남긴다. 홈에 아무것도 못 하는 카드를 늘리지 않는다.
 //
 // 스타일은 design.md가 정한다. Hallmark · macrostructure: Index-First.
@@ -12,10 +13,12 @@ import Link from "next/link"
 import { useEffect, useState } from "react"
 import type { TypeCode } from "@prisma/client"
 import { TRIBE } from "@/lib/types"
-// 미션 문구는 A가 가진 시드 콘텐츠가 정본이다. 홈에 복사해 두지 않고 그 배열을 읽는다
-import { DAILY } from "@/prisma/seed/missions"
 import "@/styles/tokens.css"
 import { type DiagnosisView, fetchMe } from "./diagnosis/api"
+
+// GET /api/missions(B 소유)가 돌려주는 DashboardDTO 중 홈이 쓰는 부분만 적는다.
+// lib/missions/dashboard.ts의 타입을 import하면 홈이 서버 모듈에 묶인다
+type DailyMissionView = { code: string; title: string; completed: boolean; reward: { seeds: number } }
 
 // 진단 전 화면에서 세 종족을 나란히 보여줄 때 쓴다
 const TRIBE_LIST = (Object.keys(TRIBE) as TypeCode[]).map((code) => ({ code, ...TRIBE[code] }))
@@ -31,6 +34,8 @@ export default function HomePage() {
   // undefined = 아직 읽는 중. null과 구분해야 진단한 사람에게 시작 화면이 깜박이지 않는다
   const [me, setMe] = useState<DiagnosisView | null | undefined>(undefined)
   const [greeting, setGreeting] = useState("")
+  // null = 못 읽었다(진단 전·미인증·에러). 빈 배열과 구분해서 안내 문구를 가른다
+  const [daily, setDaily] = useState<DailyMissionView[] | null>(null)
 
   useEffect(() => {
     let alive = true
@@ -46,6 +51,18 @@ export default function HomePage() {
       .catch(() => {
         if (alive) setMe(null)
       })
+
+    // 미션은 별도로 읽는다. 진단 전에는 400이고 미인증이면 401인데, 둘 다 홈이
+    // 뜨는 것을 막을 이유가 아니다. 실패하면 미션 카드만 안내 문구로 남는다
+    fetch("/api/missions")
+      .then((response) => (response.ok ? response.json() : null))
+      .then((body) => {
+        if (alive) setDaily(body?.data?.dailyMissions ?? null)
+      })
+      .catch(() => {
+        if (alive) setDaily(null)
+      })
+
     return () => {
       alive = false
     }
@@ -150,8 +167,8 @@ export default function HomePage() {
             </Link>
           </div>
 
-          {/* 오늘의 미션 미리보기. 문구는 시드 콘텐츠(DAILY)에서 읽는다.
-              완료 여부는 DB가 붙은 뒤에 표시한다 */}
+          {/* 오늘의 미션 미리보기. GET /api/missions에서 읽는다. 완료한 것도 그대로 보여준다 —
+              홈에서 목록이 줄어들면 무엇을 했는지가 안 보인다 */}
           <div className="hm-card">
             <div className="hm-card__head">
               <h2 className="hm-card__title">오늘의 미션</h2>
@@ -159,14 +176,23 @@ export default function HomePage() {
                 전체 보기
               </Link>
             </div>
-            <div className="hm-tiles">
-              {DAILY.slice(0, 4).map((mission) => (
-                <div key={mission.code} className="hm-tile">
-                  <span className="hm-tile__title">{mission.title}</span>
-                  <span className="hm-tile__hint">씨앗 {mission.rewardSeeds}</span>
-                </div>
-              ))}
-            </div>
+            {daily === null ? (
+              <p className="hm__note">미션을 불러오지 못했어요. 전체 보기에서 확인해 주세요</p>
+            ) : (
+              <div className="hm-tiles">
+                {daily.slice(0, 4).map((mission) => (
+                  <div key={mission.code} className="hm-tile">
+                    <span className="hm-tile__title">
+                      {mission.completed ? "✓ " : ""}
+                      {mission.title}
+                    </span>
+                    <span className="hm-tile__hint">
+                      {mission.completed ? "완료했어요" : `씨앗 ${mission.reward.seeds}`}
+                    </span>
+                  </div>
+                ))}
+              </div>
+            )}
           </div>
         </div>
 
