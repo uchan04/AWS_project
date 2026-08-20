@@ -40,7 +40,13 @@ export async function GET(_request: NextRequest, ctx: RouteContext<"/api/communi
         likedByMe: post.likes.length > 0,
         isOwn: post.userId === user.id,
       },
-      comments,
+      comments: comments.map((c) => ({
+        id: c.id,
+        body: c.body,
+        createdAt: c.createdAt,
+        user: c.user,
+        isOwn: c.userId === user.id,
+      })),
     })
   } catch (error) {
     if (error instanceof UnauthorizedError) return fail("UNAUTHORIZED", error.message, 401)

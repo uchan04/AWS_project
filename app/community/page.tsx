@@ -1,17 +1,43 @@
+import type { TypeCode } from "@prisma/client"
 import { getCurrentUser } from "@/lib/auth"
 import { TRIBE } from "@/lib/types"
 import { GalleryTabs } from "./_components/GalleryTabs"
 import { PostList } from "./_components/PostList"
 import { WriteModal } from "./_components/WriteModal"
-import { resolveGallery, listGalleryPosts } from "./_lib/gallery"
+import { resolveGallery, listGalleryPosts, type GalleryTab, type GalleryPost } from "./_lib/gallery"
+
+// 유저별 데이터를 읽으므로 정적 프리렌더 대상이 아니다. 이걸 빼면 빌드 시점에
+// 아래 catch의 안내 화면이 정적으로 굳어 로그인한 뒤에도 그대로 나온다(pet/page.tsx와 같은 이유).
+export const dynamic = "force-dynamic"
 
 export default async function CommunityPage(props: PageProps<"/community">) {
   const searchParams = await props.searchParams
   const tab = typeof searchParams.tab === "string" ? searchParams.tab : undefined
 
-  const user = await getCurrentUser()
-  const gallery = resolveGallery(tab, user.typeCode)
-  const posts = await listGalleryPosts(gallery)
+  let myTypeCode: TypeCode | null
+  let gallery: GalleryTab
+  let posts: GalleryPost[]
+
+  // 인증이나 DB가 실패해도 화면을 죽이지 않고 안내를 띄운다(C의 pet/page.tsx와 같은 패턴).
+  try {
+    const user = await getCurrentUser()
+    myTypeCode = user.typeCode
+    gallery = resolveGallery(tab, user.typeCode)
+    posts = await listGalleryPosts(gallery)
+  } catch (error) {
+    console.error("[/community]", error)
+    return (
+      <main className="mx-auto flex max-w-3xl flex-col gap-6 p-4 sm:p-6">
+        <h1 className="text-xl font-bold text-neutral-900">커뮤니티</h1>
+        <div className="rounded-2xl bg-white p-8 text-center">
+          <p className="text-sm text-neutral-700">로그인이 필요해요</p>
+          <p className="mt-2 text-sm leading-relaxed text-neutral-500">
+            진단을 아직 안 했다면 진단을 먼저 완료해 주세요.
+          </p>
+        </div>
+      </main>
+    )
+  }
 
   return (
     <main className="mx-auto flex max-w-3xl flex-col gap-6 p-4 sm:p-6">
@@ -27,7 +53,7 @@ export default async function CommunityPage(props: PageProps<"/community">) {
         <WriteModal gallery={gallery} />
       </div>
 
-      <GalleryTabs active={gallery} myTypeCode={user.typeCode} />
+      <GalleryTabs active={gallery} myTypeCode={myTypeCode} />
 
       {posts.length === 0 ? (
         <p className="py-24 text-center text-sm leading-relaxed text-neutral-500">

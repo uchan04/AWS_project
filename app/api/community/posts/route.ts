@@ -2,13 +2,8 @@ import type { NextRequest } from "next/server"
 import { getCurrentUser, getCurrentUserWithSkin, UnauthorizedError } from "@/lib/auth"
 import { prisma } from "@/lib/prisma"
 import { ok, fail } from "@/lib/api"
-import {
-  resolveGallery,
-  canAccessGallery,
-  canWriteToGallery,
-  listGalleryPosts,
-  type GalleryTab,
-} from "@/app/community/_lib/gallery"
+import { GalleryType } from "@prisma/client"
+import { resolveGallery, canAccessGallery, listGalleryPosts } from "@/app/community/_lib/gallery"
 import { grantAffinity, POST_AFFINITY } from "@/app/community/_lib/affinity"
 
 export async function GET(request: NextRequest) {
@@ -38,15 +33,19 @@ export async function POST(request: NextRequest) {
     const payload = await request.json().catch(() => null)
     const title = typeof payload?.title === "string" ? payload.title.trim() : ""
     const body = typeof payload?.body === "string" ? payload.body.trim() : ""
-    const galleryType = (typeof payload?.galleryType === "string" ? payload.galleryType : "ALL") as GalleryTab
+    const requested = typeof payload?.galleryType === "string" ? payload.galleryType : GalleryType.ALL
 
     if (!title || !body) return fail("INVALID_BODY", "제목과 본문을 입력해주세요", 400)
 
+    // 스키마의 GalleryType enum에 있는 값만 받는다(ALL 포함).
+    const galleryType = (Object.values(GalleryType) as string[]).includes(requested)
+      ? (requested as GalleryType)
+      : null
+    if (!galleryType) return fail("INVALID_BODY", "갤러리를 찾을 수 없어요", 400)
+
+    // ALL은 누구나, 종족 갤러리는 본인 종족만 쓸 수 있다.
     if (!canAccessGallery(galleryType, user.typeCode)) {
       return fail("FORBIDDEN", "다른 종족의 갤러리에는 글을 쓸 수 없어요", 400)
-    }
-    if (!canWriteToGallery(galleryType)) {
-      return fail("FORBIDDEN", "전체 커뮤니티 글쓰기는 아직 지원하지 않아요", 400)
     }
 
     const post = await prisma.post.create({

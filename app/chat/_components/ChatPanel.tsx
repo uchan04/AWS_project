@@ -1,7 +1,6 @@
 "use client"
 
 import { useEffect, useRef, useState } from "react"
-import { useRouter } from "next/navigation"
 import type { TypeCode } from "@prisma/client"
 import { TRIBE } from "@/lib/types"
 import { timeAgo } from "@/app/community/_lib/format"
@@ -27,31 +26,26 @@ type ChatMessageDTO = {
   createdAt: string
 }
 
-export function ChatPanel({
-  nickname,
-  typeCode,
-  bedrockConfigured,
-  onClose,
-}: {
-  nickname: string
-  typeCode: TypeCode | null
-  bedrockConfigured: boolean
-  onClose?: () => void
-}) {
+export function ChatPanel({ onClose }: { onClose?: () => void }) {
   const [messages, setMessages] = useState<ChatMessageDTO[]>([])
   const [affinityToday, setAffinityToday] = useState(0)
+  // 전역 오버레이라 props를 넘겨줄 서버 컴포넌트가 없다. 아래 GET 하나로 같이 받는다.
+  const [nickname, setNickname] = useState("")
+  const [typeCode, setTypeCode] = useState<TypeCode | null>(null)
+  const [bedrockConfigured, setBedrockConfigured] = useState(false)
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState<string | null>(null)
+  // 401이면 진단 안내가 아니라 로그인 안내를 띄우고 입력을 막는다
+  const [unauthorized, setUnauthorized] = useState(false)
   const [infoOpen, setInfoOpen] = useState(false)
   const [input, setInput] = useState("")
   const [sending, setSending] = useState(false)
   const [streaming, setStreaming] = useState(false)
   const [streamingText, setStreamingText] = useState("")
-  // 패널이 새로 마운트될 때(재진입 시) 한 번만 뽑는다. 서버에서 섞으면 hydration이 어긋나므로
-  // 로딩 화면 뒤에 가려진 이 값은 클라이언트 렌더에서만 실제로 쓰인다(아래 loading 분기 참고).
-  const [starters] = useState(() => (typeCode ? pickThreeStarters(typeCode) : []))
+  // 패널이 새로 마운트될 때(재진입 시) 한 번만 뽑는다. typeCode가 GET으로 채워진 뒤에야
+  // 뽑을 수 있으므로 아래 GET 성공 시점에 한 번만 계산한다(리렌더마다 다시 섞이지 않는다).
+  const [starters, setStarters] = useState<string[]>([])
   const listEndRef = useRef<HTMLDivElement>(null)
-  const router = useRouter()
 
   const accentColor = typeCode ? TRIBE[typeCode].colorHex : NEUTRAL_COLOR
 
@@ -63,11 +57,16 @@ export function ChatPanel({
       .then((json) => {
         if (ignore) return
         if (json.error) {
+          if (json.error.code === "UNAUTHORIZED") setUnauthorized(true)
           setError(json.error.message)
           return
         }
         setMessages(json.data.messages)
         setAffinityToday(json.data.affinityToday)
+        setNickname(json.data.nickname)
+        setTypeCode(json.data.typeCode)
+        setBedrockConfigured(json.data.bedrockConfigured)
+        if (json.data.typeCode) setStarters(pickThreeStarters(json.data.typeCode))
       })
       .catch(() => {
         if (!ignore) setError("대화 이력을 불러오지 못했어요")
@@ -180,10 +179,9 @@ export function ChatPanel({
             >
               ℹ
             </button>
-            {/* 전역 오버레이면 onClose로 닫고, /chat 라우트로 들어온 경우엔 이전 화면으로 돌아간다 */}
             <button
               type="button"
-              onClick={() => (onClose ? onClose() : router.back())}
+              onClick={onClose}
               className="flex h-8 w-8 shrink-0 items-center justify-center rounded-full text-neutral-400 hover:bg-neutral-100"
               aria-label="닫기"
             >
@@ -219,7 +217,7 @@ export function ChatPanel({
         <div className="flex-1 overflow-y-auto px-5 py-5">
           {loading ? (
             <p className="py-10 text-center text-sm text-neutral-400">불러오는 중...</p>
-          ) : messages.length === 0 ? (
+          ) : unauthorized ? null : messages.length === 0 ? (
             <div className="flex flex-col gap-5 py-6">
               <div>
                 <p className="text-base font-bold text-neutral-900">안녕하세요, {nickname}</p>
@@ -296,7 +294,7 @@ export function ChatPanel({
         </div>
 
         <div className="border-t border-neutral-200 px-5 py-4">
-          {!bedrockConfigured && (
+          {!loading && !bedrockConfigured && !unauthorized && (
             <p className="mb-2 rounded-lg bg-amber-50 px-3 py-2 text-xs text-amber-700">
               개발 모드 · AI 응답은 아직 연결되지 않았어요
             </p>
@@ -304,7 +302,11 @@ export function ChatPanel({
 
           {error && <p className="mb-2 text-xs text-red-500">{error}</p>}
 
-          {!typeCode ? (
+          {unauthorized ? (
+            <p className="rounded-lg bg-neutral-50 px-3 py-2.5 text-xs text-neutral-500">
+              로그인해야 마음 친구와 대화할 수 있어요
+            </p>
+          ) : !typeCode ? (
             <p className="rounded-lg bg-neutral-50 px-3 py-2.5 text-xs text-neutral-500">
               진단을 먼저 완료해야 마음 친구와 대화할 수 있어요
             </p>
