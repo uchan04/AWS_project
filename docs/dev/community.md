@@ -21,10 +21,10 @@ D 쪽 기능 구현은 끝났고, 지금은 `completeMission()`(B) 외부 결과
 - **고칠 파일**: `CLAUDE.md` 2절(전원 합의 필요, D가 직접 못 고침)
 - **조심할 것**: `업무분담.md`의 D 항목엔 이미 명시돼 있어 형식적 절차에 가깝지만, 합의 전까지 다른 담당자가 `app/chat/`을 착각해서 건드릴 위험이 있다
 
-### 4. `Post.galleryType`이 `TypeCode`라 전체 갤러리 글쓰기 불가
-- **필요한 것**: 스키마 담당(전원 합의)이 `TypeCode` 3종 + 공용(ALL) 개념을 표현할 방법을 정해야 한다(별도 enum 분리 등)
-- **고칠 파일**: `prisma/schema.prisma`(전원 합의) 변경 후 `app/community/_lib/gallery.ts`의 `galleryTypeFilter()`와 `canWriteToGallery()` 두 함수만 고치면 된다 — ALL 관련 로직을 전부 이 파일에 모아둔 설계라 나머지(목록 API, 글쓰기 API, `WriteModal`)는 자동으로 맞춰진다
-- **조심할 것**: 같은 파일의 `canAccessGallery()`도 접근 제어를 담당하니 같이 재검토할 것
+### 4. 전체 탭 글쓰기 — 해소 (2026-08-20)
+- E가 `enum GalleryType`(TypeCode 3종 + `ALL`)을 만들고 `Post.galleryType`을 그 타입으로 바꿔 전제 조건이 풀렸다(마이그레이션 `20260820130000_post_gallery_type_all`)
+- D 쪽 변경은 3파일뿐이다 — `_lib/gallery.ts`(`GalleryTab = GalleryType`, `canWriteToGallery()`는 항상 true), `app/api/community/posts/route.ts`(400 제거 + enum 검증), `WriteModal.tsx`(중립 색 + 추천 영역 제외). ALL 로직을 `gallery.ts` 한 곳에 모아둔 설계가 실제로 값을 했다
+- `galleryTypeFilter()`는 그대로다. 전체 탭은 여전히 필터 없이 ALL 글과 종족 갤러리 글을 함께 보여준다
 
 ### 5. 글쓰기 주제 추천 — 고정 문구로 구현 (2026-08-20)
 - `app/community/_lib/topics.ts`(유형별 6개, `{ title, draft }`)에서 3개를 랜덤으로 뽑아 `WriteModal`에 카드로 띄운다. 클릭하면 제목·본문이 채워진다
@@ -48,10 +48,10 @@ D 쪽 기능 구현은 끝났고, 지금은 `completeMission()`(B) 외부 결과
 ---
 
 ## 현재 상태
-- 완료: 갤러리 목록 화면, 상세 오버레이, 좋아요 토글, 댓글 작성, 글쓰기 모달, 본인 글 삭제, 본인 댓글 삭제, 친밀도 지급 헬퍼, 챗봇 시스템 프롬프트, 챗봇 메시지 저장 API(GET/POST, 친밀도 지급까지), 챗봇 패널 UI, Bedrock 스트리밍 응답 연결(`POST /api/chat/stream`), 타이핑 인디케이터, 유형별 챗봇 추천 문구 6개씩·3개 랜덤 노출(LLM 아님, 정적 상수), **챗봇 전역 오버레이 이전(`ChatLauncher` + `layout.tsx`, 임시 `/chat` 라우트 폐기)**
+- 완료: 갤러리 목록 화면, 상세 오버레이, 좋아요 토글, 댓글 작성, 글쓰기 모달, **전체 탭 글쓰기**, 본인 글 삭제, 본인 댓글 삭제, 친밀도 지급 헬퍼, 챗봇 시스템 프롬프트, 챗봇 메시지 저장 API(GET/POST, 친밀도 지급까지), 챗봇 패널 UI, Bedrock 스트리밍 응답 연결(`POST /api/chat/stream`), 타이핑 인디케이터, 유형별 챗봇 추천 문구 6개씩·3개 랜덤 노출(LLM 아님, 정적 상수), **챗봇 전역 오버레이 이전(`ChatLauncher` + `layout.tsx`, 임시 `/chat` 라우트 폐기)**
 - 진행 중: 없음
 - 미착수: 이미지 업로드, LLM 주제 추천(고정 문구로 대체됨 — 아래 "결정한 것과 이유" 참고)
-- 보류(다음 세션 이전 필요 조건): 전체 탭 글쓰기(스키마에 ALL 값 없음), 글쓰기 시 일일 미션(`DAILY_COMMUNITY_POST`) 완료 처리(B와 협의 필요), `ChatPanel`의 `layout.tsx` 이전(E 소유 파일이라 D가 직접 못 건드림) — 전부 아래 "결정한 것과 이유"에 근거 남김
+- 보류(다음 세션 이전 필요 조건): 글쓰기 시 일일 미션(`DAILY_COMMUNITY_POST`) 완료 처리(B와 협의 필요), `ChatPanel`의 `layout.tsx` 이전(E 소유 파일이라 D가 직접 못 건드림) — 전부 아래 "결정한 것과 이유"에 근거 남김
 
 ## 구현한 파일
 - `app/community/page.tsx` — 목록 화면. 서버 컴포넌트, `searchParams`의 `tab`으로 갤러리 결정
@@ -72,7 +72,9 @@ D 쪽 기능 구현은 끝났고, 지금은 `completeMission()`(B) 외부 결과
 - `app/community/_components/WriteModal.tsx` — 글쓰기 버튼 + 모달을 한 컴포넌트로 통합(트리거가 이번 세션에 새로 생기는 것이라 지시된 파일 목록에도 이 컴포넌트만 있고 별도 트리거 컴포넌트는 없었음). `gallery` prop이 `"ALL"`이면 버튼을 비활성화하고 "전체 커뮤니티 글쓰기는 준비 중이에요" 안내만 노출, 종족 갤러리일 때만 모달이 동작. `_lib/gallery.ts`의 `canWriteToGallery()`로 판단(클라이언트 쪽은 UX용 차단이고, 실제 차단은 서버가 함)
 
 ## 수정한 파일
-- `app/community/_lib/gallery.ts` — `canWriteToGallery(gallery): gallery is TypeCode` 추가. 전체 탭 글쓰기 차단 로직을 여기 한 곳에 모음(스키마에 ALL이 생기면 이 함수만 고치면 됨)
+- `app/community/_lib/gallery.ts` — `canWriteToGallery()` 추가. 전체 탭 글쓰기 차단 로직을 여기 한 곳에 모았고, **2026-08-20**에 스키마가 열리면서 예고대로 이 함수만 고쳐 해소했다. 같은 날 `GalleryTab`을 `GalleryType` 별칭으로 단순화
+- `app/community/_components/WriteModal.tsx` — **2026-08-20**: 전체 탭에서도 글쓰기 버튼이 뜬다. `NEUTRAL_COLOR` 상수 추가, `isAll`이면 모달 제목을 "전체 커뮤니티에 글쓰기"로 바꾸고 주제 추천은 렌더하지 않는다
+- `app/api/community/posts/route.ts` — **2026-08-20**: POST의 "전체 커뮤니티 글쓰기는 아직 지원하지 않아요" 400 제거, `galleryType`을 `GalleryType` enum 멤버십으로 검증
 - `app/community/_components/PostCard.tsx` — 카드를 `<button onClick>`으로 바꿔 클릭 시 상세를 열도록 함
 - `app/community/_components/PostList.tsx` — 삭제 완료(`onDeleted`) 시 모달을 닫고 `useRouter().refresh()`로 서버 컴포넌트 데이터를 다시 가져와 목록을 갱신
 - `app/community/_components/PostDetailModal.tsx` — `isOwn`일 때만 "삭제" 버튼 노출, 삭제 성공 시 `onDeleted` 콜백 호출
@@ -115,7 +117,14 @@ D 쪽 기능 구현은 끝났고, 지금은 `completeMission()`(B) 외부 결과
 - 친밀도 지급 순서를 반드시 지킴: 날짜 리셋(로컬 계산, DB는 아직 안 건드림) → `calculateReward()`로 배율 적용 → `capAffinity()`로 상한 적용 → `granted > 0`일 때만 `User.affinity`/`affinityToday`/`affinityTodayDate`를 한 번에 갱신. 순서를 바꾸면 상한 100을 넘음
 - 좋아요는 친밀도 지급 대상이 아님(SPEC.md 8절에 명시)
 - 좋아요·댓글 API의 종족 갤러리 접근 차단은 지난 세션의 `canAccessGallery()`를 그대로 재사용(새로 안 만듦)
-- **전체 탭 글쓰기는 보류.** `Post.galleryType`이 `TypeCode` enum이라 `ALL` 값을 저장할 수 없음. 클라이언트(`WriteModal`)와 서버(POST 라우트) 양쪽에서 `canWriteToGallery()`로 막음 — 버튼만 비활성화하면 API 직접 호출로 뚫리기 때문에 서버 차단이 필수
+- **(지난 세션) 전체 탭 글쓰기는 보류였다.** `Post.galleryType`이 `TypeCode` enum이라 `ALL`을 저장할 수 없어 클라이언트·서버 양쪽에서 막았다. 2026-08-20에 아래대로 열었다.
+
+### 전체 탭 글쓰기 (2026-08-20)
+- **`GalleryTab`을 `GalleryType`(@prisma/client) 별칭으로 바꿨다.** enum 값이 `"ALL" | TypeCode`와 정확히 같아서 합성 타입을 유지할 이유가 없어졌다. 파급도 없다 — `GalleryTabs`·`page.tsx`·POST 라우트는 값 비교만 하고 있어 그대로 통과한다
+- **`canWriteToGallery()`는 항상 `true`를 반환하고 인자를 받지 않는다.** 이제 모든 갤러리에 쓸 수 있어 인자를 안 쓰는데, 인자를 남기면 `@typescript-eslint/no-unused-vars` 경고가 새로 생긴다(이 프로젝트는 `_` 접두사도 경고 대상 — `_request` 사례). 호출부가 두 곳뿐이고 둘 다 이번에 고치는 파일이라 시그니처를 줄였다. 함수 자체는 해소 사실을 남기려고 유지한다. 종족 갤러리 소속 검사는 예전부터 `canAccessGallery()` 몫이다
+- **POST 라우트는 `Object.values(GalleryType)` 멤버십으로 검증한다.** 예전엔 임의 문자열을 `as GalleryTab`으로 캐스팅해 그대로 저장했다. 이제 enum에 없는 값은 400 `INVALID_BODY`로 막고, 통과한 값만 `canAccessGallery()`로 소속을 본다(ALL은 누구나, 종족은 본인만). 친밀도는 그대로 `POST_AFFINITY` 20이다 — 전체 탭 글도 종족 갤러리 글과 같다
+- **전체 갤러리 중립 색(`NEUTRAL_COLOR = "#9CA3AF"`)을 `WriteModal.tsx` 안에 뒀다.** `TRIBE`에는 ALL 키가 없고 `lib/types.ts`는 A 소유 공유 파일이라 건드리지 않는다. `ChatPanel`이 진단 전 유저를 위해 같은 상수를 자기 파일에 둔 선례를 따랐다 — 값이 두 곳에 생기지만, 공유 파일을 브랜치에서 고치는 비용이 더 크다(`CLAUDE.md` 1절)
+- **전체 탭에는 주제 추천을 넣지 않는다.** `TOPICS`는 유형별 문구이고 ALL 키가 없다. 여기에 ALL용 문구를 새로 만들면 "사용자 성향에 맞는 추천"이 아니라 아무에게나 같은 문구를 주는 것이 되어 기능의 의미가 사라진다. 전체 탭에서는 `setTopics([])`로 두고 기존 `topics.length > 0` 조건이 영역 자체를 렌더하지 않게 했다
 - **(지난 세션) LLM 주제 추천은 보류였다.** `WriteModal`에 비활성 영역과 TODO 주석만 남겼었다. 2026-08-20에 고정 문구로 구현하며 이 자리를 교체했다(아래 항목).
 - **주제 추천을 LLM이 아니라 고정 문구로 구현했다(2026-08-20).** `SPEC.md` 8절은 "LLM이 사용자 성향에 맞는 작성 주제·초안을 3가지 이상 추천"을 명시하지만, 남은 일정상 Bedrock 연동 대신 유형별 고정 문구를 택했다. 챗봇의 `app/chat/_lib/starters.ts`가 이미 같은 방식으로 돌아가고 있어 패턴을 그대로 본떴다. **구조는 LLM 전환이 열려 있다** — `WriteModal`은 `TOPICS[gallery]`에서 3개를 받아 쓰기만 하므로, 나중에 `topics.ts`를 Bedrock 호출로 바꾸면 컴포넌트는 그대로 둘 수 있다. **발표에서 이 기능을 AI 생성이라고 소개하지 않는다**
 - **문구 작성 규칙을 지켰다.** 오늘 하루 안에서 쓸 수 있는 가벼운 소재만 쓰고, 인생 계획·목표 같은 무거운 주제와 "~해보세요" 같은 권유형을 넣지 않았다(소재를 주는 것이지 조언이 아니다). 유형명을 문구에 드러내지 않고, 자해·죽음·질병 진단은 소재로 삼지 않았다. 유형별로는 혼자 보낸 시간의 작은 장면(`INDEPENDENT_LOW_INCOME`) / 아무것도 못 한 하루도 그대로 쓸 수 있는 주제(`HEALTH_EMOTION`) / 집 안에서 혼자 느낀 감정(`FAMILY_LIVING`)으로 방향을 갈랐다 — 각각 돈·일, 운동·습관 개선, 가족 평가·대화 권유를 소재에서 뺐다
@@ -175,7 +184,6 @@ D 쪽 기능 구현은 끝났고, 지금은 `completeMission()`(B) 외부 결과
 
 ## 다음 할 일
 - ~~LLM 주제 추천 3가지 이상 연동~~ — **고정 문구로 대체했다(2026-08-20).** `app/community/_lib/topics.ts`의 유형별 6개 중 3개를 `WriteModal`이 카드로 보여준다. 나중에 LLM으로 전환한다면 `topics.ts`만 Bedrock 호출로 바꾸면 되고 컴포넌트는 그대로 둘 수 있다(비스트리밍 단발 호출이라 `ConverseCommand`가 맞다). SPEC 8절과의 차이와 발표 시 주의는 "결정한 것과 이유" 참고
-- 전체 탭 글쓰기 — 스키마에 ALL(또는 공용 게시판) 개념이 추가되면 `_lib/gallery.ts`의 `canWriteToGallery()`만 고치면 됨
 - `DAILY_COMMUNITY_POST` 일일 미션 완료 처리 — B와 담당 경계 협의 필요
 - **`layout.tsx` 변경분 PR 리뷰 — E.** 전역 오버레이 이전은 끝났고(2026-08-20) E와 사전 공유했다. 공유 파일이므로 머지 전 PR 리뷰를 받는다. diff는 import 한 줄 + `<ChatLauncher />` 한 줄뿐이다
 - `app/chat/` 폴더 소유를 `CLAUDE.md` 2절에 정식 반영 — 팀 확인 대기 (계속 남아있는 이월 항목)
