@@ -2,7 +2,7 @@
 
 **모든 세션은 이 문서부터 읽는다.** 그다음 아래 "지금 읽어야 할 문서"만 읽고 시작한다.
 
-최종 갱신: 2026-08-20 (`develop` = `cb16959`. 인증 없이 프로덕션 빌드를 돌려 배포 가능 여부를 실측했다. 남은 것은 D의 6커밋)
+최종 갱신: 2026-08-20 (경제 수치 확정 반영, 폐기된 가챠 기획 삭제, 해소된 차단 항목 정리. `develop` = `cb16959`, 남은 것은 D의 6커밋)
 현재 단계: **D2 — 인프라 완료, 기능 5개 병렬 착수 (8/20 기능 동결 예정일)**
 
 팀원 인수인계용 단일 문서는 [`docs/인수인계.md`](인수인계.md)에 있다. 새로 합류하거나 노션으로 공유할 때는 그 문서를 쓴다.
@@ -31,9 +31,9 @@
 
 | 담당 | 범위 | 상태 | 비고 |
 |---|---|---|---|
-| A | 진단 + 미션 콘텐츠 + 홈 | 미션 41개, 13문항 + 판정 함수, 조기 종료, 화면 3장 + Figma 값·구성 반영, 진단 API 3종(완료·조회·닉네임) + 화면 연결, **실 DB로 진단→결과→홈 전체 흐름 확인 완료** | A 담당 기능은 4단계(Bedrock)·관리자 교차표만 남았다. 홈의 펫·미션 실데이터는 B·C API 대기 |
+| A | 진단 + 미션 콘텐츠 + 홈 | 미션 41개, 13문항 + 판정 함수, 조기 종료, 화면 3장 + Figma 값·구성 반영, 진단 API 3종(완료·조회·닉네임) + 화면 연결, **실 DB로 진단→결과→홈 전체 흐름 확인 완료**, 홈 미션을 `GET /api/missions`로 교체(`bdcef94`), 결과 화면 판정 근거 3줄(`298ab56`) | **A 담당 기능은 남은 것이 없다.** 근거 3줄의 Bedrock 실호출만 E의 IAM 키·`BEDROCK_MODEL_ID` 공유 대기다(실패해도 카드만 빠지고 화면은 뜬다). 관리자 교차표와 LLM 2종은 컷 |
 | B | 미션 시스템 + 사진 업로드 | **`develop`에 머지 완료**(`3adbea5` → `cb16959`, 2026-08-20). 미션 API 3종, 사진 업로드 presign·verify, 미션 대시보드, 출석, `lib/missions/` 8개 파일. 재화는 `calculateReward()`를 경유한다 | 하단 탭을 사이드바로 교체한 것도 B다(결정 9번은 E 배정이었다). 사이드바 뒷정리 3건은 `51b2897`·`d98fab9`로 끝냈다. 남은 것은 **차단 11번(모바일 부서짐)** + lint 에러 11건 |
-| C | 펫 + 스킨 | **`SPEC.md` 5절 기능 완료.** 성장·씨앗 투입·진화 연출, 방치형 자동 획득, 치장 착용·해제, 스킨 구매·전환 + 화면 3장. 스킨·치장 구조 변경(종족 전용 외형 / 치장 종족 무관 / 가챠 삭제)은 스키마·실 DB·시드·API·화면까지 반영 완료(2026-08-20, A) | 남은 것은 **치장 구매 라우트**(차단 9)와 `SPEC.md` 2·5·6·11절·`docs/dev/pet.md`·`docs/인수인계.md` 갱신, `scripts/check-pet.ts` 어미 단정 추가. 목록은 `docs/dev/diagnosis.md` 15절 |
+| C | 펫 + 스킨 | **`SPEC.md` 5절 기능 완료.** 성장·씨앗 투입·진화 연출, 방치형 자동 획득, 치장 착용·해제, 스킨 구매·전환 + 화면 3장. 스킨·치장 구조 변경(종족 전용 외형 / 치장 종족 무관)은 스키마·실 DB·시드·API·화면까지 반영 완료(2026-08-20, A) | 남은 것은 **치장 구매 라우트**(차단 9), **시드 가격을 확정값으로**(스킨 2,500 / 배경 600 + 배경 등급 통일), `SPEC.md` 2·5·6·11절·`docs/dev/pet.md`·`docs/인수인계.md` 갱신, `scripts/check-pet.ts` 어미 단정 추가. 목록은 `docs/dev/diagnosis.md` 15·17절 |
 | D | 커뮤니티 + 챗봇 | **`develop`에 6커밋 미반영**(`d37d12d`. 본인 댓글 삭제, 모달 버그 2건, 문서 2건, 머지 1건). 예측 충돌은 `docs/STATUS.md` 1건뿐이고 코드는 충돌하지 않는다. 기능 구현 끝. 챗봇 Bedrock 스트리밍 연결 완료(2026-08-19). 미션 완료 연동 호출부(`completeMission`)는 주석으로 준비만 해둠 | **`/community`·`/chat`이 프로덕션에서 500이다 — 차단 12번.** `completeMission()`(B) 대기 상태. `docs/dev/community.md`의 "재개 지점" 2번은 `BottomNav` 기준으로 쓰여 있어 낡았다(사이드바로 교체됨). 막힌 항목과 주의사항은 그 문서 상단 참고 |
 | E | 인프라 + 인증 | RDS·Cognito·S3+CloudFront·CloudWatch+SNS·Bedrock·auth 실검증·하단 탭 내비 완료, PR #1 머지 + 2차 마이그레이션 + auth 빌드 수정 + 색 토큰 정리 완료 | Amplify GitHub 연동만 남음(브라우저 수동 단계) |
 
@@ -43,23 +43,7 @@
 
 인프라 차단은 해소됐다(RDS·Cognito·S3·Bedrock 완료). `.env`의 `DATABASE_URL`·`COGNITO_*`·`S3_BUCKET`·`CLOUDFRONT_DOMAIN`·`BEDROCK_MODEL_ID`는 E에게 개별 공유받는다.
 
-~~2. `SubTypeCode` 2차 마이그레이션~~ — 해소(2026-08-19), **2026-08-20 실 DB로 재확인**. E가 `7d86546`으로 `prisma/migrations/20260819080703_add_subtype/`을 `main`에 올렸고, RDS `_prisma_migrations`에 `20260819061857_init`(08-19 06:19)·`20260819080703_add_subtype`(08-19 08:07) 두 행이 `finished_at`까지 찍혀 있다. `npx prisma migrate status` = "Database schema is up to date", `User.subTypeCode`·`DiagnosisSession.subTypeCode`·`indicators` 컬럼 실재 확인. **나머지 4인은 `git pull && npx prisma migrate deploy && npx prisma generate`**
-~~3. `lib/auth.ts` 빈 Pool ID로 빌드 깨짐~~ — 해소(2026-08-19). `CognitoJwtVerifier.create()`를 `getCurrentUser()` 안으로 지연 생성하도록 수정. `.env`에 더미 값 우회 넣었던 사람은 지워도 된다
-~~5. 종족 색 이중 정의~~ — 해소(2026-08-19). `app/globals.css`의 `--color-canine/feline/ursine` 세 줄 삭제. 이제 `styles/tokens.css`·`lib/types.ts`(A)가 유일한 출처
-
-~~4. `feat/community`에 중복 init 마이그레이션~~ — 해소(2026-08-20 확인). D가 `ff6c492`에서 `origin/main`을 머지해 `00000000000000_init/`을 폐기했다. 이제 `origin/feat/community`의 `prisma/migrations/`는 `main`과 동일한 2개(`20260819061857_init`·`20260819080703_add_subtype`)다
-
-~~1. 공유 DB에 옛 동물 매핑이 이미 들어가 있다~~ — 해소(2026-08-20, A). 실 DB를 다시 읽어 보니 확정 매핑과 새 이름(노을·새벽·이끼)이 이미 들어가 있었고 `main`의 시드 *파일*만 옛 값이었다. 스킨·치장 구조 변경과 함께 시드를 확정 값으로 맞췄고, 유저 `밤바다`는 `typeCode=INDEPENDENT_LOW_INCOME` / 활성 펫 **고양이**로 이미 일치해 손댈 것이 없었다. 상세는 `docs/dev/diagnosis.md` 15절
-
-~~6. 가챠 삭제 결정에 따른 스키마 드리프트~~ — 해소(2026-08-20, A). `20260820120000_skin_tribe_and_drop_gacha` 마이그레이션이 `GachaPull` 테이블과 `User.heroPity`·`legendPity`를 실 DB에서 DROP했다. `prisma migrate diff --exit-code`로 드리프트 없음 확인
-
-~~7. `npm run db:seed`가 실패한다~~ — 재현되지 않는다(2026-08-20 확인). `npm run db:seed`가 `.env`를 읽고 그대로 통과한다(`스킨 6종, 치장 12종 반영 / 미션 41개 반영 / seed 완료`). `tsx` 4.x가 `.env`를 자동으로 읽는다. `package.json`은 그대로 둔다
-
-~~8. 치장 획득 경로와 별조각 소모처가 없다~~ — **경로는 정해졌다**(2026-08-20 팀 결정). 치장은 친밀도 전용 상점에서 등급 가격으로 산다(COMMON 50 / RARE 100 / EPIC 200 / LEGENDARY 400). 별조각은 종족 변종 스킨 상점(변종 50)이 소모처다. 결정 변경 13번 참고. **구현은 스킨 쪽만 끝났다** — 아래 9번
-
-~~10. 내비 교체 뒷정리 4건~~ — **4건 중 3건 해소(2026-08-20, B)**. `51b2897`이 `TEMP_SIDEBAR_PROFILE`을 지우고 `/api/pet` + `/api/diagnosis/me`로 갈아끼웠고(사이드바가 실제로 "밤바다 / 고양잇과 / 씨앗 0 / Lv.1"을 렌더한다), 종족 색·표시명을 `lib/types.ts`의 `TRIBE`에서 가져오도록 고쳐 3중 정의를 닫았고, `/diagnosis`에서 내비를 숨겼다(실측: `/`는 `aside` 1개, `/diagnosis`는 0개). `d98fab9`가 `app/layout.tsx`의 `<main>`을 `<div>`로 바꿔 `<main>` 중첩도 없앴다(두 경로 모두 `main` 1개). 남은 잔여는 아래 11·13번으로 옮겼다
-
-남은 것은 아래 6개다.
+해소된 항목(1·2·3·4·5·6·7·8·10번)은 이 목록에서 지웠다. 이력이 필요하면 `git log docs/STATUS.md`를 본다. 남은 것은 아래 8개다.
 
 4. **인증이 붙어 있지 않다. Bearer 헤더 방식으로는 서버 컴포넌트를 인증할 수 없다 (E 담당)** — **2026-08-20에 설명을 고쳤다. 이전 서술("클라이언트가 헤더를 싣기만 하면 된다")은 틀렸다.**
     - `lib/auth.ts:44`가 `Authorization: Bearer`를 읽는다. 그런데 브라우저가 페이지를 여는 문서 내비게이션 요청에는 커스텀 헤더를 붙일 방법이 없다. `fetch`에는 붙지만 링크 클릭·주소창 이동에는 붙지 않는다
@@ -71,6 +55,8 @@
 12. **프로덕션에서 `/community`·`/chat`이 500이다 (D 담당)** — `DEV_AUTH_BYPASS`를 끄고 프로덕션 빌드를 띄워 실측했다. 두 페이지가 서버에서 `getCurrentUser()`를 부르는데 감싸지 않아 `UnauthorizedError`가 그대로 터진다(서버 로그 `⨯ Error: 로그인이 필요합니다`). C의 `app/pet/page.tsx`는 `try/catch`로 감싸 안내 화면을 띄우기 때문에 200이다. 인증이 붙기 전까지는 같은 방식으로 감싸는 것이 안전하다
 13. **내비 교체 잔여 2건** — (E) 고아가 된 `app/components/BottomNav.tsx` 삭제. `app/layout.tsx`에서 빠졌고 아무도 import하지 않는다(레포 전체 검색으로 확인). `docs/dev/infra.md`에는 아직 "동결"로 적혀 있어 문서도 함께 갱신해야 한다. (B·E) **소유권 결정 필요** — B가 E 소유 공유 파일 3개(`app/layout.tsx`·`app/globals.css`·`.env.example`)를 브랜치에서 고쳤다(`CLAUDE.md` 1절 위반). 충돌은 안 났지만 사이드바를 누가 갖는지 정해야 남은 이틀 동안 둘이 같은 파일을 각자 고치지 않는다
 14. **배포 설정이 검증되지 않았다 (E 담당)** — `amplify.yml`이 없어 Amplify의 Next.js 자동 감지에 의존하는 상태다. 이 프로젝트는 Next 16 + Turbopack이라 자동 감지가 이 조합을 처리하는지 확인되지 않았다. `BEDROCK_VISION_MODEL_ID`도 Amplify 환경변수에 등록되지 않았다(`.env.example`에는 있다. `lib/missions/vision.ts:7`이 폴백하므로 죽지는 않는다)
+15. **`main`을 받으면 전 API가 500이다 (전원 — `develop` → `main` 머지가 답)** — `origin/main`의 `prisma/schema.prisma`는 삭제된 컬럼을 아직 들고 있다. 그 스키마로 `prisma generate`한 클라이언트는 실 DB에 없는 컬럼을 SELECT하므로, `getCurrentUser()`를 부르는 모든 라우트가 `P2022`로 500이 된다(E가 `/api/diagnosis/me`에서 실제로 겪었다). **`prisma migrate status`로는 안 보인다** — 그 명령은 마이그레이션 히스토리만 비교하고 스키마↔DB 드리프트는 `npx prisma migrate diff --from-schema-datasource prisma/schema.prisma --to-schema-datamodel prisma/schema.prisma --exit-code`로 봐야 한다. **`migrate deploy`를 다시 돌리지 말 것**(실 DB는 이미 최신이다). 각자 급하면 `git merge origin/develop && npx prisma generate` + dev 서버 재시작으로 풀리고, 근본 해결은 `develop` → `main` 머지다. Amplify가 `main`에서 빌드하므로 **배포 선행 조건**이다
+16. **확정된 경제 수치가 코드에 없다 (B·C, 그리고 A·D 중 한쪽)** — 일일 미션 완주 보너스 별조각 60을 주는 지점이 없다(B). 시드의 스킨 가격이 50이고 배경 등급이 갈려 있다(C. 확정값은 2,500 / 600 + 등급 통일). 커뮤니티 글 1개에 친밀도가 40 들어간다 — 미션 보상(A 시드)과 커뮤니티 지급(D)이 각각 20이다. 상세는 `docs/dev/diagnosis.md` 17절
 
 **8/20 5인 머지 — A·B·C·E가 들어갔다.** A는 `develop`(`d8edf2b`)을 받아 충돌 3건(`prisma/schema.prisma`·`prisma/seed/items.ts`·`docs/STATUS.md`)을 해결하고 올렸고(`f9314a5`), 이어 B가 `feat/missions`를 머지했다(`3adbea5`, 이후 사이드바 수정 3커밋으로 `cb16959`). **남은 것은 D의 6커밋 하나다.**
 
@@ -92,7 +78,7 @@
 git checkout <자기브랜치> && git merge origin/develop && npx prisma migrate deploy && npx prisma generate && npm run build
 ```
 
-`develop`에 마이그레이션 `20260820120000_skin_tribe_and_drop_gacha`가 들어갔다(스킨 종족 전용 + 치장 종족 무관 + 가챠 삭제). `.env`에 `BEDROCK_VISION_MODEL_ID="us.amazon.nova-2-lite-v1:0"` 한 줄을 추가한다 — `.env.example`에 추가된 유일한 키다. `migrate dev`와 `migrate reset`은 실행하지 않는다. `migrate deploy`만 쓴다.
+`develop`에 마이그레이션 `20260820120000_skin_tribe_and_drop_gacha`가 들어갔다(스킨 종족 전용 + 치장 종족 무관). `.env`에 `BEDROCK_VISION_MODEL_ID="us.amazon.nova-2-lite-v1:0"` 한 줄을 추가한다 — `.env.example`에 추가된 유일한 키다. `migrate dev`와 `migrate reset`은 실행하지 않는다. `migrate deploy`만 쓴다.
 
 받은 뒤 데스크톱은 정상인데 모바일이 부서져 보이면 자기 코드 문제가 아니라 차단 11번이다.
 
@@ -145,9 +131,10 @@ GitHub 원격 — https://github.com/uchan04/AWS_project
 ## 결정 변경 (2026-08-20)
 
 12. **스킨은 종족 전용 외형이다.** 진단으로 정해진 동물은 고정이고 상점에서 사는 것은 같은 동물의 변종뿐이다(여우 → 북극여우, 고양이 → 샴고양이, 곰 → 북극곰). 능력치는 바뀌지 않고 외형만 바뀐다. 친밀도 전용 캐릭터 3종(늑대·삵·판다)과 고유 효과는 없어졌다
-13. **화폐를 전용으로 갈랐다.** 스킨은 별조각 전용(변종 50), 치장 아이템은 친밀도 전용이다. 치장 가격은 등급에서 파생시킨다(COMMON 50 / RARE 100 / EPIC 200 / LEGENDARY 400, 12종 합 1,850). 가챠 컷으로 소모처를 잃었던 별조각이 스킨 상점을, 획득 경로가 없던 치장 9종이 등급 가격을 얻었다
+13. **화폐를 전용으로 갈랐다.** 스킨은 별조각 전용, 치장 아이템은 친밀도 전용이다. 치장 가격은 등급에서 파생시킨다. 별조각의 소모처는 스킨 상점, 친밀도의 소모처는 치장 상점 하나씩이다
 14. **치장 아이템은 종족 구분이 없다.** `CosmeticItem.tribeColor`를 지웠다. 컬러명(노을·새벽·이끼)은 더 이상 종족과 대응하지 않는다
-15. **가챠를 스키마에서 지웠다.** `GachaPull` 테이블과 `User.heroPity`·`legendPity`를 삭제했다. `feat/pet`에 스키마 삭제분만 있고 마이그레이션이 없어 실 DB와 갈라져 있던 드리프트도 이번에 닫혔다
+15. **경제 수치를 확정했다.** 일일 미션 전부 완료 = 별조각 60 / 커뮤니티 글 1개 = 친밀도 20 / 하루 친밀도 상한 100 / 스킨 1개 = 별조각 2,500 / 배경 1개 = 친밀도 600(배경 3종은 등급을 통일한다). **코드는 아직 세 곳이 다르다** — 일일 완주 보너스 지급 지점이 없고(B), 시드의 스킨 가격이 50이고 배경 등급이 갈려 있다(C). 상세와 담당은 `docs/dev/diagnosis.md` 17절
+16. **친밀도가 글 1개에 40 들어간다.** 미션 보상(`prisma/seed/missions.ts`, A)과 커뮤니티 지급(`app/community/_lib/affinity.ts`, D)이 각각 20을 준다. 확정값은 20이므로 한쪽을 0으로 만들어야 한다 — 어느 쪽을 지울지 팀이 정한다
 
 **스키마 담당 규칙 예외.** `CLAUDE.md` 5절은 마이그레이션을 1인(E)만 실행하라고 한다. 이번에는 팀 합의 후 A가 `prisma/schema.prisma` 수정과 `migrate deploy`까지 실행했다. 마이그레이션은 `20260820120000_skin_tribe_and_drop_gacha` 하나뿐이고 히스토리는 갈라지지 않았다. **나머지 4인은 `git pull && npx prisma migrate deploy && npx prisma generate`만 실행한다.** 다음 스키마 변경은 다시 E가 맡는다
 
