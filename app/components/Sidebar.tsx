@@ -495,7 +495,9 @@ export function Sidebar() {
                 <button
                   onClick={() => {
                     if (confirm("로그아웃하시겠습니까?")) {
-                      window.location.href = "/api/auth/logout"
+                      // TODO: Cognito 로그아웃 API 구현 필요 (E 담당)
+                      alert("로그아웃 기능은 인증 시스템 연동 후 활성화됩니다")
+                      // window.location.href = "/api/auth/logout"
                     }
                   }}
                   style={{

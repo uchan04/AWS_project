@@ -813,13 +813,13 @@ export default function MissionDashboard() {
       />
 
       {(() => {
-        // 완료되지 않은 단계들만 표시
-        const incompleteMissions = dashboard.stageMissions.filter((sm) => sm.unlocked && sm.completedCount < 4)
-        if (incompleteMissions.length === 0) return null
+        // 모든 단계 표시 (잠김 포함)
+        const allMissions = dashboard.stageMissions
+        if (allMissions.length === 0) return null
 
-        const currentMission = incompleteMissions[currentStageIndex]
+        const currentMission = allMissions[currentStageIndex]
         const hasPrev = currentStageIndex > 0
-        const hasNext = currentStageIndex < incompleteMissions.length - 1
+        const hasNext = currentStageIndex < allMissions.length - 1
 
         return (
           <div style={{ marginBottom: 36 }}>
@@ -870,11 +870,10 @@ export default function MissionDashboard() {
               <button
                 onClick={() => {
                   if (hasNext) {
-                    setCurrentStageIndex((i) => Math.min(incompleteMissions.length - 1, i + 1))
+                    setCurrentStageIndex((i) => Math.min(allMissions.length - 1, i + 1))
                   }
                 }}
                 disabled={!hasNext}
-                title={!hasNext ? `아직 단계 ${currentMission.stage}을 완료하지 않았어요` : ""}
                 style={{
                   position: "absolute",
                   right: -12,
@@ -895,7 +894,7 @@ export default function MissionDashboard() {
                   boxShadow: hasNext ? "0 4px 12px rgba(0,0,0,0.15)" : "none",
                 }}
               >
-                {hasNext ? "▶" : "🔒"}
+                ▶
               </button>
 
               <StepSection
@@ -905,22 +904,9 @@ export default function MissionDashboard() {
                 bg={bg}
                 mascotEmoji={mascotEmoji}
                 unlocked={currentMission.unlocked}
-                progress={`${currentMission.completedCount} / 4 완료`}
+                progress={currentMission.unlocked ? `${currentMission.completedCount} / 4 완료` : "🔒 이전 단계를 먼저 완료해 주세요"}
                 onSelect={setSelected}
               />
-
-              {!hasNext && (
-                <p
-                  style={{
-                    fontSize: 12,
-                    color: "#9A8A76",
-                    textAlign: "center",
-                    margin: "12px 0 0",
-                  }}
-                >
-                  🔒 아직 단계 {currentMission.stage}을 완료하지 않았어요
-                </p>
-              )}
             </div>
           </div>
         )
