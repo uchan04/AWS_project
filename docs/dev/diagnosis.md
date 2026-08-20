@@ -8,9 +8,10 @@
 **브랜치 규칙 (2026-08-19 변경).** A 담당분은 `feat/diagnosis`에 커밋한다. `main`에 직접 커밋하지 않고 PR로만 올린다. `prisma/schema.prisma` 변경분도 이 브랜치에 담고, 머지 여부와 `prisma migrate dev` 실행은 팀이 결정한다.
 
 ## 현재 상태
-- 완료: 미션 41개, 지표 14개 정의, 12문항 + 형용사 문항, `classify()`·`classifySub()`, 무손실 조기 종료, 스냅샷 체크, 화면 3장(진단·결과·홈), 화면 3장 디자인 시스템 적용 + Figma 팔레트·폰트 반영(12장), 진단 API 3종 + 화면 연결, `draft.ts` 제거
-- 진행 중: 없음. 2차 마이그레이션 대기(13장)
+- 완료: 미션 41개, 지표 14개 정의, 12문항 + 형용사 문항, `classify()`·`classifySub()`, 무손실 조기 종료, 스냅샷 체크, 화면 3장(진단·결과·홈), 화면 3장 디자인 시스템 적용 + Figma 팔레트·폰트 반영(12장), 진단 API 3종 + 화면 연결, `draft.ts` 제거, 2차 마이그레이션 적용 후 실 DB로 전체 흐름 확인(14장), **스킨·치장·가챠 구조 변경을 스키마·실 DB·시드까지 적용(15장)**
+- 진행 중: 없음
 - 미착수: Bedrock 호출 2종, 관리자 교차표, 홈의 펫·미션 실데이터(B·C API 대기)
+- A 담당분이 아니지만 A가 처리한 것: 15장의 스키마 변경과 그에 딸린 `prisma/seed/items.ts`·`scripts/check-reward.ts`(C 소유) 수정. 이유는 15장에 적었다
 
 ## 구현한 파일
 - `lib/types.ts` — 종족·동물·색, 형용사 매핑, 기본 닉네임, 성장 곡선 상수
@@ -77,13 +78,23 @@ DB가 아직 없다(`DATABASE_URL` 미공유). **DB가 필요 없는 것부터 �
 - **재진단은 닉네임을 덮어쓰지 않는다.** 저장된 닉네임이 이전 판정의 기본 닉네임과 똑같을 때만 새 기본 닉네임으로 바꾼다. 유저가 직접 고친 이름은 유지되고, 종족이 바뀌었는데 "조용한 여우"가 남는 경우는 고쳐진다
 - **재진단은 레벨·경험치·재화·아이템·연속 기록을 건드리지 않는다.** 유형이 바뀌어도 키운 것은 남는다. 활성 펫 스킨만 새 유형의 기본 스킨으로 바꾼다
 - **완료 API는 기본 펫 스킨이 없어도 실패하지 않는다.** `npm run db:seed`가 C의 `items.ts` 때문에 아직 막혀 있어서, 시드 전에도 진단은 끝까지 되어야 한다
+- **하단 탭을 없애고 사이드바 하나만 쓴다** (2026-08-19, 사용자 결정). E가 "데스크톱은 사이드바 / 모바일은 하단 탭" 이원화를 제안했지만, 내비게이션이 두 벌이면 화면마다 어느 쪽이 뜨는지 확인해야 하고 활성 표시·경로도 두 곳에서 갈린다. 마감이 3일 남은 상태에서 감당할 비용이 아니다. 모바일에서는 같은 사이드바를 아이콘만 남긴 좁은 레일로 줄인다. 진단 문항 화면에서는 내비를 숨긴다(이탈 방지). 적용은 E, 적용되면 A가 `styles/tokens.css`의 `--nav-h`를 지우고 `min-height: 100dvh`로 되돌린다
+- **미션 데이터는 DB가 원본, `prisma/seed/missions.ts`는 그 DB를 채우는 시드다** (B와 합의, 2026-08-19). 화면에 41개 문구를 다시 복사하지 않는다. B는 `시드 → DB Mission → GET /api/missions → 화면`으로 가고, A의 홈 미션 미리보기도 그 API가 생기면 그쪽으로 바꾼다. 그때까지 홈이 `DAILY`를 직접 읽는 것은 임시다 — `prisma/seed/missions.ts:1`이 `import type`뿐이라 Prisma가 클라이언트 번들에 들어가지 않는 것은 빌드 산출물에서 확인했다(`.next/static/chunks`에 `PrismaClient` 없음, 미션 문구는 있음)
 - **6·7장의 기대값을 먼저 확정한 뒤 판정 함수를 구현한다.** 순서를 뒤집으면 구현 결과를 그대로 기대값으로 박게 되고, 테스트가 아무것도 검증하지 않는다. 이 테스트가 발표에서 제시할 정확도 근거다
 
 ## 3. 막힌 것
-- **2차 마이그레이션 미적용 (E 대기). 지금 진단 API 3종이 런타임에 전부 500이다.** DB에 `SubTypeCode` enum과 `User.subTypeCode`, `DiagnosisSession.subTypeCode`/`indicators`가 없다. Prisma는 모델의 모든 컬럼을 select하므로 `getCurrentUser()`의 upsert부터 `P2022: The column User.subTypeCode does not exist`로 죽는다. 13장에 넘길 DDL을 적어 뒀다. `migrate dev`는 E만 실행한다(`CLAUDE.md` 5절)
-- **`lib/auth.ts`(E 소유)가 모듈 로드 시점에 Cognito 검증기를 만든다.** `COGNITO_USER_POOL_ID`가 비어 있으면 `Invalid Cognito User Pool ID`로 **빌드가 깨진다** — API 라우트를 가진 사람 전원(A·B·C·D)이 같이 막힌다. 로컬에서는 `.env`에 형식만 맞는 더미 값을 넣어 우회했다. 13장에 요청분을 적어 뒀다
-- Bedrock 연결 확인 미완 (E 대기). 4단계에서 필요
-- `prisma/seed/items.ts`의 펫 3종이 아직 옛 동물 매핑이다. **C 담당 파일이라 내가 못 고친다.** 요청 대기
+
+해소된 것 (2026-08-19):
+
+- ~~2차 마이그레이션 미적용~~ — E가 `20260819080703_add_subtype`을 `main`에 올렸다. `migrate deploy`로 적용 완료. `P2022`로 500이던 진단 API 3종이 정상 동작한다
+- ~~`lib/auth.ts`가 모듈 로드 시점에 Cognito 검증기를 만들어 빌드가 깨짐~~ — E가 `getVerifier()` 지연 생성으로 고쳤다. `.env`에 넣었던 더미 Pool ID·Client ID를 지웠다(`DEV_AUTH_BYPASS=true`면 빈 값이어도 빌드가 통과한다)
+
+남은 것:
+
+- Bedrock 연결 확인 미완 (E 대기). 4단계(자유 입력 enum 변환·근거 3줄 요약)에서 필요하고, 그전까지 진단은 선택지 버튼만으로 끝까지 동작한다
+- `prisma/seed/items.ts`의 펫 3종이 아직 옛 동물 매핑이다. **C 담당 파일이라 내가 못 고친다.** 첫 `npm run db:seed`보다 먼저 고쳐야 한다. 그래서 `activePetSkinId`가 아직 `null`이고 홈·결과의 마스코트는 이모지다
+- 홈 미션 미리보기가 아직 `prisma/seed/missions.ts`의 `DAILY` 배열을 읽는다. B가 `GET /api/missions`를 올리면 그쪽으로 바꾼다(2장 마지막 항목)
+- ~~하단 탭 제거 + 사이드바 단일 구조가 아직 적용되지 않았다~~ — 적용됐다(2026-08-20). E가 아니라 **B**가 `app/components/Sidebar.tsx`를 만들고 `app/layout.tsx`에서 `BottomNav`를 뺐다(`65308c4`). A는 그에 맞춰 `styles/tokens.css`의 `--nav-h`를 지우고 `min-height: 100dvh`로 되돌렸다. 남은 뒷정리는 A 몫이 아니다 — 15장 "머지 후 발견한 문제" 참고
 - Google 로그인 전용 결정이 `SPEC.md` 10절("소셜 로그인은 쓰지 않는다")과 `CLAUDE.md` 8절과 충돌한다. 둘 다 공유 문서라 임의로 안 고친다
 
 ---
@@ -268,11 +279,11 @@ Q13은 조기 종료 대상이 아니다. 형용사가 없으면 닉네임을 �
 
 | `TypeCode` | 동물 | 종족 | 색 | 논문 비율 |
 |---|---|---|---|---|
-| `HEALTH_EMOTION` | 여우 | 개과 | `#F59E0B` 앰버 오렌지 | 12.13% |
-| `INDEPENDENT_LOW_INCOME` | 고양이 | 고양잇과 | `#38BDF8` 스카이 블루 | 16.75% |
-| `FAMILY_LIVING` | 곰 | 곰과 | `#34D399` 에메랄드 그린 | 71.12% |
+| `HEALTH_EMOTION` | 여우 | 개과 | `#E8956A` 노을 주황 | 12.13% |
+| `INDEPENDENT_LOW_INCOME` | 고양이 | 고양잇과 | `#6A95C8` 새벽 파랑 | 16.75% |
+| `FAMILY_LIVING` | 곰 | 곰과 | `#7AAE82` 이끼 초록 | 71.12% |
 
-색은 `lib/types.ts`의 `TRIBE` 한 곳에만 있다. 파스텔 톤으로 바꾸기로 하면 hex 3개만 교체한다(대안값을 그 파일 주석에 적어 둔다).
+색은 `lib/types.ts`의 `TRIBE`와 `styles/tokens.css`의 `[data-tribe]` 두 곳에 있다 — 한쪽만 고치지 않는다(12장). **컬러명은 첫 `npm run db:seed` 전에 확정했다.** `prisma/seed/items.ts`의 upsert가 아이템 `name`을 유니크 키로 쓰므로, 시드를 돌린 뒤 이름을 바꾸면 옛 행이 남고 새 행이 추가된다.
 
 ```
 1. health >= 3                        → HEALTH_EMOTION
@@ -602,29 +613,348 @@ model DiagnosisSession {
 
 ## 13. 다음 할 일
 
-### 다른 사람에게 넘길 것
+### 다른 사람에게 넘길 것 — 남은 것
 
-**E — 2차 마이그레이션.** A의 PR을 머지한 뒤 `npx prisma migrate dev --name add_subtype`를 한 번 실행한다. Prisma가 만들 DDL은 아래와 같다(`prisma migrate diff`로 확인한 실제 출력이다).
+**E — 하단 탭 제거 + 사이드바 단일.** 사용자 결정이다(2장). `app/layout.tsx`에서 `BottomNav`를 빼고 사이드바 하나만 남긴다. 모바일은 아이콘만 남긴 좁은 레일, 진단 문항 화면(`/diagnosis`)에서는 내비를 숨긴다. 적용됐다고 알려주면 A가 `styles/tokens.css`의 `--nav-h`를 지운다.
 
-```sql
-CREATE TYPE "SubTypeCode" AS ENUM ('AFTERCARE_YOUTH', 'FAMILY_CAREGIVER', 'MIGRANT_YOUTH', 'HEALTH_FRAGILE', 'DEBT_INDEPENDENT', 'FINANCIAL_FRAGILE', 'JOBLESS_POOR', 'FAMILY_DEPENDENT');
-ALTER TABLE "DiagnosisSession" ADD COLUMN "indicators" JSONB, ADD COLUMN "subTypeCode" "SubTypeCode";
-ALTER TABLE "User" ADD COLUMN "subTypeCode" "SubTypeCode";
-```
+**E — Amplify ↔ GitHub 연동.** 브라우저 수동 단계라 계정 소유자만 할 수 있다.
 
-전부 nullable 컬럼 추가라 기존 데이터는 지워지지 않는다. `migrate reset`은 쓰지 않는다.
+**D — 중복 init 마이그레이션.** `feat/community`의 `prisma/migrations/00000000000000_init/`을 지우고 `main`의 `20260819061857_init/`·`20260819080703_add_subtype/`을 받는다. **8/20 5인 머지 전에 처리해야 한다.** 그대로 머지되면 init이 두 개가 되어 `migrate deploy`가 깨진다.
 
-**E — `lib/auth.ts` 지연 초기화.** 모듈 로드 시점에 `CognitoJwtVerifier.create()`를 부르면 `COGNITO_USER_POOL_ID`가 비어 있을 때 빌드가 깨진다. `getCurrentUser()` 안으로 옮기거나, 실제 Pool ID·Client ID를 팀에 공유하고 Amplify 환경변수에도 등록한다.
+**B — `GET /api/missions`.** 나오면 홈 미션 미리보기를 그쪽으로 바꾼다.
 
-**E — 나머지.** `app/globals.css`의 `--color-canine/feline/ursine` 3줄 삭제(`styles/tokens.css`와 값이 다르다) / `BottomNav`의 `/diagnosis` 라벨 "진단결과" 수정 + 진단 진행 중 숨김 / `.env.example`의 DB 이름 `isol` → `welli`. 탭 높이를 바꾸면 `styles/tokens.css`의 `--nav-h`도 같이 바꿔야 한다고 알린다.
+**C — 종족 외형 스킨 전환의 남은 코드 5곳 (2026-08-20 팀 합의).** 스키마·실 DB·시드는 A가 적용을 끝냈다. `app/api/pet/cosmetics/route.ts`, `app/api/pet/skins/route.ts`, `app/api/pet/skins/buy/route.ts`, `app/pet/_components/SkinList.tsx`, `scripts/check-pet.ts`가 남았고 전부 `feat/pet`에만 있는 파일이다. 상세와 충돌 목록은 15절에 있다. `main`을 받으면 스키마·시드·마이그레이션에서 충돌하며 **전부 `main` 쪽을 채택하면 된다.** A는 `app/api/diagnosis/complete/route.ts`의 기본 펫 지급 쿼리(`where: { typeCode, isDefault: true }`)를 그대로 두면 되므로 진단 쪽 변경은 없다.
 
-**C — `prisma/seed/items.ts` 동물 매핑.** 여우 → `HEALTH_EMOTION`, 고양이 → `INDEPENDENT_LOW_INCOME`, 치장 "라벤더" 3종 이름 변경. **`npm run db:seed`보다 먼저 고쳐야 한다.** 지금 시드를 돌리면 틀린 매핑이 공유 DB에 들어간다.
+**C — 재진단 시 옛 종족 스킨 정책.** `UserPetSkin`에 남는 옛 종족 스킨을 환불할지 유지할지 정해야 한다. 15절 "남는 문제" 참고. 지금 `UserPetSkin`이 1건뿐이라 정하기 가장 싼 시점이다.
 
-**D — 중복 init 마이그레이션.** `feat/community`의 `prisma/migrations/00000000000000_init/`을 지우고 `main`의 `20260819061857_init/`을 쓴다. 그대로 머지되면 `migrate deploy`가 깨진다.
+### 넘겨서 끝난 것 (기록)
+
+- E — 2차 마이그레이션 `20260819080703_add_subtype`: A가 넘긴 DDL 그대로 적용됐다
+- C — `prisma/seed/items.ts` 동물 매핑·치장 이름: 실 DB에는 이미 확정 값이 들어가 있었고 `main`의 시드만 옛 값이었다. 2026-08-20에 스킨·치장 구조 변경과 함께 A가 맞췄다(15절)
+- E — `lib/auth.ts` 지연 초기화: `getVerifier()`로 고쳐졌다
+- E — `app/globals.css`의 종족색 3줄 삭제, `BottomNav`의 "진단결과" 경로 수정, `.env.example` DB 이름 `welli`
 
 ### A가 이어서 할 것
 
-1. 2차 마이그레이션 후 진단 → 결과 → 홈 전체 흐름을 브라우저에서 확인 (지금은 `P2022`로 500이다)
-2. 관리자 교차표 (대분류 × 세부유형)
-3. 펫 이미지가 S3에 올라오면 홈·결과의 종족색 원판을 이미지로 교체 (C·E 대기). 자리와 크기는 `styles/tokens.css`의 `.hm-plate__disc`(결과 7.5rem·기본 4.5rem)와 `.hm-tile__face`가 잡아 뒀다
-4. 다른 화면(미션·펫·커뮤니티)도 같은 결로 맞추려면 담당자에게 `design.md`와 `styles/tokens.css`를 알린다. 남의 폴더는 A가 고치지 않는다
+0. `feat/diagnosis` → `main` PR. 스키마·마이그레이션·시드가 들어 있어 5인 전원이 받아야 한다. 머지 후 전원에게 `git pull && npx prisma migrate deploy && npx prisma generate` 공지
+1. 관리자 교차표 (대분류 × 세부유형)
+2. 펫 이미지가 S3에 올라오면 홈·결과의 종족색 원판을 이미지로 교체 (C·E 대기). 자리와 크기는 `styles/tokens.css`의 `.hm-plate__disc`(결과 7.5rem·기본 4.5rem)와 `.hm-tile__face`가 잡아 뒀다
+3. 다른 화면(미션·펫·커뮤니티)도 같은 결로 맞추려면 담당자에게 `design.md`와 `styles/tokens.css`를 알린다. 남의 폴더는 A가 고치지 않는다
+
+---
+
+## 14. 실 DB 검증 기록 (2026-08-19)
+
+2차 마이그레이션이 적용된 뒤 처음으로 진단 전체 흐름을 실제 RDS에 붙여 확인했다. 그전까지는 `P2022`로 API 3종이 전부 500이었으므로, 이 기록이 "화면과 DB가 실제로 이어졌다"는 첫 증거다.
+
+절차: `git merge origin/main` → `npx prisma migrate deploy`(적용할 것 없음 = 이미 최신) → `npx prisma generate` → `npm run build` → `next start -p 3101`.
+
+확인한 것:
+
+| 확인 | 결과 |
+|---|---|
+| `GET /api/diagnosis/me` (진단 전) | `{"data":null}` — 홈이 시작 화면을 띄운다 |
+| `POST /api/diagnosis/complete` 조작된 답변 | `{"error":{"code":"INVALID_ANSWER","message":"진단 답변이 올바르지 않습니다"}}` 400 |
+| 진단 12문항 응답 후 결과 화면 | `data-tribe="INDEPENDENT_LOW_INCOME"`, "🐱 고양잇과 · 고양이 / 새벽 파랑", 기본 닉네임 "다정한 고양이"가 입력창에 채워짐 |
+| 닉네임을 "밤바다"로 바꾸고 시작하기 | `PATCH /api/diagnosis/nickname` 200, 홈으로 이동 |
+| 홈 | "오늘 하루도 / 밤바다 / 🐱 고양잇과", 일일 미션 4개 표시 |
+
+`npm run build`와 `npm run check:diagnosis` 모두 통과한다. 남은 것은 마스코트(펫 이미지 대기)와 미션 완료 여부 표시(B API 대기)뿐이다.
+
+**빌드 캐시 주의.** `next start`는 캐시된 빌드를 내보낸다. 코드를 고쳤으면 `npm run build`를 다시 돌리고 서버를 재시작해야 화면에 반영된다.
+
+---
+
+## 15. 스킨·치장·가챠 구조 변경 — C에게 넘기는 확정안 (2026-08-20)
+
+사용자 결정 4건을 한 번에 반영한다.
+
+1. **스킨은 종족 전용이다.** 진단으로 정해진 동물은 고정이고, 상점에서 사는 것은 같은 동물의 변종 외형뿐이다. 여우는 북극여우·사막여우, 고양이는 샴고양이·페르시안고양이, 곰은 북극곰·반달가슴곰처럼 어미에 종족명이 붙는다. 능력치는 바뀌지 않고 **외형만** 바뀐다
+2. **치장 아이템은 종족 구분을 없앤다.** 모든 치장 아이템을 종족과 무관하게 쓸 수 있다. 등급(`rarity`)은 유지한다
+3. **화폐를 전용으로 갈라놓는다.** 스킨은 **별조각 전용**, 치장 아이템(옷·배경 등)은 **친밀도 전용**이다. 한 품목을 두 화폐로 살 수 있게 두지 않는다. 상점 가격은 등급에 따라 다르게 매긴다
+4. **가챠를 스키마에서 지운다.** `GachaPull` 모델, `User.heroPity`, `User.legendPity`를 삭제한다
+
+**2026-08-20 팀 합의 후 DB·스키마·시드까지 적용 완료.** 마이그레이션 이름은 `20260820120000_skin_tribe_and_drop_gacha`다. 남은 것은 C 브랜치에만 있는 코드 4곳(`app/api/pet/*`, `app/pet/*`)과 `SPEC.md`·`docs/dev/pet.md` 갱신이다. 아래 "적용 순서"에 무엇이 끝났고 무엇이 남았는지 표시해 뒀다.
+
+A가 실 DB와 `feat/pet`을 읽고 구조 적합성을 검토한 결과를 여기 남긴다. 원래 구현은 C 담당이지만(`prisma/seed/items.ts`, `app/api/pet/*`, `app/pet/*`), 스키마 변경이 `prisma/seed/items.ts`와 `scripts/check-reward.ts`의 타입을 깨서 빌드가 통과하지 않았다. 빌드가 깨진 채로 둘 수 없어 그 두 파일까지 A가 함께 고쳤다. `app/api/pet/*`·`app/pet/*`은 `main`에 없어 손대지 않았다.
+
+### 결론
+
+`PetSkin`·`CosmeticItem` 두 테이블 다 거의 그대로 쓸 수 있다. 추가는 `PetSkin.priceShards` 하나, 삭제는 `PetSkin.priceAffinity`와 `CosmeticItem.tribeColor` 둘이다.
+
+종족 그룹핑에 별도 `species` 열거형이나 `baseSkinId` 자기참조는 필요하지 않다 — `TypeCode` 1개가 동물 1종에 정확히 대응하므로 기존 `typeCode`가 그대로 종족 키가 된다. 단, 이 전제는 늑대·삵·판다를 없앤다는 결정에 의존한다. 같은 `typeCode` 안에 서로 다른 동물이 공존하면 `typeCode`만으로는 종족을 식별할 수 없다.
+
+### 결정한 것 (2026-08-20 사용자)
+
+1. **늑대·삵·판다는 변종 스킨으로 대체한다.** 친밀도 전용 캐릭터와 고유 효과(씨앗 +15% / 별조각 +10% / 친밀도 +20%)는 없어진다. 외형만 바뀌는 스킨과 능력이 붙은 캐릭터가 한 목록에 섞이면 "외형만 바뀐다"는 규칙이 깨진다
+2. **스킨은 별조각 전용, 치장 아이템은 친밀도 전용.** 가챠 컷으로 별조각이 소모처를 잃은 상태였다(3단계 미션 12개가 총 60개를 지급하는데 쓸 곳이 없다). 스킨 상점이 그 구멍에 맞는다. 전용이므로 `PetSkin.priceAffinity`는 지운다 — 컬럼이 남아 있으면 "친밀도로도 살 수 있나"가 코드마다 다시 갈린다. 실 DB에서 기본 3종은 이 값이 `null`이고 값이 든 늑대·삵·판다는 삭제 대상이라 잃는 데이터가 없다
+3. **변종은 종족당 1개로 시작한다.** 이미지 장수가 곧 작업량이다. 기본 9장(3동물 × 3단) + 변종 9장 = 18장. 구조는 개수 제한이 없으므로 발표 후 시드만 추가하면 늘어난다
+4. **치장 아이템에서 종족 구분을 없앤다.** `CosmeticItem.tribeColor`를 지운다. 종족 소속감은 기본 펫과 종족 배지가 담당하고, 치장은 12종을 누구나 쓴다. 실 DB의 `tribeColor`는 여우↔고양이가 뒤바뀐 옛 매핑을 그대로 물고 있었고, 밤별 3종은 셋 다 한 종족 색으로 고정돼 있었다 — 컬럼을 지우면 두 문제가 함께 사라진다
+5. **치장 아이템의 등급(`rarity`)은 유지한다.** 가챠가 없어져 등급이 추첨 확률로 쓰이지 않으므로, 등급을 그대로 **가격 기준**으로 쓴다. 스키마 변경 없이 시드 값만 채우면 된다
+6. **가챠는 스키마에서도 지운다.** `GachaPull` 0행, `User.heroPity`·`legendPity` 값 전부 0인 지금이 데이터를 잃지 않고 지울 수 있는 시점이다
+
+### 스키마 변경
+
+```prisma
+model PetSkin {
+  id       String   @id @default(cuid())
+  name     String   @unique // 여우 / 북극여우 / 사막여우. 어미가 종족명이다
+  typeCode TypeCode        // 종족. 같은 값이면 같은 동물이다
+
+  isDefault  Boolean @default(false) // 진단으로 지급되는 기본 외형
+  stageCount Int     @default(3)     // 1에서 3으로. 외형만 바뀌므로 변종도 3단이다
+
+  effectType EffectType @default(NONE) // 외형 스킨은 전부 NONE
+  effectPct  Int        @default(0)
+
+  priceShards  Int? // 신규. 별조각 구매가. 기본 외형은 null
+  imageKeyBase String
+  // priceAffinity 삭제. 스킨은 별조각 전용이다
+
+  owners      UserPetSkin[]
+  activeUsers User[]        @relation("ActiveSkin")
+}
+```
+
+`effectType`·`effectPct`는 지우지 않는다. `calculateReward()`가 `NONE`이면 그대로 통과시키므로 남겨도 무해하고, 지우면 `lib/reward.ts`(C 소유 공유 함수)의 시그니처가 흔들린다. 나중에 능력치 스킨을 되살릴 여지도 남는다.
+
+`CosmeticItem`에서는 `tribeColor` 한 줄만 빠진다. `slot`·`rarity`·`affinityOnly`·`priceAffinity`는 그대로다.
+
+```prisma
+model CosmeticItem {
+  id     String @id @default(cuid())
+  name   String @unique
+  slot   Slot
+  rarity Rarity // 추첨 확률이 아니라 가격·희소도 표기로 쓴다
+
+  affinityOnly  Boolean @default(false)
+  priceAffinity Int?
+  imageKey      String
+
+  owners UserCosmetic[]
+}
+```
+
+`User`에서 `heroPity`·`legendPity`·`gachaPulls`를 지우고, `model GachaPull`을 통째로 지운다. 이 세 줄은 `feat/pet`에 이미 반영돼 있으나 **대응 마이그레이션이 없어 스키마와 실 DB가 갈라진 상태다.** 이번 마이그레이션이 그 드리프트를 닫는다.
+
+### 마이그레이션
+
+**파괴적 작업 4개가 들어 있다.** `GachaPull` 테이블 삭제, `CosmeticItem.tribeColor` 컬럼 삭제, `PetSkin.priceAffinity` 컬럼 삭제, `User.heroPity`·`legendPity` 컬럼 삭제다. 지금은 `GachaPull` 0행 / `UserCosmetic` 0행 / pity 값 전부 0 / `priceAffinity`에 값이 든 3행은 삭제 대상이라 잃는 데이터가 없다. 행이 쌓인 뒤에는 이 순서로 지울 수 없다.
+
+`prisma migrate dev`는 대화형 명령이라 이 환경에서 실행할 수 없다(`Prisma Migrate has detected that the environment is non-interactive`). SQL을 `migrate diff`로 뽑아 마이그레이션 디렉터리에 직접 넣고 `migrate deploy`로 적용했다.
+
+```bash
+npx prisma migrate diff --from-schema-datasource prisma/schema.prisma \
+  --to-schema-datamodel prisma/schema.prisma --script
+# 출력을 prisma/migrations/20260820120000_skin_tribe_and_drop_gacha/migration.sql 로 저장
+npx prisma migrate deploy
+npx prisma generate
+```
+
+적용 후 `migrate diff --exit-code`가 "No difference detected"를 돌려주는 것까지 확인했다.
+
+적용된 SQL:
+
+```sql
+ALTER TABLE "GachaPull" DROP CONSTRAINT "GachaPull_itemId_fkey";
+ALTER TABLE "GachaPull" DROP CONSTRAINT "GachaPull_userId_fkey";
+ALTER TABLE "CosmeticItem" DROP COLUMN "tribeColor";
+ALTER TABLE "PetSkin" DROP COLUMN "priceAffinity",
+ADD COLUMN     "priceShards" INTEGER,
+ALTER COLUMN "stageCount" SET DEFAULT 3;
+ALTER TABLE "User" DROP COLUMN "heroPity", DROP COLUMN "legendPity";
+DROP TABLE "GachaPull";
+```
+
+나머지 4인은 공지를 받고 이것만 실행한다.
+
+```bash
+git pull && npx prisma migrate deploy && npx prisma generate
+```
+
+### 치장 아이템 — 등급을 가격으로 쓴다
+
+가챠가 없어지면 `rarity`는 추첨 확률로 쓰이지 않는다. 그런데 실 DB에서 치장 12종 중 **가격이 있는 것은 밤별 3종(친밀도 200)뿐이고, 나머지 9종은 `priceAffinity`가 `null`이라 획득 경로가 없다.** 등급을 그대로 가격 기준으로 쓰면 스키마 변경 없이 이 구멍이 닫힌다.
+
+| 등급 | 친밀도 가격 | 실 DB 개수 |
+|---|---|---|
+| COMMON | 50 | 3 |
+| RARE | 100 | 3 |
+| EPIC | 200 | 5 (밤별 3종 포함) |
+| LEGENDARY | 400 | 1 |
+
+12종 전부 모으면 1,850 친밀도다. 친밀도는 하루 최대 100까지만 지급되므로(`SPEC.md` 5절) 약 19일 분량이다. 밤별 3종이 이미 EPIC 200이라 값이 그대로 맞아 떨어진다.
+
+부작용 하나. 12종이 전부 친밀도 구매가 되면 **`affinityOnly` 플래그가 항상 `true`가 되어 의미를 잃는다.** 그래도 **컬럼은 지우지 않고 12종 전부 `true`로 채운다.** `CosmeticList.tsx:132`가 `item.affinityOnly && item.priceAffinity`로 가격을 그리므로, 값만 채우면 코드를 한 줄도 고치지 않고 12종 전부에 가격이 뜬다. 컬럼을 지우면 `route.ts`·`page.tsx`·`CosmeticList.tsx` 3개를 함께 고쳐야 한다 — 마감 이틀 전에 살 이유가 없는 변경이다.
+
+### 스킨 — 별조각 가격
+
+`PetSkin`에는 `rarity`가 없다. 종족당 변종이 1개뿐인 지금은 등급 차등이 표현할 것이 없으므로 **균일 별조각 50**으로 둔다. 3단계 미션 12개가 주는 별조각 총량이 60이라, 자기 종족 변종 1개를 정확히 살 수 있는 값이다.
+
+| 스킨 | 별조각 |
+|---|---|
+| 기본 외형(여우·고양이·곰) | `null` (진단으로 지급) |
+| 변종 외형(북극여우·샴고양이·북극곰) | 50 |
+
+나중에 변종이 늘어 등급을 매기고 싶어지면 `priceShards`를 행마다 다르게 넣으면 된다. `rarity` 컬럼 추가는 필요하지 않다.
+
+### `stageCount`를 3으로 올려야 하는 이유
+
+지금 친밀도 캐릭터는 `stageCount = 1`이고, 코드가 그 값으로 진화 단계를 깎는다.
+
+```ts
+// app/api/pet/skins/activate/route.ts
+const evolutionStage = cappedStage(user.level, mine.petSkin.stageCount)
+
+// app/pet/_components/PetView.tsx
+const stage = pet.stageCount > 1 ? Math.min(pet.evolutionStage, 3) : 2
+// 표시도 "단일 형태"로 바뀐다
+```
+
+15레벨 3단 펫이 `stageCount = 1` 스킨으로 갈아타면 `evolutionStage`가 1로 떨어진다. 외형만 바뀌어야 하니 변종도 3단이어야 한다. 전부 3이 되면 위 분기는 자동으로 무해해지고, 지금 있는 퇴화 동작이 함께 사라진다.
+
+### 시드
+
+```
+여우      HEALTH_EMOTION          isDefault  stage3  pets/fox
+북극여우  HEALTH_EMOTION          별조각 50  stage3  pets/fox-arctic
+고양이    INDEPENDENT_LOW_INCOME  isDefault  stage3  pets/cat
+샴고양이  INDEPENDENT_LOW_INCOME  별조각 50  stage3  pets/cat-siamese
+곰        FAMILY_LIVING           isDefault  stage3  pets/bear
+북극곰    FAMILY_LIVING           별조각 50  stage3  pets/bear-polar
+```
+
+`imageKeyBase`는 그대로 쓸 수 있다. `stageCount`가 3이면 뒤에 `-1 -2 -3`을 붙이는 기존 규칙을 변종도 그대로 따른다.
+
+**어미 규칙은 스키마로 강제하지 않는다.** 접미사 문자열 매칭을 런타임 그룹핑에 쓰면 오타 한 번에 그룹이 깨진다. 그룹핑은 `typeCode`가 하고, 어미는 `npm run check:pet`에 단정 한 줄로 못 박는다.
+
+```ts
+for (const skin of SKINS)
+  assert(
+    skin.name.endsWith(TRIBE[skin.typeCode].animal),
+    `${skin.name}의 어미가 ${skin.typeCode} 종족명과 다르다`
+  )
+```
+
+치장 12종은 `tribeColor` 필드를 빼고, 12종 전부에 `affinityOnly: true`와 등급별 `priceAffinity`를 채운다.
+
+**시드만 고쳐서는 늑대·삵·판다가 DB에서 사라지지 않는다.** 시드는 `name`을 키로 upsert하므로 목록에서 뺀 행은 그대로 남는다. 실 DB에 이미 3행이 들어가 있다(A가 2026-08-20에 확인). 명시적으로 지워야 한다. 지금은 안전한 시점이다 — `UserPetSkin` 1건은 여우를 가리키고, `GachaPull`의 FK는 `CosmeticItem` 쪽이라 `PetSkin`을 참조하지 않는다.
+
+```sql
+DELETE FROM "PetSkin" WHERE "name" IN ('늑대', '삵', '판다');
+```
+
+그다음 `npm run db:seed`를 돌린다.
+
+**여기서 사고가 하나 났다. 기록해 둔다.** `main`의 `prisma/seed/items.ts`는 옛 치장 이름(앰버·라벤더·세이지)을 들고 있었지만 **실 DB는 이미 C의 확정 컬러명(노을·새벽·이끼)으로 재시드된 상태였다.** 시드의 upsert 키가 `name`이라, 옛 이름 목록으로 시드를 돌리자 기존 9행이 갱신되는 대신 옛 이름 9행이 새로 생겨 치장이 21종이 됐다. `UserCosmetic`이 0행이라 지우는 것으로 정리했다.
+
+```sql
+DELETE FROM "CosmeticItem" WHERE "name" IN (
+  '앰버 모자', '라벤더 모자', '세이지 모자',
+  '라벤더 목도리', '세이지 목도리', '앰버 목도리',
+  '세이지 배경', '앰버 배경', '라벤더 배경'
+);
+```
+
+`main`의 시드 목록을 확정 컬러명으로 맞춰 두었으므로 이제 다시 돌려도 12종을 유지한다. C의 `RENAMED_COSMETICS` 이관 표는 이미 이관이 끝났으므로 `feat/pet`을 머지할 때 함께 지워도 된다.
+
+동물 매핑(여우 = 개과 = `HEALTH_EMOTION`)도 실 DB에는 이미 반영돼 있었다. `main`의 시드만 옛 값이었고, 이번에 함께 맞췄다.
+
+### 코드 변경
+
+| 파일 | 변경 |
+|---|---|
+| ~~`prisma/seed/items.ts`~~ | **완료(A, 2026-08-20).** `tribeColor` 삭제, 늑대·삵·판다를 북극여우·샴고양이·북극곰으로 교체(`stageCount: 3`, `priceShards: 50`, `effectType: NONE`), 치장 12종에 `affinityOnly: true` + 등급에서 파생시킨 `priceAffinity`. 가격은 `PRICE_BY_RARITY` 한 곳에서 나온다 |
+| ~~`scripts/check-reward.ts`~~ | **완료(A, 2026-08-20).** 더미 `PetSkin`의 `priceAffinity: null`을 `priceShards: null`로 |
+| ~~`app/api/pet/cosmetics/route.ts`~~ | **완료(A, 2026-08-20 머지 시).** 응답에서 `tribeColor` 삭제 |
+| ~~`app/api/pet/skins/route.ts`~~ | **완료(A).** `findMany`에 `where: { typeCode: user.typeCode }`, `user.typeCode`가 `null`(진단 전)이면 빈 목록. 응답의 `affinity`·`priceAffinity`를 `starShards`·`priceShards`로 |
+| ~~`app/api/pet/skins/buy/route.ts`~~ | **완료(A).** `skin.typeCode !== user.typeCode`면 `WRONG_TRIBE`로 400. 가격은 `priceShards`, 차감은 `starShards`(`NOT_ENOUGH_SHARDS`). 연타 방어용 조건부 `updateMany` 패턴은 그대로 유지 |
+| ~~`app/pet/skins/page.tsx`~~ | **완료(A).** 서버 쪽 목록도 같은 종족 필터. `starShards`를 넘긴다 |
+| ~~`app/pet/_components/SkinList.tsx`~~ | **완료(A).** 묶음을 "기본 외형 / 상점"으로, 고유 효과 표기 삭제, 가격 표기를 "별조각 N"으로 |
+| ~~`lib/pet.ts`~~ | **완료(A).** `animalEmoji()`가 완전일치로만 찾아 변종 3종이 전부 🐾로 떴다. `endsWith`로 어미를 찾아 기본 동물 이모지를 쓰고, 없어진 캐릭터의 `AFFINITY_EMOJI`를 지웠다 |
+| `scripts/check-pet.ts` | 어미 = 종족명 단정 추가 — **남음(C)** |
+| `app/api/pet/cosmetics/buy/route.ts` | 치장 구매 라우트가 없다 — **남음(C)**. 아래 "남는 문제" |
+
+`lib/reward.ts`·`UserPetSkin`·`app/api/pet/skins/activate/route.ts`는 손대지 않았다.
+
+**파일 소유 규칙을 넘었다.** 위 6개 파일은 전부 C 소유다(`CLAUDE.md` 2절). `develop`을 머지하니 이 파일들이 삭제된 컬럼을 참조해 `npm run build`가 깨졌고, 빌드 깨진 커밋을 `develop`에 올리면 5인 전원의 Amplify 배포가 막힌다(`CLAUDE.md` 3절). 사용자 승인을 받고 A가 최소 수정만 했다. 소유는 그대로 C다.
+
+### 갱신할 문서
+
+| 문서 | 절 | 변경 | 담당 |
+|---|---|---|---|
+| `SPEC.md` | 5 | 가챠 절 삭제(`feat/pet`에 이미 반영). "친밀도 전용 캐릭터"를 "종족 외형 스킨"으로 재작성하고 고유 효과 표를 지운다. 별조각 소모처를 "미정"에서 "종족 외형 스킨 구매"로. 치장 절에 등급별 가격표 추가, "가챠 추첨 풀에서 제외" 문구 삭제 | C |
+| `SPEC.md` | 6 | `calculateReward()` 통과 목록에서 "가챠 중복 환급" 삭제 | C |
+| `SPEC.md` | 11 | `GachaPull.wasDuplicate`·`refundShards` 줄 삭제, `affinityOnly` 설명에서 가챠 언급 삭제, `tribeColor` 삭제. `rarity`는 남기고 설명을 "가챠 등급"에서 "가격·희소도 표기"로 | C |
+| `SPEC.md` | 2 | 치장 컬러명(노을·새벽·이끼)이 더 이상 종족과 대응하지 않음을 명시 | C |
+| `docs/dev/pet.md` | 전체 | 제목 "펫·가챠" → "펫", 가챠 항목 삭제, 스킨·치장 구조 반영 | C |
+| `docs/STATUS.md` | 담당별 상태 | C 범위 "펫 + 가챠" → "펫 + 스킨" | C |
+| `docs/STATUS.md` | 결정 변경 | 스킨 종족 전용 / 치장 종족 무관 / 가챠 스키마 삭제 3건 추가 | C |
+| `docs/인수인계.md` | C 절 | `/api/gacha/*`와 가챠 서술 삭제 | C |
+| `업무분담.md` | C 절, 데모 순서 | 가챠 항목 삭제 | C |
+| `docs/dev/diagnosis.md` | 15 | 이 절 | A (완료) |
+| `prisma/schema.prisma` | — | 스키마 변경 + 마이그레이션 | A (완료) |
+| `docs/STATUS.md` | 차단 사항 | 차단 1(시드 동물 매핑) 해소 | A (완료) |
+
+`CLAUDE.md`는 가챠 언급이 없어 손댈 것이 없다.
+
+### 적용 순서
+
+1. ~~`prisma/schema.prisma` 수정~~ — 완료. `feat/diagnosis`의 `4934868`
+2. ~~마이그레이션 생성·적용~~ — 완료. `20260820120000_skin_tribe_and_drop_gacha`. 나머지 4인은 `git pull && npx prisma migrate deploy && npx prisma generate`
+3. ~~늑대·삵·판다 `DELETE` → `npm run db:seed`~~ — 완료. 스킨 6종 / 치장 12종(합 1,850 친밀도) 확인
+4. ~~`prisma/seed/items.ts`·`scripts/check-reward.ts`~~ — 완료. `npm run build`, `npm run check:reward` 통과
+5. ~~`app/api/pet/*` 3개 + `app/pet/skins/page.tsx` + `SkinList.tsx` + `lib/pet.ts`~~ — 완료. `develop` 머지 때 A가 고쳤다. `npm run build`·`check:reward`·`check:diagnosis`·`check:pet` 통과, `/pet/skins` 화면과 `GET /api/pet/skins`·`/api/pet/cosmetics` 실 응답까지 확인
+6. **남음** — `scripts/check-pet.ts` 어미 단정, 치장 구매 라우트, `SPEC.md`·`docs/dev/pet.md`·`docs/인수인계.md`·`업무분담.md` 갱신(위 표)
+
+### `develop` 머지 실제 결과 (2026-08-20)
+
+`main`이 아니라 `develop`을 통합 지점으로 잡았고, C·D·E가 먼저 머지한 뒤 A가 `git merge origin/develop`(`d8edf2b`)을 했다. 예고했던 대로 3개 파일이 충돌했다. `prisma/migrations/`는 A만 갖고 있어 충돌 없이 그대로 들어갔다.
+
+| 파일 | 해결 |
+|---|---|
+| `prisma/schema.prisma` | HEAD(`tribeColor` 삭제) 채택. develop 쪽을 택하면 실 DB에 없는 컬럼을 Prisma가 select해 `CosmeticItem` 전 쿼리가 P2022로 죽는다 |
+| `prisma/seed/items.ts` | HEAD 구조 채택. develop의 `TypeCode ↔ 종족` 매핑 주석과 "upsert 키는 name" 경고는 남겼다. `renameLegacyCosmetics()`와 `RENAMED_COSMETICS`는 실 DB 이관이 끝나 no-op이므로 지웠다 |
+| `docs/STATUS.md` | 손으로 합쳤다. develop의 담당별 최신 상태·origin 브랜치 표를 살리고, 구조 변경으로 해소된 차단 1·6·8과 재현되지 않는 7을 해소 표시로 바꿨다 |
+
+`npm run db:seed`는 develop STATUS의 차단 7과 달리 그냥 통과한다(`tsx` 4.x가 `.env`를 읽는다). `npm run lint`는 `app/page.tsx`의 `setGreeting`을 `fetchMe().then()` 안으로 옮겨 A 쪽 에러를 없앴다. 남은 에러 1건은 D의 `PostDetailModal.tsx:54`다.
+
+### 뒤집히는 기존 결정
+
+`app/api/pet/skins/route.ts`의 주석이 지금은 이렇게 되어 있다.
+
+```
+구매 제한을 두지 않는다 — 유형과 무관하게 3종 모두 살 수 있다(SPEC.md 5절).
+자기 과로 제한하면 유저당 1개뿐이라 "고르고 전환한다"가 사라진다.
+```
+
+새 구조는 이 판단을 뒤집는다. 다만 **C의 원래 근거는 자동으로 해소된다** — 종족당 변종이 여러 개 생기므로 자기 종족으로 제한해도 고를 것이 남는다.
+
+### 남는 문제
+
+**치장 구매 라우트가 없다 (C).** 가격은 시드·실 DB에 다 들어갔고 `GET /api/pet/cosmetics`가 `affinityOnly`·`priceAffinity`를 내려주지만 `POST /api/pet/cosmetics/buy`가 없다. 그래서 치장 화면은 여전히 전부 "미획득"으로 보인다. `app/api/pet/skins/buy/route.ts`를 그대로 베끼면 된다 — 친밀도를 차감하고, 종족 검사는 없고(치장은 종족 무관), `affinityOnly && priceAffinity !== null`만 확인한다. `calculateReward()`는 통과하지 않는다(획득이 아니라 소모다).
+
+**재진단하면 옛 종족 스킨이 유령이 된다.** `app/api/diagnosis/complete/route.ts`가 새 `typeCode`의 기본 외형으로 `activePetSkinId`를 다시 심으므로 화면은 깨지지 않는다. 다만 `UserPetSkin`에 남은 옛 종족 스킨은 상점·목록 어디에도 안 보인 채로 소유 기록만 남는다. 별조각 환불이든 유지든 정책이 필요하다. 지금 `UserPetSkin`이 1건뿐이라 정하기에 가장 싼 시점이다.
+
+~~**이 작업은 `feat/pet` 머지가 먼저다.**~~ — `feat/pet`은 `develop`에 들어갔고 A도 `develop`을 받았다. 위 파일들은 이제 `feat/diagnosis`에 다 있다.
+
+### 머지 후 발견한 문제 (2026-08-20, `feat/missions` 머지 뒤 검증)
+
+B가 `feat/missions`를 `develop`에 머지해(`3adbea5`) 5인 중 4인이 통합됐다. D만 5커밋 남았고 예측 충돌은 `docs/STATUS.md` 1건뿐이다. 통합 검증은 전부 통과했다 — 충돌 마커 0건, `npm run build` 통과(라우트 31개), 마이그레이션 3개 중복 없음, 실 DB 드리프트 없음, 체크 스크립트 3종 통과, 화면 7장·API 6종 200 + 실데이터, 재화 증감은 B도 `calculateReward()`를 경유한다.
+
+기능은 합쳐졌지만 내비 교체 때문에 다음이 남았다. **번호별 담당은 커밋 작성자로 확인했다**(`Yoon` = B, `uchan04` = E, `centreject` = A).
+
+| # | 문제 | 고칠 사람 |
+|---|---|---|
+| 1 | `app/components/Sidebar.tsx:8`의 `TEMP_SIDEBAR_PROFILE`이 하드코딩이다. 화면엔 "고요한 고양이 / 씨앗 42개 / Lv.3", 실제 `GET /api/pet`은 "밤바다 / 씨앗 0 / Lv.1". 발표 시연에서 그대로 보인다 | B |
+| 2 | 같은 파일이 `CHARACTER_COLOR`·`CHARACTER_LABEL`을 다시 정의해 종족 색·표시명이 3중 정의가 됐다(8/19에 닫은 차단 5번과 같은 문제). 출처는 `lib/types.ts`의 `TRIBE`다 | B |
+| 3 | `app/layout.tsx:16`이 `<main>`을 열고 A·C 화면도 `<main className="hm">`을 열어 `/`·`/diagnosis`에 `<main>`이 2개다. 유효하지 않은 HTML이고 랜드마크가 중복된다. layout 한 곳에서 `<div>`로 바꾸는 것이 화면 6장을 고치는 것보다 싸다 | E |
+| 4 | 결정 9번이 정한 "진단 문항 화면에서 내비 숨김"이 빠졌다. `Sidebar.tsx`에 `usePathname`은 이미 있고 경로 분기만 없다 | B |
+| 5 | ~~죽은 `--nav-h`~~ 고쳤다(아래). 고아가 된 `app/components/BottomNav.tsx`는 아무도 import하지 않는다 — 삭제는 E 몫 | A(완료) / E |
+| 6 | `BEDROCK_VISION_MODEL_ID`가 Amplify 환경변수에 없다. `lib/missions/vision.ts:7`이 `us.amazon.nova-2-lite-v1:0`으로 폴백해 죽지는 않는다 | E |
+
+**5번 A 몫은 처리했다.** `styles/tokens.css`에서 `--nav-h: calc(2.5rem + 1px)`와 `min-height: calc(100dvh - var(--nav-h))`를 `min-height: 100dvh`로 되돌렸다. 근거는 `app/layout.tsx`이 화면 전체를 flex로 잡고 본문 칸에 `overflow-y: auto`를 걸어 그 칸의 높이가 정확히 뷰포트이기 때문이다. 실측으로 `--nav-h`가 사라졌고 `.hm`의 `min-height`(709.6px)가 스크롤 칸 높이(710px)와 맞는 것을 확인했다.
+
+**B가 E 소유 공유 파일 4개를 브랜치에서 고쳤다** — `app/layout.tsx`·`app/globals.css`(`65308c4`), `.env.example`(`7890af4`), 그리고 내비인 `Sidebar.tsx` 신규. `CLAUDE.md` 1절이 금지한 것이다. E가 같은 기간에 그 파일들을 안 건드려 충돌은 안 났다. 결정 9번은 사이드바를 E에게 배정했는데 B가 먼저 구현한 상태라, **소유권을 E에게 되돌릴지 사이드바만 B에게 넘길지 팀이 정해야 한다.** 안 정하면 남은 이틀 동안 둘이 같은 파일을 각자 고친다.
+
+`npm run lint` 에러는 12건으로 늘었다 — B 11건(`any` 8, `set-state-in-effect` 1 등), D 1건(`PostDetailModal.tsx:54`). A는 0건이다. 빌드는 통과하므로 Amplify 배포는 막히지 않는다.

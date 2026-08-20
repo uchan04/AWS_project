@@ -34,11 +34,3 @@ export const AFFINITY_DAILY_CAP = 100
 export function capAffinity(todayTotal: number, want: number): number {
   return Math.max(0, Math.min(want, AFFINITY_DAILY_CAP - todayTotal))
 }
-
-/** 가챠 중복 획득 시 환급하는 별조각 (SPEC.md 5절) */
-export const DUPLICATE_REFUND = {
-  COMMON: 2,
-  RARE: 5,
-  EPIC: 20,
-  LEGENDARY: 50,
-} as const

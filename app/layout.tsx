@@ -12,9 +12,9 @@ export default function RootLayout({ children }: LayoutProps<"/">) {
     <html lang="ko" className="h-full antialiased">
       <body className="h-full flex">
         <Sidebar />
-        <main style={{ flex: 1, background: "#F5F0E8", overflowY: "auto" }}>
+        <div style={{ flex: 1, background: "#F5F0E8", overflowY: "auto" }}>
           {children}
-        </main>
+        </div>
       </body>
     </html>
   );

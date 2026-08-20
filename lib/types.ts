@@ -68,7 +68,9 @@ export function isValidNickname(value: string): boolean {
 }
 
 // 성장 곡선 (SPEC.md 5절)
-export const SEED_TO_EXP = 1
+// 2026-08-19: 씨앗 1 = 경험치 1 → 10으로 변경. 유일한 소비자는 lib/pet.ts의 applySeeds()다.
+// 값을 고치면 scripts/check-pet.ts의 기대값이 함께 바뀐다. npm run check:pet 을 반드시 돌린다.
+export const SEED_TO_EXP = 10
 export const EVOLUTION_LEVEL = { STAGE2: 5, STAGE3: 15 } as const
 
 export function expToNextLevel(level: number): number {
