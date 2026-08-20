@@ -103,7 +103,7 @@ GitHub 원격 — https://github.com/uchan04/AWS_project
 
 | 브랜치 | 최신 | `develop` 미반영 | 비고 |
 |---|---|---|---|
-| `origin/develop` | (이 커밋) (8/20) | — | 통합 지점. A·B·C·E 머지 완료 |
+| `origin/develop` | `b5134e1` (8/20) | — | 통합 지점. A·B·C·E 머지 완료 |
 | `origin/main` | `f0a8634` (8/20) | 0 | `develop`에 포함됨. 배포 시점에 `develop`을 다시 올린다 |
 | `origin/feat/pet` | `82b692a` (8/19) | 0 앞 | `develop`에 머지됨. C는 작업 재개 전에 받아야 한다 |
 | `origin/feat/missions` | `6495f37` (8/20) | **3커밋** | `1dfbefc`·`79ea4e6`·`6495f37`. 충돌 0건(실측). 차단 18번 |
