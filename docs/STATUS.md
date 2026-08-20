@@ -2,7 +2,7 @@
 
 **모든 세션은 이 문서부터 읽는다.** 그다음 아래 "지금 읽어야 할 문서"만 읽고 시작한다.
 
-최종 갱신: 2026-08-20 (A·B·C·E `develop` 머지 완료 + 통합 검증. 남은 것은 D의 5커밋)
+최종 갱신: 2026-08-20 (`develop` = `cb16959`. 인증 없이 프로덕션 빌드를 돌려 배포 가능 여부를 실측했다. 남은 것은 D의 6커밋)
 현재 단계: **D2 — 인프라 완료, 기능 5개 병렬 착수 (8/20 기능 동결 예정일)**
 
 팀원 인수인계용 단일 문서는 [`docs/인수인계.md`](인수인계.md)에 있다. 새로 합류하거나 노션으로 공유할 때는 그 문서를 쓴다.
@@ -32,9 +32,9 @@
 | 담당 | 범위 | 상태 | 비고 |
 |---|---|---|---|
 | A | 진단 + 미션 콘텐츠 + 홈 | 미션 41개, 13문항 + 판정 함수, 조기 종료, 화면 3장 + Figma 값·구성 반영, 진단 API 3종(완료·조회·닉네임) + 화면 연결, **실 DB로 진단→결과→홈 전체 흐름 확인 완료** | A 담당 기능은 4단계(Bedrock)·관리자 교차표만 남았다. 홈의 펫·미션 실데이터는 B·C API 대기 |
-| B | 미션 시스템 + 사진 업로드 | **`develop`에 머지 완료**(`3adbea5`, 2026-08-20). 미션 API 3종, 사진 업로드 presign·verify, 미션 대시보드, 출석, `lib/missions/` 8개 파일. 재화는 `calculateReward()`를 경유한다 | 하단 탭을 사이드바로 교체한 것도 B다(결정 9번은 E 배정이었다). 차단 10번 4건 + lint 에러 11건 남음 |
+| B | 미션 시스템 + 사진 업로드 | **`develop`에 머지 완료**(`3adbea5` → `cb16959`, 2026-08-20). 미션 API 3종, 사진 업로드 presign·verify, 미션 대시보드, 출석, `lib/missions/` 8개 파일. 재화는 `calculateReward()`를 경유한다 | 하단 탭을 사이드바로 교체한 것도 B다(결정 9번은 E 배정이었다). 사이드바 뒷정리 3건은 `51b2897`·`d98fab9`로 끝냈다. 남은 것은 **차단 11번(모바일 부서짐)** + lint 에러 11건 |
 | C | 펫 + 스킨 | **`SPEC.md` 5절 기능 완료.** 성장·씨앗 투입·진화 연출, 방치형 자동 획득, 치장 착용·해제, 스킨 구매·전환 + 화면 3장. 스킨·치장 구조 변경(종족 전용 외형 / 치장 종족 무관 / 가챠 삭제)은 스키마·실 DB·시드·API·화면까지 반영 완료(2026-08-20, A) | 남은 것은 **치장 구매 라우트**(차단 9)와 `SPEC.md` 2·5·6·11절·`docs/dev/pet.md`·`docs/인수인계.md` 갱신, `scripts/check-pet.ts` 어미 단정 추가. 목록은 `docs/dev/diagnosis.md` 15절 |
-| D | 커뮤니티 + 챗봇 | **`develop`에 5커밋 미반영**(본인 댓글 삭제, 모달 버그 2건, 문서 2건). 예측 충돌은 `docs/STATUS.md` 1건뿐이고 코드는 충돌하지 않는다. 기능 구현 끝. 챗봇 Bedrock 스트리밍 연결 완료(2026-08-19). 미션 완료 연동 호출부(`completeMission`)는 주석으로 준비만 해둠 | `completeMission()`(B) 대기 상태. 막힌 항목 5개와 주의사항은 `docs/dev/community.md` 상단 "재개 지점" 참고 |
+| D | 커뮤니티 + 챗봇 | **`develop`에 6커밋 미반영**(`d37d12d`. 본인 댓글 삭제, 모달 버그 2건, 문서 2건, 머지 1건). 예측 충돌은 `docs/STATUS.md` 1건뿐이고 코드는 충돌하지 않는다. 기능 구현 끝. 챗봇 Bedrock 스트리밍 연결 완료(2026-08-19). 미션 완료 연동 호출부(`completeMission`)는 주석으로 준비만 해둠 | **`/community`·`/chat`이 프로덕션에서 500이다 — 차단 12번.** `completeMission()`(B) 대기 상태. `docs/dev/community.md`의 "재개 지점" 2번은 `BottomNav` 기준으로 쓰여 있어 낡았다(사이드바로 교체됨). 막힌 항목과 주의사항은 그 문서 상단 참고 |
 | E | 인프라 + 인증 | RDS·Cognito·S3+CloudFront·CloudWatch+SNS·Bedrock·auth 실검증·하단 탭 내비 완료, PR #1 머지 + 2차 마이그레이션 + auth 빌드 수정 + 색 토큰 정리 완료 | Amplify GitHub 연동만 남음(브라우저 수동 단계) |
 
 ## 전체 차단 사항
@@ -57,28 +57,48 @@
 
 ~~8. 치장 획득 경로와 별조각 소모처가 없다~~ — **경로는 정해졌다**(2026-08-20 팀 결정). 치장은 친밀도 전용 상점에서 등급 가격으로 산다(COMMON 50 / RARE 100 / EPIC 200 / LEGENDARY 400). 별조각은 종족 변종 스킨 상점(변종 50)이 소모처다. 결정 변경 13번 참고. **구현은 스킨 쪽만 끝났다** — 아래 9번
 
-남은 것은 아래 3개다.
+~~10. 내비 교체 뒷정리 4건~~ — **4건 중 3건 해소(2026-08-20, B)**. `51b2897`이 `TEMP_SIDEBAR_PROFILE`을 지우고 `/api/pet` + `/api/diagnosis/me`로 갈아끼웠고(사이드바가 실제로 "밤바다 / 고양잇과 / 씨앗 0 / Lv.1"을 렌더한다), 종족 색·표시명을 `lib/types.ts`의 `TRIBE`에서 가져오도록 고쳐 3중 정의를 닫았고, `/diagnosis`에서 내비를 숨겼다(실측: `/`는 `aside` 1개, `/diagnosis`는 0개). `d98fab9`가 `app/layout.tsx`의 `<main>`을 `<div>`로 바꿔 `<main>` 중첩도 없앴다(두 경로 모두 `main` 1개). 남은 잔여는 아래 11·13번으로 옮겼다
 
-10. **내비 교체 뒷정리 4건 (B 3건 · E 1건)** — 하단 탭이 사이드바로 바뀌면서 남았다. 세부와 근거는 `docs/dev/diagnosis.md` 15장 "머지 후 발견한 문제".
-    - (B) `app/components/Sidebar.tsx:8` `TEMP_SIDEBAR_PROFILE`이 하드코딩이다. 화면엔 "고요한 고양이 / 씨앗 42개 / Lv.3", 실제 API는 "밤바다 / 씨앗 0 / Lv.1" — **발표 시연에서 그대로 보인다**
-    - (B) 같은 파일이 종족 색·표시명을 다시 정의해 3중 정의가 됐다(8/19에 닫은 차단 5번 재발). 출처는 `lib/types.ts`의 `TRIBE`
-    - (B) 진단 문항 화면에서 내비를 숨기는 결정 9번이 빠졌다. `usePathname`은 이미 있고 경로 분기만 없다
-    - (E) `app/layout.tsx:16`의 `<main>`이 화면들의 `<main className="hm">`과 겹쳐 `<main>`이 2개다. layout 한 곳에서 `<div>`로 바꾼다. 고아가 된 `app/components/BottomNav.tsx`도 삭제
-    - **소유권 결정 필요**: B가 E 소유 공유 파일 4개(`app/layout.tsx`·`app/globals.css`·`.env.example` + 내비)를 브랜치에서 고쳤다(`CLAUDE.md` 1절 위반). 충돌은 안 났지만 사이드바를 누가 갖는지 정해야 남은 이틀 동안 둘이 같은 파일을 각자 고치지 않는다
-    - (E) `BEDROCK_VISION_MODEL_ID`를 Amplify 환경변수에 등록해야 한다. `lib/missions/vision.ts:7`이 폴백하므로 죽지는 않는다
+남은 것은 아래 6개다.
 
-4. **클라이언트가 `Authorization` 헤더를 싣지 않는다 (E 담당, D가 보고)** — `lib/auth.ts` 서버 검증은 완료됐지만 화면에서 토큰을 실어 보내지 않는다. 이대로 배포하면 전 API가 401이다. 로그인 화면·토큰 보관 방식이 E 담당이고 방식 확정 대기
+4. **인증이 붙어 있지 않다. Bearer 헤더 방식으로는 서버 컴포넌트를 인증할 수 없다 (E 담당)** — **2026-08-20에 설명을 고쳤다. 이전 서술("클라이언트가 헤더를 싣기만 하면 된다")은 틀렸다.**
+    - `lib/auth.ts:44`가 `Authorization: Bearer`를 읽는다. 그런데 브라우저가 페이지를 여는 문서 내비게이션 요청에는 커스텀 헤더를 붙일 방법이 없다. `fetch`에는 붙지만 링크 클릭·주소창 이동에는 붙지 않는다
+    - 서버에서 `getCurrentUser()`를 부르는 페이지가 5개다: `app/chat/page.tsx`, `app/community/page.tsx`, `app/pet/page.tsx`, `app/pet/cosmetics/page.tsx`, `app/pet/skins/page.tsx`. 이 5개는 헤더 방식으로는 원리적으로 인증되지 않는다
+    - **해결 방향**: 토큰을 `httpOnly` 쿠키에 담고 `lib/auth.ts`가 `headers()` 대신 `cookies()`를 읽는다. 그러면 페이지와 API가 같은 경로로 인증된다. 헤더 방식을 유지하려면 위 5개 페이지를 클라이언트 컴포넌트로 전환해야 하는데, 마감 이틀 전에 C·D 코드를 뒤집는 작업이다
+    - `app/(auth)/` 폴더가 아직 없다. 로그인 화면이 없어 토큰을 받을 곳 자체가 없다
 9. **치장 구매 라우트가 없다 (C 담당)** — 가격은 시드·DB에 다 들어갔고 `GET /api/pet/cosmetics`가 `priceAffinity`를 내려주지만 `POST /api/pet/cosmetics/buy`가 없다. 그래서 치장 화면은 여전히 전부 "미획득"으로 보인다. 스킨 쪽(`POST /api/pet/skins/buy`)은 별조각 결제로 고쳐 두었으니 그 파일을 그대로 베끼면 된다 — 친밀도 차감, 종족 검사 없음, `affinityOnly && priceAffinity !== null`만 확인
+11. **모바일에서 화면이 부서진다 (B 담당)** — 375px 폭에서 실측했다. `app/components/Sidebar.tsx`의 `aside`가 `width: 240` 고정이라 본문에 **135px만** 남고 내용이 화면 밖으로 잘려나간다. 결정 9번의 "모바일은 아이콘만 남긴 좁은 레일"이 빠졌다. 인라인 스타일로는 미디어 쿼리를 못 쓰니 CSS 클래스가 필요하다
+12. **프로덕션에서 `/community`·`/chat`이 500이다 (D 담당)** — `DEV_AUTH_BYPASS`를 끄고 프로덕션 빌드를 띄워 실측했다. 두 페이지가 서버에서 `getCurrentUser()`를 부르는데 감싸지 않아 `UnauthorizedError`가 그대로 터진다(서버 로그 `⨯ Error: 로그인이 필요합니다`). C의 `app/pet/page.tsx`는 `try/catch`로 감싸 안내 화면을 띄우기 때문에 200이다. 인증이 붙기 전까지는 같은 방식으로 감싸는 것이 안전하다
+13. **내비 교체 잔여 2건** — (E) 고아가 된 `app/components/BottomNav.tsx` 삭제. `app/layout.tsx`에서 빠졌고 아무도 import하지 않는다(레포 전체 검색으로 확인). `docs/dev/infra.md`에는 아직 "동결"로 적혀 있어 문서도 함께 갱신해야 한다. (B·E) **소유권 결정 필요** — B가 E 소유 공유 파일 3개(`app/layout.tsx`·`app/globals.css`·`.env.example`)를 브랜치에서 고쳤다(`CLAUDE.md` 1절 위반). 충돌은 안 났지만 사이드바를 누가 갖는지 정해야 남은 이틀 동안 둘이 같은 파일을 각자 고치지 않는다
+14. **배포 설정이 검증되지 않았다 (E 담당)** — `amplify.yml`이 없어 Amplify의 Next.js 자동 감지에 의존하는 상태다. 이 프로젝트는 Next 16 + Turbopack이라 자동 감지가 이 조합을 처리하는지 확인되지 않았다. `BEDROCK_VISION_MODEL_ID`도 Amplify 환경변수에 등록되지 않았다(`.env.example`에는 있다. `lib/missions/vision.ts:7`이 폴백하므로 죽지는 않는다)
 
-**8/20 5인 머지 — A·B·C·E가 들어갔다.** A는 `develop`(`d8edf2b`)을 받아 충돌 3건(`prisma/schema.prisma`·`prisma/seed/items.ts`·`docs/STATUS.md`)을 해결하고 올렸고(`f9314a5`), 이어 B가 `feat/missions`를 머지했다(`3adbea5`). **남은 것은 D의 5커밋 하나다.**
+**8/20 5인 머지 — A·B·C·E가 들어갔다.** A는 `develop`(`d8edf2b`)을 받아 충돌 3건(`prisma/schema.prisma`·`prisma/seed/items.ts`·`docs/STATUS.md`)을 해결하고 올렸고(`f9314a5`), 이어 B가 `feat/missions`를 머지했다(`3adbea5`, 이후 사이드바 수정 3커밋으로 `cb16959`). **남은 것은 D의 6커밋 하나다.**
 
-**통합 검증 결과 (2026-08-20, A)**: 충돌 마커 0건, `npm run build` 통과(라우트 31개), 마이그레이션 3개 중복 없음, 실 DB 드리프트 없음(`migrate diff --exit-code`), `check:diagnosis`·`check:pet`·`check:reward` 통과, 화면 7장·API 6종 200 + 실데이터 렌더, 재화 증감은 B도 `calculateReward()` 경유, 유형명 UI 노출 없음. **기능은 깨끗하게 합쳐졌다** — 남은 것은 차단 10번(내비 교체 뒷정리)과 lint뿐이다
+**통합 검증 결과 (2026-08-20, A)**: 충돌 마커 0건, `npm run build` 통과(라우트 31개), 마이그레이션 3개 중복 없음, 실 DB 드리프트 없음(`migrate diff --exit-code`), `check:diagnosis`·`check:pet`·`check:reward` 통과, 화면 7장·API 6종 200 + 실데이터 렌더, 재화 증감은 B도 `calculateReward()` 경유, 유형명 UI 노출 없음, 브라우저 콘솔 에러 0건. **기능은 깨끗하게 합쳐졌다.** `develop`은 각자 받아서 작업해도 안전하다
 
-**전원 실행 필요**: `git pull && npx prisma migrate deploy && npx prisma generate`. `develop`에 마이그레이션 `20260820120000_skin_tribe_and_drop_gacha`가 들어갔다(스킨 종족 전용 + 치장 종족 무관 + 가챠 삭제).
+**배포 가능 여부 실측 (2026-08-20, A)**: `DEV_AUTH_BYPASS=false`로 프로덕션 빌드를 띄워 라우트별 응답을 확인했다.
+
+| 응답 | 경로 |
+|---|---|
+| 200 | `/` `/diagnosis` `/missions` `/pet` |
+| **500** | `/community` `/chat` |
+| **401** | `/api/pet` `/api/missions` — 전 API |
+
+**즉 지금 배포하면 빌드는 성공하지만 앱은 쓸 수 없다.** 홈·진단은 뜨지만 데이터가 비고, 커뮤니티·챗봇은 에러 화면이다. 원인은 차단 4번이다. `main` 머지 자체는 fast-forward로 안전하지만(0 앞 / 76 뒤), 배포는 인증을 정한 뒤에 한다
+
+**전원 실행 필요 — `develop` 받는 절차**
+
+```bash
+git checkout <자기브랜치> && git merge origin/develop && npx prisma migrate deploy && npx prisma generate && npm run build
+```
+
+`develop`에 마이그레이션 `20260820120000_skin_tribe_and_drop_gacha`가 들어갔다(스킨 종족 전용 + 치장 종족 무관 + 가챠 삭제). `.env`에 `BEDROCK_VISION_MODEL_ID="us.amazon.nova-2-lite-v1:0"` 한 줄을 추가한다 — `.env.example`에 추가된 유일한 키다. `migrate dev`와 `migrate reset`은 실행하지 않는다. `migrate deploy`만 쓴다.
+
+받은 뒤 데스크톱은 정상인데 모바일이 부서져 보이면 자기 코드 문제가 아니라 차단 11번이다.
 
 **BottomNav 수정**: "진단결과" 탭이 `/diagnosis`(문항 화면)를 가리키던 버그를 `/diagnosis/result`(결과 화면)로 고쳤다(2026-08-19, E)
 
-**`npm run lint` 에러 12건 — B 11건, D 1건, A 0건 (2026-08-20)**: B는 `any` 8건(`lib/missions/*`·미션·업로드 라우트), `set-state-in-effect` 1건(`MissionDashboard.tsx:676`), 나머지 경고. D는 `PostDetailModal.tsx:54`의 같은 `set-state-in-effect`. A의 `app/page.tsx:37`은 `fetchMe().then()` 안으로 옮겨 해소했다. 남의 소유 파일이라 A는 고치지 않았다(`CLAUDE.md` 2절). 빌드는 통과하므로 Amplify 배포는 막히지 않는다
+**`npm run lint` 에러 12건 — B 11건, D 1건, A 0건 (`cb16959`에서 재확인)**: B는 `any` 8건(`lib/missions/*`·미션·업로드 라우트), `set-state-in-effect` 1건(`MissionDashboard.tsx:676`), 나머지 경고. D는 `PostDetailModal.tsx:54`의 같은 `set-state-in-effect`. 사이드바 수정으로 경고 1건이 늘었다 — `Sidebar.tsx:30`의 `getStageEmoji()`가 `stage`를 계산하고 쓰지 않는다(레벨이 올라도 이모지가 안 바뀐다는 뜻이다. B 확인 필요). A의 `app/page.tsx:37`은 `fetchMe().then()` 안으로 옮겨 해소했다. 남의 소유 파일이라 A는 고치지 않았다(`CLAUDE.md` 2절). 빌드는 통과하므로 Amplify 배포는 막히지 않는다
 
 **미확정 — 팀 전체 결정 필요**:
 - "결정 변경" 4번(Cognito Google 로그인만)이 `SPEC.md` 10절·`CLAUDE.md` 8절과 충돌한다. 사용자 확인 대기 중이며, 지금 Cognito는 이메일+비밀번호로 이미 구축돼 있다. 방향이 바뀌면 E가 재작업해야 한다
@@ -98,12 +118,12 @@ GitHub 원격 — https://github.com/uchan04/AWS_project
 
 | 브랜치 | 최신 | `develop` 미반영 | 비고 |
 |---|---|---|---|
-| `origin/develop` | `3adbea5` (8/20) | — | 통합 지점. A·B·C·E 머지 완료 |
-| `origin/main` | `12ff359` (8/19) | 0 | A(진단)·E(인프라)만. `develop` 안정화 후 한 번에 올린다 |
-| `origin/feat/pet` | `82b692a` (8/19) | 0 | `develop`에 머지됨 |
-| `origin/feat/missions` | `7890af4` (8/20) | 0 | `develop`에 머지됨(`3adbea5`) |
-| `origin/feat/diagnosis` | (develop 추종) | 0 | `develop`에 머지됨(fast-forward) |
-| `origin/feat/community` | `aed1320` (8/20) | **5커밋** | **아직 `develop`에 없다.** 남은 마지막 머지. 예측 충돌은 `docs/STATUS.md` 1건뿐 |
+| `origin/develop` | `cb16959` (8/20) | — | 통합 지점. A·B·C·E 머지 완료 |
+| `origin/main` | `12ff359` (8/19) | 0 앞 / 76 뒤 | A(진단)·E(인프라)만. fast-forward로 올라간다. 마감 당일에 처음 합치지 말 것 |
+| `origin/feat/pet` | `82b692a` (8/19) | 0 앞 / 59 뒤 | `develop`에 머지됨. C는 작업 재개 전에 받아야 한다 |
+| `origin/feat/missions` | `cb16959` (8/20) | 0 | `develop`과 동일 |
+| `origin/feat/diagnosis` | `cb16959` (8/20) | 0 | `develop`과 동일 |
+| `origin/feat/community` | `d37d12d` (8/20) | **6커밋** | **아직 `develop`에 없다.** 남은 마지막 머지. 예측 충돌은 `docs/STATUS.md` 1건뿐. D가 받은 `develop`은 옛 것이라 머지 전에 `origin/develop`을 다시 받아야 한다 |
 | ~~`origin/feat/infra`~~ | — | — | 원격에서 삭제됐다. E는 `main`·`develop`에 직접 push해 왔다 |
 
 **D가 머지할 때 주의**: 예측 충돌은 이 문서 하나다. 담당별 줄과 차단 항목만 살려 손으로 합친다. `prisma/` 파일은 D가 안 건드려 충돌하지 않는다. 머지 뒤 `npx prisma migrate deploy && npx prisma generate`를 돌리고 `npm run build`로 확인한다.
@@ -118,7 +138,7 @@ GitHub 원격 — https://github.com/uchan04/AWS_project
 6. **홈 화면 담당은 A**
 7. **화면 디자인 기준은 루트 `design.md`, 토큰은 `styles/tokens.css`.** A가 만들었고 진단·결과·홈 3장에 적용했다. 다른 화면도 같은 결로 맞출 담당자는 이 두 파일을 본다. `app/globals.css`·`app/layout.tsx`(E 소유)는 건드리지 않았고 새 npm 의존성도 없다
 8. **색·폰트 값의 출처는 Figma 프로토타입**(`isol-design_Figma/README.md` "디자인 규칙" 절). 배경 `#F5F0E8` / 카드 `#FDFBF5` / 주색 `#4B7A5B` / 강조 `#A9542A`, 제목 Gowun Dodum · 본문 Noto Sans KR. hex를 그대로 쓰고 OKLCH로 변환하지 않는다. 프로토타입의 6문항 진단·종족명·특성 설명·직접 `seeds` 증감은 가져오지 않는다(명세 위반)
-9. **하단 탭을 없애고 사이드바 하나만 쓴다.** — **적용됨(2026-08-20)**. 다만 E가 아니라 B가 구현했고, 모바일 레일·진단 화면 숨김은 아직 없다. A의 `--nav-h` 되돌리기는 완료. 뒷정리는 차단 10번. E가 "데스크톱=사이드바 / 모바일=하단 탭" 이원화를 제안했으나, 내비게이션 두 벌은 화면마다 어느 쪽이 뜨는지 확인해야 하고 활성 표시·경로가 두 곳에서 갈린다. 마감 3일 전에 감당할 비용이 아니다. 모바일은 같은 사이드바를 아이콘만 남긴 좁은 레일로 줄이고, 진단 문항 화면에서는 내비를 숨긴다. 적용은 E(`app/layout.tsx`), 적용 후 A가 `styles/tokens.css`의 `--nav-h`를 지운다
+9. **하단 탭을 없애고 사이드바 하나만 쓴다.** — **적용됨(2026-08-20)**. 다만 E가 아니라 B가 구현했다. 진단 화면 숨김도 `51b2897`로 붙었고 A의 `--nav-h` 되돌리기도 완료다. **모바일 좁은 레일만 아직 없다 — 차단 11번.** E가 "데스크톱=사이드바 / 모바일=하단 탭" 이원화를 제안했으나, 내비게이션 두 벌은 화면마다 어느 쪽이 뜨는지 확인해야 하고 활성 표시·경로가 두 곳에서 갈린다. 마감 3일 전에 감당할 비용이 아니다. 모바일은 같은 사이드바를 아이콘만 남긴 좁은 레일로 줄이고, 진단 문항 화면에서는 내비를 숨긴다. 적용은 E(`app/layout.tsx`), 적용 후 A가 `styles/tokens.css`의 `--nav-h`를 지운다
 10. **미션 데이터의 원본은 DB다.** `prisma/seed/missions.ts`는 그 DB를 채우는 시드일 뿐이고, 화면에 41개 문구를 다시 복사하지 않는다. B가 `시드 → DB Mission → GET /api/missions → 화면`으로 간다. A의 홈 미션 미리보기는 그 API가 나오면 그쪽으로 바꾼다(지금은 시드 배열을 직접 읽는 임시 상태이며, `import type`뿐이라 클라이언트 번들에 Prisma는 들어가지 않는다 — 빌드 산출물로 확인)
 11. **화면 구성도 Figma에서 가져왔다.** `#EDE5D0` 판 위의 카드(`.hm--canvas` + `.hm-card`), 화면별 폭(진단 680 · 결과·홈 840 · 시작 900px), 넓은 화면 2열 격자, 진행률 바, A·B·C 글자가 붙은 선택지, 결과 마스코트 등장(`bounceIn`), 시작 화면 좌우 분할. 진행률 바의 값은 총 문항 수가 아니라 "유형이 좁혀진 정도"다 — 조기 종료 때문에 총 문항 수를 노출할 수 없다(`SPEC.md` 3절). 통계 카드·출석 캘린더·경험치 바는 가져오지 않았다(데이터 없음. DB 공유 후 채운다)
 

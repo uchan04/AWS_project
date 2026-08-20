@@ -10,7 +10,8 @@
 ## 현재 상태
 - 완료: 미션 41개, 지표 14개 정의, 12문항 + 형용사 문항, `classify()`·`classifySub()`, 무손실 조기 종료, 스냅샷 체크, 화면 3장(진단·결과·홈), 화면 3장 디자인 시스템 적용 + Figma 팔레트·폰트 반영(12장), 진단 API 3종 + 화면 연결, `draft.ts` 제거, 2차 마이그레이션 적용 후 실 DB로 전체 흐름 확인(14장), **스킨·치장·가챠 구조 변경을 스키마·실 DB·시드까지 적용(15장)**
 - 진행 중: 없음
-- 미착수: Bedrock 호출 2종, 관리자 교차표, 홈의 펫·미션 실데이터(B·C API 대기)
+- 미착수: Bedrock 호출 2종, 홈 미션 미리보기를 `GET /api/missions`로 교체
+- 컷: 관리자 교차표(`SPEC.md`에 없다), 펫 S3 이미지(자산 없음). 근거는 16장
 - A 담당분이 아니지만 A가 처리한 것: 15장의 스키마 변경과 그에 딸린 `prisma/seed/items.ts`·`scripts/check-reward.ts`(C 소유) 수정. 이유는 15장에 적었다
 
 ## 구현한 파일
@@ -615,13 +616,19 @@ model DiagnosisSession {
 
 ### 다른 사람에게 넘길 것 — 남은 것
 
-**E — 하단 탭 제거 + 사이드바 단일.** 사용자 결정이다(2장). `app/layout.tsx`에서 `BottomNav`를 빼고 사이드바 하나만 남긴다. 모바일은 아이콘만 남긴 좁은 레일, 진단 문항 화면(`/diagnosis`)에서는 내비를 숨긴다. 적용됐다고 알려주면 A가 `styles/tokens.css`의 `--nav-h`를 지운다.
+**B — 모바일 좁은 레일.** 사이드바 교체는 B가 끝냈지만 모바일 레일이 빠졌다. 375px에서 본문이 135px로 눌려 부서진다. 상세는 16장.
 
-**E — Amplify ↔ GitHub 연동.** 브라우저 수동 단계라 계정 소유자만 할 수 있다.
+**E — Amplify ↔ GitHub 연동.** 브라우저 수동 단계라 계정 소유자만 할 수 있다. `amplify.yml`이 없어 Next 16 + Turbopack 자동 감지에 의존하는 상태다.
 
-**D — 중복 init 마이그레이션.** `feat/community`의 `prisma/migrations/00000000000000_init/`을 지우고 `main`의 `20260819061857_init/`·`20260819080703_add_subtype/`을 받는다. **8/20 5인 머지 전에 처리해야 한다.** 그대로 머지되면 init이 두 개가 되어 `migrate deploy`가 깨진다.
+**E — 인증 방식을 쿠키로 바꿔야 한다.** Bearer 헤더로는 서버 컴포넌트 5개가 인증되지 않는다. 근거는 16장.
 
-**B — `GET /api/missions`.** 나오면 홈 미션 미리보기를 그쪽으로 바꾼다.
+**D — `/community`·`/chat`이 프로덕션에서 500이다.** 서버에서 `getCurrentUser()`를 감싸지 않았다. 근거는 16장.
+
+**~~E — 하단 탭 제거 + 사이드바 단일~~** — 해소(2026-08-20). B가 구현했고 `--nav-h` 제거도 끝났다.
+
+**~~D — 중복 init 마이그레이션~~** — 해소(2026-08-20). D가 `ff6c492`에서 `origin/main`을 머지해 `00000000000000_init/`을 폐기했다.
+
+**~~B — `GET /api/missions`~~** — 나왔다(`3adbea5`). **홈 미션 미리보기를 그쪽으로 바꾸는 것이 A의 남은 작업이다.** 지금 `app/page.tsx:16`이 `import { DAILY } from "@/prisma/seed/missions"`로 시드 배열을 직접 읽고 `:163`에서 `DAILY.slice(0, 4)`를 렌더한다 — 완료 여부와 무관하게 늘 같은 4개가 보인다. 결정 10번 위반 상태다.
 
 **C — 종족 외형 스킨 전환의 남은 코드 5곳 (2026-08-20 팀 합의).** 스키마·실 DB·시드는 A가 적용을 끝냈다. `app/api/pet/cosmetics/route.ts`, `app/api/pet/skins/route.ts`, `app/api/pet/skins/buy/route.ts`, `app/pet/_components/SkinList.tsx`, `scripts/check-pet.ts`가 남았고 전부 `feat/pet`에만 있는 파일이다. 상세와 충돌 목록은 15절에 있다. `main`을 받으면 스키마·시드·마이그레이션에서 충돌하며 **전부 `main` 쪽을 채택하면 된다.** A는 `app/api/diagnosis/complete/route.ts`의 기본 펫 지급 쿼리(`where: { typeCode, isDefault: true }`)를 그대로 두면 되므로 진단 쪽 변경은 없다.
 
@@ -958,3 +965,70 @@ B가 `feat/missions`를 `develop`에 머지해(`3adbea5`) 5인 중 4인이 통�
 **B가 E 소유 공유 파일 4개를 브랜치에서 고쳤다** — `app/layout.tsx`·`app/globals.css`(`65308c4`), `.env.example`(`7890af4`), 그리고 내비인 `Sidebar.tsx` 신규. `CLAUDE.md` 1절이 금지한 것이다. E가 같은 기간에 그 파일들을 안 건드려 충돌은 안 났다. 결정 9번은 사이드바를 E에게 배정했는데 B가 먼저 구현한 상태라, **소유권을 E에게 되돌릴지 사이드바만 B에게 넘길지 팀이 정해야 한다.** 안 정하면 남은 이틀 동안 둘이 같은 파일을 각자 고친다.
 
 `npm run lint` 에러는 12건으로 늘었다 — B 11건(`any` 8, `set-state-in-effect` 1 등), D 1건(`PostDetailModal.tsx:54`). A는 0건이다. 빌드는 통과하므로 Amplify 배포는 막히지 않는다.
+
+---
+
+## 16. `develop` 상태 점검과 배포 가능 여부 실측 (2026-08-20)
+
+`develop`이 `cb16959`로 올라온 뒤 다시 점검한 기록이다. `feat/diagnosis`도 fast-forward로 같은 커밋에 맞춰 push했다.
+
+### B가 사이드바 뒷정리 3건을 끝냈다
+
+15장에서 적은 4건 중 3건이 `51b2897`·`d98fab9`로 해소됐다. 실측으로 확인한 것:
+
+| 항목 | 확인 방법 | 결과 |
+|---|---|---|
+| 하드코딩 프로필 제거 | 브라우저에서 사이드바 텍스트 읽기 | "밤바다 / 🐱 고양잇과 / 씨앗 0개 / Lv.1" — 실 DB 값. 옛 "고요한 고양이 / 42개 / Lv.3" 사라짐 |
+| 종족 색·표시명 3중 정의 | `Sidebar.tsx` import 확인 | `lib/types.ts`의 `TRIBE`를 쓴다. `CHARACTER_*` 상수 4개 삭제됨 |
+| 진단 화면 내비 숨김 | `document.querySelectorAll('aside').length` | `/`는 1, `/diagnosis`는 0 |
+| `<main>` 중첩 | `document.querySelectorAll('main').length` | 두 경로 모두 1 |
+| `--nav-h` 잔재 | `getComputedStyle(.hm).getPropertyValue('--nav-h')` | 없음. `.hm` min-height 709.6px = 스크롤 칸 높이 |
+
+`Sidebar.tsx`에 남은 로컬 정의는 `getBgColor()`의 배경 3색뿐이다. 원본 hex는 `TRIBE`에서 오므로 출처가 갈라진 것은 아니지만, `styles/tokens.css`가 같은 일을 `color-mix()`로 하고 있어 중복이다. 지금 고칠 값은 아니다.
+
+### 인증 없이 프로덕션 빌드를 돌려 봤다
+
+`DEV_AUTH_BYPASS=false`로 `next start`를 띄우고 라우트별 응답을 봤다. 로컬 개발에서는 우회가 켜져 있어 이 증상이 전혀 안 보인다.
+
+| 응답 | 경로 |
+|---|---|
+| 200 | `/` `/diagnosis` `/missions` `/pet` |
+| 500 | `/community` `/chat` |
+| 401 | `/api/pet` `/api/missions` — 전 API |
+
+서버 로그는 `⨯ Error: 로그인이 필요합니다`다. `/pet`이 200인 것은 C가 `app/pet/page.tsx`를 `try/catch`로 감싸 안내 화면을 띄우기 때문이고, `/community`·`/chat`은 감싸지 않아 그대로 터진다.
+
+**`docs/STATUS.md` 차단 4번의 서술이 틀렸다는 것을 여기서 확인했다.** "클라이언트가 `Authorization` 헤더를 싣지 않는다"로 적혀 있었지만, 헤더를 실어도 해결되지 않는다. `lib/auth.ts:44`가 헤더를 읽는데, 브라우저가 페이지를 여는 문서 내비게이션 요청에는 커스텀 헤더를 붙일 방법이 없다. `fetch`에는 붙지만 링크 클릭·주소창 이동에는 붙지 않는다.
+
+서버에서 `getCurrentUser()`를 부르는 페이지가 5개다: `app/chat/page.tsx`, `app/community/page.tsx`, `app/pet/page.tsx`, `app/pet/cosmetics/page.tsx`, `app/pet/skins/page.tsx`. 이 5개는 헤더 방식으로는 원리적으로 인증되지 않는다. 토큰을 `httpOnly` 쿠키에 담고 `cookies()`를 읽는 쪽으로 가야 페이지와 API가 같은 경로로 인증된다. STATUS의 차단 4번을 이 내용으로 고쳤다.
+
+### 모바일이 부서진다
+
+375px 폭에서 측정했다.
+
+| 값 | 크기 |
+|---|---|
+| 뷰포트 | 375px |
+| 사이드바 | 240px (고정) |
+| 본문 칸 | 135px |
+| 본문 내용 | 206px — 칸을 넘어 잘려나간다 |
+
+결정 9번이 "모바일은 아이콘만 남긴 좁은 레일"을 명시했는데 빠졌다. `Sidebar.tsx`가 인라인 스타일이라 미디어 쿼리를 쓸 수 없어 CSS 클래스가 필요하다. B 담당이라 A는 손대지 않는다.
+
+### `develop`은 각자 받아도 안전하다
+
+확인한 것: 충돌 마커 0건, `npm run build` 통과(라우트 31개), 마이그레이션 3개 정상(`migrate status` = up to date), 실 DB 드리프트 없음(`migrate diff --exit-code` = No difference detected), `check:diagnosis`(시나리오 20개, 평균 9.7문항)·`check:pet`·`check:reward` 통과, 브라우저 콘솔 에러 0건, lint 12건 그대로(B 11 · D 1 · A 0).
+
+`.env`에 추가된 키는 `BEDROCK_VISION_MODEL_ID` 하나뿐이다. `.env.example`과 로컬 `.env`의 키 목록을 비교해 확인했다.
+
+### A에게 남은 것
+
+1. **홈 미션 미리보기를 `GET /api/missions`로 교체** — 13장 참고. A 담당 중 유일한 실제 기능 결함이다
+2. **SPEC 3절의 LLM 3가지** — 질문 문장 다듬기, 자유 입력 enum 변환, 결과 화면 근거 3줄 요약. 전부 미착수다. SPEC에 명시된 미구현 항목은 이것뿐이다. 이틀 남은 상황에서 하나만 한다면 결과 화면 요약이 값이 크다 — 단발 호출이고, 유형이 확정된 뒤라 할루시네이션 위험이 0이고, 발표에서 보여줄 화면이다
+3. **`develop` → `main` 머지** — fast-forward로 올라간다(0 앞 / 76 뒤). 배포 판단과 별개로 마감 당일에 76커밋을 처음 합치는 것은 피한다
+
+### 컷으로 판단한 것
+
+**관리자 세부유형 교차표 — 만들지 않는다.** `SPEC.md`에 "세부유형"도 "교차표"도 없다(grep으로 확인). 결정 변경 2번의 팀 결정으로만 존재하고, `CLAUDE.md`는 SPEC에 없는 기능을 만들지 말라고 한다. `User.subTypeCode`와 `DiagnosisSession.indicators`에 데이터는 쌓이고 있으니 발표에서는 "8개 세부유형을 수집 중이며 화면은 범위 외"로 말할 수 있다.
+
+**펫 이미지 교체 — 못 한다.** S3에 이미지 자산이 없다. `prisma/seed/items.ts`가 이름을 고정해 둔 18개 파일(`pets/fox-1` ~ `pets/bear-polar-3`)을 누가 만들지 정해지지 않았다. 이모지로 간다.
