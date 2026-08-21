@@ -1,6 +1,6 @@
 import { fail, ok } from "@/lib/api"
 import { UnauthorizedError, getCurrentUserWithSkin } from "@/lib/auth"
-import { cappedStage, hungerFor, idleAccrual } from "@/lib/pet"
+import { cappedStage, idleAccrual } from "@/lib/pet"
 import { calculateReward } from "@/lib/reward"
 
 // 소유자: C. 펫 화면 초기 상태. (SPEC.md 5절)
@@ -29,8 +29,7 @@ export async function GET() {
       exp: user.exp,
       evolutionStage,
       seeds: user.seeds,
-      // 한 번도 먹이지 않았으면 가입 시각 기준 (lib/pet.ts hungerFor 주석)
-      hunger: hungerFor(user.lastFedAt ?? user.createdAt, now),
+      // 배고픔은 2026-08-21에 삭제했다 (lib/pet.ts "배고픔 — 삭제" 주석)
       affinity: user.affinity,
       starShards: user.starShards,
       idle: {

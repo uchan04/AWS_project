@@ -4,14 +4,12 @@ import { useEffect, useState } from "react"
 import Link from "next/link"
 import type { TypeCode } from "@prisma/client"
 import {
-  HUNGER_LOW,
   IDLE_CAP_HOURS,
   IDLE_MAX_SEEDS,
   IDLE_SEEDS_PER_HOUR,
   MS_PER_IDLE_SEED,
   animalEmoji,
   expProgress,
-  hungerLabel,
 } from "@/lib/pet"
 import { EVOLUTION_LEVEL, SEED_TO_EXP, expToNextLevel } from "@/lib/types"
 import PetRoom from "./PetRoom"
@@ -31,7 +29,9 @@ import "../pet.css"
 //   역할별로 색이 달라 위계는 구분된다. 규칙을 바꾼 것이 아니라 이 화면만 예외다
 // - export에 있던 "단계별 씨앗 효율 +10/25/50%"는 지웠다. 구현·명세에 없는 수치다.
 //   그 자리에는 실제로 존재하는 스킨 고유 효과(PetSkin.effectPct)를 넣는다
-// - 배고픔 게이지는 새로 붙인 기능이다. lib/pet.ts hungerFor()가 계산한다
+// - 2026-08-21 사용자 결정: 배고픔 게이지를 걷고 그 자리에 재화 3종(씨앗·별조각·친밀도)과
+//   상점 입구 2개를 넣었다. 상단 바에 있던 씨앗 HUD와 나무판 2개가 여기로 내려온 것이다.
+//   상단은 제목만 남는다 — 재화와 상점 입구가 두 곳에 겹쳐 있을 이유가 없다
 // - 방 배경: 착용한 배경 치장이 있으면 그 그림, 없으면 PetRoom의 기본 방 SVG다
 //   (2026-08-21 사용자 확정). 펫은 배경과 무관하게 방 중앙 하단에 고정한다
 
@@ -40,8 +40,10 @@ export type PetState = {
   exp: number
   evolutionStage: number
   seeds: number
-  /** 배고픔 0~100. 100이 배부름. 표시 전용이며 재화·성장에 영향이 없다 */
-  hunger: number
+  /** 별조각. 외형 상점의 값이다 */
+  starShards: number
+  /** 친밀도. 배경 상점의 값이다 */
+  affinity: number
   /** 방치형으로 모여 있는(아직 안 받은) 씨앗. 배율까지 적용된 값이다 */
   idleSeeds: number
   /** 상한(12시간분)에 닿아 누적이 멈춘 상태인지 */
@@ -118,6 +120,14 @@ export default function PetView({ initial }: { initial: PetState }) {
   const stages = Array.from({ length: Math.min(pet.stageCount, MAX_STAGE) }, (_, i) => i + 1)
   const feedable = Math.min(amount, pet.seeds)
 
+  // 재화 3종. 씨앗만 초록이고 나머지 둘은 나무색으로 묶는다 — 재화마다 색을 새로 만들면
+  // styles/tokens.css의 "채도 높은 색은 종족색 하나뿐" 예외가 계속 늘어난다
+  const wallet = [
+    { name: "씨앗", icon: "🌱", value: pet.seeds, seed: true },
+    { name: "별조각", icon: "⭐", value: pet.starShards, seed: false },
+    { name: "친밀도", icon: "💛", value: pet.affinity, seed: false },
+  ]
+
   // 토스트 2.5초 후 사라짐
   useEffect(() => {
     if (!toast) return
@@ -165,7 +175,6 @@ export default function PetView({ initial }: { initial: PetState }) {
         exp: next.exp,
         evolutionStage: next.evolutionStage,
         seeds: next.seeds,
-        hunger: next.hunger ?? prev.hunger,
         imageUrl: next.imageUrl ?? prev.imageUrl,
       }))
       setAmount(1)
@@ -236,25 +245,11 @@ export default function PetView({ initial }: { initial: PetState }) {
 
   return (
     <main className="pet" data-tribe={pet.typeCode ?? undefined}>
+      {/* 재화와 상점 입구는 아래 지갑 카드가 갖는다. 상단은 제목만 남긴다 */}
       <header className="pet__top">
         <div>
           <h1 className="pet__title">나의 펫</h1>
           <p className="pet__lede">씨앗을 먹이고 함께 성장하세요</p>
-        </div>
-
-        <div className="pet__top-acts">
-          {/* 보유 씨앗 HUD. 같은 숫자를 아래 "씨앗 투입" 카드가 글자로 다시 쓰므로
-              스크린리더에 두 번 읽히지 않게 여기서는 숨긴다 */}
-          <p className="pet-hud" aria-hidden="true">
-            <span className="pet-hud__icon">🌱</span>
-            <span className="pet-hud__value">{ko(pet.seeds)}</span>
-          </p>
-          <Link className="pet-plank" href="/pet/skins">
-            외형 상점
-          </Link>
-          <Link className="pet-plank" href="/pet/cosmetics">
-            배경 상점
-          </Link>
         </div>
       </header>
 
@@ -304,24 +299,38 @@ export default function PetView({ initial }: { initial: PetState }) {
             </div>
           </div>
 
-          {/* 배고픔. 0이 되어도 잃는 것은 없다 (lib/pet.ts hungerFor 주석) */}
+          {/* 배고픔 게이지가 있던 자리다. 재화 3종과 상점 입구 2개가 대신 들어간다.
+              숫자를 아이콘 옆에 글자로 두므로 aria를 따로 붙이지 않는다 — "씨앗 3,000"이
+              그대로 읽힌다. 아이콘만 aria-hidden이다 */}
           <div className="pet-card">
             <div className="pet-card__head">
-              <p className="pet-card__title">🍽️ 배고픔</p>
-              <span className="pet-card__meta">{pet.hunger}%</span>
+              <p className="pet-card__title">🪙 보유 재화</p>
             </div>
-            <div
-              className="pet-gauge pet-gauge--hunger"
-              data-low={pet.hunger < HUNGER_LOW}
-              role="progressbar"
-              aria-label="배고픔"
-              aria-valuemin={0}
-              aria-valuemax={100}
-              aria-valuenow={pet.hunger}
-            >
-              <div className="pet-gauge__fill" style={{ width: `${pet.hunger}%` }} />
+
+            <ul className="pet-wallet">
+              {wallet.map((row) => (
+                <li className="pet-wallet__row" key={row.name}>
+                  <span
+                    className={`pet-wallet__icon${row.seed ? " pet-wallet__icon--seed" : ""}`}
+                    aria-hidden="true"
+                  >
+                    {row.icon}
+                  </span>
+                  <span className="pet-wallet__name">{row.name}</span>
+                  <span className="pet-wallet__value">{ko(row.value)}</span>
+                </li>
+              ))}
+            </ul>
+
+            {/* 상단 바에서 내려온 상점 입구 2개 (2026-08-21 사용자 결정) */}
+            <div className="pet-wallet__shops">
+              <Link className="pet-plank" href="/pet/skins">
+                외형 상점
+              </Link>
+              <Link className="pet-plank" href="/pet/cosmetics">
+                배경 상점
+              </Link>
             </div>
-            <p className="pet-card__foot">{hungerLabel(pet.hunger)}</p>
           </div>
         </div>
 

@@ -495,17 +495,73 @@
   color: var(--color-ink);
 }
 
-/* 배고픔은 종족색을 쓰지 않는다 — 먹이(씨앗) 상태라서 씨앗 초록을 쓴다 */
-.pet-gauge--hunger {
-  height: 0.75rem;
-  border-width: 0;
+/* 2026-08-21: .pet-gauge--hunger 3벌을 걷어냈다. 배고픔 게이지를 삭제하고 그 자리에
+ * 재화 3종 + 상점 입구를 넣었다(사용자 결정). 새 규칙은 아래 "지갑" 절에 있다.
+ * 남은 .pet-gauge 본체는 경험치와 배경 수집 게이지가 계속 쓴다 */
+
+/* ── 지갑 (재화 3종 + 상점 입구) ──────────────────────────────────────────── */
+
+/* 종족색 면을 쓰지 않는다. 이 화면은 이미 씨앗 받기(초록)·먹이기(종족색)·나무판이
+   색을 나눠 갖고 있어서(파일 앞 PetView 주석의 "이 화면만 예외"), 재화 줄까지 색 면을
+   가지면 무엇이 주 동작인지 사라진다. 줄 배경은 종이색 한 단계다 */
+.pet-wallet {
+  display: grid;
+  gap: var(--space-3xs);
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+.pet-wallet__row {
+  display: grid;
+  grid-template-columns: auto 1fr auto;
+  align-items: center;
+  gap: var(--space-2xs);
+  min-height: var(--control-h);
+  padding: var(--space-3xs) var(--space-2xs);
+  border-radius: var(--radius-input);
   background: var(--color-paper-2);
 }
-.pet-gauge--hunger .pet-gauge__fill {
-  background: linear-gradient(90deg, var(--pet-seed-fill-2), var(--pet-seed-fill));
+
+.pet-wallet__icon {
+  display: grid;
+  place-items: center;
+  width: 2rem;
+  height: 2rem;
+  border: 2px solid var(--pet-wood);
+  border-radius: var(--radius-input);
+  background: linear-gradient(135deg, #f0d8a8, var(--pet-wood-light));
+  font-size: var(--text-body);
+  line-height: 1;
 }
-.pet-gauge--hunger[data-low="true"] .pet-gauge__fill {
-  background: linear-gradient(90deg, #e8b06a, #d98f45);
+
+/* 씨앗만 씨앗 초록이다. 별조각·친밀도는 상점 어휘(나무)로 묶는다 */
+.pet-wallet__icon--seed {
+  border-color: var(--pet-seed);
+  background: linear-gradient(135deg, var(--pet-seed-fill-2), var(--pet-seed-fill));
+}
+
+.pet-wallet__name {
+  font-family: var(--font-display);
+  font-size: var(--text-body);
+  color: var(--color-ink);
+}
+
+.pet-wallet__value {
+  color: var(--pet-wood-deep);
+  font-size: var(--text-md);
+  font-weight: 700;
+  font-variant-numeric: tabular-nums;
+  letter-spacing: -0.02em;
+}
+
+/* 상점 입구 2개. auto-fit이라 좁아지면 두 줄로 갈린다 — .pet-plank가 nowrap이어서
+   억지로 한 줄에 두면 320px에서 글자가 판을 넘어간다 */
+.pet-wallet__shops {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(min(8rem, 100%), 1fr));
+  gap: var(--space-2xs);
+  margin-top: var(--space-3xs);
 }
 
 /* ── 방치형 씨앗 수확 ────────────────────────────────────────────────────── */
@@ -1049,7 +1105,7 @@
     padding: var(--space-sm);
   }
 
-  /* 2단을 1단으로. 방 → 배고픔 → 경험치 → 수확 → 투입 → 진화 순으로 흐른다 */
+  /* 2단을 1단으로. 방 → 재화·상점 → 경험치 → 수확 → 투입 → 진화 순으로 흐른다 */
   .pet__grid {
     grid-template-columns: 1fr;
   }

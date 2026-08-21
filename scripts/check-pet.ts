@@ -1,9 +1,6 @@
 import assert from "node:assert/strict"
 import { COSMETICS, PET_SKINS, PRICE_BY_RARITY } from "../prisma/seed/items"
 import {
-  HUNGER_EMPTY_HOURS,
-  HUNGER_LOW,
-  HUNGER_MAX,
   IDLE_CAP_HOURS,
   IDLE_MAX_SEEDS,
   IDLE_SEEDS_PER_HOUR,
@@ -13,8 +10,6 @@ import {
   cappedStage,
   compareCosmetics,
   expProgress,
-  hungerFor,
-  hungerLabel,
   idleAccrual,
 } from "../lib/pet"
 import { EVOLUTION_LEVEL, SEED_TO_EXP, TRIBE, expToNextLevel } from "../lib/types"
@@ -325,40 +320,8 @@ assert.deepEqual(
   ["밤별 모자", "이끼 모자"],
 )
 
-// ── 배고픔 (SPEC.md 5절) ──────────────────────────────────────────────────────
-// 시각을 고정해서 검증한다. hungerFor는 now를 인자로 받는 순수 함수다.
-
-const fedAt = new Date("2026-08-21T00:00:00Z")
-const hoursAfterFed = (h: number) => new Date(fedAt.getTime() + h * 60 * 60 * 1000)
-
-// 값 자체를 못 박는다. 이게 바뀌면 아래 기대값이 전부 무효다
-assert.equal(HUNGER_EMPTY_HOURS, 24)
-assert.equal(HUNGER_MAX, 100)
-
-// 먹인 직후는 만복
-assert.equal(hungerFor(fedAt, fedAt), 100)
-
-// 24시간에 걸쳐 선형으로 0까지 내려간다
-assert.equal(hungerFor(fedAt, hoursAfterFed(6)), 75)
-assert.equal(hungerFor(fedAt, hoursAfterFed(12)), 50)
-assert.equal(hungerFor(fedAt, hoursAfterFed(18)), 25)
-assert.equal(hungerFor(fedAt, hoursAfterFed(24)), 0)
-
-// 상한을 지나도 음수가 되지 않는다
-assert.equal(hungerFor(fedAt, hoursAfterFed(100)), 0)
-
-// 기준 시각이 미래면(시계 오차·수동 수정) 감쇠하지 않는다
-assert.equal(hungerFor(fedAt, hoursAfterFed(-3)), 100)
-
-// 기준 시각이 아예 없으면 만복으로 본다. 실제 화면은 createdAt을 넘기므로
-// 이 경로는 createdAt까지 null인 이론적 상태다 (app/pet/page.tsx)
-assert.equal(hungerFor(null, fedAt), 100)
-
-// 경고 구간 경계. 라벨이 세 단계로만 갈린다
-assert.equal(HUNGER_LOW, 30)
-assert.equal(hungerLabel(100), hungerLabel(60))
-assert.notEqual(hungerLabel(60), hungerLabel(59))
-assert.notEqual(hungerLabel(HUNGER_LOW), hungerLabel(HUNGER_LOW - 1))
-assert.equal(hungerLabel(0), hungerLabel(HUNGER_LOW - 1))
+// ── 배고픔 ────────────────────────────────────────────────────────────────────
+// 2026-08-21 사용자 결정으로 삭제했다. 여기 있던 단정 12개(24시간 선형 감쇠, 음수 방지,
+// 미래 시각, 라벨 3구간)도 함께 걷었다. lib/pet.ts "배고픔 — 삭제" 주석 참고.
 
 console.log("pet 체크 통과")

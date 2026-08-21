@@ -1,5 +1,5 @@
 import { getCurrentUserWithSkin } from "@/lib/auth"
-import { cappedStage, hungerFor, idleAccrual } from "@/lib/pet"
+import { cappedStage, idleAccrual } from "@/lib/pet"
 import { prisma } from "@/lib/prisma"
 import { calculateReward } from "@/lib/reward"
 import { TRIBE } from "@/lib/types"
@@ -38,9 +38,6 @@ export default async function PetPage() {
     const idle = idleAccrual(user.lastIdleClaimAt, now)
     const idleSeeds = calculateReward(skin, { seeds: idle.seeds }).seeds ?? 0
 
-    // 한 번도 먹이지 않았으면 가입 시각을 기준으로 감쇠한다 (lib/pet.ts hungerFor 주석)
-    const hunger = hungerFor(user.lastFedAt ?? user.createdAt, now)
-
     // 착용 중인 치장 (SPEC.md 5절)
     const worn = await prisma.userCosmetic.findMany({
       where: { userId: user.id, equipped: true },
@@ -69,7 +66,10 @@ export default async function PetPage() {
       exp: user.exp,
       evolutionStage,
       seeds: user.seeds,
-      hunger,
+      // 배고픔 게이지가 있던 자리를 재화 3종이 대신 쓴다 (2026-08-21 사용자 결정).
+      // 씨앗은 이미 위에 있고 두 개만 더 필요하다
+      starShards: user.starShards,
+      affinity: user.affinity,
       idleSeeds,
       idleCapped: idle.capped,
       msToNextSeed: idle.msToNextSeed,
