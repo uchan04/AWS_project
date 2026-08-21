@@ -35,16 +35,6 @@ export async function completeDiagnosis(answers: Answer[]): Promise<DiagnosisVie
   return read<DiagnosisView>(response)
 }
 
-/**
- * 로그인 여부만 본다. 진단 완료 여부와는 무관하다.
- * fetchMe()는 401과 "로그인했지만 진단 전"을 둘 다 null로 돌려줘서 게이트에 쓸 수 없다.
- * 네트워크 실패는 그대로 던진다 — false로 뭉개면 호출부가 미인증과 구분할 수 없다.
- */
-export async function checkAuth(): Promise<boolean> {
-  const response = await fetch("/api/diagnosis/me")
-  return response.status !== 401
-}
-
 /** 진단 전이면 null. 로그인 전에도 null로 취급해 시작 화면을 보여준다. */
 export async function fetchMe(): Promise<DiagnosisView | null> {
   const response = await fetch("/api/diagnosis/me")
