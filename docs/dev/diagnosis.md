@@ -1227,3 +1227,74 @@ git pull && npx prisma migrate deploy && npx prisma generate
 | `/login` `/signup` `/diagnosis` `/diagnosis/result` | 0개 | 0개 |
 
 `/diagnosis/result`의 **사이드바는 아직 뜬다**(`aside` 1개). `Sidebar.tsx:106`의 경로 조건은 B 몫으로 남겼다(차단 21).
+
+---
+
+## 20. 간헐 500의 원인 — RDS 커넥션 고갈 (2026-08-21, A)
+
+"로그인을 비롯한 기능이 랜덤하게 동작하거나 하지 않는다"를 실측으로 좁혔다. **원인은 하나가 아니라 시간대가 다른 네 개였고, 시각을 붙이지 않으면 서로 섞여 원인을 못 찾는다.**
+
+### 재현 시도 — 내 쪽에서는 전부 통과한다
+
+프로덕션(`https://main.d2ynoyp44lt46h.amplifyapp.com`, job 10 = `e3ca7d7`)에 실계정으로:
+
+| 테스트 | 결과 |
+|---|---|
+| `POST /api/auth/login` 순차 20회 | 20/20 200, 0.32~0.35s |
+| `POST /api/auth/login` 동시 25회 | 25/25 200 (최대 3.3s = 콜드 스타트) |
+| GET API 7종(`missions` `pet` `pet/cosmetics` `pet/skins` `diagnosis/me` `community/posts` `chat/messages`) × 10회 | 70/70 200 |
+| `GET /` 12회 헤더·본문 비교 | `cache-control: private, no-cache, no-store` + 전부 `X-Cache: Miss` + 본문 해시 동일 |
+
+**CloudFront가 개인화 SSR을 캐시한다는 가설은 여기서 죽었다.** 클라이언트 1대에서 나오는 부하로는 재현되지 않는다 — 재현 조건이 동시 접속자 수이기 때문이다.
+
+### 확정된 원인 — CloudWatch 로그 스트림 53개 전수 조사
+
+`logs:FilterLogEvents` 권한이 없어 `describe-log-streams` → 스트림별 `get-log-events` → 로컬 grep으로 훑었다(`welli-diagnose` 프로필).
+
+```
+Too many database connections opened:
+FATAL: remaining connection slots are reserved for roles with the SUPERUSER attribute
+```
+
+| 에러 | 건수 | 최초 | 최종 | 판정 |
+|---|---|---|---|---|
+| `Too many database connections` | **120** | 16:40:50 | 16:50:22 | **살아 있다** |
+| `Environment variable not found: DATABASE_URL` | 55 | 15:28:36 | 16:09:31 | 죽었다 — job 7(16:09:13)이 `.env.production`을 구웠다 |
+| `CredentialsProviderError` (Bedrock·S3) | 12 | 16:19:00 | 16:25:50 | 죽었다 — IAM 컴퓨트 역할 부착(job 9, 16:31) |
+| `temperature is deprecated` | 4 | 16:33:17 | 16:44:01 | 살아 있다 — `bd04830` 미배포 |
+| 비로그인 페이지 `로그인이 필요합니다` throw | 9 | 16:19:30 | 16:35:32 | 살아 있다 — C·D 담당 |
+
+`Too many`의 시작 16:40:**50**은 job 10 배포 완료 16:40:**52**와 사실상 같은 순간이다.
+
+### 왜 랜덤인가
+
+- DB는 `db.t4g.micro`(1 GiB) + `default.postgres16` → `max_connections ≈ 112`. `superuser_reserved_connections` 3을 빼면 앱 몫 **약 107개**
+- 오늘 Lambda 인스턴스 **53개**가 떴다(로그 스트림 1개 = 인스턴스 1개). 동시요청 25개 실측에서 4초 안에 6개가 동시 생존
+- Prisma 기본 `connection_limit`은 `물리 CPU × 2 + 1`이라 인스턴스당 5개 안팎. 인스턴스 20개면 100개 → 천장
+- **배포 직후가 최악이다.** 낡은 컨테이너의 커넥션이 회수되기 전에 새 컨테이너가 전부 콜드 스타트로 새 풀을 잡는다. 그래서 에러가 배포 시각에 몰리고 10분 뒤 저절로 멎는다(컨테이너 만료로 회수)
+
+동시 접속자·콜드 스타트 수에 따라 갈리므로 **같은 요청이 될 때도 있고 안 될 때도 있다.**
+
+### `lib/prisma.ts`는 고치지 않는다
+
+"프로덕션에서 `globalThis`에 캐시하지 않아 콜드 스타트마다 새 클라이언트가 생긴다"는 진단이 팀에서 나왔는데, **결론은 맞고 근거는 틀렸다.**
+
+- `export const prisma = new PrismaClient()`는 모듈 스코프라 컨테이너가 사는 동안 이미 재사용된다. warm 호출에서 새로 만들어지지 않는다
+- 콜드 스타트는 새 컨테이너라 `globalThis`도 같이 비어 있다 — 캐시해도 못 막는다
+- 그 조건은 파일 주석대로 **로컬 hot reload 전용**이다
+
+진짜 원인은 "동시 컨테이너 수 × 컨테이너당 `connection_limit` > 107"이다. `lib/prisma.ts`(E 소유)를 고쳐도 숫자가 안 바뀐다.
+
+### 고치는 방법
+
+`DATABASE_URL` 끝에 `?connection_limit=1`(이미 `?`가 있으면 `&connection_limit=1`)을 붙인다. 코드 변경 없음, Amplify 콘솔 환경변수만.
+
+**교착 위험을 먼저 확인했다.** 인터랙티브 `$transaction(async (tx) => ...)` 8곳(`diagnosis/complete` `pet/cosmetics` `pet/cosmetics/buy` `pet/feed` `pet/idle` `pet/skins/buy` `missions/attendance` `missions/completion`) 전부 콜백 안에서 `tx`만 쓰고 전역 `prisma`를 부르지 않는다. 배열형 `$transaction([...])`은 커넥션 1개다. Lambda는 컨테이너당 요청 1개이므로 1로 줄여도 교착하지 않는다. `Promise.all` 안의 병렬 쿼리 12곳은 직렬화되지만 쿼리당 20ms대라 무해하고, `pool_timeout` 기본 10s에 한참 못 미친다.
+
+인스턴스 53개 × 1 = 53개로 천장 107의 절반이다.
+
+**콘솔 값만 바꾸면 반영되지 않는다.** `amplify.yml`이 빌드 시점에 `env | grep`으로 `.env.production`을 굽기 때문에 **재배포가 필수다.** 이걸 빠뜨리면 "고쳤는데 그대로"가 된다.
+
+### 부하 재현은 하지 않았다
+
+동시 60~80 요청으로 재현할 수 있지만 마감 전날 팀 4인이 같은 공유 DB를 쓰고 있어 1분간 전원 500이 된다. Postgres FATAL 원문 120건으로 증거가 충분해 생략했다.
