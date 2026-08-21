@@ -14,6 +14,11 @@ frontend:
         # grep이 하나도 못 맞히면 종료 코드 1로 빌드가 실패한다. 조용히 깨진 채 배포되는 것보다 낫다.
         - env | grep -e DATABASE_URL -e SESSION_SECRET -e COGNITO_USER_POOL_ID -e COGNITO_CLIENT_ID -e COGNITO_DOMAIN -e BEDROCK_REGION -e BEDROCK_MODEL_ID -e BEDROCK_VISION_MODEL_ID -e S3_BUCKET -e CLOUDFRONT_DOMAIN -e DEV_AUTH_BYPASS >> .env.production
         - npm run build
+        # next.config.ts가 output: "standalone"이면 서버가 .next/standalone에서 실행되고
+        # cwd가 거기로 바뀐다. Next는 트레이싱한 파일만 복사하므로 루트의 .env.production은
+        # 따라가지 않는다. 두 위치에 모두 둬서 출력 모드와 무관하게 읽히게 한다.
+        # standalone이 아니면 디렉터리가 없어 cp가 실패하는데, 그때는 루트 파일로 충분하다.
+        - cp .env.production .next/standalone/.env.production || true
   artifacts:
     baseDirectory: .next
     files:
