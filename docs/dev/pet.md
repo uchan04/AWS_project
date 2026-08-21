@@ -16,6 +16,81 @@
 - **가챠는 삭제로 결정했다 (2026-08-19).** 실 DB의 `GachaPull`·`heroPity`·`legendPity`까지 2026-08-20 마이그레이션으로 DROP 완료(아래 절)
 - **재화 배정 확정 (2026-08-20).** 스킨=별조각 전용 / 치장=친밀도 전용. 아래 "재화 배정 확정" 절 참고
 - **가격·수급량 확정 (2026-08-20 팀 결정).** 스킨 별조각 **2500** / 배경 각 친밀도 **600**(합 3600) / 일일 미션 전체 완료 = 별조각 **60** / 글 작성 친밀도 20 · 일 상한 100. 아래 "재화 배정 확정" 절 참고
+- 완료: **Figma 디자인 이관 (2026-08-21)** — `/pet` 화면을 Figma 시안(방 배경·캐릭터·경험치 카드·씨앗 투입 카드·진화 카드 3장)으로 다시 짰다. 아래 "Figma 디자인 이관" 절
+- 완료: **배고픔 게이지 (2026-08-21)** — `User.lastFedAt` 한 컬럼 + 순수 함수. `SPEC.md` 5절에 추가했다. 아래 "배고픔 게이지" 절
+- **차단: `lastFedAt` 마이그레이션이 실 DB에 아직 안 들어갔다.** 그래서 지금 `/pet`은 에러 카드가 뜬다. 아래 "막힌 것" 참고
+
+## Figma 디자인 이관 (2026-08-21)
+
+사용자가 Figma에서 만든 펫 홈 시안을 `/pet`에 씌웠다. 받은 것은 Figma **Make**의 소스 export(`Downloads/Create pet home design/`)다.
+
+**export 폴더를 레포에 넣지 않았다.** 그건 Vite + React 19 + Tailwind v4 앱이고 `src/App.tsx` 한 파일에 909줄이 들어 있다. 레포 안에 두면 Next 빌드와 `tsconfig`가 그 파일들을 주워 가고, `main`에 올라가면 5인 전원의 빌드가 그 폴더를 컴파일한다. **컴포넌트 모양만 베껴 왔고 폴더는 레포 밖에 그대로 뒀다.**
+
+**export의 로직은 버렸다.** 시안은 씨앗을 `setUserSeeds(prev - amount)`로 화면 상태에서 깎고 경험치를 `amount * 8`로 계산한다. 재화 증감은 `calculateReward()`만 통과한다(`CLAUDE.md` 2절)는 규칙 정면 위반이고 비율도 `SEED_TO_EXP = 10`과 다르다. **API 호출부(`/api/pet/feed`·`/api/pet/idle`)는 이관 전 코드를 그대로 유지했다** — 이번 작업은 화면 이관이고 서버 계약은 손대지 않았다.
+
+### 색은 시안 색이 아니라 종족색을 따른다
+
+시안은 전부 주황(`#E07A45`)이다. 그건 **여우 유형 데모 화면**이고, 고양이·곰 유저가 열면 진단 결과와 어긋난 색이 뜬다. 그래서 요소 모양만 같게 두고 색은 `styles/tokens.css`의 `[data-tribe]`에서 나오는 `--tribe`를 쓴다(`PetView.tsx` 루트에 이미 `data-tribe={typeCode}`가 있었다). `style={{ backgroundColor }}`를 쓰지 않는다는 기존 규칙 그대로다.
+
+`--tribe` 원색(`#E8956A`)에 흰 글자를 얹으면 명암비가 **2.35:1**로 AA(4.5:1)에 한참 못 미친다. 시안의 주황이 더 진한 색이었기 때문에 그대로 옮기면 안 된다. 그래서 흰 글자가 올라가는 면은 전부 `--tribe-cta`(종족색 58% + ink)를 쓴다.
+
+```css
+.pet {
+  --tribe-cta:   color-mix(in oklch, var(--tribe) 58%, var(--color-ink));  /* 흰 글자용 */
+  --tribe-line:  color-mix(in oklch, var(--tribe) 40%, var(--color-card)); /* 테두리 */
+  --tribe-soft:  color-mix(in oklch, var(--tribe) 22%, var(--color-card));
+  --tribe-wash:  color-mix(in oklch, var(--tribe) 12%, var(--color-paper));
+}
+```
+
+**종족색을 따르지 않는 것도 있다.** 방 배경의 바닥(나무), 창밖 하늘, 화분 잎은 고정색이다. 여기까지 `--tribe`를 넣으면 고양잇과 유저에게 파란 나무와 파란 화분이 나온다. 벽·커튼·러그만 종족색을 따른다.
+
+**씨앗 초록과 상점 나무색은 새 색 계열이라 `pet.css` 안에 뒀다.** `styles/tokens.css`는 A 소유이고 파일 끝에 덧붙이면 A도 같은 자리에 덧붙여 머지 충돌이 난다(`3bc8541` 때와 같은 판단). 씨앗 버튼은 시안의 `#7BB86A`에 흰 글자면 2.2:1이라 `--pet-seed: #4a7a3c`(5.07:1)로 낮췄고, 게이지 채움에만 밝은 원색을 쓴다.
+
+### Tailwind 유틸리티 → 의미 클래스
+
+시안은 유틸리티 클래스로 짜여 있는데 이 프로젝트 화면은 전부 의미 클래스(`.hm-*`)다. Tailwind v4가 이미 깔려 있어(`@tailwindcss/postcss` + `app/globals.css`의 `@import "tailwindcss"`) 유틸리티를 그대로 붙여도 빌드는 되지만, 한 화면만 다른 방식으로 짜 두면 다음 사람이 어느 규칙을 따를지 모른다. `.pet-*` 클래스로 다시 썼다. **새 의존성은 추가하지 않았다.**
+
+시안 `index.css`의 `@theme inline` 토큰들은 실제로는 인라인 `style`의 `var()`로만 읽히고 있었다(쓰인 Tailwind 클래스는 전부 기본 클래스였다). 그래서 `@theme`가 필요 없고 `.pet` 스코프의 일반 커스텀 프로퍼티로 옮겼다 — **E 소유인 `app/globals.css`를 건드리지 않았다.**
+
+기존 `.hm-pet`·`.hm-pet__cos`·`.hm-pet__evolve`는 지우지 않았다. `app/pet/skins`와 `app/pet/cosmetics`가 아직 쓴다.
+
+### 방 배경은 새 컴포넌트로 뺐다
+
+`app/pet/_components/PetRoom.tsx`. 벽·줄무늬·바닥 판자·창·커튼·화분·러그를 SVG로 그린다. `aria-hidden`이고 색은 인라인이 아니라 클래스(`.pet-room__wall` 등)로 줘서 `pet.css`가 `var(--tribe)`로 칠한다.
+
+**시안의 커튼은 실제로 안 그려지는 코드였다.** `App.tsx:46-47`이 `<path d="M 72% 5% Q ...">`인데 SVG path의 `d`는 퍼센트를 받지 않는다. 브라우저가 조용히 무시해서 커튼 두 장이 없는 화면이 나온다. `viewBox="0 0 400 300"` 좌표계로 다시 썼다.
+
+### 시안에 있고 명세에 없던 요소 2개 (사용자 결정)
+
+| 요소 | 결정 | 처리 |
+|---|---|---|
+| 배고픔 게이지 | **유지 + 기능 구현** | 아래 절 |
+| 진화 단계별 "씨앗 효율 +10/25/50%" | **제거** | 코드에도 `SPEC.md`에도 없는 수치다. 단계가 재화 배율을 바꾼 적이 없고, 넣으면 `calculateReward()` 밖에서 배율이 생긴다. 그 자리에는 실재하는 값 — 활성 스킨의 `effectPct`에서 만든 효과 문구 — 를 현재 단계 카드에만 띄운다 |
+
+씨앗 투입 프리셋은 시안의 1/5/10/20을 **1/10/50/100**으로 바꿨다. 1→2 레벨업이 씨앗 10개이고 일일 미션이 하루 60개를 주므로 20이 최대치면 레벨업 한 번에 버튼을 여러 번 눌러야 한다.
+
+진화 카드 3장은 각 단계 이미지를 CloudFront에서 직접 가리킨다(`page.tsx`가 `imageKeyBase-1/2/3.png`를 만들어 `stageImageUrls`로 넘긴다). 잠긴 단계도 이미지가 뜨지만 카드가 흐리고 자물쇠가 붙는다 — S3에 9장이 이미 다 있다(2026-08-20 실측).
+
+**이 화면은 primary CTA가 하나가 아니다.** `design.md`의 "화면에 primary는 하나" 규칙에서 의도적으로 벗어난 자리다. 받기·먹이기·상점 2개가 동시에 필요한 게임 HUD라서 역할별 색으로 구분했다(accent = 먹이기, 씨앗 초록 = 방치형 수령, 나무색 = 상점). 코드에 주석으로 남겼다.
+
+## 배고픔 게이지 (2026-08-21)
+
+`SPEC.md` 5절에 절을 추가했다. **표시 전용이고 재화·경험치·진화에 영향을 주지 않는다.**
+
+**값을 저장하지 않는다.** `User.lastFedAt`(마지막 급여 시각) 하나만 두고 배고픔은 `lib/pet.ts`의 `hungerFor(since, now)`가 계산한다. 값을 저장하면 화면을 열 때마다 감쇠분을 써야 해서 조회가 쓰기가 된다 — 방치형 씨앗을 페이지 로드에서 지급하지 않는 것과 같은 이유다.
+
+- 24시간에 걸쳐 100 → 0 선형 감쇠. 하루 한 번 들여다보면 유지된다
+- **투입 개수는 배고픔에 영향이 없다.** 1개를 먹여도 100이다. "얼마나 먹였나"는 경험치가 이미 표현한다
+- **0이 되어도 페널티가 없다.** 벌점형 압박은 랭킹을 배제한 것과 같은 이유로 이 서비스 대상에 맞지 않는다. 페널티를 넣으려면 `SPEC.md` 5절을 먼저 고친다
+- `lastFedAt`이 `null`인 유저는 화면이 `createdAt`을 넘긴다. 신규 유저에게 0을 보여 주면 시작부터 굶긴 것처럼 보인다
+- 시계 오차로 기준이 미래면 감쇠하지 않는다(`idleAccrual`과 같은 방어)
+
+**마이그레이션은 손으로 썼다.** `prisma/migrations/20260821090000_pet_last_fed_at/migration.sql`에 `ALTER TABLE "User" ADD COLUMN "lastFedAt" TIMESTAMP(3);` 한 줄이다. `npx prisma migrate dev`는 스키마 담당 1인만 실행한다(`CLAUDE.md` 5절). nullable 컬럼 추가라 기존 행을 건드리지 않는다.
+
+`prisma/schema.prisma`는 전원 합의 파일이라 원래 손대지 않지만, 이 컬럼은 **사용자 지시로 추가했다.** `SPEC.md` 11절 표에도 같이 넣었다(`CLAUDE.md` 1절이 요구한다).
+
+`npm run check:pet`이 감쇠 곡선(0/6/12/18/24시간 = 100/75/50/25/0), 클램프, 미래 시각, `null`, 라벨 경계(60·30)를 못 박는다.
 
 ## 재화 배정 확정 (2026-08-20)
 
@@ -255,13 +330,15 @@ Tailwind 기본 클래스로만 짜 뒀던 것을 `styles/tokens.css`의 `.hm*` 
 - `lib/reward.ts` — `calculateReward(skin, base)`, `capAffinity()`
 - `scripts/check-reward.ts` — `npm run check:reward`. 로직을 고쳤으면 반드시 돌린다
 - `prisma/seed/items.ts` — 스킨 6종(기본 3 + 변종 3), 치장 배경 6종, `pruneCosmetics()`
-- `lib/pet.ts` — `applySeeds()`, `cappedStage()`, `expProgress()`, `idleAccrual()`, `compareCosmetics()`, `ANIMAL_EMOJI`/`animalEmoji()`. 순수 함수·상수만 둔다
-- `scripts/check-pet.ts` — `npm run check:pet`. 성장 곡선·진화 임계값·다중 레벨업·방치형 누적·치장 정렬 검증
-- `app/pet/page.tsx` — 서버 컴포넌트. `force-dynamic`
-- `app/pet/_components/PetView.tsx` — 경험치 바, 씨앗 투입, 방치형 수령, 진화 연출 2초, 착용 치장 배지
+- `lib/pet.ts` — `applySeeds()`, `cappedStage()`, `expProgress()`, `idleAccrual()`, `hungerFor()`/`hungerLabel()`, `compareCosmetics()`, `ANIMAL_EMOJI`/`animalEmoji()`. 순수 함수·상수만 둔다
+- `scripts/check-pet.ts` — `npm run check:pet`. 성장 곡선·진화 임계값·다중 레벨업·방치형 누적·배고픔 감쇠·치장 정렬 검증
+- `app/pet/page.tsx` — 서버 컴포넌트. `force-dynamic`. 배고픔·단계별 이미지 URL 3장을 여기서 만든다
+- `app/pet/_components/PetView.tsx` — Figma 시안 이관본. 방 + 캐릭터 + 배고픔·경험치·방치형·씨앗 투입 카드 + 진화 카드 3장 + 토스트 + 진화 연출 2초
+- `app/pet/_components/PetRoom.tsx` — 방 배경 SVG. `aria-hidden`, 색은 클래스로만 (벽·커튼·러그는 종족색, 바닥·하늘·화분은 고정색)
+- `prisma/migrations/20260821090000_pet_last_fed_at/` — `User.lastFedAt` 추가. 손으로 쓴 SQL 한 줄
 - `app/pet/cosmetics/page.tsx` + `_components/CosmeticList.tsx` — 치장 목록·착용·수집 진행률
 - `app/pet/skins/page.tsx` + `_components/SkinList.tsx` — 캐릭터 목록·구매·전환
-- `app/pet/pet.css` — 펫 화면 전용 배치. `styles/tokens.css`의 토큰만 조합한다 (새 값 정의 금지)
+- `app/pet/pet.css` — 펫 화면 전용 배치·색. 종족색 파생값과 씨앗 초록·상점 나무색은 `.pet` 스코프 안에만 둔다 (`styles/tokens.css`는 A 소유라 덧붙이지 않는다)
 - `app/api/pet/route.ts` — GET 초기 상태 (+ 미수령 방치형 개수)
 - `app/api/pet/feed/route.ts` — POST 씨앗 투입
 - `app/api/pet/idle/route.ts` — GET 미수령 조회 / POST 수령
@@ -287,9 +364,21 @@ Tailwind 기본 클래스로만 짜 뒀던 것을 `styles/tokens.css`의 `.hm*` 
 - GET 응답의 `evolutionStage`는 저장값이 아니라 레벨에서 다시 계산한다. 미션 보상이 씨앗만 올리고 단계를 갱신하지 않는 경우에 화면이 어긋나지 않게 한다
 - `app/pet/page.tsx`에 `force-dynamic`을 넣었다. 없으면 빌드 시점에 DB 미연결 안내가 정적으로 굳어 DB가 붙은 뒤에도 그대로 나온다
 
-## 막힌 것 / 문제점 (2026-08-19 갱신)
+## 막힌 것 / 문제점 (2026-08-21 갱신)
 
-`origin/main`을 다시 읽고 갱신했다. 인프라 차단은 해소됐고, 대신 통합 쪽 문제가 3건 생겼다.
+**지금 가장 급한 것: `lastFedAt` 마이그레이션이 실 DB에 안 들어갔다.**
+
+`/pet`이 HTTP 200을 주면서 "펫 정보를 불러오지 못했어요" 에러 카드를 띄운다. 서버 로그는 `prisma.user.upsert()`에서 `PrismaClientKnownRequestError`다 — Prisma Client는 `lastFedAt`을 알지만 공유 RDS에는 그 컬럼이 없다. 마이그레이션 파일은 만들어 뒀고 **적용만 안 됐다.**
+
+```bash
+npx prisma migrate deploy && npx prisma generate
+```
+
+`migrate dev`가 아니라 `deploy`다(`CLAUDE.md` 5절: `migrate dev`는 스키마 담당 1인만). `migrate reset`은 공유 DB 데이터가 전부 지워지므로 어떤 경우에도 쓰지 않는다. **C가 임의로 공유 DB에 쓰지 않고 승인을 기다린다.** 적용 전까지 화면 검증은 불가능하다 — 지금까지 확인한 것은 `npm run build`·`tsc --noEmit`·`eslint app/pet lib/pet.ts app/api/pet`·`check:pet` 통과까지다.
+
+---
+
+아래는 2026-08-19 기준 기록이다. `origin/main`을 다시 읽고 갱신했고, 인프라 차단은 해소됐고 통합 쪽 문제가 3건 생겼다.
 
 **0. 공유 DB에 옛 매핑이 이미 들어갔다 — 시드가 자기 치유하도록 고쳐 뒀다**
 
@@ -433,6 +522,7 @@ A의 `feat/diagnosis`에서 매핑이 맞바뀌었고 8/19 팀 확인으로 의�
 
 ### 승인이 필요한 것
 
+0. **`npx prisma migrate deploy` (가장 먼저)** — `lastFedAt` 컬럼이 없어서 `/pet`이 지금 에러 카드다. 아래 1번 검증도 이게 먼저 들어가야 시작된다. 상세는 위 "막힌 것"
 1. **런타임 검증 4흐름** — 아래를 브라우저에서 한 번씩 돌린다. 전부 검증용 재화가 필요하고, 그건 5인 공유 DB 쓰기라 **승인이 있어야 한다.**
    - 씨앗 투입 → 레벨업 → 진화 연출 (유저 `밤바다`의 `seeds`가 0)
    - 방치형 수령 (`lastIdleClaimAt`을 과거로 밀어 두면 즉시 확인된다)

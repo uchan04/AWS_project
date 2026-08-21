@@ -2,7 +2,7 @@
 
 **모든 세션은 이 문서부터 읽는다.** 그다음 아래 "지금 읽어야 할 문서"만 읽고 시작한다.
 
-최종 갱신: 2026-08-20 (A·B·C·D·E 5인 전원 `develop` 머지 완료. 차단 9·12·16·18 해소. 남은 것은 13·14·17·19·20. 19번은 S3 실측으로 원인·해법 확정 — 시드 한 줄 승인만 남음)
+최종 갱신: 2026-08-21 (C가 `/pet`을 Figma 시안으로 이관 + 배고픔 게이지 추가. 차단 21번 신규 — `lastFedAt` 마이그레이션 미적용으로 `/pet`이 에러 카드다. 남은 차단은 13·14·17·19·20·21)
 현재 단계: **D2 — 인프라 완료, 기능 5개 병렬 착수 (8/20 기능 동결 예정일)**
 
 팀원 인수인계용 단일 문서는 [`docs/인수인계.md`](인수인계.md)에 있다. 새로 합류하거나 노션으로 공유할 때는 그 문서를 쓴다.
@@ -33,7 +33,7 @@
 |---|---|---|---|
 | A | 진단 + 미션 콘텐츠 + 홈 | **`develop`에 머지 완료**(`a098c61`, 2026-08-20). 미션 41개, 13문항 + 판정 함수, 조기 종료, 화면 3장 + Figma 값·구성 반영, 진단 API 3종(완료·조회·닉네임) + 화면 연결, **실 DB로 진단→결과→홈 전체 흐름 확인 완료**, 홈 미션을 `GET /api/missions`로 교체(`bdcef94`), 결과 화면 판정 근거 3줄(`298ab56`), 친밀도 이중 지급 제거(`5a2753e`) | **A 담당 기능은 남은 것이 없다.** 근거 3줄의 Bedrock 실호출만 E의 IAM 키·`BEDROCK_MODEL_ID` 공유 대기다(실패해도 카드만 빠지고 화면은 뜬다). 관리자 교차표와 LLM 2종은 컷 |
 | B | 미션 시스템 + 사진 업로드 | **`develop`에 머지 완료**(`90b386f`, 2026-08-20). 미션 API 3종, 사진 업로드 presign·verify, 미션 대시보드, 출석, `lib/missions/` 8개 파일. 재화는 `calculateReward()`를 경유한다. 마지막 6커밋으로 `exp` 직접 증가 제거(`6495f37`) + `getToday()` UTC 자정 통일(`62340e5`·`d0fa3cb`·`1e4a46d`) + 미션 화살표 위치까지 들어왔다 | 하단 탭을 사이드바로 교체한 것도 B다(결정 9번은 E 배정이었다). 남은 것은 lint 에러 11건 + **차단 17번**(`completion.ts:123`이 `calculateReward()`를 우회한다) |
-| C | 펫 + 스킨 | **`SPEC.md` 5절 기능 전부 완료 + `develop`에 머지 완료**(2026-08-20). 성장·씨앗 투입·진화 연출, 방치형 자동 획득, 치장 **구매**·착용·해제, 스킨 구매·전환 + 화면 3장. 구조 변경(종족 전용 외형 / 치장 종족 무관 / 가챠 삭제 / **치장 12종 → 배경 6종**) 반영 완료. `docs/dev/diagnosis.md` 15·17절이 넘긴 C 몫도 전부 처리(치장 구매 라우트, `check-pet` 어미 단정, 시드 가격 확정값, `SPEC.md` 2·5·6·11절, `docs/dev/pet.md`, `docs/인수인계.md`, `업무분담.md`) | **코드에 남은 것 없음.** 재화 가격·수급량 확정값까지 시드·`check:pet`·문서·**실 DB**에 반영했다. 고양잇과 변종 스킨은 `샴고양이` → **`북극고양이`**로 개명(2026-08-20). 남은 것은 런타임 검증 4흐름(공유 DB 쓰기 승인 대기), 데모 계정 재화 시드값(8/21), 재진단 후 옛 종족 스킨 처리 정책(팀 결정) |
+| C | 펫 + 스킨 | **`SPEC.md` 5절 기능 전부 완료 + `develop`에 머지 완료**(2026-08-20). 성장·씨앗 투입·진화 연출, 방치형 자동 획득, 치장 **구매**·착용·해제, 스킨 구매·전환 + 화면 3장. 구조 변경(종족 전용 외형 / 치장 종족 무관 / 가챠 삭제 / **치장 12종 → 배경 6종**) 반영 완료. `docs/dev/diagnosis.md` 15·17절이 넘긴 C 몫도 전부 처리(치장 구매 라우트, `check-pet` 어미 단정, 시드 가격 확정값, `SPEC.md` 2·5·6·11절, `docs/dev/pet.md`, `docs/인수인계.md`, `업무분담.md`). **2026-08-21: `/pet` 화면을 Figma 시안으로 이관 + 배고픔 게이지 구현**(`User.lastFedAt` 한 컬럼 + 순수 함수, `SPEC.md` 5·11절 갱신) | **차단 21번 — `/pet`이 지금 에러 카드다.** `lastFedAt` 마이그레이션이 실 DB에 안 들어갔다. 재화 가격·수급량 확정값은 시드·`check:pet`·문서·**실 DB**에 반영 완료. 남은 것은 마이그레이션 적용 → 런타임 검증 4흐름, 데모 계정 재화 시드값, 재진단 후 옛 종족 스킨 처리 정책(팀 결정) |
 | D | 커뮤니티 + 챗봇 | **`develop`에 머지 완료**(2026-08-20). 기능 구현 끝 — 챗봇 Bedrock 스트리밍(2026-08-19), 챗봇 전역 오버레이 런처 전환(`f149243`, 임시 `/chat` 라우트 폐기), 본인 댓글 삭제, 미인증 500 수정(`13f3a6a`), 글쓰기 주제 추천(고정 문구), 전체 탭 글쓰기(`GalleryType` 반영). 미션 완료 연동 호출부(`completeMission`)는 주석으로 준비만 해둠 | **대기 상태가 아니다** — `completeMissionByCode({ actor, code })`가 `develop`에 이미 있다(C 확인, 2026-08-20). 다만 주석의 `completeMission(user.id, "DAILY_CHAT")`과 시그니처가 다르니 그대로 풀지 말 것. `app/layout.tsx`(E 소유) 2줄 변경이 들어 있다 — 차단 13번과 같은 사안. 세부는 `docs/dev/community.md` "재개 지점" |
 | E | 인프라 + 인증 | RDS·Cognito·S3+CloudFront·CloudWatch+SNS·Bedrock·auth 실검증·하단 탭 내비 완료, PR #1 머지 + 2차 마이그레이션 + auth 빌드 수정 + 색 토큰 정리 완료. 로그인 화면(이메일+비밀번호/Google) + 쿠키 기반 인증 전환 + `amplify.yml` 완료(2026-08-20) | Amplify GitHub 연동, Google IdP 자격증명(아래 참고) 남음 |
 
@@ -49,7 +49,7 @@
 
 **`.env.example`의 `DATABASE_URL` 샘플에 `sslmode=require`가 없다 (E에게 알림, 2026-08-20 C 확인)**: 샘플은 `?schema=public`으로 끝나는데 실제 RDS는 SSL을 요구한다. `cp .env.example .env`로 시작한 사람은 접속에 실패한다. 동작하는 형태는 `...:5432/welli?schema=public&sslmode=require`다. `.env.example`은 E 소유라 C가 고치지 않았다
 
-해소된 항목(1·2·3·**4**·5·6·7·8·**9**·10·**11**·**12**·**15**·**16**·**18**번)은 이 목록에서 지웠다. 이력이 필요하면 `git log docs/STATUS.md`를 본다. 남은 것은 아래 5개(13·14·17·19·20)다.
+해소된 항목(1·2·3·**4**·5·6·7·8·**9**·10·**11**·**12**·**15**·**16**·**18**번)은 이 목록에서 지웠다. 이력이 필요하면 `git log docs/STATUS.md`를 본다. 남은 것은 아래 6개(13·14·17·19·20·21)다.
 
 **차단 4번(인증) 해소** — E가 `lib/auth.ts`를 `cookies()`로 바꾸고 로그인·회원가입 화면과 `/api/auth/*` 5종을 붙였다(`ba9287a`). 서버 컴포넌트 5개와 API가 같은 경로로 인증된다.
 **차단 11번(모바일) 해소** — `app/components/Sidebar.module.css`의 `768px` 미디어 쿼리로 아이콘 레일이 붙었다(B의 `468f17f`). A의 머지로 `develop`에 들어왔다.
@@ -76,7 +76,7 @@
 **차단 16번(확정 경제 수치 어긋남) 해소** — 세 갈래가 다 닫혔다. C 몫(스킨 2500 / 배경 COMMON 600)은 `53c23ed`, A·D 몫(글 1개 친밀도 40)은 A가 미션 시드 `rewardAffinity`를 0으로 내려 지급 지점을 D의 `POST_AFFINITY = 20`·`CHAT_TURN_AFFINITY = 5` 한 곳으로 모았다(`5a2753e`, 실 DB 2행도 같이 갱신). B 몫(`exp` 직접 증가)은 `6495f37`이 들어오며 사라졌다.
 **차단 18번(강제 push로 되감긴 `develop`) 해소** — B가 `feat/missions`를 다시 머지했다(`90b386f`). `origin/feat/missions`는 이제 `develop` 미반영 0건이다. **공유 브랜치(`main`·`develop`)에 `--force`를 쓰지 않는다**는 규칙만 남는다.
 
-남은 것은 아래 5개다.
+남은 것은 아래 6개다.
 
 13. **내비 교체 잔여 2건** — (E) 고아가 된 `app/components/BottomNav.tsx` 삭제. `app/layout.tsx`에서 빠졌고 아무도 import하지 않는다(레포 전체 검색으로 확인). `docs/dev/infra.md`에는 아직 "동결"로 적혀 있어 문서도 함께 갱신해야 한다. (B·E) **소유권 결정 필요** — B가 E 소유 공유 파일 3개(`app/layout.tsx`·`app/globals.css`·`.env.example`)를 브랜치에서 고쳤다(`CLAUDE.md` 1절 위반). 충돌은 안 났지만 사이드바를 누가 갖는지 정해야 남은 이틀 동안 둘이 같은 파일을 각자 고치지 않는다
 14. **배포 설정이 검증되지 않았다 (E 담당)** — `amplify.yml`은 들어왔다(`f0a8634`). 다만 Amplify가 `main`에 연결되지 않아 이 파일로 실제 빌드가 도는 것은 아직 확인되지 않았다. `BEDROCK_VISION_MODEL_ID`도 Amplify 환경변수에 등록되지 않았다(`.env.example`에는 있다. `lib/missions/vision.ts:7`이 폴백하므로 죽지는 않는다)
@@ -85,6 +85,7 @@
    - **덤으로 나온 것: 종당 이미지가 4장이다** (`-1`~`-4`, 6종 전부). `PetSkin.stageCount`는 전부 3이고 `SPEC.md` 5절도 3단 진화로 확정이라 `-4`는 명세에 없는 단계다. E가 여유분으로 만든 것인지 4단을 염두에 둔 것인지 확인이 필요하다 — **`stageCount` 변경은 명세 변경이라 팀 결정 사항이고 C가 혼자 바꾸지 않는다.** 그냥 두면 참조되지 않는 파일로 남고 동작에는 지장이 없다
    - A가 지적한 `docs/dev/pet.md:110`의 "cat-arctic 9장 다 아직 없다"는 기록도 함께 정정했다(취소선 + 실측 표). 이미지는 6종 전부 올라와 있다
 20. **로그인·회원가입 화면에 챗봇 버튼이 뜬다 (D 담당)** — `app/chat/_components/ChatLauncher.tsx`가 `/diagnosis`만 숨기고, 주석은 "별도의 로그인 라우트는 아직 없다"고 적혀 있다. E가 `app/(auth)/login`·`signup`을 만든 뒤라 실측하면 두 화면 다 "마음 친구 열기" 버튼이 1개 렌더된다(`curl /login | grep -c`). 미인증 상태라 누르면 401이다. 숨김 목록에 두 경로를 넣으면 끝난다
+21. **`lastFedAt` 마이그레이션이 실 DB에 안 들어갔다 — `/pet`이 에러 카드다 (C, 2026-08-21)** — 배고픔 게이지용 `User.lastFedAt`을 추가하고 마이그레이션 파일(`20260821090000_pet_last_fed_at`, nullable 컬럼 추가 한 줄)까지 만들었지만 적용하지 않았다. Prisma Client는 그 컬럼을 아는데 RDS에는 없어서 `user.upsert()`가 `PrismaClientKnownRequestError`로 죽고, `/pet`이 200을 주면서 "펫 정보를 불러오지 못했어요"를 렌더한다. **`npx prisma migrate deploy && npx prisma generate`만 필요하다**(`migrate dev`·`migrate reset` 아님. `CLAUDE.md` 5절). C가 공유 DB에 임의로 쓰지 않고 승인을 기다린다. 받는 쪽 4인도 머지 후 같은 명령을 돌린다. 상세는 `docs/dev/pet.md` "배고픔 게이지"
 
 **8/20 5인 머지 — A·B·C·D·E가 전부 들어갔다.** A는 `develop`(`d8edf2b`)을 받아 충돌 3건을 해결하고 올렸고(`f9314a5`), B가 `feat/missions`를 머지했고(`3adbea5` → `cb16959`), E가 `develop`을 `main`에 올린 뒤 `main`을 다시 머지했다(`152dbae`). 이어 A가 진단 근거 3줄과 B 복구분을 올렸다(`a098c61`). D가 `feat/community`를 머지했고(`563ab15`), C가 그 위에 `feat/pet`을 머지했고, B가 마지막 6커밋을 올렸다(`90b386f` → `773262d`). **다섯 브랜치 전부 `develop` 미반영 0건이다.** `docs/STATUS.md`가 매번 충돌하는데, 코드는 아직 한 번도 충돌하지 않았다 — 이 문서만 손으로 합치면 된다.
 
@@ -109,6 +110,8 @@ git checkout <자기브랜치> && git merge origin/develop && npx prisma migrate
 ```
 
 `develop`에 마이그레이션 `20260820120000_skin_tribe_and_drop_gacha`가 들어갔다(스킨 종족 전용 + 치장 종족 무관). `.env`에 `BEDROCK_VISION_MODEL_ID="us.amazon.nova-2-lite-v1:0"` 한 줄을 추가한다 — `.env.example`에 추가된 유일한 키다. `migrate dev`와 `migrate reset`은 실행하지 않는다. `migrate deploy`만 쓴다.
+
+`feat/pet`에 마이그레이션이 하나 더 있다 — `20260821090000_pet_last_fed_at`(`User.lastFedAt` nullable 컬럼 추가. 배고픔 게이지용. C의 2026-08-21 작업). **아직 실 DB에 적용되지 않았다**(차단 21번).
 
 `develop`에 마이그레이션이 하나 더 들어왔다 — `20260820130000_post_gallery_type_all`(`Post.galleryType`을 `GalleryType` enum으로 바꿔 `ALL` 값을 허용한다. E의 `06982b4`). 그전에 받아둔 사람은 `migrate deploy`를 한 번 더 돌린다.
 
