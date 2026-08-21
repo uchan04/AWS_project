@@ -15,12 +15,15 @@
  * styles/tokens.css의 "채도 높은 색은 종족색 하나뿐" 규칙에서 씨앗 초록과 상점 나무색
  * 두 개가 예외다. 씨앗은 어느 종족에게나 씨앗이고, 나무판은 나무색이라 종족색을 따르면
  * 파란 나무·초록 나무가 된다.
+ *
+ * 2026-08-21 사용자 결정으로 나무색 예외 자체가 없어졌다. 홈의 재화 줄·상점 입구에서 걷어낸
+ * 데 이어 상점 두 화면 상단의 잔액 알약(.pet-hud)까지 종족색으로 갈았다. 남은 예외는 씨앗
+ * 초록 하나뿐이다.
  */
 
 /* 2026-08-21: 옛 .hm-pet / .hm-pet__cos* 를 걷어냈다. 치장·외형 상점이 그 클래스를
- * 쓰고 있었지만 두 화면 다 아래 .pet 스코프로 옮겼다 — 펫 홈에서 나무판을 눌러
- * 들어가는 화면이라 색·테두리·나무판이 홈과 이어져야 한다. 상점 전용 규칙은
- * 파일 아래쪽 "상점 화면" 절에 있다. */
+ * 쓰고 있었지만 두 화면 다 아래 .pet 스코프로 옮겼다 — 펫 홈에서 눌러 들어가는 화면이라
+ * 색·테두리가 홈과 이어져야 한다. 상점 전용 규칙은 파일 아래쪽 "상점 화면" 절에 있다. */
 
 /* ── 펫 홈 화면 ──────────────────────────────────────────────────────────── */
 
@@ -30,26 +33,47 @@
      얹는 면은 전부 --tribe-cta 계열(ink를 섞어 어둡게)을 쓴다. 원색은 면·테두리 전용이다. */
   --tribe-cta: color-mix(in oklch, var(--tribe) 58%, var(--color-ink));
   --tribe-cta-2: color-mix(in oklch, var(--tribe) 44%, var(--color-ink));
-  --tribe-cta-shadow: color-mix(in oklch, var(--tribe) 30%, var(--color-ink));
+  /* --tribe-cta-shadow(30%)는 지웠다. 버튼 3종이 --tribe-cta를 그림자로 쓰게 되면서
+     쓰는 곳이 없어졌다 */
   --tribe-line: color-mix(in oklch, var(--tribe) 40%, var(--color-card));
   --tribe-soft: color-mix(in oklch, var(--tribe) 22%, var(--color-card));
   --tribe-wash: color-mix(in oklch, var(--tribe) 12%, var(--color-paper));
+
+  /* 2026-08-21 사용자 결정: 씨앗 투입 칸의 버튼 면을 종족색 원색으로 바꿨다. --tribe-cta
+     계열은 --color-ink(#2a1f14 = 짙은 갈색)를 42%까지 섞어 어둡게 만든 값이라 여우·고양이·곰
+     어느 유형에서도 면이 갈색으로 보였다(사용자 지적).
+     원색 면에는 흰 글자를 얹을 수 없으므로(위 주석의 여우 2.35:1) 글자를 --color-ink로
+     뒤집는다 — 원색 위 잉크 글자는 여우 6.9:1 / 고양이 5.2:1 / 곰 6.3:1이다.
+     그라데이션의 다른 끝은 카드색을 섞어 밝게 간다. 잉크를 섞어 어둡게 가면 고양이에서
+     명암비가 4.4:1로 떨어져 기준(4.5:1) 아래가 된다.
+     아래 단계 그림자만 잉크 섞은 값(--tribe-cta)을 계속 쓴다 — 3~4px 띠라 글자가 안 얹힌다 */
+  --tribe-face: color-mix(in oklch, var(--tribe) 85%, var(--color-card));
 
   /* 재화·오브제 색 (종족 무관). 흰 글자를 얹는 값은 명암비 4.5:1을 맞춰 뒀다 */
   --pet-seed: #4a7a3c; /* 흰 글자 5.07:1 */
   --pet-seed-2: #3d6631;
   --pet-seed-fill: #7bb86a; /* 게이지 채움. 글자를 얹지 않는다 */
   --pet-seed-fill-2: #a8d99a;
-  --pet-wood: #b07828;
-  --pet-wood-light: #e0b060;
-  --pet-wood-deep: #7a4e10;
-  --pet-wood-ink: #fff0cc;
+  /* --pet-wood / --pet-wood-light / --pet-wood-deep / --pet-wood-ink는 여기 있었다.
+     2026-08-21 사용자 결정으로 마지막 사용처(상점 상단 잔액 알약)까지 종족색으로 갈면서
+     네 개 다 지웠다. 나무색을 되살릴 일은 없다 — 종족색이 세 유형에서 다 도는데 나무만
+     고정색으로 남으면 그 알약이 화면에서 유일하게 종족을 안 따르는 조각이 된다 */
 
   display: grid;
   align-content: start;
   gap: var(--space-sm);
   padding: var(--space-md);
   background: var(--color-paper);
+
+  /* 2026-08-21: 이 4줄이 없어서 펫 화면군 전체가 app/globals.css의
+     Arial, Helvetica, sans-serif를 물려받고 있었다. 한글에 Arial이 없으니 시스템 고딕으로
+     떨어지고, 거기에 font-weight: 700이 붙어 뭉툭해 보였다(사용자 지적).
+     styles/tokens.css의 .hm이 같은 값을 갖는다 — 홈·미션 화면과 같은 서체가 되는 지점이다. */
+  color: var(--color-ink);
+  font-family: var(--font-body);
+  font-weight: 400;
+  font-size: var(--text-body);
+  line-height: 1.6;
 }
 
 /* ── 상단 바 ─────────────────────────────────────────────────────────────── */
@@ -81,66 +105,65 @@
   gap: var(--space-2xs);
 }
 
-/* 씨앗 HUD — 아이콘 칸 + 숫자 칸이 하나의 알약으로 붙는다 */
+/* 상점 두 화면 상단의 잔액 알약(외형=별조각, 배경=친밀도). 2026-08-21 사용자 결정으로
+   나무 어휘(2px 나무 테두리 + 크림색 숫자 면 + 나무 그림자)를 걷고 바로 옆 "펫으로"
+   (.pet-plank)와 같은 껍데기로 맞췄다 — 흰 면, 투명도 있는 종족색 테두리, 알약,
+   --control-h 높이다. 둘이 한 줄에 붙어 있어 높이와 테두리가 다르면 그 줄만 어긋나 보인다.
+   안쪽 아이콘 칸은 홈 재화 줄(.pet-wallet__icon)과 같은 종족색 20% 면이다. 홈에서
+   "🌱 씨앗 3,000"으로 읽던 줄이 상점에서는 이름 없이 알약 모양으로만 좁혀진 것이다.
+   overflow: hidden은 필요 없어졌다 — 안쪽 두 칸이 테두리에 닿지 않는다 */
 .pet-hud {
   display: flex;
-  overflow: hidden;
-  border: 2px solid var(--pet-wood);
+  align-items: center;
+  gap: var(--space-3xs);
+  height: var(--control-h);
+  padding: 0 var(--space-2xs);
+  border: 1.5px solid color-mix(in oklch, var(--tribe) 45%, transparent);
   border-radius: var(--radius-pill);
-  box-shadow: 0 3px 8px rgb(42 31 20 / 0.18);
+  background: #fff;
 }
 
 .pet-hud__icon {
   display: grid;
   place-items: center;
-  width: 2.25rem;
-  height: 2.25rem;
-  background: linear-gradient(135deg, var(--pet-seed-fill-2), var(--pet-seed-fill));
+  width: 2rem;
+  height: 2rem;
+  border-radius: var(--radius-input);
+  background: color-mix(in oklch, var(--tribe) 20%, transparent);
   font-size: var(--text-body);
   line-height: 1;
 }
 
+/* 짙은 나무색 --text-md 600이었다. 면이 흰색이 되면서 홈 재화 줄의 숫자
+   (.pet-wallet__value)와 같은 규칙으로 내렸다 — 잉크색 본문 크기 400 + tabular-nums.
+   letter-spacing은 큰 숫자용이었으므로 함께 지웠다 */
 .pet-hud__value {
-  display: grid;
-  place-items: center;
-  padding: 0 var(--space-2xs);
-  background: linear-gradient(135deg, #fef0d8, #fde4bc);
-  color: var(--pet-wood-deep);
-  font-size: var(--text-md);
-  font-weight: 700;
+  padding-right: var(--space-3xs);
+  color: var(--color-ink);
+  font-size: var(--text-body);
   font-variant-numeric: tabular-nums;
-  letter-spacing: -0.02em;
 }
 
-/* 상점 나무판. export는 SVG 한 장이었지만 두 개가 필요해서 CSS로 옮겼다.
-   (덤으로 export의 <path d="M 72% 5% ...">는 path의 d에 %를 쓸 수 없어 렌더가 안 됐다) */
+/* 상점 화면 상단의 "펫으로" 링크. 2026-08-21 사용자 결정으로 나무판(180deg 5색 그라데이션 +
+   나무 그림자 + 눌린 글자)을 걷어냈다. 홈에서 나무가 사라졌으니 상점 화면에 판만 남으면
+   두 화면이 갈린다. 지금은 흰 면 + 투명도 있는 종족색 테두리 알약이고, 같은 줄의 잔액
+   알약(.pet-hud)이 이 껍데기를 그대로 따라간다 */
 .pet-plank {
-  padding: 0 var(--space-sm);
-  height: 2.75rem; /* --control-h. 다른 화면 버튼과 높이를 맞춘다 */
-  border: none;
-  border-radius: var(--radius-pill) / 42%;
-  background: linear-gradient(
-    180deg,
-    var(--pet-wood-light) 0%,
-    #c89040 30%,
-    var(--pet-wood) 55%,
-    #c89040 80%,
-    #b07030 100%
-  );
-  box-shadow:
-    0 4px 0 var(--pet-wood-deep),
-    inset 0 2px 0 rgb(255 230 160 / 0.55),
-    inset 0 -2px 0 rgb(0 0 0 / 0.18);
-  color: var(--pet-wood-ink);
-  font-family: var(--font-display);
-  font-size: var(--text-body);
-  font-weight: 700;
-  letter-spacing: 0.03em;
-  text-shadow: 0 1px 3px rgb(0 0 0 / 0.55);
-  text-decoration: none;
-  white-space: nowrap;
   display: grid;
   place-items: center;
+  height: var(--control-h);
+  padding: 0 var(--space-sm);
+  border: 1.5px solid color-mix(in oklch, var(--tribe) 45%, transparent);
+  border-radius: var(--radius-pill);
+  background: #fff;
+  color: var(--color-ink);
+  font-family: var(--font-display);
+  /* Gowun Dodum은 굵기가 400 하나뿐이다. 700을 주면 브라우저가 합성해 흐려진다
+     (styles/tokens.css의 .hm h1 주석과 같은 이유) */
+  font-size: var(--text-label);
+  font-weight: 400;
+  text-decoration: none;
+  white-space: nowrap;
   transition: transform var(--dur-micro) var(--ease-out);
 }
 
@@ -307,7 +330,8 @@
   color: var(--color-accent-ink);
   font-family: var(--font-display);
   font-size: var(--text-label);
-  font-weight: 700;
+  /* Gowun Dodum 400 고정. 합성 굵기를 쓰지 않는다 */
+  font-weight: 400;
 }
 
 .pet-char__sparkle {
@@ -387,27 +411,11 @@
   background: radial-gradient(ellipse, rgb(42 31 20 / 0.3), transparent 70%);
 }
 
-/* 이름·설명은 배경 그림 위에 얹힌다. 배경 6종이 어떤 밝기로 올지 알 수 없으므로
-   반투명 바닥을 깔아 어떤 그림에서도 글자가 읽히게 한다 */
-.pet-char__name,
-.pet-char__desc {
-  padding: 0 var(--space-2xs);
-  border-radius: var(--radius-pill);
-  background: color-mix(in oklch, var(--color-card) 76%, transparent);
-}
-
-.pet-char__name {
-  margin: var(--space-2xs) 0 0;
-  font-family: var(--font-display);
-  font-size: var(--text-md);
-  color: var(--color-ink);
-}
-
-.pet-char__desc {
-  margin: 0;
-  font-size: var(--text-label);
-  color: var(--color-ink-2);
-}
+/* .pet-char__name / .pet-char__desc는 여기 있었다. 2026-08-21 사용자 결정으로 방에서
+   이름과 상태 문구를 걷어 규칙까지 지웠다. 두 줄은 배경 그림 위에 얹히는 유일한 글자였고
+   배경 6종의 밝기를 알 수 없어 반투명 바닥(--color-card 76%)을 깔아 뒀는데, 글자가
+   사라지면서 그 장치도 쓸 데가 없어졌다. 방에 남는 글자는 .pet-char__badge(Lv.)와
+   .pet-char__worn(착용 배지)이고 둘 다 자기 배경을 갖고 있다. */
 
 /* 착용 중인 치장. 이미지가 없어 이름 배지로만 보여준다 (SPEC.md 5절) */
 .pet-char__worn {
@@ -420,14 +428,56 @@
 
 /* ── 카드 ────────────────────────────────────────────────────────────────── */
 
+/* 2026-08-21 사용자 결정: 흰 카드의 짙은 아이보리 테두리(2px --color-rule)를 걷었다.
+   커뮤니티 글 카드처럼 테두리로 칸을 가르지 않는다.
+
+   대신 --shadow-card를 넣었다. 흰 카드(#fdfbf5)와 페이지 배경(#f5f0e8)의 명도 차이가
+   1.07:1뿐이라 테두리도 그림자도 없으면 카드가 배경에 잠긴다. 커뮤니티 카드는 순백(#fff)
+   위 베이지라 그 차이만으로 칸이 서는데 여기 카드색은 크림색이라 같은 방법이 안 통한다.
+   --shadow-card는 tokens.css의 .hm-card가 쓰는 값이라 새로 만든 색이 아니다. */
 .pet-card {
   display: grid;
   align-content: start;
   gap: var(--space-2xs);
   padding: var(--space-sm);
-  border: 2px solid var(--color-rule);
   border-radius: var(--radius-card);
   background: var(--color-card);
+  box-shadow: var(--shadow-card);
+}
+
+/* 2026-08-21 사용자 결정: 보유 재화 카드만 면 색을 재화 줄과 맞바꿨다. 전에는 카드가
+   --color-card(#fdfbf5)고 줄이 흰색이었다. 지금은 카드가 흰색이고 줄이 --color-card다.
+   .pet-card 본체를 고치지 않고 변형 클래스로 두는 이유: 이 화면의 카드 다섯 장이 전부
+   .pet-card를 쓰므로 본체를 흰색으로 바꾸면 경험치·씨앗 투입·진화 카드까지 같이 흰다 */
+.pet-card--wallet {
+  background: #fff;
+}
+
+/* 2026-08-21 사용자 결정: 씨앗 투입 카드의 글씨체를 한 벌로 묶는다. 전에는 제목만 Gowun
+   Dodum이고 보유 개수·스테퍼·개수 버튼·먹이기·각주는 본문 서체라 한 카드에 두 서체가 섞였다.
+   안쪽 규칙들이 font-family: inherit이므로 카드에 한 번만 걸면 전부 따라온다.
+
+   Gowun Dodum은 굵기가 400 하나뿐이다. 500·600을 주면 브라우저가 합성해 흐려지므로
+   이 카드 안에서는 굵기를 올리지 않는다(아래 세 규칙과 .pet-card--feed .pet-btn). */
+.pet-card--feed {
+  font-family: var(--font-display);
+}
+
+/* 먹이기 버튼. 한 번 --text-label(0.8rem)까지 줄였다가 2026-08-21 사용자 요청으로 한 단계
+   되올렸다. 0.9rem은 --text-label과 --text-body 사이의 스케일 밖 값이다 — tokens.css의
+   1.25배 스케일에는 그 사이 칸이 없고, --text-body로 되돌리면 줄이기 전과 같아진다.
+   버튼 자체도 --control-h(44px)에서 3rem(48px)으로 올렸다 */
+.pet-card--feed .pet-btn {
+  min-height: 3rem;
+  font-size: 0.9rem;
+  font-weight: 400;
+}
+
+/* 이 카드의 각주는 도움말 한 줄뿐이다. 2026-08-21 사용자 요청으로 --text-label에서 한 단계
+   더 내렸다. 0.64rem은 tokens.css의 1.25배 스케일에서 --text-label 아래 칸이다
+   (0.8 / 1.25 = 0.64). 다른 카드 각주는 --text-label 그대로다 */
+.pet-card--feed .pet-card__foot {
+  font-size: 0.64rem;
 }
 
 .pet-card__head {
@@ -437,51 +487,85 @@
   gap: var(--space-2xs);
 }
 
+/* 카드 제목은 미션 화면의 카드 제목과 같은 규칙이다 — Gowun Dodum, 굵기를 주지 않고
+   본문과 서체 차이로만 구분한다(app/missions/MissionDashboard.tsx의 h2가 20px 400이다).
+   전에는 본문 서체 700이라 제목만 뭉툭하게 튀었다 */
 .pet-card__title {
   margin: 0;
+  font-family: var(--font-display);
+  /* 크기는 올리지 않는다. 서체를 바꾸는 것만으로 본문과 구분되므로 --text-body 그대로다 */
   font-size: var(--text-body);
-  font-weight: 700;
+  font-weight: 400;
   color: var(--color-ink);
 }
 
 .pet-card__meta {
   font-size: var(--text-label);
-  font-weight: 500;
+  font-weight: 400;
   color: var(--color-muted);
 }
 
+/* 각주는 도움말이다. 2026-08-21 사용자 결정으로 본문 서체를 명시한다 — 씨앗 투입 카드가
+   .pet-card--feed로 Gowun Dodum을 물려주는데, 도움말까지 제목 서체로 읽히면 안 된다.
+   다른 카드의 각주는 원래 본문 서체였으므로 이 한 줄로 다섯 장이 같아진다 */
 .pet-card__foot {
   display: flex;
   flex-wrap: wrap;
   align-items: center;
   justify-content: space-between;
   gap: var(--space-3xs);
+  font-family: var(--font-body);
   font-size: var(--text-label);
   color: var(--color-muted);
 }
 
 .pet-card__foot em {
   font-style: normal;
-  font-weight: 700;
+  font-weight: 600;
   color: var(--tribe-cta);
 }
 
 /* ── 게이지 ──────────────────────────────────────────────────────────────── */
 
+/* 2026-08-21 사용자 결정: 빈 칸은 배경색, 채운 부분은 종족색 원색이다.
+   전에는 빈 칸도 종족색 18%를 섞어 두고 채움은 3색 그라데이션이었다 — 빈 칸과 채움이
+   같은 계열이라 어디까지 찼는지가 테두리로만 읽혔다. 배경색 대 종족색으로 갈라 놓는다.
+
+   빈 칸은 --color-paper다. 사용자가 지정한 "펫 페이지 바깥의 색"이고, app/layout.tsx:23이
+   children을 감싸는 div에 주는 #F5F0E8과 같은 값이다 — 그 파일은 E 소유라 색을 거기서
+   가져오지 않고 같은 값을 가진 토큰을 쓴다. 하드코딩하면 E가 셸 색을 바꿀 때 갈라진다.
+   카드색(--color-card)을 넣어 봤지만 게이지가 얹힌 면과 같아져서 빈 칸이 사라져 보였다.
+   모양은 2px --tribe-line 테두리가 잡아 준다.
+
+   2026-08-21 사용자 결정(3차): 3D를 걷어냈다. 안쪽 그림자 2겹·세로 그라데이션·글자 흰
+   그림자와, 그 그림자 자리를 벌리려고 올렸던 높이(1.5rem)를 전부 되돌렸다.
+   채움 색은 원색 그대로다 — 아래 참고 */
 .pet-gauge {
   position: relative;
   height: 1.25rem;
   overflow: hidden;
   border: 2px solid var(--tribe-line);
   border-radius: var(--radius-pill);
-  background: color-mix(in oklch, var(--tribe) 18%, var(--color-paper-2));
+  background: var(--color-paper);
 }
 
+/* 원색(--tribe)을 그대로 쓰는 자리다. 위 .pet 주석의 "원색은 면 전용" 규칙에 맞는다 —
+   .pet-gauge__value가 얹는 글자는 흰색이 아니라 --color-ink라서 명암비가 나온다(원색 위
+   잉크 = 여우 6.9:1 / 고양이 5.2:1 / 곰 6.3:1). 여기에 --tribe-cta(ink 섞어 어둡게)를 쓰면
+   검은 막대처럼 보여 종족색이 사라진다.
+   상점 카드와 같은 --tribe-soft(22%)로 가 봤지만 빈 칸과 구분이 안 될 만큼 연했다
+   (2026-08-21 사용자 확인). 게이지는 어디까지 찼는지가 한눈에 보여야 하므로 원색으로 돌린다 */
+/* 2026-08-21 사용자 결정: 단색을 그라데이션으로 바꿨다. 세로(3D 입체)가 아니라 가로다 —
+   90deg로 채움이 자라는 방향과 결을 맞춰, 왼쪽은 밝은 --tribe-face에서 시작해 오른쪽
+   끝(지금 도달한 지점)이 원색으로 가장 진하다. 3D였을 때의 세로 그라데이션·안쪽 그림자는
+   되살리지 않는다(2026-08-21 3차 결정).
+   그라데이션은 채움 폭 안에서 늘고 줄기 때문에 경험치가 적어도 두 색이 다 보인다.
+   글자(.pet-gauge__value)는 잉크색이고 밝은 끝(--tribe-face)이 원색보다 밝으므로
+   명암비는 원색 기준(여우 6.9:1)보다 나빠지지 않는다 */
 .pet-gauge__fill {
   height: 100%;
   border-radius: var(--radius-pill);
-  background: linear-gradient(90deg, var(--tribe-cta), var(--tribe), var(--tribe-cta));
-  background-size: 200% 100%;
+  background: linear-gradient(90deg, var(--tribe-face), var(--tribe));
   transition: width var(--dur-long) var(--ease-out);
 }
 
@@ -491,7 +575,7 @@
   display: grid;
   place-items: center;
   font-size: var(--text-label);
-  font-weight: 700;
+  font-weight: 600;
   color: var(--color-ink);
 }
 
@@ -512,6 +596,9 @@
   list-style: none;
 }
 
+/* 2026-08-21 사용자 결정: 줄과 카드 면의 색을 맞바꿨다(위 .pet-card--wallet 참고).
+   줄은 --color-card, 카드가 흰색이다. 테두리는 같은 날 지웠으므로 줄을 가르는 것은
+   이 한 단계 색 차이와 아이콘 칸뿐이다 */
 .pet-wallet__row {
   display: grid;
   grid-template-columns: auto 1fr auto;
@@ -520,25 +607,22 @@
   min-height: var(--control-h);
   padding: var(--space-3xs) var(--space-2xs);
   border-radius: var(--radius-input);
-  background: var(--color-paper-2);
+  background: var(--color-card);
 }
 
+/* 2026-08-21 사용자 결정: 나무 테두리 + 나무 그라데이션을 걷고 종족색을 투명도로 깐 칸이다.
+   불투명 혼색(--tribe-soft)이 아니라 알파를 쓴다 — 흰 줄 위에서도, 카드 면 위의 상점 입구
+   에서도 같은 규칙 하나로 얹히게 하려는 것이다. 씨앗 초록 변형(.pet-wallet__icon--seed)은
+   함께 지웠다. 세 재화가 같은 칸을 쓰면 색은 종족색 하나로 끝난다 */
 .pet-wallet__icon {
   display: grid;
   place-items: center;
   width: 2rem;
   height: 2rem;
-  border: 2px solid var(--pet-wood);
   border-radius: var(--radius-input);
-  background: linear-gradient(135deg, #f0d8a8, var(--pet-wood-light));
+  background: color-mix(in oklch, var(--tribe) 20%, transparent);
   font-size: var(--text-body);
   line-height: 1;
-}
-
-/* 씨앗만 씨앗 초록이다. 별조각·친밀도는 상점 어휘(나무)로 묶는다 */
-.pet-wallet__icon--seed {
-  border-color: var(--pet-seed);
-  background: linear-gradient(135deg, var(--pet-seed-fill-2), var(--pet-seed-fill));
 }
 
 .pet-wallet__name {
@@ -547,16 +631,19 @@
   color: var(--color-ink);
 }
 
+/* 나무색 숫자였다. 줄에서 나무를 걷었으니 숫자도 본문 잉크색이다.
+   2026-08-21 사용자 결정: --text-md 600에서 본문 크기 400으로 내렸다. 재화 이름과 같은
+   크기·굵기라 줄이 한 문장처럼 읽힌다. tabular-nums는 남긴다 — 세 줄의 자릿수가 어긋나면
+   오른쪽 끝이 들쭉날쭉해진다. letter-spacing은 큰 숫자용이었으므로 함께 지웠다 */
 .pet-wallet__value {
-  color: var(--pet-wood-deep);
-  font-size: var(--text-md);
-  font-weight: 700;
+  color: var(--color-ink);
+  font-size: var(--text-body);
+  font-weight: 400;
   font-variant-numeric: tabular-nums;
-  letter-spacing: -0.02em;
 }
 
-/* 상점 입구 2개. auto-fit이라 좁아지면 두 줄로 갈린다 — .pet-plank가 nowrap이어서
-   억지로 한 줄에 두면 320px에서 글자가 판을 넘어간다 */
+/* 상점 입구 2개. auto-fit이라 좁아지면 두 줄로 갈린다 — 라벨이 nowrap이어서 억지로 한 줄에
+   두면 320px에서 글자가 칸을 넘어간다 */
 .pet-wallet__shops {
   display: grid;
   grid-template-columns: repeat(auto-fit, minmax(min(8rem, 100%), 1fr));
@@ -564,76 +651,80 @@
   margin-top: var(--space-3xs);
 }
 
-/* ── 방치형 씨앗 수확 ────────────────────────────────────────────────────── */
+/* 2026-08-21 사용자 결정: 미션 화면의 "오늘 달성률" 카드를 따른다
+   (app/missions/MissionDashboard.tsx:602 ProgressCard) — 테두리 없는 종족색 연한 면,
+   가운데 정렬. 면 색은 --tribe-soft다. --tribe-wash는 종이색과 섞는 값이라 카드 위에 얹으면
+   거의 흰색으로 보인다.
 
-.pet-idle {
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  gap: var(--space-2xs);
-}
+   같은 날 결정으로 아이콘(🎨/🖼️)을 지웠으므로 남는 것은 라벨 한 줄이다. 그래서 place-items로
+   가운데를 잡고 --control-h를 준다 — 글자 한 줄 높이(약 30px)로 두면 누를 자리가 44px
+   아래로 내려간다.
 
-.pet-idle__left {
-  display: flex;
-  align-items: center;
-  gap: var(--space-2xs);
-  min-width: 0;
-}
-
-.pet-idle__icon {
+   이름이 .pet-shop이었다. 파일 아래쪽 "상점 화면" 절에 상점 두 화면의 타일 격자를 잡는
+   .pet-shop이 이미 있어서, 같은 이름이 겹치면 여기 면 색·가운데 정렬·nowrap이 그 격자에도
+   먹었다(외형/배경 상점 목록 전체가 종족색 면으로 깔렸다). 홈 지갑 카드 안에만 있는
+   요소이므로 .pet-wallet__shop으로 옮긴다 */
+.pet-wallet__shop {
   display: grid;
   place-items: center;
-  width: 2.5rem;
-  height: 2.5rem;
-  border-radius: var(--radius-input);
-  background: linear-gradient(135deg, var(--pet-seed-fill-2), var(--pet-seed-fill));
-  font-size: var(--text-md);
-  line-height: 1;
-}
-
-.pet-idle__label {
-  margin: 0;
-  font-size: var(--text-label);
-  font-weight: 500;
+  min-height: var(--control-h);
+  padding: var(--space-2xs) var(--space-xs);
+  border-radius: var(--radius-card);
+  background: var(--tribe-soft);
   color: var(--color-muted);
-}
-
-.pet-idle__count {
-  font-size: var(--text-md);
-  font-weight: 700;
-  color: var(--color-ink);
-}
-
-.pet-idle__unit {
-  margin-left: 0.15rem;
+  font-family: var(--font-display);
   font-size: var(--text-label);
-  font-weight: 500;
-  color: var(--color-muted);
+  text-align: center;
+  text-decoration: none;
+  white-space: nowrap;
+  transition: transform var(--dur-micro) var(--ease-out);
 }
+
+.pet-wallet__shop:active {
+  transform: translateY(1px);
+}
+
+/* ── 방치형 씨앗 수확 ────────────────────────────────────────────────────── */
+
+/* 2026-08-21 사용자 결정: .pet-idle 6벌을 걷어냈다. 아이콘 칸(연두 색 면) + 숫자 + 작은
+ * 버튼을 한 줄에 늘어놓던 전용 레이아웃이었는데, 이 카드만 제목 줄이 없어서 옆 카드들과
+ * 골격이 달랐다. 이제 .pet-card__head / .pet-btn--block / .pet-card__foot을 그대로 쓴다 */
 
 /* ── 버튼 ────────────────────────────────────────────────────────────────── */
 
+/* 먹이기 버튼. 면은 종족색 원색, 글자는 잉크색이다(.pet 스코프의 --tribe-face 주석 참고) */
 .pet-btn {
   min-height: var(--control-h);
   padding: 0 var(--space-sm);
   border: none;
   border-radius: var(--radius-input);
-  background: linear-gradient(135deg, var(--tribe-cta), var(--tribe-cta-2));
-  box-shadow: 0 4px 0 var(--tribe-cta-shadow);
-  color: var(--color-accent-ink);
+  background: linear-gradient(135deg, var(--tribe-face), var(--tribe));
+  box-shadow: 0 4px 0 var(--tribe-cta);
+  color: var(--color-ink);
   font-family: inherit;
   font-size: var(--text-body);
-  font-weight: 700;
+  font-weight: 600;
   cursor: pointer;
   transition: transform var(--dur-micro) var(--ease-out);
 }
 
+/* 씨앗 줍기 버튼만 초록이다. 높이는 건드리지 않는다 — 옆 카드의 먹이기 버튼과 같은
+   --control-h로 서야 두 카드의 주 버튼 줄이 같은 높이로 읽힌다.
+
+   2026-08-21 사용자 결정: 진한 초록(--pet-seed) 대신 연한 연두 면이고, 글자는 작고(
+   --text-label) 굵기를 주지 않는다(400). 면이 밝아진 만큼 글자는 흰색을 쓸 수 없다 —
+   #a8d99a 위 흰 글자는 1.6:1이다. 짙은 초록(#2f5026, 전에 이 버튼의 그림자색이던 값)으로
+   바꾸면 5.6:1이라 굵기 400에서도 읽힌다.
+
+   2026-08-21 사용자 결정: 아래 단계 그림자(0 4px 0)를 없앴다. .pet-btn 본체가 그림자를
+   갖고 있으므로 상속을 끊으려면 none을 명시해야 한다 — 규칙만 지우면 종족색 그림자가
+   되살아나 초록 면 아래 갈색 띠가 깔린다 */
 .pet-btn--seed {
-  min-height: 2.25rem;
-  padding: 0 var(--space-sm);
-  background: linear-gradient(135deg, var(--pet-seed), var(--pet-seed-2));
-  box-shadow: 0 3px 0 #2f5026;
+  background: linear-gradient(135deg, #c4e6b8, var(--pet-seed-fill-2));
+  box-shadow: none;
+  color: #2f5026;
   font-size: var(--text-label);
+  font-weight: 400;
 }
 
 .pet-btn--block {
@@ -641,10 +732,21 @@
 }
 
 /* 누름 효과. export의 .btn-press를 그대로 옮겼다 */
-.pet-btn:active:not(:disabled),
-.pet-plank:active {
+.pet-btn:active:not(:disabled) {
   transform: translateY(2px);
   box-shadow: none;
+}
+
+/* 씨앗 줍기는 그림자가 없어 2px를 내려앉을 데가 없다. 나무판을 걷은 .pet-plank와 같은
+   이유로 1px만 눌린다. 위 규칙과 특이도가 같으므로 반드시 그 뒤에 와야 한다 —
+   앞에 두면 본체의 2px가 이긴다 */
+.pet-btn--seed:active:not(:disabled) {
+  transform: translateY(1px);
+}
+
+/* 나무판일 때는 4px 그림자를 깔고 앉는 2px였다. 이제 그림자가 없으니 1px만 눌린다 */
+.pet-plank:active {
+  transform: translateY(1px);
 }
 
 .pet-btn:disabled {
@@ -652,10 +754,6 @@
   box-shadow: 0 4px 0 var(--color-rule);
   color: var(--color-muted);
   cursor: not-allowed;
-}
-
-.pet-btn--seed:disabled {
-  box-shadow: 0 3px 0 var(--color-rule);
 }
 
 /* ── 씨앗 투입 스테퍼 ────────────────────────────────────────────────────── */
@@ -677,12 +775,13 @@
   height: 2.25rem;
   border: none;
   border-radius: var(--radius-input);
-  background: linear-gradient(135deg, var(--tribe-cta), var(--tribe-cta-2));
-  box-shadow: 0 3px 0 var(--tribe-cta-shadow);
-  color: var(--color-accent-ink);
+  background: linear-gradient(135deg, var(--tribe-face), var(--tribe));
+  box-shadow: 0 3px 0 var(--tribe-cta);
+  color: var(--color-ink);
   font-family: inherit;
   font-size: var(--text-md);
-  font-weight: 700;
+  /* 굵기 500이었다. 카드 서체가 Gowun Dodum(400 한 벌)이라 합성 굵기가 흐려진다 */
+  font-weight: 400;
   line-height: 1;
   cursor: pointer;
 }
@@ -692,23 +791,29 @@
   box-shadow: none;
 }
 
+/* 2026-08-21 사용자 지적: −와 +의 색이 달라 보였다. 두 버튼은 클래스가 하나이고, 갈린 것은
+   상태였다 — 기본값이 1개라 −는 항상 disabled(죽인 종이색)로, +는 종족색으로 뜬다.
+   그래서 못 누르는 표시를 "다른 색"이 아니라 "같은 색을 흐리게 + 아래 단계 그림자 없음"으로
+   바꿨다. 색은 두 버튼이 언제나 같고(2026-08-21 종족색 결정 유지), 누를 수 있는지는
+   진하기와 그림자 유무가 알린다.
+   명암비는 따지지 않는다 — WCAG 1.4.3은 비활성 컨트롤을 대상에서 뺀다 */
 .pet-step__btn:disabled {
-  background: var(--color-paper-2);
-  box-shadow: 0 3px 0 var(--color-rule);
-  color: var(--color-muted);
+  box-shadow: none;
+  opacity: 0.5;
   cursor: not-allowed;
 }
 
+/* 굵기 600·500이었다. 위 .pet-step__btn과 같은 이유로 400이다 */
 .pet-step__value {
   font-size: var(--text-md);
-  font-weight: 700;
+  font-weight: 400;
   color: var(--color-ink);
 }
 
 .pet-step__unit {
   margin-left: 0.15rem;
   font-size: var(--text-label);
-  font-weight: 500;
+  font-weight: 400;
   color: var(--color-muted);
 }
 
@@ -727,15 +832,17 @@
   color: var(--color-ink-2);
   font-family: inherit;
   font-size: var(--text-label);
-  font-weight: 700;
+  font-weight: 400;
   cursor: pointer;
 }
 
+/* 고른 개수 버튼. 고르지 않은 것은 종이색 그대로다 — 둘 다 색을 가지면 무엇을 골랐는지
+   사라진다 */
 .pet-preset[aria-pressed="true"] {
-  border-color: var(--tribe-cta-2);
-  background: linear-gradient(135deg, var(--tribe-cta), var(--tribe-cta-2));
-  box-shadow: 0 2px 0 var(--tribe-cta-shadow);
-  color: var(--color-accent-ink);
+  border-color: var(--tribe-cta);
+  background: linear-gradient(135deg, var(--tribe-face), var(--tribe));
+  box-shadow: 0 2px 0 var(--tribe-cta);
+  color: var(--color-ink);
 }
 
 .pet-preset:active {
@@ -789,7 +896,7 @@
   background: linear-gradient(90deg, var(--tribe-cta), var(--tribe-cta-2));
   color: var(--color-accent-ink);
   font-size: var(--text-label);
-  font-weight: 700;
+  font-weight: 500;
   white-space: nowrap;
 }
 
@@ -824,7 +931,7 @@
 
 .pet-evo-card__stage {
   font-size: var(--text-label);
-  font-weight: 700;
+  font-weight: 500;
   color: var(--color-muted);
 }
 
@@ -846,7 +953,7 @@
   border-radius: var(--radius-input);
   background: color-mix(in oklch, var(--tribe) 18%, var(--color-card));
   font-size: var(--text-label);
-  font-weight: 700;
+  font-weight: 600;
   color: var(--tribe-cta);
 }
 
@@ -882,23 +989,28 @@
   align-content: start;
   gap: var(--space-3xs);
   padding: var(--space-sm) var(--space-2xs);
-  border: 2px solid var(--color-rule);
   border-radius: var(--radius-card);
   background: var(--color-card);
+  box-shadow: var(--shadow-card);
   text-align: center;
 }
 
 /* 착용·전환 중. 스킨은 1개, 배경은 슬롯당 1개만 켜지므로 이 면이 화면에서
    유일한 "희석된 종족색 면"이다 (design.md "종족 원판 1개 + 희석된 면 1개") */
+/* 2026-08-21: .pet-item의 아이보리 테두리를 걷으면서 이 두 변형은 테두리를 명시로 되살렸다.
+   여기 선은 장식이 아니라 상태를 나르는 선이다 — border-color·border-style만 주던 옛 방식은
+   본체에 border가 있어야 작동했고, 지금은 아무 일도 하지 않는다 */
 .pet-item--on {
-  border-color: var(--tribe-cta-2);
+  border: 2px solid var(--tribe-cta-2);
   background: var(--tribe-soft);
 }
 
-/* 미획득 (SPEC.md 5절 "미획득 실루엣"). 점선 테두리 + 죽인 종이색으로 표현한다 */
+/* 미획득 (SPEC.md 5절 "미획득 실루엣"). 점선 테두리 + 죽인 종이색으로 표현한다.
+   가지지 않은 칸이므로 그림자로 띄우지 않는다 */
 .pet-item--locked {
-  border-style: dashed;
+  border: 2px dashed var(--color-rule);
   background: var(--color-paper-2);
+  box-shadow: none;
 }
 
 /* 마스코트 자리. 스킨 타일만 쓴다 — 치장은 아이템이라 이모지를 얹지 않는다 (design.md) */
@@ -968,7 +1080,7 @@
   border-radius: var(--radius-input);
   background: var(--color-card);
   font-size: var(--text-label);
-  font-weight: 700;
+  font-weight: 600;
   color: var(--tribe-cta);
 }
 
@@ -988,12 +1100,9 @@
   color: var(--color-error);
 }
 
-/* 씨앗이 아닌 재화(별조각·친밀도)의 HUD 아이콘 칸. 재화마다 색을 새로 만들지 않고
-   나무판과 같은 계열의 옅은 나무색을 쓴다 — 상점 화면의 나무 어휘와 붙는다.
-   (styles/tokens.css의 "채도 높은 색은 종족색 하나뿐" 예외를 늘리지 않으려는 것) */
-.pet-hud__icon--wood {
-  background: linear-gradient(135deg, #f0d8a8, var(--pet-wood-light));
-}
+/* .pet-hud__icon--wood는 여기 있었다. 씨앗이 아닌 재화(별조각·친밀도)의 아이콘 칸을 옅은
+   나무색으로 덮는 변형이었는데, 2026-08-21 결정으로 .pet-hud__icon 본체가 종족색이 되면서
+   재화별로 색을 가를 이유가 없어졌다. 구분은 이모지(⭐/💛)가 한다 */
 
 /* ── 토스트 ──────────────────────────────────────────────────────────────── */
 
@@ -1009,7 +1118,7 @@
   box-shadow: 0 8px 24px rgb(42 31 20 / 0.25);
   color: var(--color-accent-ink);
   font-size: var(--text-label);
-  font-weight: 700;
+  font-weight: 500;
   animation: petSlideIn var(--dur-short) var(--ease-out);
 }
 

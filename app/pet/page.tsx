@@ -75,8 +75,6 @@ export default async function PetPage() {
       msToNextSeed: idle.msToNextSeed,
       worn: worn.map((row) => row.item.name),
       animal: skin?.name ?? tribe.animal,
-      family: tribe.family,
-      colorName: tribe.colorName,
       skinName: skin?.name ?? tribe.animal,
       typeCode: user.typeCode ?? null,
       stageCount,

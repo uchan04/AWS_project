@@ -3,14 +3,7 @@
 import { useEffect, useState } from "react"
 import Link from "next/link"
 import type { TypeCode } from "@prisma/client"
-import {
-  IDLE_CAP_HOURS,
-  IDLE_MAX_SEEDS,
-  IDLE_SEEDS_PER_HOUR,
-  MS_PER_IDLE_SEED,
-  animalEmoji,
-  expProgress,
-} from "@/lib/pet"
+import { IDLE_MAX_SEEDS, MS_PER_IDLE_SEED, animalEmoji, expProgress } from "@/lib/pet"
 import { EVOLUTION_LEVEL, SEED_TO_EXP, expToNextLevel } from "@/lib/types"
 import PetRoom from "./PetRoom"
 import "@/styles/tokens.css"
@@ -53,8 +46,9 @@ export type PetState = {
   /** 착용 중인 치장 이름 배지 */
   worn: string[]
   animal: string
-  family: string
-  colorName: string
+  // family·colorName은 없다. 방의 상태 문구("여우과 · 흰색")가 유일한 사용처였고
+  // 2026-08-21 그 문구를 걷으면서 함께 지웠다. 종족 표시가 다시 필요하면
+  // page.tsx의 TRIBE[typeCode]에서 그때 다시 내려보낸다
   skinName: string
   stageCount: number
   effectLabel: string | null
@@ -68,17 +62,13 @@ export type PetState = {
   roomImageUrl: string | null
 }
 
-// 단계 이름·문구. 단계 임계값은 lib/types.ts의 EVOLUTION_LEVEL이 정본이라
+// 단계 이름. 단계 임계값은 lib/types.ts의 EVOLUTION_LEVEL이 정본이라
 // 여기서는 이름만 갖고 구간 문자열은 그 상수로 만든다.
 // 2026-08-21: 4단 진화로 바뀌면서 이름을 알·아기·청소년·성체로 확정했다(사용자 결정).
 // 이전 3개(아기·청년·전설)는 쓰지 않는다 — "전설"은 사라졌고 최종 단계는 성체다.
+// 같은 날 방의 상태 문구를 걷으면서 STAGE_DESC("다 자란 모습이에요" 등 4개)도 지웠다.
+// 단계를 글자로 알리는 곳은 이제 진화 단계 카드의 STAGE_NAME 하나다.
 const STAGE_NAME = ["알", "아기", "청소년", "성체"]
-const STAGE_DESC = [
-  "아직 알 속에 있어요",
-  "어린 시절을 보내고 있어요",
-  "부쩍 자랐어요",
-  "다 자란 모습이에요",
-]
 
 /** 마지막 단계 번호. STAGE_NAME과 어긋나면 이름이 없는 단계가 생긴다 */
 const MAX_STAGE = STAGE_NAME.length
@@ -120,12 +110,12 @@ export default function PetView({ initial }: { initial: PetState }) {
   const stages = Array.from({ length: Math.min(pet.stageCount, MAX_STAGE) }, (_, i) => i + 1)
   const feedable = Math.min(amount, pet.seeds)
 
-  // 재화 3종. 씨앗만 초록이고 나머지 둘은 나무색으로 묶는다 — 재화마다 색을 새로 만들면
-  // styles/tokens.css의 "채도 높은 색은 종족색 하나뿐" 예외가 계속 늘어난다
+  // 재화 3종. 2026-08-21 사용자 결정으로 셋이 같은 칸을 쓴다 — 전에는 씨앗만 초록, 나머지
+  // 둘은 나무색이었다. 색은 종족색 하나로 끝내고 구분은 이모지가 한다
   const wallet = [
-    { name: "씨앗", icon: "🌱", value: pet.seeds, seed: true },
-    { name: "별조각", icon: "⭐", value: pet.starShards, seed: false },
-    { name: "친밀도", icon: "💛", value: pet.affinity, seed: false },
+    { name: "씨앗", icon: "🌱", value: pet.seeds },
+    { name: "별조각", icon: "⭐", value: pet.starShards },
+    { name: "친밀도", icon: "💛", value: pet.affinity },
   ]
 
   // 토스트 2.5초 후 사라짐
@@ -135,7 +125,8 @@ export default function PetView({ initial }: { initial: PetState }) {
     return () => clearTimeout(t)
   }, [toast])
 
-  // 다음 씨앗까지 남은 시간. 표시 전용이다 — 실제 지급량은 받기를 누를 때 서버가 다시 센다.
+  // 다음 씨앗까지 남은 시간. 2026-08-21부터 화면에 띄우지 않고, 쌓인 개수를 1씩 올리는
+  // 타이머로만 쓴다 — 실제 지급량은 받기를 누를 때 서버가 다시 센다.
   // 상한에 닿아 있으면 더 쌓이지 않으므로 돌리지 않는다.
   useEffect(() => {
     if (pet.idleCapped || pet.idleSeeds >= IDLE_MAX_SEEDS) return
@@ -281,12 +272,12 @@ export default function PetView({ initial }: { initial: PetState }) {
               </span>
               <span className="pet-char__shadow" aria-hidden="true" />
 
-              <p className="pet-char__name">{pet.skinName}</p>
-              <p className="pet-char__desc">
-                {pet.stageCount > 1
-                  ? (STAGE_DESC[stage - 1] ?? `${stage}단계`)
-                  : `${pet.family} · ${pet.colorName}`}
-              </p>
+              {/* 2026-08-21 사용자 결정으로 방에서 이름("북극여우")과 상태 문구("다 자란
+                  모습이에요")를 걷었다. 방에 남는 글자는 Lv. 배지와 착용 배지뿐이다.
+                  이름은 눈에만 안 보이게 남긴다 — 펫 그림은 alt=""이고 이모지 대체도
+                  부모 .pet-char__body가 aria-hidden이라, 이 줄까지 지우면 스크린리더에
+                  방 안의 캐릭터가 무엇인지 알려주는 텍스트가 하나도 남지 않는다 */}
+              <p className="sr-only">{pet.skinName}</p>
               {pet.worn.length > 0 ? (
                 <span className="pet-char__worn">
                   {pet.worn.map((name) => (
@@ -302,18 +293,15 @@ export default function PetView({ initial }: { initial: PetState }) {
           {/* 배고픔 게이지가 있던 자리다. 재화 3종과 상점 입구 2개가 대신 들어간다.
               숫자를 아이콘 옆에 글자로 두므로 aria를 따로 붙이지 않는다 — "씨앗 3,000"이
               그대로 읽힌다. 아이콘만 aria-hidden이다 */}
-          <div className="pet-card">
+          <div className="pet-card pet-card--wallet">
             <div className="pet-card__head">
-              <p className="pet-card__title">🪙 보유 재화</p>
+              <p className="pet-card__title">보유 재화</p>
             </div>
 
             <ul className="pet-wallet">
               {wallet.map((row) => (
                 <li className="pet-wallet__row" key={row.name}>
-                  <span
-                    className={`pet-wallet__icon${row.seed ? " pet-wallet__icon--seed" : ""}`}
-                    aria-hidden="true"
-                  >
+                  <span className="pet-wallet__icon" aria-hidden="true">
                     {row.icon}
                   </span>
                   <span className="pet-wallet__name">{row.name}</span>
@@ -322,12 +310,14 @@ export default function PetView({ initial }: { initial: PetState }) {
               ))}
             </ul>
 
-            {/* 상단 바에서 내려온 상점 입구 2개 (2026-08-21 사용자 결정) */}
+            {/* 상단 바에서 내려온 상점 입구 2개 (2026-08-21 사용자 결정).
+                나무판(.pet-plank)이었다. 같은 날 결정으로 미션 화면의 "오늘 달성률" 카드처럼
+                테두리 없는 종족색 면에 가운데 정렬이고, 아이콘 없이 라벨만 둔다 */}
             <div className="pet-wallet__shops">
-              <Link className="pet-plank" href="/pet/skins">
+              <Link className="pet-wallet__shop" href="/pet/skins">
                 외형 상점
               </Link>
-              <Link className="pet-plank" href="/pet/cosmetics">
+              <Link className="pet-wallet__shop" href="/pet/cosmetics">
                 배경 상점
               </Link>
             </div>
@@ -338,7 +328,7 @@ export default function PetView({ initial }: { initial: PetState }) {
           {/* 경험치 */}
           <div className="pet-card">
             <div className="pet-card__head">
-              <p className="pet-card__title">⭐ 경험치</p>
+              <p className="pet-card__title">경험치</p>
               <span className="pet-card__meta">
                 {ko(pet.exp)} / {ko(need)}
               </span>
@@ -356,52 +346,54 @@ export default function PetView({ initial }: { initial: PetState }) {
                 {ko(pet.exp)} / {ko(need)}
               </span>
             </div>
+            {/* 2026-08-21 사용자 결정으로 "마지막 단계예요"를 지웠다. 최종 단계에 닿으면
+                다음 진화 안내가 없으므로 오른쪽 칸을 비우고 "현재 Lv.N"만 남긴다 —
+                빈 <span>을 두면 space-between이 왼쪽 글자를 그대로 왼쪽에 두므로
+                자리가 어긋나지는 않는다 */}
             <p className="pet-card__foot">
               <span>현재 Lv.{pet.level}</span>
-              <span>{milestone ?? "마지막 단계예요"}</span>
+              {milestone ? <span>{milestone}</span> : null}
             </p>
           </div>
 
-          {/* 방치형 수확 */}
-          <div className="pet-card">
-            <div className="pet-idle">
-              <span className="pet-idle__left">
-                <span className="pet-idle__icon" aria-hidden="true">
-                  🌱
-                </span>
-                <span>
-                  <span className="pet-idle__label">그동안 쌓인 씨앗</span>
-                  <br />
-                  <span className="pet-idle__count">{ko(pet.idleSeeds)}</span>
-                  <span className="pet-idle__unit">개</span>
-                </span>
-              </span>
-              <button
-                type="button"
-                className="pet-btn pet-btn--seed"
-                onClick={claim}
-                disabled={pending || pet.idleSeeds < 1}
-                aria-disabled={pending || pet.idleSeeds < 1}
-              >
-                받기
-              </button>
-            </div>
-            <p className="pet-card__foot">
-              <span>
-                시간당 {IDLE_SEEDS_PER_HOUR}개, 최대 {IDLE_CAP_HOURS}시간분까지 모여요
-              </span>
-              {pet.idleCapped ? (
-                <em>가득 찼어요</em>
-              ) : (
-                <em>다음 씨앗까지 {Math.max(1, Math.ceil(msLeft / 60000))}분</em>
-              )}
-            </p>
-          </div>
-
-          {/* 씨앗 투입 */}
+          {/* 방치형 수확. 2026-08-21 사용자 결정으로 아이콘 칸 + 숫자를 왼쪽에 두던 한 줄을
+              걷고 경험치·씨앗 투입 카드와 같은 골격(제목 줄 → 주 버튼 → 각주)으로 맞췄다.
+              씨앗 이모지는 다른 카드처럼 제목 앞에 글자로만 붙는다 — 색 면을 두지 않는다 */}
           <div className="pet-card">
             <div className="pet-card__head">
-              <p className="pet-card__title">🌿 씨앗 투입</p>
+              <p className="pet-card__title">그동안 쌓인 씨앗</p>
+              <span className="pet-card__meta">{ko(pet.idleSeeds)}개</span>
+            </div>
+
+            <button
+              type="button"
+              className="pet-btn pet-btn--seed pet-btn--block"
+              onClick={claim}
+              disabled={pending || pet.idleSeeds < 1}
+              aria-disabled={pending || pet.idleSeeds < 1}
+            >
+              {/* 2026-08-21 사용자 결정: "씨앗 N개 받기 🌱" → "씨앗 받기" → "씨앗 줍기".
+                  개수는 위 제목 줄의 __meta("N개")가 이미 갖고 있어 사라진 정보가 없다 */}
+              씨앗 줍기
+            </button>
+
+            {/* 2026-08-21 사용자 결정으로 각주가 "가득 찼어요" 하나로 줄었다. 지운 두 문구는
+                "시간당 N개, 최대 N시간분까지 모여요"와 "다음 씨앗까지 N분"이다.
+                msLeft는 화면에서 사라졌을 뿐 계속 돌아간다 — 아래 useEffect가 그 타이머로
+                쌓인 개수를 1씩 올리므로 지우면 개수가 새로고침 전까지 멈춘다.
+                가득 찼을 때만 각주를 그린다. 빈 <p>를 남기면 gap만큼 카드가 길어진다 */}
+            {pet.idleCapped ? (
+              <p className="pet-card__foot">
+                <em>가득 찼어요</em>
+              </p>
+            ) : null}
+          </div>
+
+          {/* 씨앗 투입. --feed는 이 카드 안의 글씨체를 한 벌로 묶는 변형이다
+              (2026-08-21 사용자 결정) */}
+          <div className="pet-card pet-card--feed">
+            <div className="pet-card__head">
+              <p className="pet-card__title">씨앗 투입</p>
               <span className="pet-card__meta">보유 {ko(pet.seeds)}개</span>
             </div>
 
@@ -467,7 +459,7 @@ export default function PetView({ initial }: { initial: PetState }) {
       {/* 진화 단계 */}
       <section className="pet-card pet-evo">
         <div className="pet-card__head">
-          <h2 className="pet-card__title">🌟 진화 단계</h2>
+          <h2 className="pet-card__title">진화 단계</h2>
           {pet.effectLabel ? <span className="pet-card__meta">{pet.effectLabel}</span> : null}
         </div>
         <div className="pet-evo__list">
