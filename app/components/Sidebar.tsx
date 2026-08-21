@@ -51,8 +51,18 @@ export function Sidebar() {
   useEffect(() => {
     function loadProfile() {
       Promise.all([fetch("/api/pet"), fetch("/api/diagnosis/me")])
-        .then(([petRes, diagRes]) => Promise.all([petRes.json(), diagRes.json()]))
-        .then(([petData, diagData]) => {
+        .then(([petRes, diagRes]) => {
+          // 401을 본문 폴백으로 메우면 미인증에도 "익명 · 미분류 · Lv.1 · 씨앗 0개"와
+          // 로그아웃 버튼이 그대로 뜬다(2026-08-21 제보, A 수정). 인증이 안 됐으면 사이드바를 뺀다
+          if (!petRes.ok || !diagRes.ok) return null
+          return Promise.all([petRes.json(), diagRes.json()])
+        })
+        .then((pair) => {
+          if (!pair) {
+            setProfile(null)
+            return
+          }
+          const [petData, diagData] = pair
           setProfile({
             nickname: diagData.data?.nickname || "익명",
             typeCode: diagData.data?.typeCode || null,
@@ -65,16 +75,8 @@ export function Sidebar() {
           })
         })
         .catch(() => {
-          setProfile({
-            nickname: "익명",
-            typeCode: null,
-            seeds: 0,
-            affinity: 0,
-            starShards: 0,
-            level: 1,
-            createdAt: new Date().toISOString(),
-            imageUrl: null,
-          })
+          // 여기도 가짜 프로필을 만들지 않는다. 못 읽었으면 사이드바를 안 그리는 쪽이 맞다
+          setProfile(null)
         })
         .finally(() => setLoading(false))
     }
@@ -494,11 +496,13 @@ export function Sidebar() {
                 </button>
                 <button
                   onClick={() => {
-                    if (confirm("로그아웃하시겠습니까?")) {
-                      // TODO: Cognito 로그아웃 API 구현 필요 (E 담당)
-                      alert("로그아웃 기능은 인증 시스템 연동 후 활성화됩니다")
-                      // window.location.href = "/api/auth/logout"
-                    }
+                    if (!confirm("로그아웃하시겠습니까?")) return
+                    // /api/auth/logout은 POST만 받는다(GET으로 열면 405). 쿠키 두 개를 지운다
+                    void fetch("/api/auth/logout", { method: "POST", redirect: "manual" }).finally(
+                      () => {
+                        window.location.href = "/login"
+                      }
+                    )
                   }}
                   style={{
                     width: "100%",
