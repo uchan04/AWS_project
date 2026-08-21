@@ -263,7 +263,7 @@ export function PostDetailModal({
                   onChange={(e) => setCommentBody(e.target.value)}
                   onKeyDown={(e) => e.key === "Enter" && handleComment()}
                   placeholder="따뜻한 댓글을 남겨봐요"
-                  className="flex-1 rounded-xl border border-neutral-300 bg-neutral-50 px-4 py-2.5 text-sm outline-none focus:border-neutral-500"
+                  className="flex-1 rounded-xl border border-neutral-300 bg-neutral-50 px-4 py-2.5 text-sm text-neutral-900 placeholder:text-neutral-400 outline-none focus:border-neutral-500"
                 />
                 <button
                   type="button"
