@@ -32,6 +32,8 @@ import "../pet.css"
 // - export에 있던 "단계별 씨앗 효율 +10/25/50%"는 지웠다. 구현·명세에 없는 수치다.
 //   그 자리에는 실제로 존재하는 스킨 고유 효과(PetSkin.effectPct)를 넣는다
 // - 배고픔 게이지는 새로 붙인 기능이다. lib/pet.ts hungerFor()가 계산한다
+// - 방 배경: 착용한 배경 치장이 있으면 그 그림, 없으면 PetRoom의 기본 방 SVG다
+//   (2026-08-21 사용자 확정). 펫은 배경과 무관하게 방 중앙 하단에 고정한다
 
 export type PetState = {
   level: number
@@ -46,7 +48,7 @@ export type PetState = {
   idleCapped: boolean
   /** 다음 1개가 쌓이기까지 남은 밀리초. 상단 카운트다운에 쓴다 */
   msToNextSeed: number
-  /** 착용 중인 치장 이름. 이미지가 없어 이름 배지로만 보여준다 */
+  /** 착용 중인 치장 이름 배지 */
   worn: string[]
   animal: string
   family: string
@@ -60,6 +62,8 @@ export type PetState = {
   imageUrl: string | null
   /** 진화 단계 카드용 단계별 이미지. 원소가 stageCount개다 */
   stageImageUrls: (string | null)[]
+  /** 착용한 배경 치장의 이미지. null이면 기본 방 SVG가 나온다 */
+  roomImageUrl: string | null
 }
 
 // 단계 이름·문구. 단계 임계값은 lib/types.ts(A 소유)의 EVOLUTION_LEVEL이 정본이라
@@ -240,7 +244,7 @@ export default function PetView({ initial }: { initial: PetState }) {
       <div className="pet__grid">
         <div className="pet__col pet__col--room">
           <div className="pet-room">
-            <PetRoom />
+            <PetRoom imageUrl={pet.roomImageUrl} />
             <div className="pet-room__seeds" aria-hidden="true">
               <span className="pet-room__seed">🌱</span>
               <span className="pet-room__seed">🌿</span>

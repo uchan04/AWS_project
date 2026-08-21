@@ -41,15 +41,22 @@ export default async function PetPage() {
     // 한 번도 먹이지 않았으면 가입 시각을 기준으로 감쇠한다 (lib/pet.ts hungerFor 주석)
     const hunger = hungerFor(user.lastFedAt ?? user.createdAt, now)
 
-    // 착용 중인 치장. 이미지가 아직 없어 이름만 배지로 보여준다 (SPEC.md 5절)
+    // 착용 중인 치장 (SPEC.md 5절)
     const worn = await prisma.userCosmetic.findMany({
       where: { userId: user.id, equipped: true },
-      select: { item: { select: { name: true } } },
+      select: { item: { select: { name: true, slot: true, imageKey: true } } },
     })
 
     const evolutionStage = cappedStage(user.level, stageCount)
     const cloudfront = process.env.CLOUDFRONT_DOMAIN
     const imageUrl = cloudfront && skin ? `${cloudfront}/${skin.imageKeyBase}-${evolutionStage}.png` : null
+
+    // 착용한 배경이 방 배경이 된다 (2026-08-21 사용자 확정). 슬롯당 1개라 첫 행이 유일하다.
+    // 없으면 null이고 PetRoom이 기본 방 SVG를 그린다 — 지금은 UserCosmetic이 0행이라 전원 기본 방이다.
+    // imageKey에 확장자가 이미 붙어 있다(prisma/seed/items.ts: "cosmetics/bg-1.png").
+    const wornBackground = worn.find((row) => row.item.slot === "BACKGROUND")
+    const roomImageUrl =
+      cloudfront && wornBackground ? `${cloudfront}/${wornBackground.item.imageKey}` : null
 
     // 진화 단계 카드가 단계별 그림을 쓴다. 규칙은 imageUrl과 같은 <base>-<단계>.png다
     // (prisma/seed/items.ts가 imageKeyBase를 고정해 뒀다)
@@ -79,6 +86,7 @@ export default async function PetPage() {
           : null,
       imageUrl,
       stageImageUrls,
+      roomImageUrl,
     }
   } catch (error) {
     console.error("[/pet]", error)

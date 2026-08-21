@@ -1,11 +1,16 @@
 // 소유자: C. 펫 방 배경. Figma Make export의 RoomBackground를 옮겼다.
 //
-// ⚠ 이 SVG는 **데모다.** 방 배경은 나중에 이미지로 교체한다(2026-08-21 사용자 확인).
-// 그림을 더 예쁘게 다듬는 데 시간을 쓰지 않는다 — 어차피 갈아치울 자리다.
-// 교체 지점은 아래 <svg className="pet-room__bg"> 하나다. 같은 클래스를 붙인
-// <img>로 바꾸면 pet.css의 크기·자르기(object-fit)가 그대로 적용된다.
-// 이미지 URL을 어디서 받을지(착용한 배경 치장 아이템 vs 고정 배경)는 팀 확인 대기 중이다.
-// 이미지가 없을 때의 기본 배경으로 이 SVG를 남길지도 그때 같이 정한다.
+// 이 SVG는 **기본 배경이다** (2026-08-21 사용자 확정). 배경 치장(배경1~배경6)을
+// 상점에서 사서 착용하기 전까지 이 방이 나온다. 그림을 더 다듬는 데 시간을 쓰지 않는다 —
+// 착용한 유저에게는 안 보이고, 지금은 아무도 배경을 갖고 있지 않아 전원이 이 방을 본다.
+//
+// 착용 중이면 그 배경 이미지를 이 SVG **위에** 덮는다. 지우고 갈아 끼우지 않는 이유는
+// 이미지가 안 뜰 때(CloudFront 403·미업로드) 빈 방이 되지 않게 하려는 것이다.
+// 그래서 배경 이미지는 **불투명 전체 그림**이어야 한다 — 투명 PNG면 두 방이 겹쳐 보인다.
+// (그 경우에도 아래 방이 새어 나오지는 않게 pet.css가 img에 불투명 배경을 깔아 둔다)
+//
+// 카펫(러그)은 **배경에 속하는 요소다** (2026-08-21 사용자 확정). 다른 배경 그림에는
+// 카펫이 없으므로 별도 레이어로 빼지 않고 이 SVG 안에 둔다 — 배경이 갈리면 카펫도 같이 간다.
 //
 // export와 다른 점 두 가지:
 //  1) 색을 fill 속성에 하드코딩하지 않고 클래스로 뺐다. pet.css가 var(--tribe) 파생으로
@@ -20,7 +25,28 @@ const WALL_H = 210 // 300의 70%
 const STRIPE_COUNT = 13
 const PLANK_COUNT = 9
 
-export default function PetRoom() {
+export default function PetRoom({ imageUrl }: { imageUrl?: string | null }) {
+  return (
+    <>
+      <RoomSvg />
+      {imageUrl ? (
+        // 착용한 배경 치장. 기본 방을 덮는다. 안 뜨면 스스로 숨어 아래 방이 다시 보인다
+        // eslint-disable-next-line @next/next/no-img-element
+        <img
+          className="pet-room__bg pet-room__bg--img"
+          src={imageUrl}
+          alt=""
+          aria-hidden="true"
+          onError={(e) => {
+            e.currentTarget.style.display = "none"
+          }}
+        />
+      ) : null}
+    </>
+  )
+}
+
+function RoomSvg() {
   return (
     <svg
       className="pet-room__bg"
