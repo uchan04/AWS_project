@@ -191,6 +191,29 @@
 
 `320px` 무가로스크롤은 브라우저 없이 잴 수 없어 구조로 막았다 — 타일 격자를 `minmax(min(8rem, 100%), 1fr)`로 뒀고(진화 단계 목록과 같은 값), 기존 `@media (max-width: 768px)`가 `.pet__top-acts`를 `width: 100%` + 줄바꿈으로 이미 처리한다. 나무판 문구는 `펫으로` 세 글자다(`.pet-plank`는 `white-space: nowrap`이라 긴 문구를 넣으면 넘친다).
 
+## `develop` 머지 (2026-08-21) — 이벤트 이름 변경과 loading 화면
+
+`develop`이 49커밋 앞서 있어서 `feat/pet`에서 먼저 받았다. 충돌은 한 곳, 걸린 것은 두 곳이다. 머지 후 `develop`은 `feat/pet` 팁으로 fast-forward 됐다(`4cad58f`).
+
+### 커스텀 이벤트 이름이 바뀌었다 — `mission-completed` → `user-stats-changed`
+
+`develop` `35746be`가 이름을 갈았다. 재화가 늘면 사이드바 HUD를 갱신하려고 쏘는 이벤트다. 듣는 쪽은 `app/components/Sidebar.tsx` 한 곳이고, 쏘는 쪽은 미션·커뮤니티·챗·펫 전부다. **이름이 어긋나면 에러 없이 조용히 갱신만 안 된다** — 씨앗을 받았는데 상단 숫자가 그대로다.
+
+`PetView.tsx`의 방치형 수령 핸들러가 충돌했다. `develop`이 그 줄만 남기고 내가 같은 자리에 `setMsLeft`·토스트를 넣었기 때문이다. 양쪽을 다 살렸다 — 내 두 줄 + `develop`의 새 이름. `SkinList.tsx`(구매·전환 2곳)는 자동 머지로 들어갔고 grep으로 확인했다. 펫 폴더에 옛 이름은 0건이다.
+
+### `app/pet/loading.tsx` — A가 내 폴더에 넣은 파일을 `.pet` 어휘로 옮겼다
+
+`develop`이 이 파일을 새로 넣었다(`force-dynamic` 서버 컴포넌트라 DB 3회 왕복 약 900ms 동안 App Router가 이동을 커밋하지 않아, 탭을 눌렀는데 아무 일도 안 난 것처럼 보이는 문제). 파일이 필요한 이유는 맞지만 뼈대가 `.hm hm--canvas` + `.hm-pet`이었다.
+
+- **`.hm-pet`은 이제 없는 클래스다.** 상점 이관 때 `pet.css`에서 걷어냈고 `tokens.css`에는 원래 없다. 아무 규칙에도 걸리지 않는다
+- 실제 `/pet`은 종이색 전면 배경 + 2단 그리드다. 흰 카드로 떴다가 900ms 뒤 **배경색과 폭이 동시에 튄다** — 이 파일이 없애려던 그 덜컥거림이 형태만 바꿔 남는다
+
+그래서 `.pet` + `.pet__top` + `.pet__grid`(방 자리 1 + 카드 3장)로 다시 썼다. 실제 화면과 자리·색이 같으니 데이터가 오면 그 자리에 채워진다. 종족색은 아직 모르는 시점이라 `data-tribe`를 붙이지 않고 `:root` 기본값(accent)에 맡긴다. 스켈레톤 유틸리티(`animate-pulse` 등)는 Tailwind v4가 `package.json`·`globals.css`에 이미 있어 그대로 쓴다.
+
+### 검증
+
+`feat/pet`에서 `npm run check:pet` 통과 · `npm run build` 통과. `develop` 머지 후 같은 두 개를 다시 돌려 통과. `develop`은 내가 받아온 시점보다 35커밋 더 나가 있었으므로(새 `lib/session.ts`, 인증 마이그레이션 포함) 올리기 전에 그 상태로 다시 빌드했다.
+
 ## 배고픔 게이지 (2026-08-21)
 
 `SPEC.md` 5절에 절을 추가했다. **표시 전용이고 재화·경험치·진화에 영향을 주지 않는다.**
