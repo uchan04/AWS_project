@@ -1,7 +1,7 @@
 import type { User } from "@prisma/client"
 import { prisma } from "@/lib/prisma"
 import { getTodayKey, getToday } from "./reset"
-import { getStageProgress } from "./stages"
+import { computeStageProgress } from "./stages"
 
 export type CompletionMode = "BUTTON" | "PHOTO" | "EVENT"
 
@@ -58,21 +58,46 @@ function getCompletionMode(mission: { code: string; requiresPhoto: boolean }): C
  */
 export async function buildDashboard(user: User): Promise<DashboardDTO> {
   const today = getTodayKey()
+  const typeCode = user.typeCode!
 
-  // 일일 미션 5개
-  const dailyMissionsRaw = await prisma.mission.findMany({
-    where: { scope: "DAILY" },
-    orderBy: { order: "asc" },
-  })
+  // 주간: 이번 주 월요일 ~ 오늘
+  const mondayOfThisWeek = getMondayOfWeek(new Date())
+  const mondayKey = mondayOfThisWeek.toLocaleDateString("sv-SE")
+  const todayDate = getToday()
 
-  const dailyCompletions = await prisma.userMission.findMany({
-    where: {
-      userId: user.id,
-      missionId: { in: dailyMissionsRaw.map((m) => m.id) },
-      resetKey: today,
-    },
-    select: { missionId: true },
-  })
+  // 6개 쿼리를 한 번에 낸다(2026-08-21 A).
+  // 서로 의존하지 않으므로 순차로 기다릴 이유가 없다. RDS가 us-east-1이라 왕복 1회가
+  // 176ms다 — 순차로 6번 기다리면 그것만 1초가 넘는다.
+  // 완료 기록은 앞 쿼리의 missionId 목록 대신 관계 필터로 같은 집합을 고른다.
+  const [dailyMissionsRaw, dailyCompletions, allStageMissions, allStageCompletions, weeklyCount, claimedToday] =
+    await Promise.all([
+      prisma.mission.findMany({
+        where: { scope: "DAILY" },
+        orderBy: { order: "asc" },
+      }),
+      prisma.userMission.findMany({
+        where: { userId: user.id, resetKey: today, mission: { scope: "DAILY" } },
+        select: { missionId: true },
+      }),
+      prisma.mission.findMany({
+        where: { scope: "STAGE", typeCode },
+        orderBy: [{ stage: "asc" }, { order: "asc" }],
+      }),
+      prisma.userMission.findMany({
+        where: { userId: user.id, resetKey: "STAGE", mission: { scope: "STAGE", typeCode } },
+        select: { missionId: true },
+      }),
+      prisma.userMission.count({
+        where: {
+          userId: user.id,
+          resetKey: { gte: mondayKey, lte: today },
+          mission: { scope: "DAILY" },
+        },
+      }),
+      prisma.attendanceClaim.count({
+        where: { userId: user.id, claimDate: todayDate },
+      }),
+    ])
 
   const dailyCompletedIds = new Set(dailyCompletions.map((c) => c.missionId))
 
@@ -91,29 +116,10 @@ export async function buildDashboard(user: User): Promise<DashboardDTO> {
     },
   }))
 
-  // 단계 미션
-  const typeCode = user.typeCode!
-  const stageProgress = await getStageProgress(user.id, typeCode)
-
-  // 전체 단계 미션 한 번에 조회
-  const allStageMissions = await prisma.mission.findMany({
-    where: { scope: "STAGE", typeCode },
-    orderBy: [{ stage: "asc" }, { order: "asc" }],
-  })
-
-  const stageMissionIds = allStageMissions.map((m) => m.id)
-
-  // 전체 단계 완료 기록 한 번에 조회
-  const allStageCompletions = await prisma.userMission.findMany({
-    where: {
-      userId: user.id,
-      missionId: { in: stageMissionIds },
-      resetKey: "STAGE",
-    },
-    select: { missionId: true },
-  })
-
+  // 단계 미션. 해금 계산은 위에서 읽은 행을 그대로 쓴다 —
+  // getStageProgress()를 호출하면 같은 두 쿼리를 다시 낸다.
   const completedIdSet = new Set(allStageCompletions.map((c) => c.missionId))
+  const stageProgress = computeStageProgress(allStageMissions, completedIdSet)
 
   const stageMissions: StageMissionDTO[] = stageProgress.map((sp) => {
     const missions = allStageMissions.filter((m) => m.stage === sp.stage)
@@ -146,30 +152,9 @@ export async function buildDashboard(user: User): Promise<DashboardDTO> {
   const dailyCompleted = dailyCompletedIds.size
   const dailyTotal = dailyMissionsRaw.length
 
-  // 주간: 이번 주 월요일 ~ 오늘
-  const mondayOfThisWeek = getMondayOfWeek(new Date())
-  const mondayKey = mondayOfThisWeek.toLocaleDateString("sv-SE")
-
-  const weeklyCount = await prisma.userMission.count({
-    where: {
-      userId: user.id,
-      resetKey: { gte: mondayKey, lte: today },
-      mission: { scope: "DAILY" },
-    },
-  })
-
   // 주간 분모는 경과일 × 5 (아직 팀 합의 필요)
   const daysPassed = Math.floor((new Date().getTime() - mondayOfThisWeek.getTime()) / 86400000) + 1
   const weeklyTotal = Math.min(daysPassed * 5, 35)
-
-  // 출석
-  const todayDate = getToday()
-  const claimedToday = await prisma.attendanceClaim.count({
-    where: {
-      userId: user.id,
-      claimDate: todayDate,
-    },
-  })
 
   const cycleDay = user.attendanceTotal > 0 ? ((user.attendanceTotal - 1) % 7) + 1 : 1
 
