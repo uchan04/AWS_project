@@ -64,9 +64,11 @@ export default function SkinList({ skins: initial, starShards: initialShards }: 
           prev.map((row) => (row.id === skin.id ? { ...row, owned: true } : row)),
         )
         setNotice(`${skin.name}를 데려왔어요. 전환해서 바로 쓸 수 있어요.`)
+        window.dispatchEvent(new CustomEvent("mission-completed"))
       } else {
         setSkins((prev) => prev.map((row) => ({ ...row, active: row.id === skin.id })))
         setNotice(`이제 ${skin.name}와 함께해요.`)
+        window.dispatchEvent(new CustomEvent("mission-completed"))
       }
     } catch {
       setError("네트워크 연결을 확인해 주세요")

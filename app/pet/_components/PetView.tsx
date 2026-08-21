@@ -89,6 +89,8 @@ export default function PetView({ initial }: { initial: PetState }) {
         setEvolvedTo(next.evolvedTo)
         setTimeout(() => setEvolvedTo(null), 2000)
       }
+
+      window.dispatchEvent(new CustomEvent("mission-completed"))
     } catch {
       setError("네트워크 연결을 확인해 주세요")
     } finally {
@@ -112,6 +114,7 @@ export default function PetView({ initial }: { initial: PetState }) {
       }
 
       setPet((prev) => ({ ...prev, seeds: json.data.seeds, idleSeeds: 0, idleCapped: false }))
+      window.dispatchEvent(new CustomEvent("mission-completed"))
     } catch {
       setError("네트워크 연결을 확인해 주세요")
     } finally {
