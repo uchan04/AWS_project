@@ -138,7 +138,10 @@ export async function summarizeReason(params: { answers: Answer[]; typeCode: Typ
         },
       ],
       toolConfig: { tools: [REASON_TOOL], toolChoice: { tool: { name: "submit_reason" } } },
-      inferenceConfig: { temperature: 0.3, maxTokens: 512 },
+      // temperature를 넣지 않는다. Claude Sonnet 5는 이 값을 거부한다
+      // (ValidationException: `temperature` is deprecated for this model, 2026-08-21 프로덕션 확인).
+      // 근거 3줄은 Tool 스키마로 형식이 고정돼 있어 온도를 낮춰 얻는 이득도 없다.
+      inferenceConfig: { maxTokens: 512 },
     }),
   )
 
