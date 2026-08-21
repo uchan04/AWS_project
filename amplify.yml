@@ -6,6 +6,13 @@ frontend:
         - npm ci
     build:
       commands:
+        # Amplify 콘솔 환경 변수는 빌드 컨테이너에만 주입되고 SSR 컴퓨트(Lambda)에는 전달되지 않는다.
+        # 2026-08-21 확인: 콘솔에 등록한 9개가 런타임에서 전부 undefined, Lambda가 자동 주입하는
+        # AWS_REGION·NODE_ENV만 존재. 그래서 첫 Prisma 쿼리마다 "Environment variable not found:
+        # DATABASE_URL"으로 500이 났다. 빌드 시점에 .env.production으로 구워 산출물에 실어 보낸다.
+        # AWS_REGION은 넣지 않는다 — 런타임이 이미 주입하고, Amplify 예약 접두사다.
+        # grep이 하나도 못 맞히면 종료 코드 1로 빌드가 실패한다. 조용히 깨진 채 배포되는 것보다 낫다.
+        - env | grep -e DATABASE_URL -e SESSION_SECRET -e COGNITO_USER_POOL_ID -e COGNITO_CLIENT_ID -e COGNITO_DOMAIN -e BEDROCK_REGION -e BEDROCK_MODEL_ID -e BEDROCK_VISION_MODEL_ID -e S3_BUCKET -e CLOUDFRONT_DOMAIN -e DEV_AUTH_BYPASS >> .env.production
         - npm run build
   artifacts:
     baseDirectory: .next
