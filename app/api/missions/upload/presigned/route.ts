@@ -1,15 +1,25 @@
 import { getCurrentUser } from "@/lib/auth"
 import { S3Client, PutObjectCommand } from "@aws-sdk/client-s3"
 import { getSignedUrl } from "@aws-sdk/s3-request-presigner"
-import { NextResponse } from "next/server"
+import { NextRequest, NextResponse } from "next/server"
 
 const s3 = new S3Client({ region: process.env.AWS_REGION })
 
-export async function POST() {
+export async function POST(req: NextRequest) {
   try {
     const user = await getCurrentUser()
+    const body = await req.json()
+    const contentType = body.contentType || "image/jpeg"
 
-    const fileKey = `mission-photos/${user.id}/${Date.now()}.jpg`
+    // 파일 확장자 결정
+    const extMap: Record<string, string> = {
+      "image/jpeg": "jpg",
+      "image/jpg": "jpg",
+      "image/png": "png",
+      "image/webp": "webp",
+    }
+    const ext = extMap[contentType] || "jpg"
+    const fileKey = `mission-photos/${user.id}/${Date.now()}.${ext}`
     const bucket = process.env.S3_BUCKET
 
     if (!bucket) {
@@ -22,7 +32,7 @@ export async function POST() {
     const command = new PutObjectCommand({
       Bucket: bucket,
       Key: fileKey,
-      ContentType: "image/jpeg",
+      ContentType: contentType,
     })
 
     const uploadUrl = await getSignedUrl(s3, command, { expiresIn: 300 })

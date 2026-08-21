@@ -157,7 +157,11 @@ function MissionModal({ mission, color, bg, mascotEmoji, onClose, onComplete }: 
 
       try {
         // 1. presigned URL 받기
-        const presignRes = await fetch("/api/missions/upload/presigned", { method: "POST" })
+        const presignRes = await fetch("/api/missions/upload/presigned", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ contentType: uploadedFile.type }),
+        })
         const presignJson = await presignRes.json()
 
         if (!presignRes.ok) {
@@ -171,7 +175,7 @@ function MissionModal({ mission, color, bg, mascotEmoji, onClose, onComplete }: 
         const uploadRes = await fetch(uploadUrl, {
           method: "PUT",
           body: uploadedFile,
-          headers: { "Content-Type": "image/jpeg" },
+          headers: { "Content-Type": uploadedFile.type },
         })
 
         if (!uploadRes.ok) {
@@ -401,7 +405,7 @@ function MissionModal({ mission, color, bg, mascotEmoji, onClose, onComplete }: 
 
                   {proofMode && (
                     <div style={{ marginBottom: 12 }}>
-                      <input ref={fileRef} type="file" accept="image/*" style={{ display: "none" }} onChange={handleFile} />
+                      <input ref={fileRef} type="file" accept="image/jpeg,image/jpg,image/png,image/webp" style={{ display: "none" }} onChange={handleFile} />
                       {proofImage ? (
                         <div style={{ position: "relative", borderRadius: 14, overflow: "hidden", aspectRatio: "16/9" }}>
                           <img src={proofImage} alt="proof" style={{ width: "100%", height: "100%", objectFit: "cover" }} />

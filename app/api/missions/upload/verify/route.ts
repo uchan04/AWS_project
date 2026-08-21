@@ -63,6 +63,12 @@ export async function POST(req: NextRequest) {
       )
     }
 
+    // 이미지 포맷 판단 (파일 확장자 기반)
+    let imageFormat: "jpeg" | "png" | "gif" | "webp" = "jpeg"
+    if (body.fileKey.endsWith(".png")) imageFormat = "png"
+    else if (body.fileKey.endsWith(".webp")) imageFormat = "webp"
+    else if (body.fileKey.endsWith(".gif")) imageFormat = "gif"
+
     // Bedrock Vision 호출
     const visionModelId = process.env.BEDROCK_VISION_MODEL_ID || "us.amazon.nova-2-lite-v1:0"
 
@@ -81,7 +87,7 @@ export async function POST(req: NextRequest) {
           content: [
             {
               image: {
-                format: "jpeg",
+                format: imageFormat,
                 source: { bytes: imageBytes },
               },
             },
