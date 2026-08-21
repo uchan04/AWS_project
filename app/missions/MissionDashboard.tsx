@@ -208,7 +208,7 @@ function MissionModal({ mission, color, bg, mascotEmoji, onClose, onComplete }: 
 
         onComplete()
         onClose()
-        window.dispatchEvent(new CustomEvent("mission-completed"))
+        window.dispatchEvent(new CustomEvent("user-stats-changed"))
       } catch {
         setCompleteError("네트워크 오류가 발생했습니다")
       } finally {
@@ -231,7 +231,7 @@ function MissionModal({ mission, color, bg, mascotEmoji, onClose, onComplete }: 
 
       onComplete()
       onClose()
-      window.dispatchEvent(new CustomEvent("mission-completed"))
+      window.dispatchEvent(new CustomEvent("user-stats-changed"))
     } catch {
       setCompleteError("네트워크 오류가 발생했습니다")
     } finally {
@@ -648,7 +648,7 @@ function AttendanceCalendar({ cycleDay, claimedToday, attendanceTotal, color, bg
 
       if (res.ok && !json.data.alreadyClaimed) {
         onClaim()
-        window.dispatchEvent(new CustomEvent("mission-completed"))
+        window.dispatchEvent(new CustomEvent("user-stats-changed"))
       }
     } catch {
       // silent

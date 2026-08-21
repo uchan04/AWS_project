@@ -83,14 +83,14 @@ export function Sidebar() {
 
     loadProfile()
 
-    // 미션 완료 시 씨앗 갱신
+    // 재화·상태 변경 시 갱신
     function handleMissionComplete() {
       loadProfile()
     }
-    window.addEventListener("mission-completed", handleMissionComplete)
+    window.addEventListener("user-stats-changed", handleMissionComplete)
 
     return () => {
-      window.removeEventListener("mission-completed", handleMissionComplete)
+      window.removeEventListener("user-stats-changed", handleMissionComplete)
     }
   }, [])
 

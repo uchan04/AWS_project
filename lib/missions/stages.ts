@@ -15,25 +15,33 @@ export type StageProgress = {
  */
 export async function getStageProgress(userId: string, typeCode: TypeCode): Promise<StageProgress[]> {
   const stages = [1, 2, 3]
+
+  // 전체 단계 미션 한 번에 조회
+  const allMissions = await prisma.mission.findMany({
+    where: { scope: "STAGE", typeCode, stage: { in: stages } },
+    select: { id: true, stage: true },
+  })
+
+  const missionIds = allMissions.map((m) => m.id)
+
+  // 전체 완료 기록 한 번에 조회
+  const completions = await prisma.userMission.findMany({
+    where: {
+      userId,
+      missionId: { in: missionIds },
+      resetKey: "STAGE",
+    },
+    select: { missionId: true },
+  })
+
+  const completedIds = new Set(completions.map((c) => c.missionId))
+
   const result: StageProgress[] = []
 
   for (const stage of stages) {
-    // 해당 단계 미션 조회
-    const missions = await prisma.mission.findMany({
-      where: { scope: "STAGE", typeCode, stage },
-      select: { id: true },
-    })
+    const stageMissionIds = allMissions.filter((m) => m.stage === stage).map((m) => m.id)
+    const completedCount = stageMissionIds.filter((id) => completedIds.has(id)).length
 
-    // 완료 수 (resetKey = "STAGE"로 고정)
-    const completedCount = await prisma.userMission.count({
-      where: {
-        userId,
-        missionId: { in: missions.map((m) => m.id) },
-        resetKey: "STAGE",
-      },
-    })
-
-    // 해금 여부
     let unlocked = stage === 1
 
     if (stage > 1 && result.length > 0) {

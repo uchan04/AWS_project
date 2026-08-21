@@ -145,6 +145,7 @@ export function ChatPanel({ onClose }: { onClose?: () => void }) {
       // 서버가 이미 상한을 적용한 값이라 여기서 다시 min(100, ...)을 계산하지 않는다.
       setAffinityToday((prev) => prev + json.data.granted)
       setInput("")
+      window.dispatchEvent(new CustomEvent("user-stats-changed"))
     } finally {
       setSending(false)
     }

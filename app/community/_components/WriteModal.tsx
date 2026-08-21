@@ -62,7 +62,7 @@ export function WriteModal({ gallery }: { gallery: GalleryTab }) {
       }
       close()
       router.refresh()
-      window.dispatchEvent(new CustomEvent("mission-completed"))
+      window.dispatchEvent(new CustomEvent("user-stats-changed"))
     } finally {
       setPending(false)
     }
