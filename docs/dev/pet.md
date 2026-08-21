@@ -22,6 +22,8 @@
 - 완료: **`develop` 머지 + 공유 DB 반영 (2026-08-21)** — 옛 차단 21·22번(`docs/STATUS.md`에서 **24·25번**으로 밀렸다)이 둘 다 닫혔다. `lastFedAt` 컬럼이 들어가고 `PetSkin` 6행이 `stageCount = 4`가 됐다. `/pet`은 이제 에러 카드가 아니라 정상 화면이고 4단 카드가 다 뜬다. 아래 "막힌 것"·"런타임 검증"
 - 완료: **차단 19번 해소 (2026-08-21)** — 북극곰 `imageKeyBase`를 `pets/bear-polar` → `pets/bear-arctic`으로 시드·실 DB 둘 다 맞췄다(`83a9920`). 6종 전부 S3 실제 키와 일치한다
 - 완료: **런타임 3흐름 검증 (2026-08-21)** — 재화 시드 실행 후 진화 연출·치장 구매·스킨 구매를 다 봤다. 아래 "런타임 검증"
+- 완료: **상점 2화면 디자인 이관 (2026-08-21)** — `/pet/skins`·`/pet/cosmetics`가 옛 `.hm-*`로 남아 있어 홈에서 나무판을 누르면 다른 앱처럼 보였다. 둘 다 `.pet` 스코프로 옮기고 오류 폴백 카드 3장까지 맞췄다. **`hm-pet` 접두사가 코드·CSS에서 0건이 됐다.** 아래 "상점 2화면 이관"
+- **펫 화면군의 디자인 구현은 이걸로 끝났다.** 남은 것은 코드가 아니라 팀 결정(재진단 옛 종족 스킨, 녹화 계정 분리)과 E 담당 인프라(`bg-1~6.png` 업로드, `CLOUDFRONT_DOMAIN`, `SESSION_SECRET`)다
 - **E에게 알림: `.env`·`.env.example`에 `SESSION_SECRET`이 없어 로그인이 500이다.** 아래 "막힌 것"
 
 ## 4단 진화로 변경 (2026-08-21)
@@ -98,7 +100,7 @@
 
 시안 `index.css`의 `@theme inline` 토큰들은 실제로는 인라인 `style`의 `var()`로만 읽히고 있었다(쓰인 Tailwind 클래스는 전부 기본 클래스였다). 그래서 `@theme`가 필요 없고 `.pet` 스코프의 일반 커스텀 프로퍼티로 옮겼다 — **E 소유인 `app/globals.css`를 건드리지 않았다.**
 
-기존 `.hm-pet`·`.hm-pet__cos`·`.hm-pet__evolve`는 지우지 않았다. `app/pet/skins`와 `app/pet/cosmetics`가 아직 쓴다.
+~~기존 `.hm-pet`·`.hm-pet__cos`·`.hm-pet__evolve`는 지우지 않았다. `app/pet/skins`와 `app/pet/cosmetics`가 아직 쓴다.~~ → **2026-08-21에 상점 2화면까지 이관하면서 지웠다.** 아래 "상점 2화면 이관" 절.
 
 ### 방 배경 = 착용한 배경 치장, 기본값은 SVG 방 (2026-08-21 사용자 확정)
 
@@ -131,6 +133,63 @@
 진화 카드 3장은 각 단계 이미지를 CloudFront에서 직접 가리킨다(`page.tsx`가 `imageKeyBase-1/2/3.png`를 만들어 `stageImageUrls`로 넘긴다). 잠긴 단계도 이미지가 뜨지만 카드가 흐리고 자물쇠가 붙는다 — S3에 9장이 이미 다 있다(2026-08-20 실측).
 
 **이 화면은 primary CTA가 하나가 아니다.** `design.md`의 "화면에 primary는 하나" 규칙에서 의도적으로 벗어난 자리다. 받기·먹이기·상점 2개가 동시에 필요한 게임 HUD라서 역할별 색으로 구분했다(accent = 먹이기, 씨앗 초록 = 방치형 수령, 나무색 = 상점). 코드에 주석으로 남겼다.
+
+## 상점 2화면 이관 (2026-08-21) — 펫 화면군 디자인 통일
+
+`/pet`만 Figma 어휘(`.pet-*`)로 이관돼 있었고, **거기서 나무판을 눌러 들어가는 `/pet/skins`·`/pet/cosmetics`는 옛 `.hm-*`였다.** 홈은 종이색·종족색 테두리·나무판인데 상점은 흰 카드 한 장이 가운데 뜨는 `.hm--canvas`라서, 나무판을 누른 순간 다른 앱으로 넘어간 것처럼 보였다. 두 화면을 `.pet` 스코프로 옮겼다.
+
+### 왜 `.pet` 스코프를 그대로 쓰는가
+
+새 스코프를 만들지 않고 홈과 같은 `.pet`을 루트에 얹었다. `--tribe-cta`/`--tribe-line`/`--tribe-soft`/`--tribe-wash`·씨앗 초록·나무색이 전부 `.pet`에 선언돼 있어서, 스코프를 공유하면 상점에서 색 값을 새로 만들 필요가 없다. 상점에만 필요한 것은 세 벌뿐이었다 — 폭 제한, 타일 격자, 타일 안에 들어가는 ghost 버튼.
+
+`data-tribe`가 없으면 `--tribe`가 안 켜지므로 **두 페이지에서 `user.typeCode`를 컴포넌트로 넘긴다.** `SkinList`는 목록 행마다 `typeCode`가 있었지만 그것을 쓰지 않았다 — 진단 전이면 목록이 비어서 스코프가 성립하지 않는다. 값이 `null`이면 `styles/tokens.css`의 `:root { --tribe: var(--color-accent) }`로 떨어져 화면이 깨지지 않는다.
+
+**치장은 종족 제한이 없다(`SPEC.md` 2절).** `typeCode`는 화면 색에만 쓰고 목록 필터에는 쓰지 않는다.
+
+### `main`에 `max-width`를 걸지 않았다
+
+상점은 목록 한 줄이라 데스크톱에서 폭을 묶어야 하는데, `.pet`이 `background: var(--color-paper)`(#f5f0e8)를 깔고 `body`는 `app/globals.css`의 `--background`(#fff, 다크모드 #0a0a0a)다. `main`을 좁히면 **양옆에 흰 띠가, 다크모드에서는 검은 띠가 생긴다.** 그래서 `.pet--shop > *`에 걸어 배경은 전면으로 두고 내용만 46rem으로 묶었다.
+
+### `design.md` "종족 원판 1개 + 희석된 면 1개"를 지키는 방법
+
+배경 상점은 칸이 6개다. 칸마다 종족색 버튼을 넣으면 종족색이 화면을 덮는다. 그래서 색 면적을 이렇게 갈랐다.
+
+| 요소 | 처리 | 이유 |
+|---|---|---|
+| 타일 버튼 (구매·착용·전환) | `.pet-btn--ghost` — 테두리와 글자만 종족색, 면은 비움 | 6개가 동시에 뜨는 자리다 |
+| 착용·전환 중인 칸 | `.pet-item--on` — `--tribe-soft` 면 + `--tribe-cta-2` 테두리 | 스킨 1개·배경 슬롯당 1개만 켜지므로 화면에 하나다. 이게 그 "희석된 면 1개" |
+| 미획득 칸 | `.pet-item--locked` — 점선 테두리 + `--color-paper-2` | `SPEC.md` 5절 "미획득 실루엣". 이미지가 오면 같은 클래스가 `<img>`에 `filter: grayscale(1)`을 건다 |
+| 재화 HUD 아이콘 | `.pet-hud__icon--wood` — 옅은 나무색 | 별조각·친밀도마다 새 색을 만들면 `tokens.css`의 "채도 높은 색은 종족색 하나뿐" 예외가 넷으로 늘어난다. 나무판과 같은 계열을 써서 예외를 늘리지 않았다 |
+
+### 이름을 바꾼 것 2개
+
+- `.pet-pill`로 만들려던 "함께하는 중" 배지를 **`.pet-item__state`**로 바꿨다. `tokens.css`에 이미 작은 `.hm-pill`이 있고 `PetView`가 착용 치장 배지로 그걸 쓴다 — 같은 이름 두 개가 크기만 다르면 다음 사람이 아무거나 집는다. 이 배지는 버튼 자리를 대신 채워서 `--control-h` 높이를 맞춰야 하는 다른 물건이다
+- `.hm-pet__evolve` → **`.pet-evolve`**. 진화 연출만 옛 접두사로 남아 있었다. `hm-pet` 접두사가 이제 코드·CSS에 하나도 없다
+
+### 상점 메시지는 토스트로 두지 않았다
+
+홈의 `.pet-toast`는 `position: fixed`로 떴다 사라지는 값이다. 상점의 안내·오류는 **다음 동작까지 남아 있어야 하는 상태**라서(구매 실패 사유를 읽고 다시 눌러야 한다) 고정 토스트로 두면 화면 아래에 안 사라지고 붙는다. 흐름 안에 들어가는 `.pet-msg` / `.pet-msg--error`로 따로 뒀다. 옛 코드의 `⚠ ` 접두사는 뺐다 — 색 면이 이미 오류를 말하고, `design.md`는 문장 안의 이모지를 금지한다.
+
+### 오류 폴백 카드 3장도 같이 옮겼다
+
+`/pet`·`/pet/skins`·`/pet/cosmetics`의 `catch` 블록이 `.hm--canvas` 카드를 그리고 있었다. 세 화면 다 정상 화면과 같은 어휘가 되도록 `.pet pet--shop` + `.pet-card`로 바꿨고, 상점 두 장에는 `/pet`으로 돌아가는 나무판을 넣었다(오류 화면에서 나갈 길이 없었다).
+
+### 실측
+
+프로덕션 빌드 + 실 DB, `test@welli.local`(여우 = `HEALTH_EMOTION`)로 확인했다.
+
+| 확인 | 결과 |
+|---|---|
+| 세 화면 HTTP | `/pet` `/pet/skins` `/pet/cosmetics` 전부 200 |
+| `.pet pet--shop data-tribe="HEALTH_EMOTION"` | 상점 두 장 모두 루트에 붙었다 |
+| 옛 클래스 잔존 | `hm-pet`·`hm--canvas` 0건 (HTML·CSS 번들 둘 다) |
+| CSS 번들 | `.pet--shop` `.pet-shop` `.pet-item` `--on` `--locked` `.pet-item__state` `.pet-btn--ghost` `.pet-msg` `.pet-hud__icon--wood` `.pet-evolve` 전부 포함 |
+| 외형 상점 상태 | 여우(보유·비활성) → ghost 전환 버튼 / 북극여우(활성) → `.pet-item--on` + `.pet-item__state` |
+| 배경 상점 상태 | 보유 2 + 미획득 4 → ghost 6개, `.pet-item--locked` 4개. 배경1을 착용시키니 `.pet-item--on` 1개 + `벗기` 버튼 |
+| 수집 게이지 | `.pet-gauge__value`에 `2 / 6 수집`. 별도 도감 화면 없이 이 게이지가 겸한다(`SPEC.md` 5절) |
+| `npm run check:pet` / `npm run build` / `npm run lint` | 통과 / 통과 / 0 에러 (경고 6건은 전부 다른 담당 폴더) |
+
+`320px` 무가로스크롤은 브라우저 없이 잴 수 없어 구조로 막았다 — 타일 격자를 `minmax(min(8rem, 100%), 1fr)`로 뒀고(진화 단계 목록과 같은 값), 기존 `@media (max-width: 768px)`가 `.pet__top-acts`를 `width: 100%` + 줄바꿈으로 이미 처리한다. 나무판 문구는 `펫으로` 세 글자다(`.pet-plank`는 `white-space: nowrap`이라 긴 문구를 넣으면 넘친다).
 
 ## 배고픔 게이지 (2026-08-21)
 
@@ -459,9 +518,9 @@ Tailwind 기본 클래스로만 짜 뒀던 것을 `styles/tokens.css`의 `.hm*` 
 - `app/pet/_components/PetView.tsx` — Figma 시안 이관본. 방 + 캐릭터 + 배고픔·경험치·방치형·씨앗 투입 카드 + 진화 카드 3장 + 토스트 + 진화 연출 2초
 - `app/pet/_components/PetRoom.tsx` — 방 배경 SVG. `aria-hidden`, 색은 클래스로만 (벽·커튼·러그는 종족색, 바닥·하늘·화분은 고정색)
 - `prisma/migrations/20260821090000_pet_last_fed_at/` — `User.lastFedAt` 추가. 손으로 쓴 SQL 한 줄
-- `app/pet/cosmetics/page.tsx` + `_components/CosmeticList.tsx` — 치장 목록·착용·수집 진행률
-- `app/pet/skins/page.tsx` + `_components/SkinList.tsx` — 캐릭터 목록·구매·전환
-- `app/pet/pet.css` — 펫 화면 전용 배치·색. 종족색 파생값과 씨앗 초록·상점 나무색은 `.pet` 스코프 안에만 둔다 (`styles/tokens.css`는 A 소유라 덧붙이지 않는다)
+- `app/pet/cosmetics/page.tsx` + `_components/CosmeticList.tsx` — 배경 상점. 목록·구매·착용·수집 진행률. 2026-08-21에 `.pet` 스코프로 이관
+- `app/pet/skins/page.tsx` + `_components/SkinList.tsx` — 외형 상점. 목록·구매·전환. 2026-08-21에 `.pet` 스코프로 이관
+- `app/pet/pet.css` — 펫 화면군(홈 + 상점 2장) 전용 배치·색. 종족색 파생값과 씨앗 초록·상점 나무색은 `.pet` 스코프 안에만 둔다 (`styles/tokens.css`는 A 소유라 덧붙이지 않는다)
 - `app/api/pet/route.ts` — GET 초기 상태 (+ 미수령 방치형 개수)
 - `app/api/pet/feed/route.ts` — POST 씨앗 투입
 - `app/api/pet/idle/route.ts` — GET 미수령 조회 / POST 수령
@@ -694,9 +753,16 @@ A의 `feat/diagnosis`에서 매핑이 맞바뀌었고 8/19 팀 확인으로 의�
 - 확인 안 된 것(다른 담당 영역): 미션·커뮤니티·챗봇 라우트가 `user.seeds += n` 없이 `calculateReward()`를 통과하는지는 그 라우트들이 미착수라 검증 불가. B·D가 착수하면 재확인
   - **2026-08-20**: B·D 둘 다 착수해 `feat/missions`·`feat/community`에 라우트가 올라왔다. 아직 `main`에 없어 `feat/pet`에서는 보이지 않는다. 머지된 뒤 `calculateReward()` 우회 여부를 확인한다
 
-## 다음 할 일 (2026-08-20 갱신)
+## 다음 할 일 (2026-08-21 갱신)
 
-**코드는 끝났다.** `SPEC.md` 5절 기능 전부 + 치장 구매 라우트 + 어미 단정까지 구현됐고, 낡은 문서 3건(`SPEC.md` 2절 / `docs/인수인계.md` / `업무분담.md`)도 맞췄다. 남은 것은 **혼자서는 못 하는 것들**이다.
+**코드와 디자인이 둘 다 끝났다.** `SPEC.md` 5절 기능 전부 + 치장 구매 라우트 + 어미 단정이 구현됐고, 낡은 문서 3건(`SPEC.md` 2절 / `docs/인수인계.md` / `업무분담.md`)도 맞췄다. 2026-08-21에 **펫 화면군 3장(홈 + 상점 2장)의 디자인 어휘 통일**까지 마쳤다(위 "상점 2화면 이관"). 남은 것은 **혼자서는 못 하는 것들**이다.
+
+### 화면 검증 중 브라우저가 필요한 것 2개
+
+`curl`로는 마크업과 CSS 번들까지만 볼 수 있다. 아래 둘은 눈으로 봐야 하며, 값 자체는 이미 검증돼 있다.
+
+- **진화 연출 2초** — `evolvedTo`가 2·3·4로 내려오는 것은 실측했다(위 "런타임 검증"). 화면에 2초 뜨고 사라지는 것만 못 봤다
+- **좁은 화면(320px) 무가로스크롤** — 구조로 막았다(타일 격자 `minmax(min(8rem, 100%), 1fr)`, `@media (max-width: 768px)`가 상단 액션을 줄바꿈). 실제 렌더 확인은 남았다
 
 ### 승인이 필요한 것
 
