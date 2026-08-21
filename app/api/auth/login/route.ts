@@ -7,7 +7,9 @@ import {
   UserNotFoundException,
 } from "@aws-sdk/client-cognito-identity-provider"
 import { fail, ok } from "@/lib/api"
-import { setSessionCookie } from "@/lib/auth"
+import { setLocalSessionCookie, setSessionCookie } from "@/lib/auth"
+import { verifyPassword } from "@/lib/password"
+import { prisma } from "@/lib/prisma"
 
 const client = new CognitoIdentityProviderClient({ region: process.env.AWS_REGION })
 
@@ -22,6 +24,17 @@ export async function POST(request: Request) {
   const { email, password } = (body as { email?: unknown; password?: unknown }) ?? {}
   if (typeof email !== "string" || typeof password !== "string" || !email || !password) {
     return fail("INVALID_BODY", "이메일과 비밀번호를 입력해 주세요", 400)
+  }
+
+  // 자체 DB 계정(A 추가, 2026-08-21). passwordHash가 있는 계정은 Cognito를 거치지 않는다.
+  // Cognito로 만든 계정(Google 로그인 등)은 passwordHash가 null이라 아래 Cognito 경로로 내려간다.
+  const local = await prisma.user.findUnique({ where: { email } })
+  if (local?.passwordHash) {
+    if (!verifyPassword(password, local.passwordHash)) {
+      return fail("INVALID_CREDENTIALS", "이메일 또는 비밀번호가 올바르지 않습니다", 401)
+    }
+    await setLocalSessionCookie(local.id)
+    return ok({})
   }
 
   try {
