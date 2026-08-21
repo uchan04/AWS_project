@@ -73,11 +73,14 @@ export const PET_SKINS: Prisma.PetSkinCreateInput[] = [
   // 곰과 — 가족동거형
   { name: "곰", typeCode: "FAMILY_LIVING", isDefault: true, stageCount: 4, imageKeyBase: "pets/bear" },
   {
+    // 2026-08-21: imageKeyBase를 pets/bear-polar → pets/bear-arctic으로 고쳤다(차단 19번).
+    // S3 실제 파일명이 bear-arctic이고 -polar는 403이다. 여우·고양이도 -arctic이라
+    // 어휘가 맞는 쪽이다. 실 DB도 같이 UPDATE했다(이름은 그대로라 upsert가 덮어쓴다).
     name: "북극곰",
     typeCode: "FAMILY_LIVING",
     stageCount: 4,
     priceShards: VARIANT_PRICE_SHARDS,
-    imageKeyBase: "pets/bear-polar",
+    imageKeyBase: "pets/bear-arctic",
   },
 ]
 

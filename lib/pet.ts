@@ -79,8 +79,8 @@ export function expProgress(level: number, exp: number): number {
 //
 // 이미지가 안 뜰 때 원판·배지 자리에 쓰는 폴백이다 (design.md).
 // 2026-08-21: 이미지는 S3에 6종 × 4단 = 24장이 다 올라와 있다. 옛 주석의 "9장이 아직
-// 없다"는 사실이 아니었다. 지금 이모지로 떨어지는 것은 CLOUDFRONT_DOMAIN이 없을 때와
-// 북극곰(시드가 pets/bear-polar를 가리켜 403. 차단 19번)뿐이다.
+// 없다"는 사실이 아니었다. 북극곰 키 불일치(차단 19번)도 pets/bear-arctic으로 해소했다.
+// 지금 이모지로 떨어지는 것은 CLOUDFRONT_DOMAIN이 빈 값일 때뿐이다.
 // 기본 3종은 lib/types.ts의 TRIBE가 정본이라 여기 다시 적지 않는다.
 // 화면 두 곳(PetView·SkinList)이 같이 쓰므로 컴포넌트가 아니라 여기에 둔다.
 

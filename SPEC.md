@@ -161,7 +161,7 @@ S3 presigned URL로 브라우저가 S3에 직접 업로드하고, 업로드 완�
 - **단계 이름은 알 · 아기 · 청소년 · 성체다.** 이전 3단 구성의 이름(아기·청년·전설)은 쓰지 않는다. 최종 단계는 "전설"이 아니라 "성체"다
 - 임계값의 유일한 출처는 `lib/types.ts`의 `EVOLUTION_LEVEL`이고 `npm run check:pet`이 못 박는다. 단계 이름은 `app/pet/_components/PetView.tsx`의 `STAGE_NAME`이 갖는다
 - 진화 시 풀스크린 연출 2초
-- 이미지는 여우·고양이·곰 × 기본·변종 × 4단 = **24장**이며 S3에 전부 올라와 있다(2026-08-20 실측). 단 `PetSkin.imageKeyBase`가 `pets/bear-polar`인데 S3는 `pets/bear-arctic`이라 북극곰만 어긋난다
+- 이미지는 여우·고양이·곰 × 기본·변종 × 4단 = **24장**이며 S3에 전부 올라와 있다(2026-08-20 실측). `imageKeyBase`는 6종 전부 S3 실제 키와 일치한다 — 북극곰만 `pets/bear-polar`로 어긋나 있던 것을 `pets/bear-arctic`으로 맞췄다(2026-08-21, 시드 + 실 DB)
 - 애니메이션은 CSS transform 수준으로만
 
 ### 재화 3종
