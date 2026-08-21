@@ -17,7 +17,7 @@
 - **재화 배정 확정 (2026-08-20).** 스킨=별조각 전용 / 치장=친밀도 전용. 아래 "재화 배정 확정" 절 참고
 - **가격·수급량 확정 (2026-08-20 팀 결정).** 스킨 별조각 **2500** / 배경 각 친밀도 **600**(합 3600) / 일일 미션 전체 완료 = 별조각 **60** / 글 작성 친밀도 20 · 일 상한 100. 아래 "재화 배정 확정" 절 참고
 - 완료: **Figma 디자인 이관 (2026-08-21)** — `/pet` 화면을 Figma 시안(방 배경·캐릭터·경험치 카드·씨앗 투입 카드·진화 카드 3장)으로 다시 짰다. 아래 "Figma 디자인 이관" 절
-- 완료: **배고픔 게이지 (2026-08-21)** — `User.lastFedAt` 한 컬럼 + 순수 함수. `SPEC.md` 5절에 추가했다. 아래 "배고픔 게이지" 절
+- **배고픔 게이지는 삭제했다 (2026-08-21, 사용자 결정).** 같은 날 넣고 걷었다. 게이지가 있던 자리는 **보유 재화 3종 + 상점 입구 2개** 카드가 쓴다. `User.lastFedAt` 컬럼만 남겨 뒀다. 아래 "배고픔 게이지 → 보유 재화 카드로 교체" 절
 - 완료: **3단 → 4단 진화 (2026-08-21)** — `-4` 이미지가 여유분이 아니라 계획된 것임을 E가 확인해 줬다. 아래 "4단 진화로 변경" 절
 - 완료: **`develop` 머지 + 공유 DB 반영 (2026-08-21)** — 옛 차단 21·22번(`docs/STATUS.md`에서 **24·25번**으로 밀렸다)이 둘 다 닫혔다. `lastFedAt` 컬럼이 들어가고 `PetSkin` 6행이 `stageCount = 4`가 됐다. `/pet`은 이제 에러 카드가 아니라 정상 화면이고 4단 카드가 다 뜬다. 아래 "막힌 것"·"런타임 검증"
 - 완료: **차단 19번 해소 (2026-08-21)** — 북극곰 `imageKeyBase`를 `pets/bear-polar` → `pets/bear-arctic`으로 시드·실 DB 둘 다 맞췄다(`83a9920`). 6종 전부 S3 실제 키와 일치한다
@@ -125,7 +125,7 @@
 
 | 요소 | 결정 | 처리 |
 |---|---|---|
-| 배고픔 게이지 | **유지 + 기능 구현** | 아래 절 |
+| 배고픔 게이지 | 유지 + 기능 구현 → **같은 날 삭제** | 2026-08-21에 구현했다가 사용자 결정으로 걷었다. 그 자리는 보유 재화 3종 + 상점 입구 2개가 쓴다. 아래 "배고픔 게이지 → 보유 재화 카드로 교체" 절 |
 | 진화 단계별 "씨앗 효율 +10/25/50%" | **제거** | 코드에도 `SPEC.md`에도 없는 수치다. 단계가 재화 배율을 바꾼 적이 없고, 넣으면 `calculateReward()` 밖에서 배율이 생긴다. 그 자리에는 실재하는 값 — 활성 스킨의 `effectPct`에서 만든 효과 문구 — 를 현재 단계 카드에만 띄운다 |
 
 씨앗 투입 프리셋은 시안의 1/5/10/20을 **1/10/50/100**으로 바꿨다. 1→2 레벨업이 씨앗 10개이고 일일 미션이 하루 60개를 주므로 20이 최대치면 레벨업 한 번에 버튼을 여러 번 눌러야 한다.
@@ -214,23 +214,59 @@
 
 `feat/pet`에서 `npm run check:pet` 통과 · `npm run build` 통과. `develop` 머지 후 같은 두 개를 다시 돌려 통과. `develop`은 내가 받아온 시점보다 35커밋 더 나가 있었으므로(새 `lib/session.ts`, 인증 마이그레이션 포함) 올리기 전에 그 상태로 다시 빌드했다.
 
-## 배고픔 게이지 (2026-08-21)
+## ~~배고픔 게이지~~ → 보유 재화 카드로 교체 (2026-08-21)
 
-`SPEC.md` 5절에 절을 추가했다. **표시 전용이고 재화·경험치·진화에 영향을 주지 않는다.**
+배고픔 게이지를 같은 날 넣고 뺐다. **사용자 결정으로 삭제**하고, 게이지가 있던 자리(왼쪽 열, 방 아래)에 **재화 3종 + 상점 입구 2개**를 넣었다.
 
-**값을 저장하지 않는다.** `User.lastFedAt`(마지막 급여 시각) 하나만 두고 배고픔은 `lib/pet.ts`의 `hungerFor(since, now)`가 계산한다. 값을 저장하면 화면을 열 때마다 감쇠분을 써야 해서 조회가 쓰기가 된다 — 방치형 씨앗을 페이지 로드에서 지급하지 않는 것과 같은 이유다.
+### 지운 것
 
-- 24시간에 걸쳐 100 → 0 선형 감쇠. 하루 한 번 들여다보면 유지된다
-- **투입 개수는 배고픔에 영향이 없다.** 1개를 먹여도 100이다. "얼마나 먹였나"는 경험치가 이미 표현한다
-- **0이 되어도 페널티가 없다.** 벌점형 압박은 랭킹을 배제한 것과 같은 이유로 이 서비스 대상에 맞지 않는다. 페널티를 넣으려면 `SPEC.md` 5절을 먼저 고친다
-- `lastFedAt`이 `null`인 유저는 화면이 `createdAt`을 넘긴다. 신규 유저에게 0을 보여 주면 시작부터 굶긴 것처럼 보인다
-- 시계 오차로 기준이 미래면 감쇠하지 않는다(`idleAccrual`과 같은 방어)
+| 대상 | 처리 |
+|---|---|
+| `lib/pet.ts` | `hungerFor()`·`hungerLabel()`·`HUNGER_MAX`·`HUNGER_EMPTY_HOURS`·`HUNGER_LOW` 삭제. 자리에 삭제 경위 주석을 남겼다 |
+| `GET /api/pet` | 응답에서 `hunger` 필드 제거 |
+| `POST /api/pet/feed` | 응답에서 `hunger` 제거. **`lastFedAt` 쓰기는 남겼다**(아래) |
+| `app/pet/page.tsx` | `hungerFor()` 호출과 `PetState.hunger` 제거, `starShards`·`affinity` 추가 |
+| `PetView.tsx` | 배고픔 카드·`data-low`·`hunger` 상태 병합 제거 |
+| `app/pet/pet.css` | `.pet-gauge--hunger` 3벌 삭제. `.pet-gauge` 본체는 경험치·수집 게이지가 계속 쓴다 |
+| `scripts/check-pet.ts` | 감쇠 곡선 단정 12개 삭제 |
+| `SPEC.md` 5절 | 절을 취소선 처리하고 대체 화면을 명시. 11절 `lastFedAt` 행도 갱신 |
 
-**마이그레이션은 손으로 썼다.** `prisma/migrations/20260821090000_pet_last_fed_at/migration.sql`에 `ALTER TABLE "User" ADD COLUMN "lastFedAt" TIMESTAMP(3);` 한 줄이다. `npx prisma migrate dev`는 스키마 담당 1인만 실행한다(`CLAUDE.md` 5절). nullable 컬럼 추가라 기존 행을 건드리지 않는다.
+### `User.lastFedAt` 컬럼은 남겼다
 
-`prisma/schema.prisma`는 전원 합의 파일이라 원래 손대지 않지만, 이 컬럼은 **사용자 지시로 추가했다.** `SPEC.md` 11절 표에도 같이 넣었다(`CLAUDE.md` 1절이 요구한다).
+두 가지 이유다.
 
-`npm run check:pet`이 감쇠 곡선(0/6/12/18/24시간 = 100/75/50/25/0), 클램프, 미래 시각, `null`, 라벨 경계(60·30)를 못 박는다.
+- **"일단 삭제"라서 되살릴 수 있어야 한다.** 계산식이 시각 하나만 보므로 컬럼이 남아 있으면 함수를 다시 붙이는 것으로 끝난다. 컬럼을 지웠다 되살리면 그 사이 기록이 비어 전원이 만복으로 리셋된다
+- **컬럼 드롭은 공유 DB 마이그레이션이다.** `prisma/schema.prisma`는 5인 합의 파일이고(`CLAUDE.md` 1·5절) 마감 하루 전에 혼자 낼 변경이 아니다
+
+그래서 `POST /api/pet/feed`는 `lastFedAt`을 계속 쓴다. **읽는 곳은 없는 기록용**이고, 그렇게 주석에 적어 뒀다. `prisma/schema.prisma` 122~123줄 주석은 아직 `hungerFor()`를 가리킨다 — 공유 파일이라 손대지 않았다. 스키마 담당이 정리할 것 하나다.
+
+### 그 자리에 넣은 것 — 보유 재화 카드
+
+```
+🪙 보유 재화
+  🌱 씨앗      83
+  ⭐ 별조각    60
+  💛 친밀도  2,450
+ [외형 상점] [배경 상점]
+```
+
+- 상단 바에 있던 씨앗 HUD와 나무판 2개가 **이 카드로 내려왔다.** 상단은 제목·설명만 남는다 — 재화와 상점 입구가 두 곳에 겹쳐 있을 이유가 없다
+- **종족색 면을 쓰지 않는다.** 이 화면은 이미 씨앗 받기(초록)·먹이기(종족색)·나무판이 색을 나눠 갖고 있어서, 재화 줄까지 색 면을 가지면 주 동작이 사라진다. 줄 배경은 `--color-paper-2` 한 단계뿐이다
+- 아이콘은 씨앗만 씨앗 초록(`.pet-wallet__icon--seed`)이고 별조각·친밀도는 나무색으로 묶었다. 재화마다 색을 만들면 `tokens.css`의 "채도 높은 색은 종족색 하나뿐" 예외가 계속 늘어난다 — 상점 화면에서 `.pet-hud__icon--wood`로 같은 판단을 했다
+- 숫자를 이름 옆 글자로 두므로 `aria`를 따로 붙이지 않았다. "씨앗 83"이 그대로 읽힌다. 아이콘만 `aria-hidden`이다
+- 상점 입구 격자는 `repeat(auto-fit, minmax(min(8rem, 100%), 1fr))`이다. `.pet-plank`가 `white-space: nowrap`이라 320px에서 억지로 한 줄에 두면 글자가 판을 넘어간다 — 좁아지면 두 줄로 갈린다
+
+### 실측
+
+프로덕션 빌드 + 실 DB(`test@welli.local`). `npm run check:pet` 통과 · `npm run build` 통과(exit 0).
+
+| 확인 | 결과 |
+|---|---|
+| `/pet` | 200 |
+| 지갑 마크업 | `.pet-wallet` 1 · `__row` 3 · `__value` 3 · `__icon--seed` 1 · `__shops` 1 |
+| 재화 3줄 | `씨앗 83` / `별조각 60` / `친밀도 2,450` — DB 값과 일치 |
+| 상점 링크 | `/pet/skins` · `/pet/cosmetics` 둘 다 카드 안에 있다 |
+| 배고픔 잔존 | HTML에 `배고픔`·`hunger` **0건** |
 
 ## 재화 배정 확정 (2026-08-20)
 
@@ -328,8 +364,8 @@
 |---|---|
 | `GET /pet` | **200 + 정상 화면.** 에러 카드가 사라졌다 |
 | 진화 단계 카드 | 4장 — `알` Lv.1~4 / `아기` Lv.5~14 / `청소년` Lv.15~24 / `성체` Lv.25+ |
-| `GET /api/pet` | `skin.stageCount = 4`, `hunger` 값이 내려온다 |
-| 배고픔 게이지 | 89 → 씨앗 투입 후 **100**. 투입 개수와 무관하게 100이다(`SPEC.md` 5절) |
+| `GET /api/pet` | `skin.stageCount = 4` |
+| ~~배고픔 게이지~~ | 이때는 89 → 씨앗 투입 후 100이었다. **같은 날 삭제해서 지금은 없는 실측이다**(아래 "보유 재화 카드로 교체") |
 | 씨앗 15개 투입 | `Lv.3 exp 200` → **`Lv.4 exp 50`**, `gainedLevels 1`, `evolvedTo null`(2단은 Lv.5라 맞다) |
 | 잔액 초과 투입 | `400 NOT_ENOUGH_SEEDS` |
 | 방치형 수령(빈 상태) | `200 claimed 0` — 없는데 주지 않는다 |
@@ -377,7 +413,7 @@
 | 전환 | `200` · `activeSkinId` 교체 · `evolutionStage 4` 재계산 |
 | 전환 후 `GET /api/pet` | `skin.name 북극여우` · `imageKeyBase pets/fox-arctic` · `stageCount 4` |
 
-**④ `/pet` 화면** — `200`, 오류 카드 0건, 진화 카드 4장(`알`·`아기`·`청소년`·`성체`)과 `북극여우`·배고픔이 렌더된다.
+**④ `/pet` 화면** — `200`, 오류 카드 0건, 진화 카드 4장(`알`·`아기`·`청소년`·`성체`)과 `북극여우`가 렌더된다. (이때는 배고픔 게이지도 함께 떴다. 같은 날 삭제해 지금은 그 자리에 보유 재화 카드가 뜬다 — 아래 절의 실측 표를 본다)
 
 **아직 못 본 것: 방치형 실제 수령.** 빈 상태(`claimed 0`)만 확인했고 실제 수령은 `lastIdleClaimAt`을 과거로 미는 DB 쓰기가 필요하다 — 이번 승인 범위(재화 시드)에 없어서 하지 않았다. 순수 함수 `idleAccrual()`은 `check:pet`이 이월·상한 초과까지 못 박고 있다.
 
@@ -535,10 +571,11 @@ Tailwind 기본 클래스로만 짜 뒀던 것을 `styles/tokens.css`의 `.hm*` 
 - `lib/reward.ts` — `calculateReward(skin, base)`, `capAffinity()`
 - `scripts/check-reward.ts` — `npm run check:reward`. 로직을 고쳤으면 반드시 돌린다
 - `prisma/seed/items.ts` — 스킨 6종(기본 3 + 변종 3), 치장 배경 6종, `pruneCosmetics()`
-- `lib/pet.ts` — `applySeeds()`, `cappedStage()`, `expProgress()`, `idleAccrual()`, `hungerFor()`/`hungerLabel()`, `compareCosmetics()`, `ANIMAL_EMOJI`/`animalEmoji()`. 순수 함수·상수만 둔다
-- `scripts/check-pet.ts` — `npm run check:pet`. 성장 곡선·진화 임계값·다중 레벨업·방치형 누적·배고픔 감쇠·치장 정렬 검증
-- `app/pet/page.tsx` — 서버 컴포넌트. `force-dynamic`. 배고픔·단계별 이미지 URL 3장을 여기서 만든다
-- `app/pet/_components/PetView.tsx` — Figma 시안 이관본. 방 + 캐릭터 + 배고픔·경험치·방치형·씨앗 투입 카드 + 진화 카드 3장 + 토스트 + 진화 연출 2초
+- `lib/pet.ts` — `applySeeds()`, `cappedStage()`, `expProgress()`, `idleAccrual()`, `compareCosmetics()`, `ANIMAL_EMOJI`/`animalEmoji()`. 순수 함수·상수만 둔다. 배고픔 함수가 있던 자리에는 삭제 사유 주석만 남았다
+- `scripts/check-pet.ts` — `npm run check:pet`. 성장 곡선·진화 임계값·다중 레벨업·방치형 누적·치장 정렬 검증
+- `app/pet/page.tsx` — 서버 컴포넌트. `force-dynamic`. 재화 3종·단계별 이미지 URL 4장을 여기서 만든다
+- `app/pet/_components/PetView.tsx` — Figma 시안 이관본. 방 + 캐릭터 + 보유 재화·경험치·방치형·씨앗 투입 카드 + 진화 카드 4장 + 토스트 + 진화 연출 2초
+- `app/pet/loading.tsx` — `/pet` 뼈대. `force-dynamic` + DB 3회 왕복(약 900ms) 동안 내비게이션이 커밋되게 한다. A가 넣었고 2026-08-21에 `.pet` 어휘로 옮겼다
 - `app/pet/_components/PetRoom.tsx` — 방 배경 SVG. `aria-hidden`, 색은 클래스로만 (벽·커튼·러그는 종족색, 바닥·하늘·화분은 고정색)
 - `prisma/migrations/20260821090000_pet_last_fed_at/` — `User.lastFedAt` 추가. 손으로 쓴 SQL 한 줄
 - `app/pet/cosmetics/page.tsx` + `_components/CosmeticList.tsx` — 배경 상점. 목록·구매·착용·수집 진행률. 2026-08-21에 `.pet` 스코프로 이관
