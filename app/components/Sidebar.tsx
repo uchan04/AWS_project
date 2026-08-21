@@ -2,21 +2,11 @@
 
 import { useState, useEffect } from "react"
 import Link from "next/link"
-import { usePathname } from "next/navigation"
+import { usePathname, useRouter } from "next/navigation"
 import { TRIBE } from "@/lib/types"
+import type { SidebarProfile } from "@/lib/profile"
 import type { TypeCode } from "@prisma/client"
 import styles from "./Sidebar.module.css"
-
-type ProfileData = {
-  nickname: string
-  typeCode: TypeCode | null
-  seeds: number
-  affinity: number
-  starShards: number
-  level: number
-  createdAt: string
-  imageUrl: string | null
-}
 
 function getBgColor(hex: string): string {
   // colorHex → 배경색 (약한 톤)
@@ -41,63 +31,23 @@ const TABS: { href: string; label: string; emoji: string; desc: string }[] = [
   { href: "/community", label: "커뮤니티", emoji: "💬", desc: "같은 종족 모임" },
 ]
 
-export function Sidebar() {
+export function Sidebar({ profile }: { profile: SidebarProfile | null }) {
   const pathname = usePathname()
+  const router = useRouter()
   const [showAccount, setShowAccount] = useState(false)
-  const [profile, setProfile] = useState<ProfileData | null>(null)
-  const [loading, setLoading] = useState(true)
   const [compact, setCompact] = useState(false)
 
+  // 재화·상태 변경 시 갱신(2026-08-21 A 수정).
+  // 프로필은 layout.tsx가 서버에서 읽어 props로 주므로 여기서 fetch하지 않는다.
+  // router.refresh()가 레이아웃을 다시 렌더해 새 props를 흘려보낸다 — 요청 1건이고,
+  // 이동할 때가 아니라 씨앗·친밀도가 실제로 바뀐 순간에만 나간다.
   useEffect(() => {
-    function loadProfile() {
-      Promise.all([fetch("/api/pet"), fetch("/api/diagnosis/me")])
-        .then(([petRes, diagRes]) => {
-          // 401을 본문 폴백으로 메우면 미인증에도 "익명 · 미분류 · Lv.1 · 씨앗 0개"와
-          // 로그아웃 버튼이 그대로 뜬다(2026-08-21 제보, A 수정). 인증이 안 됐으면 사이드바를 뺀다
-          if (!petRes.ok || !diagRes.ok) return null
-          return Promise.all([petRes.json(), diagRes.json()])
-        })
-        .then((pair) => {
-          if (!pair) {
-            setProfile(null)
-            return
-          }
-          const [petData, diagData] = pair
-          setProfile({
-            nickname: diagData.data?.nickname || "익명",
-            typeCode: diagData.data?.typeCode || null,
-            seeds: petData.data?.seeds || 0,
-            affinity: petData.data?.affinity || 0,
-            starShards: petData.data?.starShards || 0,
-            level: petData.data?.level || 1,
-            createdAt: diagData.data?.createdAt || new Date().toISOString(),
-            imageUrl: petData.data?.imageUrl || null,
-          })
-        })
-        .catch(() => {
-          // 여기도 가짜 프로필을 만들지 않는다. 못 읽었으면 사이드바를 안 그리는 쪽이 맞다
-          setProfile(null)
-        })
-        .finally(() => setLoading(false))
+    function handleStatsChanged() {
+      router.refresh()
     }
-
-    loadProfile()
-
-    // 재화·상태 변경 시 갱신
-    function handleMissionComplete() {
-      loadProfile()
-    }
-    window.addEventListener("user-stats-changed", handleMissionComplete)
-
-    return () => {
-      window.removeEventListener("user-stats-changed", handleMissionComplete)
-    }
-    // pathname을 넣는다(2026-08-21 A 수정). 사이드바는 layout.tsx에 있어 앱 전체에서 한 번만
-    // 마운트되므로 deps가 비어 있으면 프로필을 최초 1회만 읽는다. 로그인은 router.push("/")로
-    // 클라이언트 이동하니 재조회가 없고, 미인증 때 잡은 profile=null이 그대로 남아 홈에서
-    // 사이드바가 사라진다(새로고침하면 뜨는 이유가 이것이다).
-    // 401 폴백을 없애면서 드러난 문제다 — 폴백이 있던 때는 가짜 프로필로 가려져 있었다.
-  }, [pathname])
+    window.addEventListener("user-stats-changed", handleStatsChanged)
+    return () => window.removeEventListener("user-stats-changed", handleStatsChanged)
+  }, [router])
 
   // 화면 크기 감지
   useEffect(() => {
@@ -115,7 +65,9 @@ export function Sidebar() {
     return null
   }
 
-  if (loading || !profile) {
+  // 미인증이거나 프로필을 못 읽었으면 그리지 않는다. 폴백으로 가짜 프로필을 만들면
+  // 미인증에도 "익명 · 미분류 · Lv.1"과 로그아웃 버튼이 뜬다(2026-08-21 제보, A 수정).
+  if (!profile) {
     return null
   }
 

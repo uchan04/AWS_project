@@ -29,6 +29,8 @@ export default function SignupPage() {
     try {
       await signup(email, password)
       router.push("/")
+      // 서버 레이아웃이 새 세션 쿠키를 읽도록 강제한다(login/page.tsx와 같은 이유)
+      router.refresh()
     } catch (caught) {
       setError(caught instanceof Error ? caught.message : "잠시 후 다시 시도해 주세요")
     } finally {
