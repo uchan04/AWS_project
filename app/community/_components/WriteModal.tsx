@@ -76,7 +76,9 @@ export function WriteModal({ gallery }: { gallery: GalleryTab }) {
           setTopics(isAll ? [] : pickThreeTopics(gallery))
           setIsOpen(true)
         }}
-        className="rounded-xl px-5 py-2.5 text-sm font-semibold text-white transition"
+        // 배경이 종족 색(인라인)이라 hover:bg-*로는 못 건드린다. 색과 무관한 그림자·이동·축소로 반응을 만든다.
+        // 이동·확대만 motion-safe:로 감싼다 — prefers-reduced-motion에서도 그림자는 남아야 무엇을 누르는지 보인다.
+        className="rounded-xl px-5 py-2.5 text-sm font-semibold text-white shadow-sm transition duration-150 hover:shadow-lg focus-visible:shadow-lg focus-visible:ring-2 focus-visible:ring-neutral-900 focus-visible:ring-offset-2 focus-visible:outline-none active:shadow-sm motion-safe:hover:-translate-y-0.5 motion-safe:hover:scale-[1.02] motion-safe:focus-visible:-translate-y-0.5 motion-safe:active:translate-y-0 motion-safe:active:scale-[0.98]"
         style={{ backgroundColor: tribeColor }}
       >
         ✏️ 글 쓰기
@@ -112,7 +114,8 @@ export function WriteModal({ gallery }: { gallery: GalleryTab }) {
                         setTitle(topic.title)
                         setBody(topic.draft)
                       }}
-                      className="rounded-xl border border-neutral-200 px-4 py-2.5 text-left transition hover:bg-neutral-50"
+                      // 세로로 나열되므로 이동 효과는 넣지 않는다. 테두리 색만 진해져 "고를 수 있는 것"임을 드러낸다.
+                      className="rounded-xl border border-neutral-200 px-4 py-2.5 text-left transition duration-150 hover:border-neutral-400 hover:bg-neutral-50 focus-visible:border-neutral-400 focus-visible:bg-neutral-50 focus-visible:ring-2 focus-visible:ring-neutral-900 focus-visible:ring-offset-2 focus-visible:outline-none"
                     >
                       <span className="block text-sm font-semibold" style={{ color: tribeColor }}>
                         {topic.title}
