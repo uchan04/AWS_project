@@ -126,6 +126,7 @@ export function PostDetailModal({
       setCommentBody("")
       setPost((prev) => (prev ? { ...prev, commentCount: prev.commentCount + 1 } : prev))
       setAffinityNotice(json.data.granted > 0 ? `친밀도 +${json.data.granted}` : "오늘 친밀도를 이미 다 받았어요")
+      window.dispatchEvent(new CustomEvent("mission-completed"))
     } finally {
       setCommentPending(false)
     }

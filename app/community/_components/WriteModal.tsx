@@ -57,6 +57,7 @@ export function WriteModal({ gallery }: { gallery: GalleryTab }) {
       }
       close()
       router.refresh()
+      window.dispatchEvent(new CustomEvent("mission-completed"))
     } finally {
       setPending(false)
     }
