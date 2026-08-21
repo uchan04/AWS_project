@@ -2,7 +2,7 @@
 
 **모든 세션은 이 문서부터 읽는다.** 그다음 아래 "지금 읽어야 할 문서"만 읽고 시작한다.
 
-최종 갱신: 2026-08-20 (A·B·C·D·E 5인 전원 `develop` 머지 완료. 차단 9·12·16·18 해소. 남은 것은 13·14·17 + 새로 찾은 19·20)
+최종 갱신: 2026-08-21 (D 미션 완료 연동 + 로그인 화면 챗봇 버튼 숨김. 차단 20 해소. 남은 것은 13·14·19)
 현재 단계: **D2 — 인프라 완료, 기능 5개 병렬 착수 (8/20 기능 동결 예정일)**
 
 팀원 인수인계용 단일 문서는 [`docs/인수인계.md`](인수인계.md)에 있다. 새로 합류하거나 노션으로 공유할 때는 그 문서를 쓴다.
@@ -34,7 +34,7 @@
 | A | 진단 + 미션 콘텐츠 + 홈 | **`develop`에 머지 완료**(`a098c61`, 2026-08-20). 미션 41개, 13문항 + 판정 함수, 조기 종료, 화면 3장 + Figma 값·구성 반영, 진단 API 3종(완료·조회·닉네임) + 화면 연결, **실 DB로 진단→결과→홈 전체 흐름 확인 완료**, 홈 미션을 `GET /api/missions`로 교체(`bdcef94`), 결과 화면 판정 근거 3줄(`298ab56`), 친밀도 이중 지급 제거(`5a2753e`) | **A 담당 기능은 남은 것이 없다.** 근거 3줄의 Bedrock 실호출만 E의 IAM 키·`BEDROCK_MODEL_ID` 공유 대기다(실패해도 카드만 빠지고 화면은 뜬다). 관리자 교차표와 LLM 2종은 컷 |
 | B | 미션 시스템 + 사진 업로드 | **`develop`에 머지 완료**(`90b386f`, 2026-08-20). 미션 API 3종, 사진 업로드 presign·verify, 미션 대시보드, 출석, `lib/missions/` 8개 파일. 재화는 `calculateReward()`를 경유한다. 마지막 6커밋으로 `exp` 직접 증가 제거(`6495f37`) + `getToday()` UTC 자정 통일(`62340e5`·`d0fa3cb`·`1e4a46d`) + 미션 화살표 위치까지 들어왔다 | 하단 탭을 사이드바로 교체한 것도 B다(결정 9번은 E 배정이었다). 남은 것은 lint 에러 11건 + **차단 17번**(`completion.ts:123`이 `calculateReward()`를 우회한다) |
 | C | 펫 + 스킨 | **`SPEC.md` 5절 기능 전부 완료 + `develop`에 머지 완료**(2026-08-20). 성장·씨앗 투입·진화 연출, 방치형 자동 획득, 치장 **구매**·착용·해제, 스킨 구매·전환 + 화면 3장. 구조 변경(종족 전용 외형 / 치장 종족 무관 / 가챠 삭제 / **치장 12종 → 배경 6종**) 반영 완료. `docs/dev/diagnosis.md` 15·17절이 넘긴 C 몫도 전부 처리(치장 구매 라우트, `check-pet` 어미 단정, 시드 가격 확정값, `SPEC.md` 2·5·6·11절, `docs/dev/pet.md`, `docs/인수인계.md`, `업무분담.md`) | **코드에 남은 것 없음.** 재화 가격·수급량 확정값까지 시드·`check:pet`·문서·**실 DB**에 반영했다. 고양잇과 변종 스킨은 `샴고양이` → **`북극고양이`**로 개명(2026-08-20). 남은 것은 런타임 검증 4흐름(공유 DB 쓰기 승인 대기), 데모 계정 재화 시드값(8/21), 재진단 후 옛 종족 스킨 처리 정책(팀 결정) |
-| D | 커뮤니티 + 챗봇 | **`develop`에 머지 완료**(2026-08-20). 기능 구현 끝 — 챗봇 Bedrock 스트리밍(2026-08-19), 챗봇 전역 오버레이 런처 전환(`f149243`, 임시 `/chat` 라우트 폐기), 본인 댓글 삭제, 미인증 500 수정(`13f3a6a`), 글쓰기 주제 추천(고정 문구), 전체 탭 글쓰기(`GalleryType` 반영). 미션 완료 연동 호출부(`completeMission`)는 주석으로 준비만 해둠 | **대기 상태가 아니다** — `completeMissionByCode({ actor, code })`가 `develop`에 이미 있다(C 확인, 2026-08-20). 다만 주석의 `completeMission(user.id, "DAILY_CHAT")`과 시그니처가 다르니 그대로 풀지 말 것. `app/layout.tsx`(E 소유) 2줄 변경이 들어 있다 — 차단 13번과 같은 사안. 세부는 `docs/dev/community.md` "재개 지점" |
+| D | 커뮤니티 + 챗봇 | **`develop`에 머지 완료**(2026-08-20). 기능 구현 끝 — 챗봇 Bedrock 스트리밍(2026-08-19), 챗봇 전역 오버레이 런처 전환(`f149243`, 임시 `/chat` 라우트 폐기), 본인 댓글 삭제, 미인증 500 수정(`13f3a6a`), 글쓰기 주제 추천(고정 문구), 전체 탭 글쓰기(`GalleryType` 반영). **미션 완료 연동 완료**(2026-08-21) — `DAILY_COMMUNITY_POST`·`DAILY_CHAT` 두 라우트가 `completeMissionByCode({ actor, code })`를 실제로 호출한다 | **D 담당 기능은 남은 것이 없다.** 미션 연동은 주석의 `completeMission(user.id, code)` 대신 확정 시그니처로 새로 썼고, `grantAffinity()` 다음 별도 `try/catch`에 둬 미션 실패가 글·메시지 저장을 롤백시키지 않는다. 응답 형태는 그대로다. `app/layout.tsx`(E 소유) 2줄 변경이 들어 있다 — 차단 13번과 같은 사안. 세부는 `docs/dev/community.md` "재개 지점" |
 | E | 인프라 + 인증 | RDS·Cognito·S3+CloudFront·CloudWatch+SNS·Bedrock·auth 실검증·하단 탭 내비 완료, PR #1 머지 + 2차 마이그레이션 + auth 빌드 수정 + 색 토큰 정리 완료. 로그인 화면(이메일+비밀번호/Google) + 쿠키 기반 인증 전환 + `amplify.yml` 완료(2026-08-20) | Amplify GitHub 연동, Google IdP 자격증명(아래 참고) 남음 |
 
 ## 전체 차단 사항
@@ -49,7 +49,7 @@
 
 **`.env.example`의 `DATABASE_URL` 샘플에 `sslmode=require`가 없다 (E에게 알림, 2026-08-20 C 확인)**: 샘플은 `?schema=public`으로 끝나는데 실제 RDS는 SSL을 요구한다. `cp .env.example .env`로 시작한 사람은 접속에 실패한다. 동작하는 형태는 `...:5432/welli?schema=public&sslmode=require`다. `.env.example`은 E 소유라 C가 고치지 않았다
 
-해소된 항목(1·2·3·**4**·5·6·7·8·**9**·10·**11**·**12**·**15**·**16**·**18**번)은 이 목록에서 지웠다. 이력이 필요하면 `git log docs/STATUS.md`를 본다. 남은 것은 아래 5개(13·14·17·19·20)다.
+해소된 항목(1·2·3·**4**·5·6·7·8·**9**·10·**11**·**12**·**15**·**16**·**17**·**18**·**20**번)은 이 목록에서 지웠다. 이력이 필요하면 `git log docs/STATUS.md`를 본다. 남은 것은 아래 3개(13·14·19)다.
 
 **차단 4번(인증) 해소** — E가 `lib/auth.ts`를 `cookies()`로 바꾸고 로그인·회원가입 화면과 `/api/auth/*` 5종을 붙였다(`ba9287a`). 서버 컴포넌트 5개와 API가 같은 경로로 인증된다.
 **차단 11번(모바일) 해소** — `app/components/Sidebar.module.css`의 `768px` 미디어 쿼리로 아이콘 레일이 붙었다(B의 `468f17f`). A의 머지로 `develop`에 들어왔다.
@@ -82,7 +82,7 @@
 14. **배포 설정이 검증되지 않았다 (E 담당)** — `amplify.yml`은 들어왔다(`f0a8634`). 다만 Amplify가 `main`에 연결되지 않아 이 파일로 실제 빌드가 도는 것은 아직 확인되지 않았다. `BEDROCK_VISION_MODEL_ID`도 Amplify 환경변수에 등록되지 않았다(`.env.example`에는 있다. `lib/missions/vision.ts:7`이 폴백하므로 죽지는 않는다)
 ~~17. 일일 완주 보너스가 `calculateReward()`를 우회한다~~ — 해소(2026-08-20, E). `lib/missions/completion.ts`가 `starShards: { increment: 60 }` 직접 증감 대신 `calculateReward(actor.activePetSkin, { starShards: 60 })`을 거치도록 고쳤다. 값은 그대로 60이지만(스킨 고유 효과 없음), 앞으로 별조각 배율 스킨이 생기면 이 보너스에도 자동 적용된다
 19. **북극곰 스킨 이미지 키가 S3에 없는 경로를 가리킨다 (C 담당, 확인 후 처리로 미룸)** — `prisma/seed/items.ts`의 `imageKeyBase`가 `pets/bear-polar`인데 CloudFront에 올라간 파일은 그 이름이 아니다. 여우·고양이는 `pets/fox-arctic`·`pets/cat-arctic`으로 맞는다. 곰만 어긋나 변종을 사면 이미지가 깨진다. 시드 파일 한 줄이라 고치는 비용은 없고, **S3에 실제로 올라간 파일명을 먼저 확인해야** 어느 쪽을 맞출지 정해진다(2026-08-20 판단 보류). `docs/dev/pet.md:110`의 "cat-arctic 9장 다 아직 없어서 지금은 공짜다"도 사실과 다르다 — `pets/cat-arctic-1.png`·`-3.png`는 200이다
-20. **로그인·회원가입 화면에 챗봇 버튼이 뜬다 (D 담당)** — `app/chat/_components/ChatLauncher.tsx`가 `/diagnosis`만 숨기고, 주석은 "별도의 로그인 라우트는 아직 없다"고 적혀 있다. E가 `app/(auth)/login`·`signup`을 만든 뒤라 실측하면 두 화면 다 "마음 친구 열기" 버튼이 1개 렌더된다(`curl /login | grep -c`). 미인증 상태라 누르면 401이다. 숨김 목록에 두 경로를 넣으면 끝난다
+~~20. 로그인·회원가입 화면에 챗봇 버튼이 뜬다~~ — 해소(2026-08-21, D). `app/chat/_components/ChatLauncher.tsx`의 숨김 경로를 모듈 스코프 `HIDDEN_PATHS = ["/diagnosis", "/login", "/signup"]` + `includes()`로 바꿨다. `(auth)`는 라우트 그룹이라 URL에 안 나타나므로 실제 경로가 `/login`·`/signup`이다. 낡은 "별도의 로그인 라우트는 아직 없다" 주석도 경로별 숨김 이유로 교체했다. 상세는 `docs/dev/community.md` "로그인 화면 챗봇 버튼 숨김"
 
 **8/20 5인 머지 — A·B·C·D·E가 전부 들어갔다.** A는 `develop`(`d8edf2b`)을 받아 충돌 3건을 해결하고 올렸고(`f9314a5`), B가 `feat/missions`를 머지했고(`3adbea5` → `cb16959`), E가 `develop`을 `main`에 올린 뒤 `main`을 다시 머지했다(`152dbae`). 이어 A가 진단 근거 3줄과 B 복구분을 올렸다(`a098c61`). D가 `feat/community`를 머지했고(`563ab15`), C가 그 위에 `feat/pet`을 머지했고, B가 마지막 6커밋을 올렸다(`90b386f` → `773262d`). **다섯 브랜치 전부 `develop` 미반영 0건이다.** `docs/STATUS.md`가 매번 충돌하는데, 코드는 아직 한 번도 충돌하지 않았다 — 이 문서만 손으로 합치면 된다.
 
