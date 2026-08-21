@@ -678,7 +678,7 @@ model DiagnosisSession {
 
 사용자 결정 3건을 한 번에 반영한다.
 
-1. **스킨은 종족 전용이다.** 진단으로 정해진 동물은 고정이고, 상점에서 사는 것은 같은 동물의 변종 외형뿐이다. 여우는 북극여우·사막여우, 고양이는 샴고양이·페르시안고양이, 곰은 북극곰·반달가슴곰처럼 어미에 종족명이 붙는다. 능력치는 바뀌지 않고 **외형만** 바뀐다
+1. **스킨은 종족 전용이다.** 진단으로 정해진 동물은 고정이고, 상점에서 사는 것은 같은 동물의 변종 외형뿐이다. 어미에 종족의 동물명이 붙는다 — 실제로 들어간 3종은 북극여우·북극고양이·북극곰이다(2026-08-20, C가 `샴고양이`를 `북극고양이`로 개명해 셋을 "북극"으로 맞췄다). 능력치는 바뀌지 않고 **외형만** 바뀐다
 2. **치장 아이템은 종족 구분을 없앤다.** 모든 치장 아이템을 종족과 무관하게 쓸 수 있다. 등급(`rarity`)은 유지한다
 3. **화폐를 전용으로 갈라놓는다.** 스킨은 **별조각 전용**, 치장 아이템(옷·배경 등)은 **친밀도 전용**이다. 한 품목을 두 화폐로 살 수 있게 두지 않는다
 
@@ -801,7 +801,7 @@ git pull && npx prisma migrate deploy && npx prisma generate
 | 스킨 | 별조각 |
 |---|---|
 | 기본 외형(여우·고양이·곰) | `null` (진단으로 지급) |
-| 변종 외형(북극여우·샴고양이·북극곰) | **2,500** |
+| 변종 외형(북극여우·북극고양이·북극곰) | **2,500** |
 
 **시드가 아직 50이다.** `prisma/seed/items.ts`의 `VARIANT_PRICE_SHARDS`를 2500으로 바꾸고 `npm run db:seed`를 돌려야 실 DB가 맞는다 — C 소유 파일이라 A가 고치지 않았다.
 
@@ -830,7 +830,7 @@ const stage = pet.stageCount > 1 ? Math.min(pet.evolutionStage, 3) : 2
 여우      HEALTH_EMOTION          isDefault    stage3  pets/fox
 북극여우  HEALTH_EMOTION          별조각 2500  stage3  pets/fox-arctic
 고양이    INDEPENDENT_LOW_INCOME  isDefault    stage3  pets/cat
-샴고양이  INDEPENDENT_LOW_INCOME  별조각 2500  stage3  pets/cat-siamese
+북극고양이  INDEPENDENT_LOW_INCOME  별조각 2500  stage3  pets/cat-arctic
 곰        FAMILY_LIVING           isDefault    stage3  pets/bear
 북극곰    FAMILY_LIVING           별조각 2500  stage3  pets/bear-polar
 ```
@@ -875,7 +875,7 @@ DELETE FROM "CosmeticItem" WHERE "name" IN (
 
 | 파일 | 변경 |
 |---|---|
-| ~~`prisma/seed/items.ts`~~ | **완료(A, 2026-08-20).** `tribeColor` 삭제, 늑대·삵·판다를 북극여우·샴고양이·북극곰으로 교체(`stageCount: 3`, `priceShards: 50`, `effectType: NONE`), 치장 12종에 `affinityOnly: true` + 등급에서 파생시킨 `priceAffinity`. 가격은 `PRICE_BY_RARITY` 한 곳에서 나온다 |
+| ~~`prisma/seed/items.ts`~~ | **완료(A, 2026-08-20).** `tribeColor` 삭제, 늑대·삵·판다를 북극여우·샴고양이·북극곰으로 교체(`stageCount: 3`, `effectType: NONE`), 치장에 `affinityOnly: true` + 등급에서 파생시킨 `priceAffinity`. 가격은 `PRICE_BY_RARITY` 한 곳에서 나온다. **이후 C가 확정값으로 마무리했다** — 변종 2,500 / 배경 600, 치장 12종을 배경 6종으로 줄임, `샴고양이` → `북극고양이` 개명 |
 | ~~`scripts/check-reward.ts`~~ | **완료(A, 2026-08-20).** 더미 `PetSkin`의 `priceAffinity: null`을 `priceShards: null`로 |
 | ~~`app/api/pet/cosmetics/route.ts`~~ | **완료(A, 2026-08-20 머지 시).** 응답에서 `tribeColor` 삭제 |
 | ~~`app/api/pet/skins/route.ts`~~ | **완료(A).** `findMany`에 `where: { typeCode: user.typeCode }`, `user.typeCode`가 `null`(진단 전)이면 빈 목록. 응답의 `affinity`·`priceAffinity`를 `starShards`·`priceShards`로 |
@@ -1086,6 +1086,45 @@ A 소유 문서에서 폐기된 기획을 지웠다. 아래 4곳은 C 소유라 
 ### 미결
 
 1. **성장 단계가 3단인가 4단인가** — 시트에는 단계가 4개 그려져 있고 스키마·시드·`lib/pet.ts`는 3단이다. E가 지금 올리고 있으므로 오늘 정해야 한다. 4단으로 가면 `stageCount`(전원 합의)와 `lib/pet.ts`(C)를 함께 고쳐야 한다
-2. **고양이 변종 이름** — 시드는 `샴고양이`, 시트는 북극 계열이다. `check:pet`의 어미 단정은 둘 다 통과한다
+2. ~~**고양이 변종 이름**~~ — 해소(2026-08-20, C). `북극고양이`로 개명했고 `imageKeyBase`도 `pets/cat-arctic`이다. 시트와 맞는다
 3. **모자·목도리 가격** — 배경만 600으로 정해졌다
 4. **치장 시트의 두 항목** — 앰버 모자에 여우 귀가 붙어 있어 "종족 무관" 규칙과 어긋난다. 라벤더 모자·목도리는 진열대에 놓인 그림이라 캐릭터에 겹칠 수 없다
+
+---
+
+## 18. 진단 로그인 게이트 (2026-08-20)
+
+### 문제
+
+미인증 상태로 `/diagnosis`에 들어가면 문항이 전부 뜬다. 답을 다 하고 나서 `POST /api/diagnosis/complete`가 401을 내고, 그때 "로그인이 필요합니다"가 보인다. 답변은 `useState` 안에만 있고 서버에 없어서 로그인하고 돌아오면 처음부터 다시 푼다. 평균 문항 수가 9.7개이므로 3분쯤 버린다. D가 제보했다.
+
+### 고친 방식 — 서버 컴포넌트 게이트
+
+`app/diagnosis/page.tsx`를 서버 컴포넌트로 바꿨다. `getCurrentUser()`가 throw하면 가입 안내 카드를 렌더하고, 통과하면 `_components/AskFlow.tsx`(클라이언트, 기존 문항 흐름 그대로)를 렌더한다. `export const dynamic = "force-dynamic"`을 붙였다 — 인증을 읽으므로 정적 프리렌더 대상이 아니다. 빌드 출력에서 `/diagnosis`가 `○`에서 `ƒ`로 바뀐다.
+
+파일 분리는 이 때문에 필요했다. 기존 `page.tsx`가 `"use client"`였고 클라이언트 컴포넌트는 `getCurrentUser()`를 부를 수 없다. `AskFlow.tsx`는 옮긴 것뿐이고 `progressOf()`·`nextQuestion()`·`choose()`·완료 실패 시 "다시 보내기" 카드는 손대지 않았다.
+
+### 클라이언트 확인(`checkAuth()` + `useEffect`)을 쓰지 않은 이유
+
+D가 그 방식으로 먼저 구현했다. 두 가지가 서버 쪽으로 기울었다.
+
+1. **깜빡인다.** 정적 셸이 먼저 그려지고 마운트 후 확인 결과가 와서 안내 카드로 바뀐다. 서버에서 판단하면 첫 바이트부터 최종 화면이다
+2. **확인 요청이 실패할 때 정할 게 생긴다.** 통과시키면 원래 문제가 그대로 재현되고, 막으면 로그인한 사람이 네트워크가 한 번 끊겼다고 진단을 시작할 수 없다. 어느 쪽을 골라도 한쪽이 틀린다. 서버 컴포넌트는 요청이 하나뿐이라 이 갈림길이 아예 생기지 않는다
+
+덧붙여 `GET /api/diagnosis/me` 왕복이 진단 시작마다 한 번 더 붙는 것도 없어졌다. 같은 패턴이 `app/pet/page.tsx`(C)·`app/community/page.tsx`(D)에 이미 두 번 있어서 세 번째 사본이 새 함수보다 싸다.
+
+### 실측
+
+프로덕션 빌드로 확인했다.
+
+| 조건 | 결과 |
+|---|---|
+| `DEV_AUTH_BYPASS=false`, 쿠키 없음 | 200. "먼저 가입해 주세요" + `/signup`·`/login` 링크. 문항 마크업(`hm-ask__choices`·`hm-bar__fill`) 없음 |
+| `DEV_AUTH_BYPASS=true` | 200. 문항 마크업과 "1번째 질문이에요" 렌더 |
+
+`npm run check:diagnosis` 통과(시나리오 20개, 평균 9.7문항), `tsc --noEmit` 통과.
+
+### 남겨둔 것
+
+- `getCurrentUser()`는 DB 장애로도 throw한다. 그것까지 이 안내로 받는다 — 미인증과 장애를 구분해 보여줘도 사용자가 누를 버튼은 같다
+- 이미 진단을 마친 유저가 `/diagnosis`에 들어오면 그대로 다시 푼다. 재진단 경로가 그것이므로(SPEC 3절) 막지 않았다

@@ -76,7 +76,6 @@ export async function completeMission(params: {
         where: { id: actor.id },
         data: {
           seeds: { increment: effectiveReward.seeds || 0 },
-          exp: { increment: effectiveReward.seeds || 0 },
           starShards: { increment: effectiveReward.starShards || 0 },
           affinity: { increment: affinityToGive },
           affinityToday: { increment: affinityToGive },
@@ -116,12 +115,15 @@ export async function completeMission(params: {
           }
 
           // 일일 전체 완료: streak 갱신 + 별조각 60 보너스
+          // calculateReward()를 경유해야 한다(CLAUDE.md 2절) — 스킨 고유 효과(별조각 +n%)가
+          // 이 보너스에도 적용되게 하려면 직접 increment하면 안 된다.
+          const dailyBonus = calculateReward(actor.activePetSkin, { starShards: 60 })
           await tx.user.update({
             where: { id: actor.id },
             data: {
               streakCount: newStreak,
               lastStreakDate: todayDate,
-              starShards: { increment: 60 },
+              starShards: { increment: dailyBonus.starShards || 0 },
             },
           })
         }

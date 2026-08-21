@@ -4,7 +4,7 @@
 명세는 `SPEC.md` 10절, 규칙은 `CLAUDE.md`.
 
 ## 현재 상태
-- 완료: Next.js 프로젝트, Prisma 6 + 스키마, `lib/auth.ts`(실 Cognito 검증, 쿠키 기반), `lib/prisma.ts`, `lib/api.ts`, `.env.example`, RDS, Cognito, S3+CloudFront, CloudWatch+SNS, Bedrock 확인, 하단 탭 내비게이션, Amplify 앱 생성(환경변수 포함), 로그인·가입 화면(이메일+비밀번호), `amplify.yml`(2026-08-20)
+- 완료: Next.js 프로젝트, Prisma 6 + 스키마, `lib/auth.ts`(실 Cognito 검증, 쿠키 기반), `lib/prisma.ts`, `lib/api.ts`, `.env.example`, RDS, Cognito, S3+CloudFront, CloudWatch+SNS, Bedrock 확인, Amplify 앱 생성(환경변수 포함), 로그인·가입 화면(이메일+비밀번호), `amplify.yml`(2026-08-20). 내비게이션은 B의 사이드바로 교체됨(하단 탭은 폐기, 아래 "삭제한 파일" 참고)
 - 진행 중: Amplify GitHub 연동 (브라우저 OAuth 필요 — 아래 참고), Google 로그인(Cognito Domain은 생성됨, Google Cloud OAuth 자격증명 대기)
 - 미착수: 희망 문구 배너, 발표 자료
 
@@ -18,8 +18,10 @@
 - `lib/prisma.ts` — PrismaClient 싱글턴 (hot reload 커넥션 고갈 방지)
 - `lib/api.ts` — `ok()` / `fail()` 응답 헬퍼
 - `prisma/seed.ts` — 시드 엔트리
-- `app/components/BottomNav.tsx` + `app/layout.tsx` — 하단 탭 5개(진단결과/미션/펫/커뮤니티/챗봇). **동결**, 다른 담당자는 이 파일들을 고치지 않는다
 - `app/globals.css` — 종족 컬러 토큰 3종(`--color-canine` `--color-feline` `--color-ursine`) 추가
+
+## 삭제한 파일
+- `app/components/BottomNav.tsx` — **2026-08-20 삭제.** B가 내비게이션을 사이드바(`app/components/Sidebar.tsx`)로 교체하며 `app/layout.tsx`에서 뺐고(`65308c4`), 이후 아무도 import하지 않는 고아 파일이었다(레포 전체 검색으로 확인). `docs/STATUS.md` 차단 13번 참고
 
 ## 결정한 것과 이유
 - **Prisma는 6.x로 고정한다.** 7은 `prisma.config.ts` + driver adapter가 필수여서 설정 실패 지점이 늘고 참고 자료도 적다
