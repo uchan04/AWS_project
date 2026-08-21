@@ -1,4 +1,5 @@
 import type { TypeCode } from "@prisma/client"
+import { unstable_rethrow } from "next/navigation"
 import { UnauthorizedError, getCurrentUserWithSkin } from "@/lib/auth"
 import { cappedStage } from "@/lib/pet"
 
@@ -44,6 +45,10 @@ export async function getSidebarProfile(): Promise<SidebarProfile | null> {
       diagnosed: Boolean(user.typeCode && user.adjective),
     }
   } catch (error) {
+    // cookies()는 정적 렌더 시도 중에 Next 내부 에러를 던진다. 그걸 여기서 삼키면
+    // Next가 정적 렌더를 포기하지 못하고 빌드 로그가 에러로 뒤덮인다 —
+    // unstable_rethrow가 프레임워크 에러만 다시 던진다(next/navigation).
+    unstable_rethrow(error)
     if (error instanceof UnauthorizedError) return null
     // DB가 죽어도 화면 전체를 죽이지 않는다. 사이드바만 빠진다
     console.error("[getSidebarProfile]", error)
