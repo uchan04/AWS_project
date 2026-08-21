@@ -124,6 +124,7 @@ interface MissionModalProps {
 function MissionModal({ mission, color, bg, mascotEmoji, onClose, onComplete }: MissionModalProps) {
   const [proofMode, setProofMode] = useState(false)
   const [proofImage, setProofImage] = useState<string | null>(null)
+  const [uploadedFile, setUploadedFile] = useState<File | null>(null)
   const fileRef = useRef<HTMLInputElement>(null)
 
   const animType = getMissionAnimType(mission)
@@ -133,6 +134,7 @@ function MissionModal({ mission, color, bg, mascotEmoji, onClose, onComplete }: 
   function handleFile(e: React.ChangeEvent<HTMLInputElement>) {
     const file = e.target.files?.[0]
     if (!file) return
+    setUploadedFile(file)
     const reader = new FileReader()
     reader.onload = (ev) => setProofImage(ev.target?.result as string)
     reader.readAsDataURL(file)
@@ -143,8 +145,71 @@ function MissionModal({ mission, color, bg, mascotEmoji, onClose, onComplete }: 
 
   async function handleComplete() {
     if (mission.completionMode === "EVENT") return
+
     if (mission.requiresPhoto && mission.completionMode === "PHOTO") {
-      // TODO: stage 6·7에서 upload → verify 연결
+      if (!uploadedFile) {
+        setCompleteError("사진을 선택해 주세요")
+        return
+      }
+
+      setCompleting(true)
+      setCompleteError(null)
+
+      try {
+        // 1. presigned URL 받기
+        const presignRes = await fetch("/api/missions/upload/presigned", { method: "POST" })
+        const presignJson = await presignRes.json()
+
+        if (!presignRes.ok) {
+          setCompleteError(presignJson.error?.message || "업로드 URL 생성 실패")
+          return
+        }
+
+        const { uploadUrl, fileKey } = presignJson.data
+
+        // 2. S3에 직접 업로드
+        const uploadRes = await fetch(uploadUrl, {
+          method: "PUT",
+          body: uploadedFile,
+          headers: { "Content-Type": "image/jpeg" },
+        })
+
+        if (!uploadRes.ok) {
+          setCompleteError("이미지 업로드 실패")
+          return
+        }
+
+        // 3. Bedrock Vision 검증
+        const verifyRes = await fetch("/api/missions/upload/verify", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ missionId: mission.id, fileKey }),
+        })
+        const verifyJson = await verifyRes.json()
+
+        if (!verifyRes.ok) {
+          setCompleteError(verifyJson.error?.message || "검증 중 오류 발생")
+          return
+        }
+
+        if (!verifyJson.data.passed) {
+          setCompleteError(`인증 실패: ${verifyJson.data.reason}`)
+          return
+        }
+
+        if (verifyJson.data.alreadyCompleted) {
+          setCompleteError("이미 완료한 미션입니다")
+          return
+        }
+
+        onComplete()
+        onClose()
+        window.dispatchEvent(new CustomEvent("mission-completed"))
+      } catch {
+        setCompleteError("네트워크 오류가 발생했습니다")
+      } finally {
+        setCompleting(false)
+      }
       return
     }
 
@@ -162,7 +227,6 @@ function MissionModal({ mission, color, bg, mascotEmoji, onClose, onComplete }: 
 
       onComplete()
       onClose()
-      // 사이드바 씨앗 갱신 이벤트
       window.dispatchEvent(new CustomEvent("mission-completed"))
     } catch {
       setCompleteError("네트워크 오류가 발생했습니다")
@@ -344,6 +408,7 @@ function MissionModal({ mission, color, bg, mascotEmoji, onClose, onComplete }: 
                           <button
                             onClick={() => {
                               setProofImage(null)
+                              setUploadedFile(null)
                               if (fileRef.current) fileRef.current.value = ""
                             }}
                             style={{
@@ -391,7 +456,7 @@ function MissionModal({ mission, color, bg, mascotEmoji, onClose, onComplete }: 
 
               <button
                 onClick={handleComplete}
-                disabled={completing || (mission.requiresPhoto && !proofImage)}
+                disabled={completing || (mission.requiresPhoto && !uploadedFile)}
                 style={{
                   width: "100%",
                   background: color,
@@ -401,11 +466,11 @@ function MissionModal({ mission, color, bg, mascotEmoji, onClose, onComplete }: 
                   padding: "14px",
                   fontSize: 15,
                   fontWeight: 700,
-                  cursor: completing || (mission.requiresPhoto && !proofImage) ? "not-allowed" : "pointer",
-                  opacity: completing || (mission.requiresPhoto && !proofImage) ? 0.4 : 1,
+                  cursor: completing || (mission.requiresPhoto && !uploadedFile) ? "not-allowed" : "pointer",
+                  opacity: completing || (mission.requiresPhoto && !uploadedFile) ? 0.4 : 1,
                 }}
               >
-                {completing ? "완료 중..." : "완료했어요 ✓"}
+                {completing ? (mission.requiresPhoto ? "검증 중..." : "완료 중...") : "완료했어요 ✓"}
               </button>
             </>
           )}
