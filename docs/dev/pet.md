@@ -12,15 +12,15 @@
 - 완료: **치장 구매 (2026-08-20)** — `POST /api/pet/cosmetics/buy` + 화면 구매 버튼. 아래 절 참고
 - 완료: `scripts/check-pet.ts`에 **스킨 이름 어미 = 종족 동물명 단정** 추가 (2026-08-20)
 - 완료: **치장 12종 → 배경 6종(`배경1`~`배경6`) 축소 (2026-08-20)** — 아래 절 참고. 코드·시드·문서·**실 DB**까지 반영 완료(`npm run db:seed`)
-- **SPEC.md 5절의 기능은 전부 구현했다.** 남은 것은 런타임 검증(공유 DB 쓰기 승인 대기)뿐이다
+- **SPEC.md 5절의 기능은 전부 구현했다.** 남은 것은 재화가 있어야 보이는 3흐름뿐이다(아래 "막힌 것")
 - **가챠는 삭제로 결정했다 (2026-08-19).** 실 DB의 `GachaPull`·`heroPity`·`legendPity`까지 2026-08-20 마이그레이션으로 DROP 완료(아래 절)
 - **재화 배정 확정 (2026-08-20).** 스킨=별조각 전용 / 치장=친밀도 전용. 아래 "재화 배정 확정" 절 참고
 - **가격·수급량 확정 (2026-08-20 팀 결정).** 스킨 별조각 **2500** / 배경 각 친밀도 **600**(합 3600) / 일일 미션 전체 완료 = 별조각 **60** / 글 작성 친밀도 20 · 일 상한 100. 아래 "재화 배정 확정" 절 참고
 - 완료: **Figma 디자인 이관 (2026-08-21)** — `/pet` 화면을 Figma 시안(방 배경·캐릭터·경험치 카드·씨앗 투입 카드·진화 카드 3장)으로 다시 짰다. 아래 "Figma 디자인 이관" 절
 - 완료: **배고픔 게이지 (2026-08-21)** — `User.lastFedAt` 한 컬럼 + 순수 함수. `SPEC.md` 5절에 추가했다. 아래 "배고픔 게이지" 절
 - 완료: **3단 → 4단 진화 (2026-08-21)** — `-4` 이미지가 여유분이 아니라 계획된 것임을 E가 확인해 줬다. 아래 "4단 진화로 변경" 절
-- **차단: `lastFedAt` 마이그레이션이 실 DB에 아직 안 들어갔다.** 그래서 지금 `/pet`은 에러 카드가 뜬다. 아래 "막힌 것" 참고
-- **차단: 실 DB의 `PetSkin.stageCount` 6행이 아직 3이다.** 시드 파일은 4로 고쳤지만 DB를 안 올려서 화면은 3단에서 멈춘다. 아래 "막힌 것" 참고
+- 완료: **`develop` 머지 + 공유 DB 반영 (2026-08-21)** — 옛 차단 21·22번(`docs/STATUS.md`에서 **24·25번**으로 밀렸다)이 둘 다 닫혔다. `lastFedAt` 컬럼이 들어가고 `PetSkin` 6행이 `stageCount = 4`가 됐다. `/pet`은 이제 에러 카드가 아니라 정상 화면이고 4단 카드가 다 뜬다. 아래 "막힌 것"·"런타임 검증"
+- **E에게 알림: `.env`·`.env.example`에 `SESSION_SECRET`이 없어 로그인이 500이다.** 아래 "막힌 것"
 
 ## 4단 진화로 변경 (2026-08-21)
 
@@ -229,12 +229,30 @@
 
 - 이름 어미 = `TRIBE[typeCode].animal`
 - `animalEmoji(name)` = `TRIBE[typeCode].emoji` (어미 규칙을 지켜도 typeCode가 어긋나면 여기서 걸린다)
-- `stageCount`는 전부 3, 기본 외형은 이름이 동물명 그대로 + `priceShards === null`, 변종은 `priceShards > 0`
+- `stageCount`는 전부 4(2026-08-21에 3에서 올렸다), 기본 외형은 이름이 동물명 그대로 + `priceShards === null`, 변종은 `priceShards > 0`
 - 종족마다 기본 1종 + 변종 1종 (한쪽이 빠지면 그 종족은 상점이 비거나 펫이 없다)
 
 이를 위해 `PET_SKINS`를 `export`했다. 그 파일은 `@prisma/client`를 **type으로만** import하는 순수 데이터라 체크 스크립트가 DB 커넥션 없이 읽는다 — `check:pet`이 DB를 모르는 순수 검증으로 남는다.
 
-**아직 런타임 검증은 못 했다.** 확인한 것은 `npm run build`, `tsc --noEmit`, `eslint app/pet`, `check:pet`·`check:reward`·`check:diagnosis` 통과까지다. 씨앗 투입·레벨업·진화 연출을 브라우저에서 실제로 돌려보지는 않았다 — 유저 `밤바다`의 `seeds`가 0이라 씨앗을 넣을 수 없고, 씨앗을 채우는 것은 공유 DB 쓰기라 승인이 필요하다.
+**런타임 검증은 2026-08-21에 절반 했다.** 아래 "런타임 검증" 절에 실측을 적었다. 재화가 필요한 3흐름(진화 연출·치장 구매·스킨 구매)만 남았다.
+
+## 런타임 검증 (2026-08-21, 실 DB + 프로덕션 빌드)
+
+`npm run build` 산출물을 `PORT=3001 npm run start`로 띄우고 팀 공용 계정(`test@welli.local`)으로 로그인해 확인했다. 로그인은 `SESSION_SECRET`을 로컬 `.env`에 넣은 뒤에야 됐다(위 절).
+
+| 확인 | 결과 |
+|---|---|
+| `GET /pet` | **200 + 정상 화면.** 에러 카드가 사라졌다 |
+| 진화 단계 카드 | 4장 — `알` Lv.1~4 / `아기` Lv.5~14 / `청소년` Lv.15~24 / `성체` Lv.25+ |
+| `GET /api/pet` | `skin.stageCount = 4`, `hunger` 값이 내려온다 |
+| 배고픔 게이지 | 89 → 씨앗 투입 후 **100**. 투입 개수와 무관하게 100이다(`SPEC.md` 5절) |
+| 씨앗 15개 투입 | `Lv.3 exp 200` → **`Lv.4 exp 50`**, `gainedLevels 1`, `evolvedTo null`(2단은 Lv.5라 맞다) |
+| 잔액 초과 투입 | `400 NOT_ENOUGH_SEEDS` |
+| 방치형 수령(빈 상태) | `200 claimed 0` — 없는데 주지 않는다 |
+| 치장 목록 | 배경 6종 · 전부 `COMMON` · `priceAffinity 600` · `affinityOnly true` |
+| 없는 스킨 구매 | `404 SKIN_NOT_FOUND` |
+
+**펫 그림은 여전히 이모지로 떨어진다** — `CLOUDFRONT_DOMAIN`이 빈 문자열이라 `imageUrl`이 `null`이다. 코드 문제가 아니고 E의 환경변수 대기다.
 
 ## 샴고양이 → 북극고양이 개명 (2026-08-20)
 
@@ -422,21 +440,51 @@ Tailwind 기본 클래스로만 짜 뒀던 것을 `styles/tokens.css`의 `.hm*` 
 
 ## 막힌 것 / 문제점 (2026-08-21 갱신)
 
-**지금 가장 급한 것: `lastFedAt` 마이그레이션이 실 DB에 안 들어갔다.**
+### ~~`lastFedAt` 마이그레이션 미적용~~ · ~~실 DB `stageCount`가 3~~ — 둘 다 해소 (2026-08-21)
 
-`/pet`이 HTTP 200을 주면서 "펫 정보를 불러오지 못했어요" 에러 카드를 띄운다. 서버 로그는 `prisma.user.upsert()`에서 `PrismaClientKnownRequestError`다 — Prisma Client는 `lastFedAt`을 알지만 공유 RDS에는 그 컬럼이 없다. 마이그레이션 파일은 만들어 뒀고 **적용만 안 됐다.**
+옛 차단 21·22번이고, `develop`과 번호가 겹쳐 `docs/STATUS.md`에서 **24·25번으로 밀렸다.** 사용자 승인을 받고 순서대로 실행해 둘 다 닫혔다.
 
 ```bash
-npx prisma migrate deploy && npx prisma generate
+git merge develop                                  # ① 이력 갈라짐을 먼저 푼다 (아래)
+npx prisma migrate deploy && npx prisma generate   # ② 차단 24 — lastFedAt 컬럼
+npm run db:seed                                    # ③ 차단 25 — PetSkin.stageCount 6행을 4로
 ```
 
-`migrate dev`가 아니라 `deploy`다(`CLAUDE.md` 5절: `migrate dev`는 스키마 담당 1인만). `migrate reset`은 공유 DB 데이터가 전부 지워지므로 어떤 경우에도 쓰지 않는다. **C가 임의로 공유 DB에 쓰지 않고 승인을 기다린다.** 적용 전까지 화면 검증은 불가능하다 — 지금까지 확인한 것은 `npm run build`·`tsc --noEmit`·`eslint`·`check:pet` 통과까지다.
+**①이 왜 먼저인가 — E의 지적이 실제로 걸렸다.** `feat/pet`에는 `develop`의 `20260821020000_user_email_password`가 없어서 로컬 이력과 DB 이력이 갈라져 있었다. `npx prisma migrate status`가 이렇게 잡는다.
 
-**E가 지적한 실행 순서 하나.** `feat/pet`의 `prisma/migrations/`에는 `20260821090000_pet_last_fed_at`만 있고 `develop`의 `20260821020000_user_email_password`가 없다(아직 `develop`을 안 합쳤다). 이 상태로 `migrate deploy`를 돌려도 **DB는 안전하다** — 이미 적용된 마이그레이션은 건드리지 않고 `lastFedAt`만 새로 들어간다. 다만 이어서 `prisma generate`까지 돌리면 이 브랜치의 Prisma Client가 `email`·`passwordHash` 타입을 모른다. **인증 코드를 이 브랜치에서 빌드·타입체크할 계획이면 `develop`을 먼저 머지**해서 두 마이그레이션이 다 보이는 상태로 돌린다. `/pet`만 고칠 목적이면 지금 그대로도 된다.
+```
+The migration have not yet been applied:      20260821090000_pet_last_fed_at
+The migration from the database are not found locally: 20260821020000_user_email_password
+```
 
-**두 번째 차단: 실 DB의 `PetSkin.stageCount`가 아직 3이다.**
+이 상태에서는 `migrate deploy`가 거부한다. `develop`을 합치니 마이그레이션 6개가 다 보이면서 미적용 1건만 남았고 그다음에 통과했다. **`migrate dev`도 `migrate reset`도 쓰지 않았다**(`CLAUDE.md` 5절 — `reset`은 공유 DB 데이터를 전부 지운다).
 
-4단 진화로 늘리면서 시드 파일은 4로 고쳤지만 실 DB 6행은 그대로다. `cappedStage()`가 `stageCount`에서 자르므로 Lv.25에 도달해도 화면은 3단에서 멈춘다. `npm run db:seed` 한 번이면 `upsert`가 덮어쓴다(치장 6종·스킨 가격도 이미 같은 경로로 반영한 이력이 있다). 이것도 공유 DB 쓰기라 승인 대기다. 상세는 위 "4단 진화로 변경" 절.
+머지 충돌은 2건이었다. `PetView.tsx`의 `claim()`은 양쪽이 같은 자리에 다른 줄을 넣은 것이라 **둘 다 살렸다**(수확 토스트 + `mission-completed` 이벤트 — 씨앗이 늘었으니 상단 재화 HUD를 갱신해야 한다). `docs/STATUS.md`는 차단 번호 충돌이라 위처럼 옮겼다.
+
+**실 DB 확인 결과** (`information_schema` + `PetSkin` 직접 조회):
+
+| 확인 | 결과 |
+|---|---|
+| `User.lastFedAt` 컬럼 | 있다 (`email`·`passwordHash`도 함께) |
+| `PetSkin` 6행 `stageCount` | 여우·고양이·곰 + 북극 3종 **전부 4** |
+| 스킨 가격 | 기본 3종 `null`, 북극 3종 2500 |
+| `imageKeyBase` | 북극곰만 여전히 `pets/bear-polar` — **차단 19번이라 손대지 않았다** |
+
+### 받는 쪽 4인이 할 것
+
+```bash
+git pull && npx prisma migrate deploy && npx prisma generate
+```
+
+컬럼은 이미 공유 DB에 들어갔으므로 `migrate deploy`는 "적용할 것 없음"으로 끝난다. **`prisma generate`는 꼭 돌린다** — 안 돌리면 각자의 Prisma Client가 `lastFedAt`을 몰라 `/pet`이 타입 에러를 낸다.
+
+### `.env`에 `SESSION_SECRET`이 없다 (E에게 알림, 2026-08-21 C 확인)
+
+`develop`을 받은 뒤 `POST /api/auth/login`이 **본문 없는 500**을 준다. 원인은 `lib/session.ts:23`의 `if (!value) throw new Error("SESSION_SECRET이 설정되지 않았습니다")`이고, 로컬 `.env`에 그 키가 아예 없다. **`.env.example`에도 없다** — `cp .env.example .env`로 시작한 사람은 로그인이 안 된다. `.env.example`은 E 소유라 C가 고치지 않았고(`CLAUDE.md` 1절), 로컬 `.env`에만 임시값을 넣어 검증을 이어갔다. Amplify 환경변수에도 등록해야 한다(차단 14번과 같은 묶음).
+
+### 남은 것: 재화가 있어야 확인되는 3흐름
+
+`/pet` 화면과 씨앗 투입까지는 실 DB로 확인했다(아래 "런타임 검증"). 다만 **진화 연출 · 치장 구매 · 스킨 구매는 테스트 계정의 재화가 부족해 아직 못 봤다.** 팀 공용 계정 `test@welli.local`은 지금 씨앗 0 · 친밀도 50 · 별조각 0이고, 필요한 값은 씨앗 3,000(4단) · 친밀도 600(배경 1개) · 별조각 2,500(스킨 1개)이다. 재화를 심는 것은 **승인 범위(마이그레이션·시드)를 넘는 공유 DB 쓰기**라 실행하지 않았다. `SPEC.md` 5절이 "데모 계정에 재화를 시드로 넣는다"고 이미 정해 뒀으므로 **그 확정값이 정해지면 같이 처리한다**(열려 있는 팀 결정 항목).
 
 ---
 
@@ -584,13 +632,13 @@ A의 `feat/diagnosis`에서 매핑이 맞바뀌었고 8/19 팀 확인으로 의�
 
 ### 승인이 필요한 것
 
-0. **`npx prisma migrate deploy` (가장 먼저)** — `lastFedAt` 컬럼이 없어서 `/pet`이 지금 에러 카드다. 아래 1번 검증도 이게 먼저 들어가야 시작된다. 상세는 위 "막힌 것"
-0-1. **`npm run db:seed`** — 실 DB `PetSkin` 6행의 `stageCount`를 3 → 4로 올린다. 안 돌리면 4단 진화가 화면에 나오지 않는다. 상세는 위 "4단 진화로 변경"
-1. **런타임 검증 4흐름** — 아래를 브라우저에서 한 번씩 돌린다. 전부 검증용 재화가 필요하고, 그건 5인 공유 DB 쓰기라 **승인이 있어야 한다.**
-   - 씨앗 투입 → 레벨업 → 진화 연출 (유저 `밤바다`의 `seeds`가 0). **4단까지 다 보려면 3,000개가 필요하다** — 2단만 확인하려면 40개, 3단까지는 1,050개다
-   - 방치형 수령 (`lastIdleClaimAt`을 과거로 밀어 두면 즉시 확인된다)
-   - **치장 구매 → 착용 → 해제** (`affinity` 0, `UserCosmetic` 0행. 배경 하나 600이면 전 흐름이 돈다)
-   - 스킨 구매 → 전환 (`starShards` 0. 실 DB 가격이 이제 **2500**이므로 검증용 잔액도 2500 이상이어야 한다)
+0. ~~`npx prisma migrate deploy`~~ — **완료 (2026-08-21).** `develop`을 먼저 머지해 이력 갈라짐을 풀고 적용했다. 위 "막힌 것"
+0-1. ~~`npm run db:seed`~~ — **완료 (2026-08-21).** `PetSkin` 6행이 `stageCount = 4`다. 위 "막힌 것"
+1. **런타임 검증 — 4흐름 중 1흐름 완료, 3흐름 남았다.** 완료분은 위 "런타임 검증" 절이다. 남은 셋은 전부 **검증용 재화**가 필요하고, 재화를 심는 것은 승인 범위(마이그레이션·시드)를 넘는 공유 DB 쓰기라 실행하지 않았다.
+   - ~~씨앗 투입 → 레벨업~~ 완료(15개 → Lv.4). **진화 연출은 아직** — 2단만 보려면 씨앗 40개, 3단 1,050개, **4단까지 3,000개**가 필요하다
+   - 방치형 수령 — 빈 상태(`claimed 0`)만 확인했다. 실제 수령은 `lastIdleClaimAt`을 과거로 밀어야 보인다
+   - **치장 구매 → 착용 → 해제** (`affinity` 50, `UserCosmetic` 0행. 배경 하나 **600**이면 전 흐름이 돈다). 착용 그림은 `cosmetics/bg-*.png`가 S3에 없어(403) 기본 방 SVG로 폴백한다 — 폴백 자체가 의도한 동작이다
+   - 스킨 구매 → 전환 (`starShards` 0. 실 DB 가격이 **2500**이므로 잔액도 2500 이상이어야 한다)
 2. ~~확정 가격 실 DB 반영~~ — **완료 (2026-08-20).** 승인 후 `npm run db:seed` 한 번으로 스킨 2500 + 배경 6종 600 + 옛 치장 12행 삭제가 함께 들어갔다. 기록은 위 "재화 배정 확정" 절
 3. **데모 계정 재화 시드값 정하기 (8/21)** — 36일·39일은 실제로 모을 수 있는 기간이 아니라 녹화용 계정에 별조각·친밀도·보유 배경을 심어야 한다. `업무분담.md` 5장에 "치장 3~4개 획득"은 있지만 별조각·친밀도 수치는 없다
 
