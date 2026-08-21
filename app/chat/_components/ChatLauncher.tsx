@@ -1,6 +1,6 @@
 "use client"
 
-import { useEffect, useState } from "react"
+import { useState } from "react"
 import { usePathname } from "next/navigation"
 import { ChatPanel } from "./ChatPanel"
 
@@ -16,30 +16,16 @@ function allowedPath(pathname: string) {
 
 // layout.tsx는 서버 컴포넌트라 useState를 쓸 수 없다. 열림 상태를 이 래퍼가 대신 갖는다.
 // 챗봇은 Sidebar 탭이 아니라 전역 오버레이다(시안 기준) — 허용된 화면에서 우상단 버튼으로 연다.
-export function ChatLauncher() {
+// 경로만으로는 소개 화면과 홈이 갈리지 않는다 — 둘 다 "/"이고 진단 여부로 나뉜다.
+// 진단을 마치지 않았으면(미인증 포함) 아직 홈이 아니므로 버튼을 띄우지 않는다.
+// diagnosed는 layout.tsx가 서버에서 읽어 넘긴다(2026-08-21 A 수정, D 통보).
+// 전에는 여기서 /api/diagnosis/me를 usePathname deps로 불러서 탭을 옮길 때마다
+// 요청이 하나 더 나갔다 — 한국에서 us-east-1까지 왕복 178ms짜리다.
+export function ChatLauncher({ diagnosed }: { diagnosed: boolean }) {
   const pathname = usePathname()
   const [open, setOpen] = useState(false)
-  const [ready, setReady] = useState(false)
 
-  // 경로만으로는 소개 화면과 홈이 갈리지 않는다 — 둘 다 "/"이고 진단 여부로 나뉜다.
-  // 진단을 마치지 않았으면(미인증 포함) 아직 홈이 아니므로 버튼을 띄우지 않는다.
-  useEffect(() => {
-    let alive = true
-    fetch("/api/diagnosis/me")
-      .then((response) => (response.ok ? response.json() : null))
-      .then((body) => {
-        if (alive) setReady(Boolean(body?.data))
-      })
-      .catch(() => {
-        // 못 읽었으면 띄우지 않는다. 진단 전 화면에 챗봇이 뜨는 쪽이 더 나쁘다
-        if (alive) setReady(false)
-      })
-    return () => {
-      alive = false
-    }
-  }, [pathname])
-
-  if (!ready || !allowedPath(pathname)) return null
+  if (!diagnosed || !allowedPath(pathname)) return null
 
   if (open) return <ChatPanel onClose={() => setOpen(false)} />
 

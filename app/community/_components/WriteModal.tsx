@@ -62,7 +62,7 @@ export function WriteModal({ gallery }: { gallery: GalleryTab }) {
       }
       close()
       router.refresh()
-      window.dispatchEvent(new CustomEvent("mission-completed"))
+      window.dispatchEvent(new CustomEvent("user-stats-changed"))
     } finally {
       setPending(false)
     }
@@ -132,7 +132,7 @@ export function WriteModal({ gallery }: { gallery: GalleryTab }) {
               value={title}
               onChange={(e) => setTitle(e.target.value)}
               placeholder="제목을 입력해주세요"
-              className="mb-3 w-full rounded-xl border border-neutral-300 bg-neutral-50 px-4 py-2.5 text-sm outline-none focus:border-neutral-500"
+              className="mb-3 w-full rounded-xl border border-neutral-300 bg-neutral-50 px-4 py-2.5 text-sm text-neutral-900 placeholder:text-neutral-400 outline-none focus:border-neutral-500"
             />
 
             <textarea
@@ -140,7 +140,7 @@ export function WriteModal({ gallery }: { gallery: GalleryTab }) {
               onChange={(e) => setBody(e.target.value)}
               placeholder={"오늘 있었던 일, 느낀 것을 이야기해봐요\n여기선 뭐든 괜찮아요."}
               rows={6}
-              className="mb-4 w-full resize-none rounded-xl border border-neutral-300 bg-neutral-50 px-4 py-3 text-sm leading-relaxed outline-none focus:border-neutral-500"
+              className="mb-4 w-full resize-none rounded-xl border border-neutral-300 bg-neutral-50 px-4 py-3 text-sm leading-relaxed text-neutral-900 placeholder:text-neutral-400 outline-none focus:border-neutral-500"
             />
 
             {error && <p className="mb-3 text-xs text-red-500">{error}</p>}

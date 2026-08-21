@@ -145,6 +145,7 @@ export function ChatPanel({ onClose }: { onClose?: () => void }) {
       // 서버가 이미 상한을 적용한 값이라 여기서 다시 min(100, ...)을 계산하지 않는다.
       setAffinityToday((prev) => prev + json.data.granted)
       setInput("")
+      window.dispatchEvent(new CustomEvent("user-stats-changed"))
     } finally {
       setSending(false)
     }
@@ -318,7 +319,7 @@ export function ChatPanel({ onClose }: { onClose?: () => void }) {
                 onKeyDown={handleKeyDown}
                 placeholder="오늘 하루는 어땠나요?"
                 rows={1}
-                className="max-h-32 flex-1 resize-none rounded-xl border border-neutral-300 bg-neutral-50 px-4 py-2.5 text-sm outline-none focus:border-neutral-500"
+                className="max-h-32 flex-1 resize-none rounded-xl border border-neutral-300 bg-neutral-50 px-4 py-2.5 text-sm text-neutral-900 placeholder:text-neutral-400 outline-none focus:border-neutral-500"
               />
               <button
                 type="button"

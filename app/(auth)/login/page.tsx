@@ -24,6 +24,10 @@ export default function LoginPage() {
     try {
       await login(email, password)
       router.push("/")
+      // 사이드바 프로필은 layout.tsx가 서버에서 읽는다. 레이아웃은 클라이언트 이동으로
+      // 재렌더되지 않으니 refresh 없이는 로그인 직후 홈에서 사이드바가 안 뜬다
+      // (새로고침해야 뜨던 그 버그다. 2026-08-21 A 수정, E 통보)
+      router.refresh()
     } catch (caught) {
       setError(caught instanceof Error ? caught.message : "잠시 후 다시 시도해 주세요")
     } finally {

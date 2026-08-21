@@ -62,6 +62,9 @@ export default function DiagnosisResultPage() {
     // 이름을 바꾸지 않았으면 서버를 부르지 않는다
     if (nickname === current.nickname) {
       router.push("/")
+      // 진단으로 typeCode가 생겼다. 서버 레이아웃을 다시 렌더해야 사이드바에
+      // 종족 색·이모지와 챗봇 버튼이 반영된다
+      router.refresh()
       return
     }
     setSaving(true)
@@ -69,6 +72,7 @@ export default function DiagnosisResultPage() {
     try {
       await saveNickname(nickname)
       router.push("/")
+      router.refresh()
     } catch (caught) {
       setSaveError(caught instanceof Error ? caught.message : "잠시 후 다시 시도해 주세요")
     } finally {

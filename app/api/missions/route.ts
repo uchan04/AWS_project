@@ -11,10 +11,9 @@ export async function GET() {
       return fail("DIAGNOSIS_NOT_COMPLETED", "진단을 먼저 완료해주세요", 400)
     }
 
-    await ensureMissionReset(user)
+    // ensureMissionReset이 streakCount를 갱신할 수 있으므로 반환값 사용
+    const refreshedUser = await ensureMissionReset(user)
 
-    // 초기화 후 최신 user 다시 조회
-    const refreshedUser = await getCurrentUser()
     const dashboard = await buildDashboard(refreshedUser)
 
     return ok(dashboard)

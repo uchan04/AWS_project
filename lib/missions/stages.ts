@@ -8,32 +8,23 @@ export type StageProgress = {
   requiredForNextStage: number
 }
 
+const STAGES = [1, 2, 3]
+
 /**
- * 단계별 해금 상태와 완료 수 계산.
- * 단계 1은 항상 해금.
- * 이후 단계는 바로 이전 단계 4개 중 3개 이상 완료 시 해금.
+ * 해금 계산의 순수 함수 판. DB를 읽지 않는다.
+ * 미션 행과 완료 id를 이미 들고 있는 호출자(buildDashboard)가 같은 것을 다시 읽지 않게
+ * 분리했다(2026-08-21 A). getStageProgress는 이 함수를 감싼 조회판이다.
  */
-export async function getStageProgress(userId: string, typeCode: TypeCode): Promise<StageProgress[]> {
-  const stages = [1, 2, 3]
+export function computeStageProgress(
+  allMissions: { id: string; stage: number | null }[],
+  completedIds: Set<string>
+): StageProgress[] {
   const result: StageProgress[] = []
 
-  for (const stage of stages) {
-    // 해당 단계 미션 조회
-    const missions = await prisma.mission.findMany({
-      where: { scope: "STAGE", typeCode, stage },
-      select: { id: true },
-    })
+  for (const stage of STAGES) {
+    const stageMissionIds = allMissions.filter((m) => m.stage === stage).map((m) => m.id)
+    const completedCount = stageMissionIds.filter((id) => completedIds.has(id)).length
 
-    // 완료 수 (resetKey = "STAGE"로 고정)
-    const completedCount = await prisma.userMission.count({
-      where: {
-        userId,
-        missionId: { in: missions.map((m) => m.id) },
-        resetKey: "STAGE",
-      },
-    })
-
-    // 해금 여부
     let unlocked = stage === 1
 
     if (stage > 1 && result.length > 0) {
@@ -50,4 +41,27 @@ export async function getStageProgress(userId: string, typeCode: TypeCode): Prom
   }
 
   return result
+}
+
+/**
+ * 단계별 해금 상태와 완료 수 계산.
+ * 단계 1은 항상 해금.
+ * 이후 단계는 바로 이전 단계 4개 중 3개 이상 완료 시 해금.
+ *
+ * 두 쿼리를 병렬로 낸다. 완료 기록은 missionId 목록에 의존하지 않고
+ * 관계 필터(mission: {...})로 같은 집합을 고르므로 순차로 기다릴 이유가 없다.
+ */
+export async function getStageProgress(userId: string, typeCode: TypeCode): Promise<StageProgress[]> {
+  const [allMissions, completions] = await Promise.all([
+    prisma.mission.findMany({
+      where: { scope: "STAGE", typeCode, stage: { in: STAGES } },
+      select: { id: true, stage: true },
+    }),
+    prisma.userMission.findMany({
+      where: { userId, resetKey: "STAGE", mission: { scope: "STAGE", typeCode, stage: { in: STAGES } } },
+      select: { missionId: true },
+    }),
+  ])
+
+  return computeStageProgress(allMissions, new Set(completions.map((c) => c.missionId)))
 }
