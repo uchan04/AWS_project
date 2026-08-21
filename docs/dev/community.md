@@ -5,7 +5,7 @@
 
 ## 재개 지점
 
-D 쪽 기능 구현은 끝났고, 외부 대기 항목도 없다. AWS 계정·`BEDROCK_MODEL_ID`는 확보되어 챗봇 스트리밍은 완료했다(2026-08-19). origin/main을 머지해 인프라 완료분(Cognito 실검증, `BottomNav`, RDS 마이그레이션 등)도 받았다(2026-08-19). 2026-08-20에 `origin/develop`을 두 차례 머지해 A·B·C·E 작업분을 받았고, 챗봇을 전역 오버레이로 이전했다(차단 2 해소). 2026-08-21에 미션 완료 연동(6번)과 로그인 화면 챗봇 버튼 숨김(`docs/STATUS.md` 차단 20번)을 처리했다. **아래 표에서 남은 항목은 3번(`app/chat/` 폴더 소유 확정, 팀 합의 대기) 하나뿐이다.** 재개할 때 이 표부터 본다.
+D 쪽 기능 구현은 끝났고, 외부 대기 항목도 없다. AWS 계정·`BEDROCK_MODEL_ID`는 확보되어 챗봇 스트리밍은 완료했다(2026-08-19). origin/main을 머지해 인프라 완료분(Cognito 실검증, `BottomNav`, RDS 마이그레이션 등)도 받았다(2026-08-19). 2026-08-20에 `origin/develop`을 두 차례 머지해 A·B·C·E 작업분을 받았고, 챗봇을 전역 오버레이로 이전했다(차단 2 해소). 2026-08-21에 미션 완료 연동(6번)을 처리했고, 같은 날 `origin/develop`을 다시 머지해 흐름 변경분(소개 → 가입/로그인 → 문항 → 결과 → 홈, 자체 DB 계정)을 받았다. 챗봇 버튼 노출 판정은 이 머지에서 **허용 목록 방식으로 대체**됐다 — D의 `HIDDEN_PATHS`는 남아 있지 않다(`docs/STATUS.md` 차단 20번 + 21번의 D 몫 해소). **아래 표에서 남은 항목은 3번(`app/chat/` 폴더 소유 확정, 팀 합의 대기) 하나뿐이다.** 재개할 때 이 표부터 본다.
 
 ### 1. Bedrock 스트리밍 응답 — 완료 (2026-08-19)
 `POST /api/chat/stream`을 새로 만들어 `ConverseStreamCommand`로 응답을 스트리밍하고, 스트림이 `messageStop`까지 정상 종료된 경우에만 `ChatRole.ASSISTANT`로 저장한다. 기존 `app/api/chat/messages/route.ts`(사용자 발화 저장 + 친밀도 지급)는 건드리지 않았다. 자세한 내용은 아래 "구현한 파일"·"결정한 것과 이유" 참고.
@@ -89,7 +89,7 @@ D 쪽 기능 구현은 끝났고, 외부 대기 항목도 없다. AWS 계정·`B
 - `app/community/_components/PostDetailModal.tsx` — `DetailComment`에 `isOwn` 추가, `deletingCommentId` state와 `handleDeleteComment()` 추가. 본인 댓글에만 작은 삭제 버튼(`text-[11px]`, 헤더의 글 삭제 버튼과 같은 계열) 노출
 
 - `app/chat/_lib/systemPrompt.ts` — 챗봇 "마음 친구" 시스템 프롬프트. 공통 원칙(조언·해결책·진단·평가 금지, 유형명 노출 금지, 자해·죽음 언급 시 안전 예외) + 유형별 페르소나 레이어. `buildSystemPrompt(typeCode, nickname)`을 `app/api/chat/messages/route.ts`와 `app/api/chat/stream/route.ts`가 참조
-- `app/chat/_components/ChatLauncher.tsx` — **이번 세션에 추가.** 전역 오버레이 진입점(클라이언트). `useState`로 열림 상태를 갖고, 닫혀 있으면 우상단 플로팅 버튼(`fixed top-4 right-4 z-40`, `aria-label="마음 친구 열기"`)만, 열리면 `<ChatPanel onClose={...} />`를 렌더한다. `usePathname()`으로 `/diagnosis`에서는 `null`을 반환해 숨긴다(`Sidebar`가 같은 경로에서 같은 방식으로 숨는다). 별도 로그인 라우트는 아직 없어서(`app/(auth)/` 미생성) 제외 경로는 `/diagnosis` 하나다
+- `app/chat/_components/ChatLauncher.tsx` — **이번 세션에 추가.** 전역 오버레이 진입점(클라이언트). `useState`로 열림 상태를 갖고, 닫혀 있으면 우상단 플로팅 버튼(`fixed top-4 right-4 z-40`, `aria-label="마음 친구 열기"`)만, 열리면 `<ChatPanel onClose={...} />`를 렌더한다. **노출 경로 판정은 2026-08-21 머지로 바뀌었다** — 처음엔 `usePathname()`으로 `/diagnosis`만 제외했으나(당시 `app/(auth)/` 미생성), 지금은 `ALLOWED_PREFIXES = ["/missions", "/pet", "/community"]` + `pathname === "/"` 허용 목록에 더해 `GET /api/diagnosis/me`로 진단 완료 여부까지 확인한다. 아래 "결정한 것과 이유"의 `### 로그인 화면 챗봇 버튼 숨김 (2026-08-21)` 참고
 - `app/chat/_lib/starters.ts` — **이번 세션에 추가.** `CHAT_STARTERS: Record<TypeCode, string[]>`. 빈 화면 추천 문구를 유형별 6개씩 정적 상수로 둔다. `TypeCode`는 `@prisma/client`에서 그대로 import(새로 정의하지 않음). LLM 호출 없음
 - `app/api/chat/messages/route.ts` — GET(대화 이력 조회, 최근 50개, `createdAt asc`, 이제 `affinityToday`도 응답에 포함) + POST(사용자 메시지 저장 + 친밀도 지급). 진단 전(`typeCode` 없음)이면 400 `NO_TYPE_CODE`
 - `app/api/chat/stream/route.ts` — **이번 세션에 추가.** POST. 사용자 메시지 저장 이후 클라이언트가 이어서 호출한다. 최근 20개 대화 이력을 Converse 형식으로 변환해 `ConverseStreamCommand`로 호출하고, 토큰을 `text/plain` 스트림으로 그대로 흘린다. 스트림이 `messageStop`까지 정상 종료됐고 내용이 비어있지 않을 때만 `ChatRole.ASSISTANT`로 저장한다. 메시지 저장·친밀도 지급·미션 완료는 이 라우트에서 하지 않는다(모두 `app/api/chat/messages/route.ts` 소관, 이중 지급 방지). `BEDROCK_MODEL_ID`가 없으면 500 `BEDROCK_NOT_CONFIGURED`로 막는다(클라이언트는 `bedrockConfigured`가 false면 애초에 이 라우트를 호출하지 않는다)
@@ -99,7 +99,7 @@ D 쪽 기능 구현은 끝났고, 외부 대기 항목도 없다. AWS 계정·`B
 - `app/api/chat/messages/route.ts` — **2026-08-20 수정.** GET 응답에 `nickname`·`typeCode`·`bedrockConfigured` 3필드 추가(additive). `BEDROCK_MODEL_ID` 값 자체는 내보내지 않고 `Boolean()`으로 설정 여부만 내린다. POST 로직과 친밀도 지급은 그대로
 - `app/api/chat/messages/route.ts` — **2026-08-21 수정.** POST에 `completeMissionByCode({ actor: user, code: "DAILY_CHAT" })` 연결 + **죽은 Bedrock 코드 정리.** `buildSystemPrompt()` 호출과 `void systemPrompt`, 그 사이 Bedrock TODO 주석을 지웠다(같은 파일에 다른 사용처가 없어 `import { buildSystemPrompt }`도 함께 제거). Bedrock 호출은 `app/api/chat/stream/route.ts`로 분리돼 거기서 같은 함수를 실제로 쓴다 — 이 라우트의 TODO는 낡은 것이었다. "친밀도는 사용자 발화 시점에만 지급하고 Bedrock 응답 저장 시점에 다시 지급하지 않는다"는 경고는 지우지 않고 `grantAffinity` 호출부 위로 옮겨 살렸다
 - `app/api/community/posts/route.ts` — **2026-08-21 수정.** POST의 미션 TODO 주석 블록을 지우고 `grantAffinity()` 다음에 `completeMissionByCode({ actor: user, code: "DAILY_COMMUNITY_POST" })`를 연결했다. 친밀도 하루 상한 함정 주석도 여기에 남겼다
-- `app/chat/_components/ChatLauncher.tsx` — **2026-08-21 수정.** `pathname === "/diagnosis"` 단일 비교를 모듈 스코프 `HIDDEN_PATHS` 배열 + `includes()`로 교체하고 `/login`·`/signup`을 추가했다. "별도의 로그인 라우트는 아직 없다" 주석은 경로별 숨김 이유로 대체
+- `app/chat/_components/ChatLauncher.tsx` — **2026-08-21 수정 → 머지에서 대체됨.** D가 `pathname === "/diagnosis"` 단일 비교를 `HIDDEN_PATHS` 배열 + `includes()`로 바꾸고 `/login`·`/signup`을 추가했으나(`c8b4d08`), 같은 날 `origin/develop` 머지에서 A/E의 허용 목록 방식(`ALLOWED_PREFIXES` + `/api/diagnosis/me` 확인)으로 대체됐다. **현재 이 파일에 D의 변경분은 남아 있지 않다.** 경위는 아래 "결정한 것과 이유"의 `### 로그인 화면 챗봇 버튼 숨김 (2026-08-21)` 참고
 
 **`app/chat/` 폴더 소유 — 팀 확인 대기.** `CLAUDE.md` 2절의 폴더 소유 표(`app/diagnosis/` A, `app/missions/` B, `app/pet/` C, `app/community/` D, `app/(auth)/` E)에는 `app/chat/`이 없다. `업무분담.md`의 D 항목에 "AI 상담 챗봇"과 `/api/chat/*`가 D 담당으로 명시돼 있어 D 소유로 보고 진행했지만, `CLAUDE.md` 갱신은 전원 합의가 필요하므로 다음 통합 때 팀에 확인해 `CLAUDE.md` 2절에 정식으로 추가해야 한다.
 
@@ -173,7 +173,7 @@ D 쪽 기능 구현은 끝났고, 외부 대기 항목도 없다. AWS 계정·`B
 - **개발 모드 배너는 `!loading`일 때만 띄운다.** `bedrockConfigured` 초기값이 `false`라 로딩 중에 배너가 잠깐 번쩍이는 것을 막는다(props로 받던 때는 첫 렌더부터 확정값이라 이 문제가 없었다)
 - **`pickThreeStarters()`는 GET 성공 시점에 한 번만 호출한다.** `typeCode`가 채워진 뒤라야 호출할 수 있고, `useState` 초기화 함수 자리에서는 아직 `null`이다. 리렌더마다 다시 섞이지 않는다는 기존 성질은 그대로다
 - **401은 진단 안내가 아니라 로그인 안내를 띄운다.** 둘 다 `typeCode`가 `null`이라 구분 없이 두면 로그인이 안 된 사용자에게 "진단을 먼저 완료해야" 라고 잘못 안내한다. `unauthorized` state로 갈라 로그인 안내만 띄우고 입력을 막는다(크래시 없음)
-- **`/diagnosis`에서는 플로팅 버튼을 숨긴다.** `Sidebar`가 같은 경로에서 같은 방식(`usePathname()`)으로 숨는다 — 진단 문항 화면의 몰입을 깨지 않기 위한 기존 결정에 동작을 맞췄다. 로그인 라우트는 아직 없어서(`app/(auth)/` 미생성) 제외 경로는 `/diagnosis` 하나뿐이다. 로그인 화면이 생기면 여기에 함께 추가한다
+- **`/diagnosis`에서는 플로팅 버튼을 숨긴다.** `Sidebar`가 같은 경로에서 같은 방식(`usePathname()`)으로 숨는다 — 진단 문항 화면의 몰입을 깨지 않기 위한 기존 결정에 동작을 맞췄다. 로그인 라우트는 아직 없어서(`app/(auth)/` 미생성) 제외 경로는 `/diagnosis` 하나뿐이다. 로그인 화면이 생기면 여기에 함께 추가한다 — **(2026-08-21 갱신) 이 방식은 허용 목록으로 대체됐다. 아래 `### 로그인 화면 챗봇 버튼 숨김 (2026-08-21)` 참고**
 - **`router.back()` 폴백을 지웠다.** `/chat` 라우트로 직접 들어오는 경우를 위한 코드였는데 그 라우트를 없앴고, `ChatLauncher`가 항상 `onClose`를 넘긴다. `useRouter` import도 다른 데서 안 써서 같이 정리했다
 
 ### 인증 실패 처리와 lint (2026-08-20)
@@ -189,8 +189,12 @@ D 쪽 기능 구현은 끝났고, 외부 대기 항목도 없다. AWS 계정·`B
 - **응답 형태는 그대로 두었다**(`{ post, granted }` / `{ message, granted }`). 미션 결과를 얹지 않는다 — 커뮤니티·챗봇 화면은 미션 완료를 표시하지 않고, 미션 대시보드는 B 소유의 별도 화면이다
 - **잠재 함정 — 친밀도 하루 상한.** `completeMission`은 넘겨받은 `actor.affinityToday`(메모리 값)로 상한을 계산하는데 바로 위 `grantAffinity`는 DB만 갱신하고 `user` 객체를 변형하지 않는다. 두 미션의 `rewardAffinity`가 0이라(`prisma/seed/missions.ts`, 2026-08-20 결정) 지금은 무해하지만, 0보다 큰 값을 넣으면 이 호출이 낡은 `affinityToday`를 보고 하루 상한 100을 넘길 수 있다. 두 호출부 중 커뮤니티 쪽에 같은 취지의 주석을 남겨뒀다
 
-### 로그인 화면 챗봇 버튼 숨김 (2026-08-21)
-- **`ChatLauncher`의 숨김 경로를 `HIDDEN_PATHS = ["/diagnosis", "/login", "/signup"]`로 넓혔다.** `app/(auth)/`가 생기면서 미인증 화면에도 플로팅 버튼이 떴고, 누르면 GET `/api/chat/messages`가 401을 내 로그인 화면 위에 로그인 안내 패널이 겹쳤다. `(auth)`는 라우트 그룹이라 URL에 나타나지 않으므로 실제 경로는 `/login`·`/signup`이다. 위 "전역 오버레이 이전"의 "로그인 라우트는 아직 없어서 제외 경로는 `/diagnosis` 하나뿐" 기록은 이 항목으로 대체된다
+### 로그인 화면 챗봇 버튼 숨김 (2026-08-21) — 최종 구현은 허용 목록 방식
+- **증상**: `app/(auth)/`가 생기면서 미인증 화면에도 플로팅 버튼이 떴고, 누르면 GET `/api/chat/messages`가 401을 내 로그인 화면 위에 로그인 안내 패널이 겹쳤다. `(auth)`는 라우트 그룹이라 URL에 나타나지 않으므로 실제 경로는 `/login`·`/signup`이다
+- **D가 먼저 `HIDDEN_PATHS = ["/diagnosis", "/login", "/signup"]`로 고쳤고(`c8b4d08`), 2026-08-21 `origin/develop` 머지에서 A/E의 허용 목록 방식으로 대체됐다.** 숨길 경로를 나열하는 방식은 화면이 늘 때마다 목록에서 빠뜨린다 — 실제로 `/diagnosis/result`가 그렇게 빠져 별도 차단(`docs/STATUS.md` 21번)으로 올라와 있었다. 허용 목록은 새 화면이 기본적으로 "챗봇 없음"이 되므로 빠뜨림이 구조적으로 생기지 않는다
+- **현재 구현**: `ALLOWED_PREFIXES = ["/missions", "/pet", "/community"]` 접두사 일치 + `pathname === "/"` 정확 일치만 통과한다. `/pet/skins`·`/pet/cosmetics` 같은 하위 경로가 있어 접두사로 본다. `/login`·`/signup`·`/diagnosis`·`/diagnosis/result`는 목록에 없어 전부 자동으로 제외된다(차단 20번 + 21번의 D 몫 해소)
+- **`useEffect`가 `GET /api/diagnosis/me`를 확인한다.** 소개 화면과 홈은 경로가 둘 다 `/`라 경로만으로는 갈리지 않는다 — 진단 완료 여부로 나뉜다. 진단 미완료(미인증 포함)거나 응답을 못 읽으면 버튼을 띄우지 않는다. 진단 전 화면에 챗봇이 뜨는 쪽이 더 나쁘다는 판단이다
+- 위 "전역 오버레이 이전"(2026-08-20)의 "제외 경로는 `/diagnosis` 하나뿐" 기록은 이 항목으로 대체된다
 
 ## 막힌 것
 - 없음 (로컬 DB가 `prisma migrate`로 관리되지 않고 있던 것을 발견해 베이스라인 마이그레이션(`prisma/migrations/00000000000000_init`)을 만들어 해결. 기존 시드 데이터(미션 41개, 펫스킨 6개)는 유지됨. 스키마 담당과 공유 필요)

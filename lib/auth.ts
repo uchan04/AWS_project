@@ -1,7 +1,9 @@
+import { randomUUID } from "node:crypto"
 import type { PetSkin, User } from "@prisma/client"
 import { cookies } from "next/headers"
 import { CognitoJwtVerifier } from "aws-jwt-verify"
 import { prisma } from "@/lib/prisma"
+import { SESSION_COOKIE, SESSION_MAX_AGE, createSessionToken, readSessionToken } from "@/lib/session"
 
 // 소유자: E. 모든 API Route Handler의 첫 줄에서 호출한다.
 // 로그인(app/api/auth/*)이 Cognito 액세스 토큰을 `access_token` httpOnly 쿠키에 담아 두고,
@@ -15,6 +17,15 @@ export class UnauthorizedError extends Error {
 }
 
 const DEV_COGNITO_SUB = "dev-user-000"
+
+/**
+ * 자체 DB 계정의 cognitoSub. cognitoSub는 NOT NULL·유니크인데 자체 계정에는 Cognito sub가 없다.
+ * Cognito sub는 UNIQUE 제약을 만족시켜야 하므로 계정마다 다른 값이 필요하고, Cognito가 만든
+ * sub(UUID)와 절대 겹치지 않아야 한다. 접두사를 붙여 두 조건을 동시에 만족시킨다.
+ */
+export function localCognitoSub() {
+  return `local:${randomUUID()}`
+}
 
 // DEV_AUTH_BYPASS=true인 로컬 개발 환경은 COGNITO_USER_POOL_ID를 설정할 필요가 없다.
 // 모듈 로드 시점에 CognitoJwtVerifier.create()를 부르면 빈 Pool ID로 즉시 throw해서
@@ -42,7 +53,21 @@ export async function getCurrentUser(): Promise<User> {
     })
   }
 
-  const token = (await cookies()).get("access_token")?.value ?? null
+  const jar = await cookies()
+
+  // 자체 계정 세션(A 추가, 2026-08-21). Cognito 쿠키와 이름이 달라 섞이지 않는다.
+  // 쿠키가 있는데 서명이 깨졌거나 만료됐으면 Cognito 경로로 흘려보내지 않고 바로 401이다 —
+  // 흘려보내면 만료된 세션이 "쿠키 없음"과 구분되지 않아 원인을 못 찾는다.
+  const session = jar.get(SESSION_COOKIE)?.value
+  if (session) {
+    const userId = readSessionToken(session)
+    if (!userId) throw new UnauthorizedError()
+    const user = await prisma.user.findUnique({ where: { id: userId } })
+    if (!user) throw new UnauthorizedError()
+    return user
+  }
+
+  const token = jar.get("access_token")?.value ?? null
   if (!token) throw new UnauthorizedError()
 
   try {
@@ -81,6 +106,23 @@ export async function setSessionCookie(accessToken: string, expiresInSeconds: nu
   })
 }
 
+/**
+ * 자체 계정 로그인이 심는 쿠키. Cognito 토큰이 아니라 서명된 userId라 검증에 네트워크가 없다.
+ * 만료는 lib/session.ts가 토큰 안에 박아두므로 쿠키 maxAge와 같은 값을 쓴다.
+ */
+export async function setLocalSessionCookie(userId: string) {
+  ;(await cookies()).set(SESSION_COOKIE, createSessionToken(userId), {
+    httpOnly: true,
+    secure: process.env.NODE_ENV === "production",
+    sameSite: "lax",
+    path: "/",
+    maxAge: SESSION_MAX_AGE,
+  })
+}
+
 export async function clearSessionCookie() {
-  ;(await cookies()).delete("access_token")
+  const jar = await cookies()
+  jar.delete("access_token")
+  // 두 쿠키 중 어느 쪽으로 들어왔는지 로그아웃 시점에는 알 필요가 없다. 둘 다 지운다
+  jar.delete(SESSION_COOKIE)
 }
