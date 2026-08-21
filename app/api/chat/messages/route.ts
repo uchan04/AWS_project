@@ -3,7 +3,7 @@ import { getCurrentUser, getCurrentUserWithSkin, UnauthorizedError } from "@/lib
 import { prisma } from "@/lib/prisma"
 import { ok, fail } from "@/lib/api"
 import { grantAffinity, CHAT_TURN_AFFINITY } from "@/app/community/_lib/affinity"
-import { buildSystemPrompt } from "@/app/chat/_lib/systemPrompt"
+import { completeMissionByCode } from "@/lib/missions/completion"
 
 export async function GET(_request: NextRequest) {
   try {
@@ -50,22 +50,20 @@ export async function POST(request: NextRequest) {
       data: { userId: user.id, role: "USER", content },
     })
 
-    const systemPrompt = buildSystemPrompt(user.typeCode, user.nickname)
-    // TODO: Bedrock 호출 — app/chat/_lib/systemPrompt.ts의 systemPrompt와 대화 이력으로
-    // 스트리밍 응답을 생성하고 ChatRole.ASSISTANT로 저장한다. BEDROCK_MODEL_ID 확보 후 구현 (SPEC.md 7절).
-    // 친밀도는 사용자가 메시지를 보낸 이 시점에 이미 지급한다 — Bedrock 응답 저장 시점에
-    // 다시 지급하지 않는다(1턴 = 사용자 발화 기준, 중복 지급 금지).
-    void systemPrompt
-
+    // 친밀도는 사용자가 메시지를 보낸 이 시점에만 지급한다 — Bedrock 응답 저장 시점
+    // (/api/chat/stream)에서 다시 지급하지 않는다(1턴 = 사용자 발화 기준, 중복 지급 금지).
     const granted = await grantAffinity(user, CHAT_TURN_AFFINITY)
 
-    // TODO: 미션 완료 연결 — B의 completeMission 대기
-    // 사용자 발화 저장 시점에만 호출한다. Bedrock 응답 저장 자리에서 또 부르면 중복이다.
-    // try {
-    //   await completeMission(user.id, "DAILY_CHAT")
-    // } catch (e) {
-    //   console.error("미션 완료 처리 실패", e)
-    // }
+    // 미션 완료는 본 동작이 끝난 뒤에 별도 try/catch로 부른다.
+    // 트랜잭션에 넣지 않는다 — 미션 실패가 메시지 저장을 롤백시키면 안 된다.
+    // 중복 완료는 completeMission 내부에서 P2002를 잡아 newlyCompleted:false로 돌려준다.
+    // 사용자 발화 저장 시점에만 호출한다. Bedrock 응답 저장 자리(/api/chat/stream)에서
+    // 또 부르면 중복이다.
+    try {
+      await completeMissionByCode({ actor: user, code: "DAILY_CHAT" })
+    } catch (error) {
+      console.error("[DAILY_CHAT] 미션 완료 처리 실패", error)
+    }
 
     return ok({ message, granted })
   } catch (error) {
