@@ -55,6 +55,15 @@
 
 기존 `.hm-pet`·`.hm-pet__cos`·`.hm-pet__evolve`는 지우지 않았다. `app/pet/skins`와 `app/pet/cosmetics`가 아직 쓴다.
 
+### 방 배경 SVG는 데모다 (2026-08-21 사용자 확인)
+
+**방 배경과 펫은 나중에 이미지로 붙인다.** 지금 SVG는 이미지가 올 자리를 채우는 임시물이고, 더 예쁘게 다듬는 데 시간을 쓰지 않는다.
+
+- **펫은 이미 이미지가 먼저다.** `pet.imageUrl`(CloudFront `<imageKeyBase>-<단계>.png`)이 있으면 `<img>`를 쓰고, 없을 때만 이모지로 떨어진다. 그림이 오면 **코드를 고칠 것이 없다** — S3 파일과 `imageKeyBase`만 맞으면 된다. 단 `pets/bear-polar`(시드) ↔ `pets/bear-arctic`(S3 실제) 불일치가 남아 있어 **북극곰만 이모지로 떨어진다**(차단 19번)
+- **방 배경은 아직 SVG뿐이다.** 교체 지점은 `PetRoom.tsx`의 `<svg className="pet-room__bg">` 하나다. 같은 클래스를 붙인 `<img>`로 바꾸면 `pet.css`의 크기·`object-fit`이 그대로 적용된다
+- **정해야 할 것**: 방 배경 이미지가 **치장 배경 6종(`배경1`~`배경6`)과 같은 것인지** 별개 고정 배경인지. `SPEC.md` 5절에 이미 배경 치장 6종이 있고 슬롯당 1개 착용이라, 같은 것이라면 배경 URL은 착용 중인 `CosmeticItem.imageKey`에서 나와야 한다. 지금 화면은 착용 치장을 이름 배지(`.pet-char__worn`)로만 보여주고 배경에 반영하지 않는다
+- 같은 것으로 정해지면 **아무것도 착용하지 않은 유저의 기본 배경**이 필요하다. 이 SVG를 그 자리에 남기는 것이 가장 싸다(CloudFront가 403을 줄 때의 폴백도 겸한다)
+
 ### 방 배경은 새 컴포넌트로 뺐다
 
 `app/pet/_components/PetRoom.tsx`. 벽·줄무늬·바닥 판자·창·커튼·화분·러그를 SVG로 그린다. `aria-hidden`이고 색은 인라인이 아니라 클래스(`.pet-room__wall` 등)로 줘서 `pet.css`가 `var(--tribe)`로 칠한다.
