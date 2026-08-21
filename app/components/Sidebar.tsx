@@ -102,8 +102,9 @@ export function Sidebar() {
     return () => window.removeEventListener("resize", checkWidth)
   }, [])
 
-  // 진단 문항 화면에서 숨김
-  if (pathname === "/diagnosis") {
+  // 진단/로그인/회원가입 화면에서 숨김
+  const hiddenPaths = ["/diagnosis", "/diagnosis/result", "/login", "/signup"]
+  if (hiddenPaths.includes(pathname)) {
     return null
   }
 

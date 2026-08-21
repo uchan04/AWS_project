@@ -12,7 +12,7 @@ export class UnauthorizedError extends Error {
   }
 }
 
-const DEV_COGNITO_SUB = "dev-user-000"
+const DEV_COGNITO_SUB = "local:team-test"
 
 // DEV_AUTH_BYPASS=true인 로컬 개발 환경은 COGNITO_USER_POOL_ID를 설정할 필요가 없다.
 // 모듈 로드 시점에 CognitoJwtVerifier.create()를 부르면 빈 Pool ID로 즉시 throw해서
@@ -36,7 +36,7 @@ export async function getCurrentUser(): Promise<User> {
     return prisma.user.upsert({
       where: { cognitoSub: DEV_COGNITO_SUB },
       update: {},
-      create: { cognitoSub: DEV_COGNITO_SUB, nickname: "개발용 계정" },
+      create: { cognitoSub: DEV_COGNITO_SUB, nickname: "Welli 팀" },
     })
   }
 
