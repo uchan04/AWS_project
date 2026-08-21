@@ -35,11 +35,32 @@ export async function completeDiagnosis(answers: Answer[]): Promise<DiagnosisVie
   return read<DiagnosisView>(response)
 }
 
+/**
+ * 미인증과 "로그인했지만 진단 전"을 가른다. 홈의 "시작하기"가 갈 곳이 이 둘에서 다르다 —
+ * 미인증은 가입/로그인부터, 로그인 상태면 문항부터다. me만 보면 둘 다 null이라 구분이 안 된다.
+ */
+export type MeState = { authed: boolean; me: DiagnosisView | null }
+
+export async function fetchMeState(): Promise<MeState> {
+  const response = await fetch("/api/diagnosis/me")
+  if (response.status === 401) return { authed: false, me: null }
+  return { authed: true, me: await read<DiagnosisView | null>(response) }
+}
+
 /** 진단 전이면 null. 로그인 전에도 null로 취급해 시작 화면을 보여준다. */
 export async function fetchMe(): Promise<DiagnosisView | null> {
-  const response = await fetch("/api/diagnosis/me")
-  if (response.status === 401) return null
-  return read<DiagnosisView | null>(response)
+  return (await fetchMeState()).me
+}
+
+/**
+ * 결과 화면의 판정 근거 3줄. 없으면 null이다 —
+ * 진단 전, 미인증, Bedrock 실패가 전부 null로 온다(화면은 카드를 빼면 된다).
+ */
+export async function fetchReason(): Promise<string[] | null> {
+  const response = await fetch("/api/diagnosis/reason")
+  if (!response.ok) return null
+  const body: ApiBody<{ lines: string[] } | null> = await response.json().catch(() => ({}))
+  return body.data?.lines ?? null
 }
 
 export async function saveNickname(nickname: string): Promise<string> {

@@ -17,6 +17,15 @@ enum TypeCode {
   FAMILY_LIVING // 가족동거형 / 곰과 / 곰
 }
 
+// Post.galleryType 전용. TypeCode 3종 + 커뮤니티 "전체" 탭 글쓰기용 ALL.
+// 값 이름은 TypeCode와 동일하게 맞춘다 — 기존 데이터가 이름 그대로 매핑된다.
+enum GalleryType {
+  INDEPENDENT_LOW_INCOME
+  HEALTH_EMOTION
+  FAMILY_LIVING
+  ALL
+}
+
 // 관리자 전용 세부유형. 연구보고서 9유형에서 경계선지능청년을 뺀 8개다.
 // (IQ 71~84는 자기보고로 측정할 수 없고 묻는 것 자체가 낙인이다)
 // 절대 화면에 노출하지 않는다. 관리자 화면은 TypeCode × SubTypeCode 교차표로 본다.
@@ -71,6 +80,12 @@ enum ChatRole {
 model User {
   id         String @id @default(cuid())
   cognitoSub String @unique
+
+  // 자체 DB 계정용(A가 E 합의로 추가, 2026-08-21). Cognito로 가입한 계정은 둘 다 null이다.
+  // 자체 계정은 cognitoSub에 "local:<cuid>"를 넣어 Cognito sub(UUID)와 겹치지 않게 한다.
+  // passwordHash는 lib/password.ts의 scrypt 형식("scrypt$<salt>$<hash>")이다. 평문은 저장하지 않는다.
+  email        String? @unique
+  passwordHash String?
 
   // 진단 완료 시 표시명(형용사 + 동물)으로 자동 세팅한다.
   // 이후 유저가 프로필에서 변경할 수 있다. 유니크 제약을 두지 않는다.
@@ -240,7 +255,8 @@ model Post {
   id String @id @default(cuid())
 
   // 작성 시점의 갤러리를 그대로 보관한다. 재진단으로 유형이 바뀌어도 글은 이동하지 않는다.
-  galleryType TypeCode
+  // ALL은 "전체" 탭에 쓴 글. TypeCode가 아니라 GalleryType이라 전체 탭도 저장할 수 있다.
+  galleryType GalleryType
 
   userId       String
   title        String

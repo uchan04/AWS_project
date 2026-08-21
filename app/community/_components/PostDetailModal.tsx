@@ -12,6 +12,7 @@ type DetailComment = {
   body: string
   createdAt: string
   user: DetailUser
+  isOwn: boolean
 }
 
 type DetailPost = {
@@ -42,17 +43,23 @@ export function PostDetailModal({
   const [post, setPost] = useState<DetailPost | null>(null)
   const [comments, setComments] = useState<DetailComment[]>([])
   const [loading, setLoading] = useState(true)
+  // error는 최초 GET 실패 전용(모달 전체를 에러 화면으로 바꾼다).
+  // 좋아요·댓글·삭제 등 액션 실패는 actionError로 분리해 하단에 인라인으로만 띄운다.
   const [error, setError] = useState<string | null>(null)
+  const [actionError, setActionError] = useState<string | null>(null)
   const [likePending, setLikePending] = useState(false)
   const [commentBody, setCommentBody] = useState("")
   const [commentPending, setCommentPending] = useState(false)
   const [affinityNotice, setAffinityNotice] = useState<string | null>(null)
   const [deletePending, setDeletePending] = useState(false)
+  // 어느 댓글이 처리 중인지 구분한다. 단일 boolean이면 삭제 중에 모든 댓글 버튼이 같이 비활성화된다.
+  const [deletingCommentId, setDeletingCommentId] = useState<string | null>(null)
 
+  // 마운트 시 한 번만 로드한다. loading=true / error=null은 useState 초기값이 이미 그 상태라
+  // 이펙트 본문에서 다시 세팅하지 않는다(react-hooks/set-state-in-effect).
+  // PostList가 key={selectedPostId}로 렌더하므로 다른 글을 열면 컴포넌트가 새로 마운트된다.
   useEffect(() => {
     let ignore = false
-    setLoading(true)
-    setError(null)
 
     fetch(`/api/community/posts/${postId}`)
       .then((res) => res.json())
@@ -80,10 +87,14 @@ export function PostDetailModal({
   async function handleLike() {
     if (!post || likePending) return
     setLikePending(true)
+    setActionError(null)
     try {
       const res = await fetch(`/api/community/posts/${postId}/like`, { method: "POST" })
       const json = await res.json()
-      if (json.error) return
+      if (json.error) {
+        setActionError(json.error.message)
+        return
+      }
       setPost((prev) => (prev ? { ...prev, likedByMe: json.data.liked, likeCount: json.data.likeCount } : prev))
     } finally {
       setLikePending(false)
@@ -93,11 +104,12 @@ export function PostDetailModal({
   async function handleDelete() {
     if (!post || deletePending) return
     setDeletePending(true)
+    setActionError(null)
     try {
       const res = await fetch(`/api/community/posts/${postId}`, { method: "DELETE" })
       const json = await res.json()
       if (json.error) {
-        setError(json.error.message)
+        setActionError(json.error.message)
         return
       }
       onDeleted()
@@ -106,11 +118,30 @@ export function PostDetailModal({
     }
   }
 
+  async function handleDeleteComment(commentId: string) {
+    if (deletingCommentId) return
+    setDeletingCommentId(commentId)
+    setActionError(null)
+    try {
+      const res = await fetch(`/api/community/posts/${postId}/comments/${commentId}`, { method: "DELETE" })
+      const json = await res.json()
+      if (json.error) {
+        setActionError(json.error.message)
+        return
+      }
+      setComments((prev) => prev.filter((c) => c.id !== commentId))
+      setPost((prev) => (prev ? { ...prev, commentCount: Math.max(0, prev.commentCount - 1) } : prev))
+    } finally {
+      setDeletingCommentId(null)
+    }
+  }
+
   async function handleComment() {
     const trimmed = commentBody.trim()
     if (!trimmed || commentPending) return
     setCommentPending(true)
     setAffinityNotice(null)
+    setActionError(null)
     try {
       const res = await fetch(`/api/community/posts/${postId}/comments`, {
         method: "POST",
@@ -119,7 +150,7 @@ export function PostDetailModal({
       })
       const json = await res.json()
       if (json.error) {
-        setError(json.error.message)
+        setActionError(json.error.message)
         return
       }
       setComments((prev) => [...prev, json.data.comment])
@@ -205,6 +236,16 @@ export function PostDetailModal({
                       <div className="mb-1 flex items-center gap-2">
                         <span className="text-sm font-semibold text-neutral-900">{authorText(comment.user)}</span>
                         <span className="text-xs text-neutral-400">{timeAgo(new Date(comment.createdAt))}</span>
+                        {comment.isOwn && (
+                          <button
+                            type="button"
+                            onClick={() => handleDeleteComment(comment.id)}
+                            disabled={deletingCommentId === comment.id}
+                            className="ml-auto rounded-lg border border-neutral-300 px-2 py-1 text-[11px] text-neutral-500 hover:bg-white disabled:opacity-60"
+                          >
+                            삭제
+                          </button>
+                        )}
                       </div>
                       <p className="text-sm leading-relaxed text-neutral-700">{comment.body}</p>
                     </div>
@@ -214,6 +255,7 @@ export function PostDetailModal({
             </div>
 
             <div className="flex flex-col gap-2 border-t border-neutral-200 px-7 py-4">
+              {actionError && <p className="text-xs text-red-500">{actionError}</p>}
               {affinityNotice && <p className="text-xs text-neutral-400">{affinityNotice}</p>}
               <div className="flex gap-2">
                 <input

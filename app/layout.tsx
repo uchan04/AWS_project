@@ -1,6 +1,7 @@
 import type { Metadata } from "next";
 import "./globals.css";
 import { Sidebar } from "./components/Sidebar";
+import { ChatLauncher } from "./chat/_components/ChatLauncher";
 
 export const metadata: Metadata = {
   title: "함께 걷는 하루",
@@ -15,6 +16,7 @@ export default function RootLayout({ children }: LayoutProps<"/">) {
         <div style={{ flex: 1, background: "#F5F0E8", overflowY: "auto" }}>
           {children}
         </div>
+        <ChatLauncher />
       </body>
     </html>
   );

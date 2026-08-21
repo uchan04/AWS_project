@@ -2,8 +2,11 @@
 
 // 소유자: A. 홈. 종족·펫·오늘 미션 진입점.
 //
-// 진단 결과는 GET /api/diagnosis/me에서 읽는다. 펫·미션 실데이터는 B·C의 API가 나온 뒤에 붙인다.
-// 진단 전에는 진단 화면으로 보내는 것 하나만 남긴다. 홈에 아무것도 못 하는 카드를 늘리지 않는다.
+// 진단 결과는 GET /api/diagnosis/me, 오늘 미션은 GET /api/missions에서 읽는다.
+// 미션 문구를 홈에 복사하거나 시드 배열을 직접 읽지 않는다 — 원본은 DB다(결정 10번).
+// 진단 전에는 다음 한 걸음만 남긴다. 홈에 아무것도 못 하는 카드를 늘리지 않는다.
+// 그 한 걸음이 미인증이면 가입, 로그인 상태면 문항이다 — 미인증을 /diagnosis로 보내면
+// 게이트 안내 카드에 부딪혀 한 번 더 눌러야 한다(흐름: 소개 → 가입/로그인 → 문항 → 결과 → 홈).
 //
 // 스타일은 design.md가 정한다. Hallmark · macrostructure: Index-First.
 // 홈은 링크 목록이다. 화면을 채우는 가운데 정렬 히어로를 두지 않는다.
@@ -12,10 +15,12 @@ import Link from "next/link"
 import { useEffect, useState } from "react"
 import type { TypeCode } from "@prisma/client"
 import { TRIBE } from "@/lib/types"
-// 미션 문구는 A가 가진 시드 콘텐츠가 정본이다. 홈에 복사해 두지 않고 그 배열을 읽는다
-import { DAILY } from "@/prisma/seed/missions"
 import "@/styles/tokens.css"
-import { type DiagnosisView, fetchMe } from "./diagnosis/api"
+import { type MeState, fetchMeState } from "./diagnosis/api"
+
+// GET /api/missions(B 소유)가 돌려주는 DashboardDTO 중 홈이 쓰는 부분만 적는다.
+// lib/missions/dashboard.ts의 타입을 import하면 홈이 서버 모듈에 묶인다
+type DailyMissionView = { code: string; title: string; completed: boolean; reward: { seeds: number } }
 
 // 진단 전 화면에서 세 종족을 나란히 보여줄 때 쓴다
 const TRIBE_LIST = (Object.keys(TRIBE) as TypeCode[]).map((code) => ({ code, ...TRIBE[code] }))
@@ -28,30 +33,45 @@ function greetingFor(hour: number): string {
 }
 
 export default function HomePage() {
-  // undefined = 아직 읽는 중. null과 구분해야 진단한 사람에게 시작 화면이 깜박이지 않는다
-  const [me, setMe] = useState<DiagnosisView | null | undefined>(undefined)
+  // undefined = 아직 읽는 중. me=null과 구분해야 진단한 사람에게 시작 화면이 깜박이지 않는다
+  const [state, setState] = useState<MeState | undefined>(undefined)
   const [greeting, setGreeting] = useState("")
+  // null = 못 읽었다(진단 전·미인증·에러). 빈 배열과 구분해서 안내 문구를 가른다
+  const [daily, setDaily] = useState<DailyMissionView[] | null>(null)
 
   useEffect(() => {
     let alive = true
     // 인사말도 이 콜백 안에서 정한다. 이펙트 본문에서 바로 setState하면
     // react-hooks/set-state-in-effect가 에러다. greeting은 me가 정해진 뒤에만 쓰이므로
     // 여기로 옮겨도 화면에 보이는 순서는 같다
-    fetchMe()
+    fetchMeState()
       .then((next) => {
         if (!alive) return
         setGreeting(greetingFor(new Date().getHours()))
-        setMe(next)
+        setState(next)
       })
       .catch(() => {
-        if (alive) setMe(null)
+        // 읽지 못했으면 미인증으로 취급한다. 소개 화면이 가입으로 보내는 쪽이 덜 막힌다
+        if (alive) setState({ authed: false, me: null })
       })
+
+    // 미션은 별도로 읽는다. 진단 전에는 400이고 미인증이면 401인데, 둘 다 홈이
+    // 뜨는 것을 막을 이유가 아니다. 실패하면 미션 카드만 안내 문구로 남는다
+    fetch("/api/missions")
+      .then((response) => (response.ok ? response.json() : null))
+      .then((body) => {
+        if (alive) setDaily(body?.data?.dailyMissions ?? null)
+      })
+      .catch(() => {
+        if (alive) setDaily(null)
+      })
+
     return () => {
       alive = false
     }
   }, [])
 
-  if (me === undefined) {
+  if (state === undefined) {
     return (
       <main className="hm hm--canvas">
         <div className="hm__col">
@@ -60,6 +80,8 @@ export default function HomePage() {
       </main>
     )
   }
+
+  const me = state.me
 
   // 진단 전 홈 = 시작 화면. Figma 인트로 구성(왼쪽 글, 오른쪽 안내 카드)을 가져왔다
   if (!me) {
@@ -88,9 +110,15 @@ export default function HomePage() {
               ))}
             </div>
 
-            <Link href="/diagnosis" className="hm-btn">
+            {/* 미인증이면 가입부터. 로그인 상태로 여기 온 사람은 진단만 안 한 것이므로 문항으로 보낸다 */}
+            <Link href={state.authed ? "/diagnosis" : "/signup"} className="hm-btn">
               시작하기
             </Link>
+            {!state.authed && (
+              <Link href="/login" className="hm-link">
+                이미 계정이 있어요
+              </Link>
+            )}
           </div>
 
           <div className="hm-card">
@@ -150,8 +178,8 @@ export default function HomePage() {
             </Link>
           </div>
 
-          {/* 오늘의 미션 미리보기. 문구는 시드 콘텐츠(DAILY)에서 읽는다.
-              완료 여부는 DB가 붙은 뒤에 표시한다 */}
+          {/* 오늘의 미션 미리보기. GET /api/missions에서 읽는다. 완료한 것도 그대로 보여준다 —
+              홈에서 목록이 줄어들면 무엇을 했는지가 안 보인다 */}
           <div className="hm-card">
             <div className="hm-card__head">
               <h2 className="hm-card__title">오늘의 미션</h2>
@@ -159,14 +187,23 @@ export default function HomePage() {
                 전체 보기
               </Link>
             </div>
-            <div className="hm-tiles">
-              {DAILY.slice(0, 4).map((mission) => (
-                <div key={mission.code} className="hm-tile">
-                  <span className="hm-tile__title">{mission.title}</span>
-                  <span className="hm-tile__hint">씨앗 {mission.rewardSeeds}</span>
-                </div>
-              ))}
-            </div>
+            {daily === null ? (
+              <p className="hm__note">미션을 불러오지 못했어요. 전체 보기에서 확인해 주세요</p>
+            ) : (
+              <div className="hm-tiles">
+                {daily.slice(0, 4).map((mission) => (
+                  <div key={mission.code} className="hm-tile">
+                    <span className="hm-tile__title">
+                      {mission.completed ? "✓ " : ""}
+                      {mission.title}
+                    </span>
+                    <span className="hm-tile__hint">
+                      {mission.completed ? "완료했어요" : `씨앗 ${mission.reward.seeds}`}
+                    </span>
+                  </div>
+                ))}
+              </div>
+            )}
           </div>
         </div>
 

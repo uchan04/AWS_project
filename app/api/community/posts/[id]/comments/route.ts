@@ -35,7 +35,17 @@ export async function POST(request: NextRequest, ctx: RouteContext<"/api/communi
 
     const granted = await grantAffinity(user, COMMENT_AFFINITY)
 
-    return ok({ comment, granted })
+    // 작성 직후 목록에 바로 붙는 구조라 GET 상세의 댓글 형태와 똑같이 맞춘다(userId 미노출 + isOwn).
+    return ok({
+      comment: {
+        id: comment.id,
+        body: comment.body,
+        createdAt: comment.createdAt,
+        user: comment.user,
+        isOwn: true,
+      },
+      granted,
+    })
   } catch (error) {
     if (error instanceof UnauthorizedError) return fail("UNAUTHORIZED", error.message, 401)
     throw error

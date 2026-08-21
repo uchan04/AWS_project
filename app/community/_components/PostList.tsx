@@ -35,6 +35,7 @@ export function PostList({ posts, showTribeBadge }: { posts: GalleryPost[]; show
 
       {selectedPostId && (
         <PostDetailModal
+          key={selectedPostId}
           postId={selectedPostId}
           onClose={() => setSelectedPostId(null)}
           onDeleted={handleDeleted}

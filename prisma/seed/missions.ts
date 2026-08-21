@@ -43,7 +43,11 @@ export const DAILY: Prisma.MissionCreateInput[] = [
     title: "커뮤니티에 글 남기기",
     description: "오늘의 기분을 한 줄이라도 남겨봐요. 주제를 추천해 드려요.",
     rewardSeeds: 15,
-    rewardAffinity: 20,
+    // 친밀도는 미션 보상이 아니라 D의 app/community/_lib/affinity.ts가 준다(POST_AFFINITY = 20).
+    // 양쪽이 각각 20을 주면 글 1개에 40이 들어간다. 확정값은 20이므로 이쪽을 0으로 둔다
+    // (2026-08-20 결정). 지급 지점을 커뮤니티 쪽에 둔 이유는 글을 두 번째로 쓸 때도
+    // 친밀도가 붙어야 하는데, 미션 보상은 하루 한 번만 나가기 때문이다.
+    rewardAffinity: 0,
     order: 4,
   },
   {
@@ -52,7 +56,8 @@ export const DAILY: Prisma.MissionCreateInput[] = [
     title: "AI 친구와 대화하기",
     description: "무슨 말이든 괜찮아요. 한 마디만 걸어봐요.",
     rewardSeeds: 15,
-    rewardAffinity: 5,
+    // 위와 같은 이유. 대화 친밀도는 D의 CHAT_TURN_AFFINITY = 5가 턴마다 준다
+    rewardAffinity: 0,
     order: 5,
   },
 ]
