@@ -2,7 +2,7 @@
 
 **모든 세션은 이 문서부터 읽는다.** 그다음 아래 "지금 읽어야 할 문서"만 읽고 시작한다.
 
-최종 갱신: 2026-08-21 (흐름 확정: 소개 → 가입/로그인 → 문항 → 결과 → 홈. 차단 21·22·23 추가. 남은 것은 13·14·19·20·21·22·23)
+최종 갱신: 2026-08-21 (흐름 확정: 소개 → 가입/로그인 → 문항 → 결과 → 홈. 자체 DB 계정 + 쿠키 로그인 유지 완료, 차단 22 해소. 남은 것은 13·14·19·20·21·23)
 현재 단계: **D2 — 인프라 완료, 기능 5개 병렬 착수 (8/20 기능 동결 예정일)**
 
 팀원 인수인계용 단일 문서는 [`docs/인수인계.md`](인수인계.md)에 있다. 새로 합류하거나 노션으로 공유할 때는 그 문서를 쓴다.
@@ -88,8 +88,8 @@
 
 확정 흐름: **소개(`/`) → 가입/로그인 → 문항 → 결과 → 홈**. 홈에 닿기 전에는 사이드바·챗봇 버튼이 없어야 한다.
 
-21. **`/diagnosis/result`에 사이드바와 챗봇 버튼이 뜬다 (B·D 담당)** — 2026-08-21 브라우저 실측: `/diagnosis/result`는 `aside` 1개 + "마음 친구 열기" 1개, `/login`은 챗봇 1개(위 20번), `/diagnosis`는 둘 다 0개다. 결과 화면은 아직 홈이 아니라 진단의 마지막 장이므로 둘 다 숨겨야 한다. 각각 한 줄이다 — B는 `app/components/Sidebar.tsx:106`의 `pathname === "/diagnosis"`를 경로 목록으로, D는 `ChatLauncher.tsx`의 `HIDDEN_PATHS`에 `/diagnosis/result` 추가. **A 소유 파일이 아니라 A가 고치지 않았다**(`CLAUDE.md` 2절)
-22. **자체 DB 계정 컬럼이 공유 DB에 없다 (E 담당)** — 2026-08-21 실 DB `information_schema` 확인: `User`에 `cognitoSub`만 있고 `email`·`passwordHash`가 없다. `origin/develop`·`origin/main`에도 `prisma/schema.prisma` 변경과 새 마이그레이션이 없고 `origin/feat/infra`는 원격에 존재하지 않는다. E가 로컬에만 적용했거나 push하지 않은 상태로 보인다. 필요한 것은 **추가만** 하는 마이그레이션 하나다(`email String? @unique`, `passwordHash String?` — `cognitoSub`는 그대로 두고 자체 계정은 `local:<cuid>`를 넣는다. 기존 행을 고치지 않으므로 NOT NULL 문제가 없다). 이것이 오기 전까지 자체 가입·로그인 라우트는 빌드되지 않는다
+21. **`/diagnosis/result`에 사이드바와 챗봇 버튼이 뜬다 (B·D 담당)** — 2026-08-21 브라우저 실측: `/diagnosis/result`는 `aside` 1개 + "마음 친구 열기" 1개, `/login`은 챗봇 1개(위 20번), `/diagnosis`는 둘 다 0개다. 결과 화면은 아직 홈이 아니라 진단의 마지막 장이므로 둘 다 숨겨야 한다. 각각 한 줄이다 — B는 `app/components/Sidebar.tsx:106`의 `pathname === "/diagnosis"`를 경로 목록으로, D는 `ChatLauncher.tsx`의 `HIDDEN_PATHS`에 `/diagnosis/result` 추가. 경로 숨김은 **A 소유 파일이 아니라 A가 고치지 않았다**(`CLAUDE.md` 2절). 다만 같은 파일의 **미인증 표시 버그는 A가 고쳤다(B에게 통보 필요)** — 401 본문을 폴백으로 메워서 로그인 전에도 `익명 / 미분류 / Lv.1 / 씨앗 0개 / 로그아웃`이 떴다. `res.ok`를 확인해 실패면 `setProfile(null)`로 두고, 로그아웃 버튼의 `alert(…)`를 실제 `POST /api/auth/logout`으로 바꿨다. 상세는 `docs/dev/diagnosis.md` 19절
+22. ~~**자체 DB 계정 컬럼이 공유 DB에 없다**~~ — **해소(2026-08-21, A가 E 합의로 적용)**. `prisma/migrations/20260821020000_user_email_password/`가 `User`에 `email TEXT UNIQUE`·`passwordHash TEXT`를 더한다. 둘 다 nullable이라 기존 행에 영향이 없다. 공유 RDS에 `migrate deploy` 완료(마이그레이션 5개). **다른 4인은 `git pull && npx prisma migrate deploy && npx prisma generate`.** 이어서 가입·로그인이 자체 DB 계정으로 동작한다(`/signup`은 Cognito `AdminCreateUser`를 쓰지 않는다 — IAM 자격증명이 없어 로컬에서 가입이 아예 안 됐고, 확정 흐름상 가입 직후 `User` 행이 있어야 한다). Google 로그인만 Cognito를 계속 쓴다. **팀 공용 테스트 계정: `test@welli.local` / `welli-test-1234`** (공유 개발 DB 전용. 심사·배포 전에 삭제한다. 재생성은 `npx tsx scripts/create-local-user.ts`). `DEV_AUTH_BYPASS`는 이제 쓰지 않는다 — 로컬 `.env`도 `false`다
 23. **자체 로그인의 보안 항목을 의도적으로 미뤘다 (팀 결정, 2026-08-21)** — 지금 있는 것: scrypt 해싱(`lib/password.ts`), HMAC 서명 세션 쿠키(`lib/session.ts`, `SESSION_SECRET` 없으면 즉시 throw), `scripts/check-auth.ts` 단정 20건. **미룬 것**: 로그인 시도 횟수 제한, 비밀번호 재설정, 세션 즉시 무효화(DB 세션 표가 없어 만료 전 강제 로그아웃이 안 된다), 이메일 소유 확인. 기능이 붙은 뒤에 다시 본다. `DEV_AUTH_BYPASS`는 배포 환경에서 절대 `true`가 되면 안 된다 — 모든 방문자가 같은 계정으로 들어온다
 
 **8/20 5인 머지 — A·B·C·D·E가 전부 들어갔다.** A는 `develop`(`d8edf2b`)을 받아 충돌 3건을 해결하고 올렸고(`f9314a5`), B가 `feat/missions`를 머지했고(`3adbea5` → `cb16959`), E가 `develop`을 `main`에 올린 뒤 `main`을 다시 머지했다(`152dbae`). 이어 A가 진단 근거 3줄과 B 복구분을 올렸다(`a098c61`). D가 `feat/community`를 머지했고(`563ab15`), C가 그 위에 `feat/pet`을 머지했고, B가 마지막 6커밋을 올렸다(`90b386f` → `773262d`). **다섯 브랜치 전부 `develop` 미반영 0건이다.** `docs/STATUS.md`가 매번 충돌하는데, 코드는 아직 한 번도 충돌하지 않았다 — 이 문서만 손으로 합치면 된다.

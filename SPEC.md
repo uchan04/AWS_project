@@ -360,6 +360,8 @@ Cognito 기반 인증, Amplify 관리형 HTTPS 강제, Prisma parameterized quer
 
 | 항목 | 의도 |
 |---|---|
+| `User.email` / `passwordHash` (2026-08-21 추가) | 자체 DB 계정용. Cognito로 가입한 계정(Google 로그인)은 둘 다 `null`이다. `passwordHash`는 `lib/password.ts`의 scrypt 형식이며 평문은 저장하지 않는다 |
+| `User.cognitoSub` | NOT NULL·유니크다. 자체 계정에는 Cognito sub가 없으므로 `local:<uuid>`를 넣는다 — Cognito sub는 UUID라 접두사가 있으면 절대 겹치지 않는다 |
 | `UserMission.@@unique([userId, missionId, resetKey])` | 중복 완료를 DB가 막는다. 애플리케이션에서 중복 체크를 하지 않는다 |
 | `User.activePetSkin` relation | `calculateReward()`에 넘길 활성 스킨을 `include` 한 번으로 가져오기 위한 것 |
 | `User.affinityToday` / `affinityTodayDate` | 친밀도 일일 상한 100 계산. 접속 시점 비교로 리셋 |
