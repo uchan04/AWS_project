@@ -92,7 +92,12 @@ export function Sidebar() {
     return () => {
       window.removeEventListener("user-stats-changed", handleMissionComplete)
     }
-  }, [])
+    // pathname을 넣는다(2026-08-21 A 수정). 사이드바는 layout.tsx에 있어 앱 전체에서 한 번만
+    // 마운트되므로 deps가 비어 있으면 프로필을 최초 1회만 읽는다. 로그인은 router.push("/")로
+    // 클라이언트 이동하니 재조회가 없고, 미인증 때 잡은 profile=null이 그대로 남아 홈에서
+    // 사이드바가 사라진다(새로고침하면 뜨는 이유가 이것이다).
+    // 401 폴백을 없애면서 드러난 문제다 — 폴백이 있던 때는 가짜 프로필로 가려져 있었다.
+  }, [pathname])
 
   // 화면 크기 감지
   useEffect(() => {
