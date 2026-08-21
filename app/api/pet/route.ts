@@ -8,7 +8,7 @@ import { calculateReward } from "@/lib/reward"
 export async function GET() {
   try {
     const user = await getCurrentUserWithSkin()
-    const stageCount = user.activePetSkin?.stageCount ?? 3
+    const stageCount = user.activePetSkin?.stageCount ?? 4
     const now = new Date()
 
     // 아직 안 받은 방치형 씨앗. 홈 화면(A)에서 "받을 씨앗 N개" 배지로도 쓸 수 있다.

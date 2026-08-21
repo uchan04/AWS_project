@@ -358,7 +358,9 @@
 }
 
 /* 진화 단계별 크기. SPEC.md 5절은 "CSS transform 수준"까지만 요구한다.
-   design.md가 금지하는 것은 scale 애니메이션이고, 단계별 고정 크기는 애니메이션이 아니다. */
+   design.md가 금지하는 것은 scale 애니메이션이고, 단계별 고정 크기는 애니메이션이 아니다.
+   2026-08-21: 4단 진화(알·아기·청소년·성체)가 되면서 3구간 → 4구간으로 늘렸다.
+   기본값은 stageCount = 1(단일 형태 캐릭터)이 쓰는 중간 크기다. */
 .pet-char__img,
 .pet-char__emoji {
   width: 8rem;
@@ -369,13 +371,27 @@
 }
 .pet-char[data-stage="1"] .pet-char__img,
 .pet-char[data-stage="1"] .pet-char__emoji {
-  width: 6.5rem;
-  height: 6.5rem;
-  font-size: 4.5rem;
-  line-height: 6.5rem;
+  width: 5.5rem;
+  height: 5.5rem;
+  font-size: 4rem;
+  line-height: 5.5rem;
+}
+.pet-char[data-stage="2"] .pet-char__img,
+.pet-char[data-stage="2"] .pet-char__emoji {
+  width: 7rem;
+  height: 7rem;
+  font-size: 5rem;
+  line-height: 7rem;
 }
 .pet-char[data-stage="3"] .pet-char__img,
 .pet-char[data-stage="3"] .pet-char__emoji {
+  width: 8.5rem;
+  height: 8.5rem;
+  font-size: 6rem;
+  line-height: 8.5rem;
+}
+.pet-char[data-stage="4"] .pet-char__img,
+.pet-char[data-stage="4"] .pet-char__emoji {
   width: 10rem;
   height: 10rem;
   font-size: 7rem;

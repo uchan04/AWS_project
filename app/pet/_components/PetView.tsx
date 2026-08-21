@@ -66,21 +66,33 @@ export type PetState = {
   roomImageUrl: string | null
 }
 
-// 단계 이름·문구. 단계 임계값은 lib/types.ts(A 소유)의 EVOLUTION_LEVEL이 정본이라
+// 단계 이름·문구. 단계 임계값은 lib/types.ts의 EVOLUTION_LEVEL이 정본이라
 // 여기서는 이름만 갖고 구간 문자열은 그 상수로 만든다.
-const STAGE_NAME = ["아기", "청년", "전설"]
-const STAGE_DESC = ["어린 시절을 보내고 있어요", "멋지게 자랐어요", "전설이 되었어요"]
+// 2026-08-21: 4단 진화로 바뀌면서 이름을 알·아기·청소년·성체로 확정했다(사용자 결정).
+// 이전 3개(아기·청년·전설)는 쓰지 않는다 — "전설"은 사라졌고 최종 단계는 성체다.
+const STAGE_NAME = ["알", "아기", "청소년", "성체"]
+const STAGE_DESC = [
+  "아직 알 속에 있어요",
+  "어린 시절을 보내고 있어요",
+  "부쩍 자랐어요",
+  "다 자란 모습이에요",
+]
+
+/** 마지막 단계 번호. STAGE_NAME과 어긋나면 이름이 없는 단계가 생긴다 */
+const MAX_STAGE = STAGE_NAME.length
 
 function stageRange(stage: number): string {
   if (stage === 1) return `Lv.1 ~ ${EVOLUTION_LEVEL.STAGE2 - 1}`
   if (stage === 2) return `Lv.${EVOLUTION_LEVEL.STAGE2} ~ ${EVOLUTION_LEVEL.STAGE3 - 1}`
-  return `Lv.${EVOLUTION_LEVEL.STAGE3}+`
+  if (stage === 3) return `Lv.${EVOLUTION_LEVEL.STAGE3} ~ ${EVOLUTION_LEVEL.STAGE4 - 1}`
+  return `Lv.${EVOLUTION_LEVEL.STAGE4}+`
 }
 
 /** 다음 진화까지 남은 것. 최종 단계면 null */
 function nextMilestone(level: number): string | null {
   if (level < EVOLUTION_LEVEL.STAGE2) return `Lv.${EVOLUTION_LEVEL.STAGE2} 첫 진화`
-  if (level < EVOLUTION_LEVEL.STAGE3) return `Lv.${EVOLUTION_LEVEL.STAGE3} 마지막 진화`
+  if (level < EVOLUTION_LEVEL.STAGE3) return `Lv.${EVOLUTION_LEVEL.STAGE3} 다음 진화`
+  if (level < EVOLUTION_LEVEL.STAGE4) return `Lv.${EVOLUTION_LEVEL.STAGE4} 마지막 진화`
   return null
 }
 
@@ -100,10 +112,10 @@ export default function PetView({ initial }: { initial: PetState }) {
   const progress = expProgress(pet.level, pet.exp)
   const emoji = animalEmoji(pet.animal)
   // 단일 형태(친밀도 캐릭터)는 단계 크기를 쓰지 않는다. 중간 크기로 고정한다
-  const stage = pet.stageCount > 1 ? Math.min(pet.evolutionStage, 3) : 2
+  const stage = pet.stageCount > 1 ? Math.min(pet.evolutionStage, MAX_STAGE) : 2
   const milestone = nextMilestone(pet.level)
-  // evolutionStageFor가 3에서 멈추므로 카드도 3장을 넘기지 않는다
-  const stages = Array.from({ length: Math.min(pet.stageCount, 3) }, (_, i) => i + 1)
+  // evolutionStageFor가 MAX_STAGE에서 멈추므로 카드도 그 수를 넘기지 않는다
+  const stages = Array.from({ length: Math.min(pet.stageCount, MAX_STAGE) }, (_, i) => i + 1)
   const feedable = Math.min(amount, pet.seeds)
 
   // 토스트 2.5초 후 사라짐

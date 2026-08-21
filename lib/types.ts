@@ -71,13 +71,19 @@ export function isValidNickname(value: string): boolean {
 // 2026-08-19: 씨앗 1 = 경험치 1 → 10으로 변경. 유일한 소비자는 lib/pet.ts의 applySeeds()다.
 // 값을 고치면 scripts/check-pet.ts의 기대값이 함께 바뀐다. npm run check:pet 을 반드시 돌린다.
 export const SEED_TO_EXP = 10
-export const EVOLUTION_LEVEL = { STAGE2: 5, STAGE3: 15 } as const
+
+// 2026-08-21: 3단 → **4단 진화**로 확정. S3에 종당 4장(`-1`~`-4`)이 올라와 있고
+// 4단 진화가 계획된 것임을 E가 확인해 줬다. 4단은 Lv.25다.
+// 누적 씨앗은 5 × N × (N-1)이므로 Lv.25는 3,000개(수급 약 109/일 → 약 27일)다.
+// 스킨 2500 별조각 39일·배경 3600 친밀도 36일과 결을 맞춘 값이다.
+export const EVOLUTION_LEVEL = { STAGE2: 5, STAGE3: 15, STAGE4: 25 } as const
 
 export function expToNextLevel(level: number): number {
   return level * 100
 }
 
 export function evolutionStageFor(level: number): number {
+  if (level >= EVOLUTION_LEVEL.STAGE4) return 4
   if (level >= EVOLUTION_LEVEL.STAGE3) return 3
   if (level >= EVOLUTION_LEVEL.STAGE2) return 2
   return 1

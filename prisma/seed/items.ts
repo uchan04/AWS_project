@@ -22,7 +22,12 @@ import type { Prisma, PrismaClient, Rarity } from "@prisma/client"
 
 // 스킨은 진단으로 정해진 종족 안에서만 고른다. 어미가 종족명이면 같은 종족이고,
 // 그룹핑은 typeCode가 담당한다(어미 문자열은 scripts/check-pet.ts에서 단정만 한다).
-// 능력치는 바뀌지 않고 외형만 바뀌므로 effectType은 전부 NONE이고 stageCount는 전부 3이다.
+// 능력치는 바뀌지 않고 외형만 바뀌므로 effectType은 전부 NONE이고 stageCount는 전부 4다.
+//
+// 2026-08-21: stageCount를 3 → 4로 올렸다. S3에 종당 4장(`-1`~`-4`)이 올라와 있고
+// 4단 진화가 계획된 것임을 E가 확인해 줬다. 임계값은 lib/types.ts의 EVOLUTION_LEVEL이 정본이다.
+// !! 실 DB의 PetSkin 6행은 아직 stageCount = 3이다. 시드 재실행(npm run db:seed)이나
+// UPDATE로 4로 올려야 4단 이미지가 화면에 뜬다 — 사용자 승인 후 실행한다 !!
 // 구매 화폐는 별조각 전용이다. 가격 2500은 2026-08-20 팀 확정값이다(그 전 안은 300, 최초 안은 50).
 //
 // 이 값은 같은 날 확정된 수급량과 짝이다: 일일 미션 전체 완료 = 별조각 60.
@@ -42,17 +47,17 @@ const VARIANT_PRICE_SHARDS = 2500
 // 체크 스크립트가 DB 없이 그대로 읽을 수 있다.
 export const PET_SKINS: Prisma.PetSkinCreateInput[] = [
   // 개과 — 건강·정서취약형
-  { name: "여우", typeCode: "HEALTH_EMOTION", isDefault: true, stageCount: 3, imageKeyBase: "pets/fox" },
+  { name: "여우", typeCode: "HEALTH_EMOTION", isDefault: true, stageCount: 4, imageKeyBase: "pets/fox" },
   {
     name: "북극여우",
     typeCode: "HEALTH_EMOTION",
-    stageCount: 3,
+    stageCount: 4,
     priceShards: VARIANT_PRICE_SHARDS,
     imageKeyBase: "pets/fox-arctic",
   },
 
   // 고양잇과 — 독립거주-저소득형
-  { name: "고양이", typeCode: "INDEPENDENT_LOW_INCOME", isDefault: true, stageCount: 3, imageKeyBase: "pets/cat" },
+  { name: "고양이", typeCode: "INDEPENDENT_LOW_INCOME", isDefault: true, stageCount: 4, imageKeyBase: "pets/cat" },
   {
     // 2026-08-20: 샴고양이 → 북극고양이로 개명. 북극여우·북극곰과 어휘를 맞췄다.
     // 실 DB는 시드 재실행이 아니라 UPDATE로 제자리 변경했다(위 17~19줄 경고 참고) —
@@ -60,17 +65,17 @@ export const PET_SKINS: Prisma.PetSkinCreateInput[] = [
     // 이미지가 아직 없어서 지금은 공짜지만, 올린 뒤에 바꾸면 S3 키가 어긋난다.
     name: "북극고양이",
     typeCode: "INDEPENDENT_LOW_INCOME",
-    stageCount: 3,
+    stageCount: 4,
     priceShards: VARIANT_PRICE_SHARDS,
     imageKeyBase: "pets/cat-arctic",
   },
 
   // 곰과 — 가족동거형
-  { name: "곰", typeCode: "FAMILY_LIVING", isDefault: true, stageCount: 3, imageKeyBase: "pets/bear" },
+  { name: "곰", typeCode: "FAMILY_LIVING", isDefault: true, stageCount: 4, imageKeyBase: "pets/bear" },
   {
     name: "북극곰",
     typeCode: "FAMILY_LIVING",
-    stageCount: 3,
+    stageCount: 4,
     priceShards: VARIANT_PRICE_SHARDS,
     imageKeyBase: "pets/bear-polar",
   },

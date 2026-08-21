@@ -20,7 +20,7 @@ export type GrowthResult = Growth & {
 
 /**
  * 진화 단계는 레벨로 정해지지만 스킨이 가진 단계 수를 넘지 못한다.
- * 지금 스킨은 전부 stageCount = 3이지만(외형만 바뀐다. SPEC.md 5절), 단계 수가 다른
+ * 지금 스킨은 전부 stageCount = 4이지만(외형만 바뀐다. SPEC.md 5절), 단계 수가 다른
  * 스킨이 들어와도 저장값이 stageCount를 넘지 않게 여기서 자른다.
  */
 export function cappedStage(level: number, stageCount: number): number {
@@ -33,7 +33,7 @@ export function cappedStage(level: number, stageCount: number): number {
  *
  * 씨앗 차감은 이 함수가 하지 않는다. 호출부가 트랜잭션 안에서 함께 처리한다.
  */
-export function applySeeds(current: Growth, seeds: number, stageCount = 3): GrowthResult {
+export function applySeeds(current: Growth, seeds: number, stageCount = 4): GrowthResult {
   // level이 0 이하로 들어오면 expToNextLevel이 0이 되어 while이 끝나지 않는다.
   const startLevel = Math.max(1, Math.floor(current.level))
   const startExp = Math.max(0, Math.floor(current.exp))
@@ -77,7 +77,10 @@ export function expProgress(level: number, exp: number): number {
 
 // ── 마스코트 이모지 ───────────────────────────────────────────────────────────
 //
-// 이미지 9장이 아직 없어 원판·배지 자리에 동물 이모지를 쓴다 (design.md).
+// 이미지가 안 뜰 때 원판·배지 자리에 쓰는 폴백이다 (design.md).
+// 2026-08-21: 이미지는 S3에 6종 × 4단 = 24장이 다 올라와 있다. 옛 주석의 "9장이 아직
+// 없다"는 사실이 아니었다. 지금 이모지로 떨어지는 것은 CLOUDFRONT_DOMAIN이 없을 때와
+// 북극곰(시드가 pets/bear-polar를 가리켜 403. 차단 19번)뿐이다.
 // 기본 3종은 lib/types.ts의 TRIBE가 정본이라 여기 다시 적지 않는다.
 // 화면 두 곳(PetView·SkinList)이 같이 쓰므로 컴포넌트가 아니라 여기에 둔다.
 

@@ -79,13 +79,21 @@ const base = { level: 1, exp: 0, evolutionStage: 1 }
 applySeeds(base, 500)
 assert.deepEqual(base, { level: 1, exp: 0, evolutionStage: 1 })
 
-// 진화: 5레벨 2단 / 15레벨 3단 (SPEC.md 5절)
+// 진화: 5레벨 2단 / 15레벨 3단 / 25레벨 4단 (SPEC.md 5절)
+// 2026-08-21: S3에 종당 4장이 있고 4단 진화가 계획된 것이라 3단 → 4단으로 늘렸다
 assert.equal(EVOLUTION_LEVEL.STAGE2, 5)
 assert.equal(EVOLUTION_LEVEL.STAGE3, 15)
-assert.equal(cappedStage(4, 3), 1)
-assert.equal(cappedStage(5, 3), 2)
-assert.equal(cappedStage(14, 3), 2)
-assert.equal(cappedStage(15, 3), 3)
+assert.equal(EVOLUTION_LEVEL.STAGE4, 25)
+assert.equal(cappedStage(4, 4), 1)
+assert.equal(cappedStage(5, 4), 2)
+assert.equal(cappedStage(14, 4), 2)
+assert.equal(cappedStage(15, 4), 3)
+assert.equal(cappedStage(24, 4), 3)
+assert.equal(cappedStage(25, 4), 4)
+// 4단이 최종이다. 그 위 레벨에서도 5단으로 새지 않는다
+assert.equal(cappedStage(999, 4), 4)
+// stageCount가 3인 옛 스킨 행이 남아 있어도 4단으로 새지 않는다(실 DB가 아직 3이다)
+assert.equal(cappedStage(25, 3), 3)
 
 // 4레벨에서 5레벨로 올리면 2단 진화 연출이 뜬다. 4→5는 경험치 400 = 씨앗 40개
 const toStage2 = applySeeds({ level: 4, exp: 0, evolutionStage: 1 }, 40)
@@ -95,14 +103,26 @@ assert.equal(toStage2.evolvedTo, 2)
 // 이미 2단이면 같은 단계에서 연출이 다시 뜨지 않는다
 assert.equal(applySeeds({ level: 5, exp: 0, evolutionStage: 2 }, 10).evolvedTo, null)
 
-// 한 번에 1단 → 3단으로 뛰면 최종 단계로 연출한다
-// 1→15레벨 누적 경험치 = 100×(1+2+…+14) = 10,500 = 씨앗 1,050개
-const jump = applySeeds({ level: 1, exp: 0, evolutionStage: 1 }, 1050)
-assert.equal(jump.level, EVOLUTION_LEVEL.STAGE3)
-assert.equal(jump.exp, 0)
-assert.equal(jump.evolvedTo, 3)
+// 14 → 15레벨이면 3단 연출이 뜬다. 14→15는 경험치 1,400 = 씨앗 140개
+const toStage3 = applySeeds({ level: 14, exp: 0, evolutionStage: 2 }, 140)
+assert.equal(toStage3.level, EVOLUTION_LEVEL.STAGE3)
+assert.equal(toStage3.evolvedTo, 3)
 
-// stageCount가 1이면 진화하지 않는다. 지금 시드는 전부 3이라(아래 스킨 검사) 쓰이지 않지만,
+// 한 번에 1단 → 4단으로 뛰면 최종 단계로 연출한다.
+// 누적 씨앗 = 5 × N × (N-1) 이므로 1→25레벨은 5 × 25 × 24 = 3,000개다
+// (경험치로는 100×(1+2+…+24) = 30,000). SPEC.md 5절의 "약 27일"이 이 값에서 나온다
+const jump = applySeeds({ level: 1, exp: 0, evolutionStage: 1 }, 3000)
+assert.equal(jump.level, EVOLUTION_LEVEL.STAGE4)
+assert.equal(jump.exp, 0)
+assert.equal(jump.evolvedTo, 4)
+
+// 3단까지의 누적도 함께 못 박는다. 5 × 15 × 14 = 1,050개
+const toStage3Total = applySeeds({ level: 1, exp: 0, evolutionStage: 1 }, 1050)
+assert.equal(toStage3Total.level, EVOLUTION_LEVEL.STAGE3)
+assert.equal(toStage3Total.exp, 0)
+assert.equal(toStage3Total.evolvedTo, 3)
+
+// stageCount가 1이면 진화하지 않는다. 지금 시드는 전부 4라(아래 스킨 검사) 쓰이지 않지만,
 // 단계 수가 다른 스킨이 들어와도 저장값이 stageCount를 넘지 않는 것을 지키는 방어다
 assert.equal(cappedStage(20, 1), 1)
 const single = applySeeds({ level: 4, exp: 0, evolutionStage: 1 }, 40, 1)
@@ -120,7 +140,7 @@ assert.equal(expProgress(1, -5), 0)
 
 // ── 스킨 이름 어미 = 종족 동물명 (SPEC.md 5절) ────────────────────────────────
 //
-// 이미지 9장이 없어 원판·배지에 동물 이모지를 쓴다. animalEmoji()는 이름의 **어미**로
+// 이미지가 안 뜰 때 원판·배지에 동물 이모지로 떨어진다. animalEmoji()는 이름의 **어미**로
 // 기본 동물을 찾는다(북극여우 → 여우 → 🦊). 변종마다 이모지를 새로 적지 않으려고 그렇게 짰다.
 //
 // 이 규칙이 깨지는 방식이 조용하다. 어미가 종족명이 아닌 이름("스노우폭스")을 시드에 넣으면
@@ -147,9 +167,11 @@ for (const skin of PET_SKINS) {
   // 어미 규칙을 지켜도 TRIBE와 어긋나면(예: 곰 스킨을 여우 typeCode에 붙이면) 여기서 걸린다
   assert.equal(animalEmoji(skin.name), tribe.emoji, `${skin.name}: 이모지가 종족과 어긋난다`)
 
-  // 외형만 바뀌므로 전부 3단 진화다. 기본 외형은 진단으로 지급되어 가격이 없고,
+  // 외형만 바뀌므로 전부 4단 진화다. 기본 외형은 진단으로 지급되어 가격이 없고,
   // 변종은 별조각 전용이다(친밀도가 아니다 — 2026-08-20 확정)
-  assert.equal(skin.stageCount, 3, `${skin.name}: stageCount는 전부 3이다`)
+  // S3에 종당 4장(`-1`~`-4`)이 있어 2026-08-21에 3 → 4로 올렸다. 단계 수를 바꾸면
+  // 실 DB의 PetSkin 6행도 함께 올려야 한다 — 시드 파일만 고치면 화면은 3단에서 멈춘다
+  assert.equal(skin.stageCount, 4, `${skin.name}: stageCount는 전부 4다`)
   if (skin.isDefault) {
     assert.equal(skin.name, tribe.animal, `${skin.name}: 기본 외형 이름은 동물명 그대로다`)
     assert.equal(skin.priceShards ?? null, null, `${skin.name}: 기본 외형은 살 수 없다`)

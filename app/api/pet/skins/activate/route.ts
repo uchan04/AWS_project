@@ -7,8 +7,8 @@ import { prisma } from "@/lib/prisma"
 //
 // 재화가 오가지 않는다. 레벨·경험치는 유저에게 붙어 있으므로 전환해도 진행도가 남는다.
 //
-// 진화 단계만 다시 계산한다. 친밀도 캐릭터는 stageCount = 1이라 3단 펫에서 갈아타면
-// 저장된 evolutionStage(2·3)가 새 캐릭터의 단계 수를 넘는다. 화면·GET은 레벨에서 다시
+// 진화 단계만 다시 계산한다. 친밀도 캐릭터는 stageCount = 1이라 4단 펫에서 갈아타면
+// 저장된 evolutionStage(2~4)가 새 캐릭터의 단계 수를 넘는다. 화면·GET은 레벨에서 다시
 // 계산하므로 표시가 깨지지는 않지만, 저장값을 방치하면 DB만 보는 사람이 틀린 값을 읽는다.
 
 export async function POST(request: Request) {

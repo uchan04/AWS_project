@@ -26,7 +26,7 @@ export async function POST(request: Request) {
       return fail("INVALID_SEEDS", "투입할 씨앗 개수를 1개 이상으로 지정해 주세요")
     }
 
-    const stageCount = user.activePetSkin?.stageCount ?? 3
+    const stageCount = user.activePetSkin?.stageCount ?? 4
     const now = new Date()
 
     // 씨앗 차감과 성장 반영을 한 트랜잭션에 묶는다.

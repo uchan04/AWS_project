@@ -26,7 +26,7 @@ export default async function PetPage() {
   try {
     const user = await getCurrentUserWithSkin()
     const skin = user.activePetSkin
-    const stageCount = skin?.stageCount ?? 3
+    const stageCount = skin?.stageCount ?? 4
 
     // 진단 전이면 typeCode가 없다. 기본 펫이 정해지기 전이므로 곰과 색을 임시로 쓴다.
     const tribe = user.typeCode ? TRIBE[user.typeCode] : TRIBE.FAMILY_LIVING
