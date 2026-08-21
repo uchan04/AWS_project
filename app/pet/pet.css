@@ -1,12 +1,24 @@
-/* 소유자: C. 펫 화면 전용 배치. design.md의 디자인 시스템을 따른다.
+/* 소유자: C. 펫 화면 전용 배치·스타일.
  *
- * 새 색·폰트·간격 값을 정의하지 않는다. 값의 정본은 styles/tokens.css이고
- * 여기서는 그 토큰을 조합만 한다. 새 값이 필요해지면 design.md를 먼저 고친다.
+ * 2026-08-21: Figma Make export("Create pet home design")의 펫 홈 디자인을 옮겼다.
+ * export는 Tailwind 유틸리티 + 하드코딩 hex였다. 두 가지를 바꿔서 들여왔다.
+ *   1) 유틸리티 대신 시맨틱 클래스로 — 이 프로젝트의 나머지 화면이 그 방식이다
+ *   2) 하드코딩 주색(#E07A45/#C45E2A)은 전부 var(--tribe) 파생으로 —
+ *      export는 여우 유형 데모라서 주황이었다. 요소 모양은 그대로 두고 색만 종족을 따른다.
+ *      여우 #E8956A / 고양이 #6A95C8 / 곰 #7AAE82 (styles/tokens.css [data-tribe])
  *
- * styles/tokens.css에 넣지 않은 이유: 그 파일은 A가 만든 공용 토큰이다.
- * 파일 끝에 덧붙이면 A도 같은 자리에 덧붙여 머지 충돌이 난다(CLAUDE.md 1절 취지).
- * .hm-pet* 는 펫 화면에서만 쓰므로 화면 폴더에 둔다.
+ * 색·간격·폰트 값의 정본은 여전히 styles/tokens.css다. 아래 :root 대신 .pet 스코프에
+ * 둔 것은 그 파일에서 파생한 조합값 + 재화 오브제 색 두 종뿐이다.
+ * 재화 색을 tokens.css에 넣지 않은 이유: 그 파일은 A 소유고, 파일 끝에 덧붙이면
+ * A도 같은 자리에 덧붙여 머지 충돌이 난다(CLAUDE.md 1절 취지).
+ *
+ * styles/tokens.css의 "채도 높은 색은 종족색 하나뿐" 규칙에서 씨앗 초록과 상점 나무색
+ * 두 개가 예외다. 씨앗은 어느 종족에게나 씨앗이고, 나무판은 나무색이라 종족색을 따르면
+ * 파란 나무·초록 나무가 된다.
  */
+
+/* ── 다른 펫 화면(치장·외형)과 공유하는 것 ───────────────────────────────────
+   app/pet/cosmetics, app/pet/skins가 .hm-pet / .hm-pet__cos* 를 쓴다. 건드리지 않는다. */
 
 .hm-pet {
   /* 단일 열 화면이라 진단과 같은 폭을 쓴다 (design.md "폭은 화면이 정한다") */
@@ -16,29 +28,777 @@
   align-content: start;
 }
 
-/* 진화 단계별 크기. SPEC.md 5절은 "CSS transform 수준"까지만 요구한다.
-   design.md가 금지하는 것은 scale 애니메이션이고, 단계별 고정 크기는 애니메이션이 아니다.
-   기준은 .hm-plate--hero(7.5rem / 4rem)이고 2단계가 그 값이다. */
-.hm-pet__plate[data-stage="1"] .hm-plate__disc {
-  width: 6rem;
-  height: 6rem;
-  font-size: 3rem;
-}
-.hm-pet__plate[data-stage="3"] .hm-plate__disc {
-  width: 9rem;
-  height: 9rem;
-  font-size: 5rem;
+/* 치장 타일. 버튼이 타일 아래에 붙으므로 위쪽 여백만 준다 */
+.hm-pet__cos .hm-btn {
+  margin-top: var(--space-3xs);
 }
 
-/* 씨앗 투입 버튼 줄. 좁은 화면에서 라벨이 두 줄이 되지 않게 자동으로 한 열이 된다 */
-.hm-pet__acts {
+/* 미획득 실루엣 (SPEC.md 5절). 이미지가 없어 지금은 글자를 죽여 둔다.
+   이미지가 오면 아래에 .hm-pet__cos--locked img { filter: brightness(0) opacity(.28) }를
+   더하면 된다 — 새 색 값을 만들지 않고 실루엣이 된다 */
+.hm-pet__cos--locked .hm-tile__title {
+  color: var(--color-muted);
+  font-weight: 400;
+}
+
+/* ── 펫 홈 화면 ──────────────────────────────────────────────────────────── */
+
+.pet {
+  /* 종족색 파생. 계산식을 여기 한 곳에 두고 아래에서는 이 이름만 쓴다.
+     --tribe 원색은 흰 글자와 명암비가 2.35:1(여우)밖에 안 나온다. 그래서 흰 글자를
+     얹는 면은 전부 --tribe-cta 계열(ink를 섞어 어둡게)을 쓴다. 원색은 면·테두리 전용이다. */
+  --tribe-cta: color-mix(in oklch, var(--tribe) 58%, var(--color-ink));
+  --tribe-cta-2: color-mix(in oklch, var(--tribe) 44%, var(--color-ink));
+  --tribe-cta-shadow: color-mix(in oklch, var(--tribe) 30%, var(--color-ink));
+  --tribe-line: color-mix(in oklch, var(--tribe) 40%, var(--color-card));
+  --tribe-soft: color-mix(in oklch, var(--tribe) 22%, var(--color-card));
+  --tribe-wash: color-mix(in oklch, var(--tribe) 12%, var(--color-paper));
+
+  /* 재화·오브제 색 (종족 무관). 흰 글자를 얹는 값은 명암비 4.5:1을 맞춰 뒀다 */
+  --pet-seed: #4a7a3c; /* 흰 글자 5.07:1 */
+  --pet-seed-2: #3d6631;
+  --pet-seed-fill: #7bb86a; /* 게이지 채움. 글자를 얹지 않는다 */
+  --pet-seed-fill-2: #a8d99a;
+  --pet-wood: #b07828;
+  --pet-wood-light: #e0b060;
+  --pet-wood-deep: #7a4e10;
+  --pet-wood-ink: #fff0cc;
+
   display: grid;
-  grid-template-columns: repeat(auto-fit, minmax(min(7rem, 100%), 1fr));
+  align-content: start;
+  gap: var(--space-sm);
+  padding: var(--space-md);
+  background: var(--color-paper);
+}
+
+/* ── 상단 바 ─────────────────────────────────────────────────────────────── */
+
+.pet__top {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--space-sm);
+}
+
+.pet__title {
+  margin: 0;
+  font-family: var(--font-display);
+  font-size: var(--text-lg);
+  color: var(--color-ink);
+}
+
+.pet__lede {
+  margin: var(--space-3xs) 0 0;
+  font-size: var(--text-label);
+  color: var(--color-muted);
+}
+
+.pet__top-acts {
+  display: flex;
+  align-items: center;
   gap: var(--space-2xs);
+}
+
+/* 씨앗 HUD — 아이콘 칸 + 숫자 칸이 하나의 알약으로 붙는다 */
+.pet-hud {
+  display: flex;
+  overflow: hidden;
+  border: 2px solid var(--pet-wood);
+  border-radius: var(--radius-pill);
+  box-shadow: 0 3px 8px rgb(42 31 20 / 0.18);
+}
+
+.pet-hud__icon {
+  display: grid;
+  place-items: center;
+  width: 2.25rem;
+  height: 2.25rem;
+  background: linear-gradient(135deg, var(--pet-seed-fill-2), var(--pet-seed-fill));
+  font-size: var(--text-body);
+  line-height: 1;
+}
+
+.pet-hud__value {
+  display: grid;
+  place-items: center;
+  padding: 0 var(--space-2xs);
+  background: linear-gradient(135deg, #fef0d8, #fde4bc);
+  color: var(--pet-wood-deep);
+  font-size: var(--text-md);
+  font-weight: 700;
+  font-variant-numeric: tabular-nums;
+  letter-spacing: -0.02em;
+}
+
+/* 상점 나무판. export는 SVG 한 장이었지만 두 개가 필요해서 CSS로 옮겼다.
+   (덤으로 export의 <path d="M 72% 5% ...">는 path의 d에 %를 쓸 수 없어 렌더가 안 됐다) */
+.pet-plank {
+  padding: 0 var(--space-sm);
+  height: 2.75rem; /* --control-h. 다른 화면 버튼과 높이를 맞춘다 */
+  border: none;
+  border-radius: var(--radius-pill) / 42%;
+  background: linear-gradient(
+    180deg,
+    var(--pet-wood-light) 0%,
+    #c89040 30%,
+    var(--pet-wood) 55%,
+    #c89040 80%,
+    #b07030 100%
+  );
+  box-shadow:
+    0 4px 0 var(--pet-wood-deep),
+    inset 0 2px 0 rgb(255 230 160 / 0.55),
+    inset 0 -2px 0 rgb(0 0 0 / 0.18);
+  color: var(--pet-wood-ink);
+  font-family: var(--font-display);
+  font-size: var(--text-body);
+  font-weight: 700;
+  letter-spacing: 0.03em;
+  text-shadow: 0 1px 3px rgb(0 0 0 / 0.55);
+  text-decoration: none;
+  white-space: nowrap;
+  display: grid;
+  place-items: center;
+  transition: transform var(--dur-micro) var(--ease-out);
+}
+
+/* ── 2단 그리드 ──────────────────────────────────────────────────────────── */
+
+.pet__grid {
+  display: grid;
+  grid-template-columns: 6fr 4fr;
+  align-items: stretch;
+  gap: var(--space-sm);
+}
+
+.pet__col {
+  display: grid;
+  align-content: start;
+  gap: var(--space-sm);
+  min-width: 0;
+}
+
+.pet__col--room {
+  grid-template-rows: 1fr auto;
+}
+
+/* ── 펫 방 ───────────────────────────────────────────────────────────────── */
+
+.pet-room {
+  position: relative;
+  display: flex;
+  align-items: flex-end;
+  justify-content: center;
+  min-height: 21rem;
+  overflow: hidden;
+  border: 3px solid var(--tribe-line);
+  border-radius: var(--radius-card);
+  box-shadow: 0 8px 32px rgb(42 31 20 / 0.12);
+}
+
+.pet-room__bg {
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+}
+
+/* 방 배경 색. 벽·커튼·러그는 종족색을 따르고, 바닥(나무)과 창밖(하늘)·화분(초록)은
+   사물 고유색이라 고정이다 — 종족색을 따르면 파란 나무·주황 하늘이 된다 */
+.pet-room__wall {
+  fill: color-mix(in oklch, var(--tribe) 22%, #fffaf2);
+}
+.pet-room__stripe {
+  fill: color-mix(in oklch, var(--tribe) 34%, #fffaf2);
+  opacity: 0.5;
+}
+.pet-room__floor {
+  fill: #c8a878;
+}
+.pet-room__plank {
+  fill: #b89060;
+  opacity: 0.4;
+}
+.pet-room__trim {
+  fill: #b09070;
+}
+.pet-room__sky {
+  fill: #aee4f8;
+}
+.pet-room__frame {
+  fill: none;
+  stroke: #c89060;
+  stroke-width: 4;
+}
+.pet-room__frame-bar {
+  stroke: #c89060;
+  stroke-width: 3;
+}
+.pet-room__curtain {
+  fill: color-mix(in oklch, var(--tribe) 72%, var(--color-card));
+  opacity: 0.75;
+}
+.pet-room__pot {
+  fill: #c87050;
+}
+.pet-room__leaf {
+  fill: var(--pet-seed-fill);
+}
+.pet-room__rug {
+  fill: color-mix(in oklch, var(--tribe) 48%, var(--color-card));
+  opacity: 0.55;
+}
+.pet-room__rug-line {
+  fill: none;
+  stroke: color-mix(in oklch, var(--tribe) 62%, var(--color-ink));
+  stroke-width: 2;
+  opacity: 0.4;
+}
+
+/* 떠다니는 씨앗 장식. 클릭을 막지 않는다 */
+.pet-room__seeds {
+  position: absolute;
+  inset: 0;
+  overflow: hidden;
+  pointer-events: none;
+}
+
+.pet-room__seed {
+  position: absolute;
+}
+.pet-room__seed:nth-child(1) {
+  top: 15%;
+  left: 10%;
+  font-size: var(--text-md);
+  opacity: 0.6;
+  animation: petFloatSeed 3s var(--ease-in-out) infinite;
+}
+.pet-room__seed:nth-child(2) {
+  top: 25%;
+  right: 12%;
+  font-size: var(--text-body);
+  opacity: 0.5;
+  animation: petFloatSeed 3.5s var(--ease-in-out) 0.8s infinite;
+}
+.pet-room__seed:nth-child(3) {
+  bottom: 30%;
+  left: 15%;
+  font-size: var(--text-body);
+  opacity: 0.4;
+  animation: petFloatSeed 2.8s var(--ease-in-out) 1.5s infinite;
+}
+
+/* ── 펫 캐릭터 ───────────────────────────────────────────────────────────── */
+
+.pet-char {
+  position: relative;
+  z-index: var(--z-raised);
+  display: grid;
+  justify-items: center;
+  padding-bottom: var(--space-lg);
+  text-align: center;
+}
+
+.pet-char__badge {
+  position: absolute;
+  top: -0.5rem;
+  right: -0.5rem;
+  z-index: var(--z-raised);
+  padding: 0.1rem var(--space-2xs);
+  border: 2px solid var(--color-card);
+  border-radius: var(--radius-pill);
+  background: linear-gradient(135deg, var(--tribe-cta), var(--tribe-cta-2));
+  box-shadow: 0 2px 6px rgb(42 31 20 / 0.25);
+  color: var(--color-accent-ink);
+  font-family: var(--font-display);
+  font-size: var(--text-label);
+  font-weight: 700;
+}
+
+.pet-char__sparkle {
+  position: absolute;
+  pointer-events: none;
+}
+/* nth-of-type을 쓰지 않는다 — .pet-char 안의 형제가 전부 span이라 배지·그림자까지 세어진다 */
+.pet-char__sparkle[data-i="1"] {
+  top: -1rem;
+  left: -1.5rem;
+  animation: petSparkle 2s var(--ease-in-out) infinite;
+}
+.pet-char__sparkle[data-i="2"] {
+  top: -0.5rem;
+  right: 0;
+  animation: petSparkle 2.5s var(--ease-in-out) 0.5s infinite;
+}
+.pet-char__sparkle[data-i="3"] {
+  top: 1rem;
+  right: -1.5rem;
+  animation: petSparkle 3s var(--ease-in-out) 1s infinite;
+}
+
+.pet-char__body {
+  display: grid;
+  place-items: center;
+  filter: drop-shadow(0 8px 16px rgb(42 31 20 / 0.25));
+  animation: petBounce 2.5s var(--ease-in-out) infinite;
+}
+
+/* 진화 단계별 크기. SPEC.md 5절은 "CSS transform 수준"까지만 요구한다.
+   design.md가 금지하는 것은 scale 애니메이션이고, 단계별 고정 크기는 애니메이션이 아니다. */
+.pet-char__img,
+.pet-char__emoji {
+  width: 8rem;
+  height: 8rem;
+  object-fit: contain;
+  font-size: 5.5rem;
+  line-height: 8rem;
+}
+.pet-char[data-stage="1"] .pet-char__img,
+.pet-char[data-stage="1"] .pet-char__emoji {
+  width: 6.5rem;
+  height: 6.5rem;
+  font-size: 4.5rem;
+  line-height: 6.5rem;
+}
+.pet-char[data-stage="3"] .pet-char__img,
+.pet-char[data-stage="3"] .pet-char__emoji {
+  width: 10rem;
+  height: 10rem;
+  font-size: 7rem;
+  line-height: 10rem;
+}
+
+.pet-char__shadow {
+  width: 4rem;
+  height: 0.75rem;
+  margin-top: var(--space-3xs);
+  border-radius: var(--radius-pill);
+  background: radial-gradient(ellipse, rgb(42 31 20 / 0.3), transparent 70%);
+}
+
+.pet-char__name {
+  margin: var(--space-2xs) 0 0;
+  font-family: var(--font-display);
+  font-size: var(--text-md);
+  color: var(--color-ink);
+}
+
+.pet-char__desc {
+  margin: 0;
+  font-size: var(--text-label);
+  color: var(--color-ink-2);
+}
+
+/* 착용 중인 치장. 이미지가 없어 이름 배지로만 보여준다 (SPEC.md 5절) */
+.pet-char__worn {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--space-3xs);
+  justify-content: center;
   margin-top: var(--space-2xs);
 }
 
-/* 진화 연출 2초 (SPEC.md 5절). 종이색 한 벌로 덮는다 */
+/* ── 카드 ────────────────────────────────────────────────────────────────── */
+
+.pet-card {
+  display: grid;
+  align-content: start;
+  gap: var(--space-2xs);
+  padding: var(--space-sm);
+  border: 2px solid var(--color-rule);
+  border-radius: var(--radius-card);
+  background: var(--color-card);
+}
+
+.pet-card__head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--space-2xs);
+}
+
+.pet-card__title {
+  margin: 0;
+  font-size: var(--text-body);
+  font-weight: 700;
+  color: var(--color-ink);
+}
+
+.pet-card__meta {
+  font-size: var(--text-label);
+  font-weight: 500;
+  color: var(--color-muted);
+}
+
+.pet-card__foot {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--space-3xs);
+  font-size: var(--text-label);
+  color: var(--color-muted);
+}
+
+.pet-card__foot em {
+  font-style: normal;
+  font-weight: 700;
+  color: var(--tribe-cta);
+}
+
+/* ── 게이지 ──────────────────────────────────────────────────────────────── */
+
+.pet-gauge {
+  position: relative;
+  height: 1.25rem;
+  overflow: hidden;
+  border: 2px solid var(--tribe-line);
+  border-radius: var(--radius-pill);
+  background: color-mix(in oklch, var(--tribe) 18%, var(--color-paper-2));
+}
+
+.pet-gauge__fill {
+  height: 100%;
+  border-radius: var(--radius-pill);
+  background: linear-gradient(90deg, var(--tribe-cta), var(--tribe), var(--tribe-cta));
+  background-size: 200% 100%;
+  transition: width var(--dur-long) var(--ease-out);
+}
+
+.pet-gauge__value {
+  position: absolute;
+  inset: 0;
+  display: grid;
+  place-items: center;
+  font-size: var(--text-label);
+  font-weight: 700;
+  color: var(--color-ink);
+}
+
+/* 배고픔은 종족색을 쓰지 않는다 — 먹이(씨앗) 상태라서 씨앗 초록을 쓴다 */
+.pet-gauge--hunger {
+  height: 0.75rem;
+  border-width: 0;
+  background: var(--color-paper-2);
+}
+.pet-gauge--hunger .pet-gauge__fill {
+  background: linear-gradient(90deg, var(--pet-seed-fill-2), var(--pet-seed-fill));
+}
+.pet-gauge--hunger[data-low="true"] .pet-gauge__fill {
+  background: linear-gradient(90deg, #e8b06a, #d98f45);
+}
+
+/* ── 방치형 씨앗 수확 ────────────────────────────────────────────────────── */
+
+.pet-idle {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--space-2xs);
+}
+
+.pet-idle__left {
+  display: flex;
+  align-items: center;
+  gap: var(--space-2xs);
+  min-width: 0;
+}
+
+.pet-idle__icon {
+  display: grid;
+  place-items: center;
+  width: 2.5rem;
+  height: 2.5rem;
+  border-radius: var(--radius-input);
+  background: linear-gradient(135deg, var(--pet-seed-fill-2), var(--pet-seed-fill));
+  font-size: var(--text-md);
+  line-height: 1;
+}
+
+.pet-idle__label {
+  margin: 0;
+  font-size: var(--text-label);
+  font-weight: 500;
+  color: var(--color-muted);
+}
+
+.pet-idle__count {
+  font-size: var(--text-md);
+  font-weight: 700;
+  color: var(--color-ink);
+}
+
+.pet-idle__unit {
+  margin-left: 0.15rem;
+  font-size: var(--text-label);
+  font-weight: 500;
+  color: var(--color-muted);
+}
+
+/* ── 버튼 ────────────────────────────────────────────────────────────────── */
+
+.pet-btn {
+  min-height: var(--control-h);
+  padding: 0 var(--space-sm);
+  border: none;
+  border-radius: var(--radius-input);
+  background: linear-gradient(135deg, var(--tribe-cta), var(--tribe-cta-2));
+  box-shadow: 0 4px 0 var(--tribe-cta-shadow);
+  color: var(--color-accent-ink);
+  font-family: inherit;
+  font-size: var(--text-body);
+  font-weight: 700;
+  cursor: pointer;
+  transition: transform var(--dur-micro) var(--ease-out);
+}
+
+.pet-btn--seed {
+  min-height: 2.25rem;
+  padding: 0 var(--space-sm);
+  background: linear-gradient(135deg, var(--pet-seed), var(--pet-seed-2));
+  box-shadow: 0 3px 0 #2f5026;
+  font-size: var(--text-label);
+}
+
+.pet-btn--block {
+  width: 100%;
+}
+
+/* 누름 효과. export의 .btn-press를 그대로 옮겼다 */
+.pet-btn:active:not(:disabled),
+.pet-plank:active {
+  transform: translateY(2px);
+  box-shadow: none;
+}
+
+.pet-btn:disabled {
+  background: var(--color-paper-2);
+  box-shadow: 0 4px 0 var(--color-rule);
+  color: var(--color-muted);
+  cursor: not-allowed;
+}
+
+.pet-btn--seed:disabled {
+  box-shadow: 0 3px 0 var(--color-rule);
+}
+
+/* ── 씨앗 투입 스테퍼 ────────────────────────────────────────────────────── */
+
+.pet-step {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: var(--space-2xs) var(--space-xs);
+  border: 2px solid var(--tribe-line);
+  border-radius: var(--radius-input);
+  background: var(--tribe-wash);
+}
+
+.pet-step__btn {
+  display: grid;
+  place-items: center;
+  width: 2.25rem;
+  height: 2.25rem;
+  border: none;
+  border-radius: var(--radius-input);
+  background: linear-gradient(135deg, var(--tribe-cta), var(--tribe-cta-2));
+  box-shadow: 0 3px 0 var(--tribe-cta-shadow);
+  color: var(--color-accent-ink);
+  font-family: inherit;
+  font-size: var(--text-md);
+  font-weight: 700;
+  line-height: 1;
+  cursor: pointer;
+}
+
+.pet-step__btn:active:not(:disabled) {
+  transform: translateY(2px);
+  box-shadow: none;
+}
+
+.pet-step__btn:disabled {
+  background: var(--color-paper-2);
+  box-shadow: 0 3px 0 var(--color-rule);
+  color: var(--color-muted);
+  cursor: not-allowed;
+}
+
+.pet-step__value {
+  font-size: var(--text-md);
+  font-weight: 700;
+  color: var(--color-ink);
+}
+
+.pet-step__unit {
+  margin-left: 0.15rem;
+  font-size: var(--text-label);
+  font-weight: 500;
+  color: var(--color-muted);
+}
+
+.pet-presets {
+  display: grid;
+  grid-template-columns: repeat(4, 1fr);
+  gap: var(--space-3xs);
+}
+
+.pet-preset {
+  min-height: 2.25rem;
+  border: 2px solid var(--color-rule);
+  border-radius: var(--radius-input);
+  background: var(--color-paper);
+  box-shadow: 0 2px 0 var(--color-rule);
+  color: var(--color-ink-2);
+  font-family: inherit;
+  font-size: var(--text-label);
+  font-weight: 700;
+  cursor: pointer;
+}
+
+.pet-preset[aria-pressed="true"] {
+  border-color: var(--tribe-cta-2);
+  background: linear-gradient(135deg, var(--tribe-cta), var(--tribe-cta-2));
+  box-shadow: 0 2px 0 var(--tribe-cta-shadow);
+  color: var(--color-accent-ink);
+}
+
+.pet-preset:active {
+  transform: translateY(2px);
+  box-shadow: none;
+}
+
+.pet-preset:disabled {
+  color: var(--color-muted);
+  cursor: not-allowed;
+}
+
+/* ── 진화 단계 ───────────────────────────────────────────────────────────── */
+
+.pet-evo__list {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(min(8rem, 100%), 1fr));
+  gap: var(--space-2xs);
+}
+
+.pet-evo-card {
+  position: relative;
+  display: grid;
+  justify-items: center;
+  gap: var(--space-3xs);
+  padding: var(--space-sm) var(--space-2xs);
+  border: 2px solid var(--color-rule);
+  border-radius: var(--radius-card);
+  background: var(--color-paper);
+  text-align: center;
+}
+
+.pet-evo-card--now {
+  border-color: var(--tribe-cta-2);
+  background: var(--tribe-soft);
+  box-shadow: 0 4px 12px color-mix(in oklch, var(--tribe) 30%, transparent);
+}
+
+.pet-evo-card--locked {
+  border-style: dashed;
+  background: var(--color-paper-2);
+}
+
+.pet-evo-card__now {
+  position: absolute;
+  top: -0.7rem;
+  left: 50%;
+  transform: translateX(-50%);
+  padding: 0.05rem var(--space-2xs);
+  border-radius: var(--radius-pill);
+  background: linear-gradient(90deg, var(--tribe-cta), var(--tribe-cta-2));
+  color: var(--color-accent-ink);
+  font-size: var(--text-label);
+  font-weight: 700;
+  white-space: nowrap;
+}
+
+.pet-evo-card__img {
+  width: 4rem;
+  height: 4rem;
+  object-fit: contain;
+}
+
+.pet-evo-card__emoji {
+  display: grid;
+  place-items: center;
+  width: 4rem;
+  height: 4rem;
+  font-size: 2.5rem;
+  line-height: 1;
+}
+
+.pet-evo-card--locked .pet-evo-card__img,
+.pet-evo-card--locked .pet-evo-card__emoji {
+  filter: grayscale(1);
+  opacity: 0.35;
+}
+
+.pet-evo-card__lock {
+  position: absolute;
+  top: 50%;
+  left: 50%;
+  transform: translate(-50%, -50%);
+  font-size: var(--text-md);
+}
+
+.pet-evo-card__stage {
+  font-size: var(--text-label);
+  font-weight: 700;
+  color: var(--color-muted);
+}
+
+.pet-evo-card__label {
+  font-family: var(--font-display);
+  font-size: var(--text-body);
+  color: var(--color-ink);
+}
+
+.pet-evo-card__range {
+  font-size: var(--text-label);
+  color: var(--color-muted);
+}
+
+/* 스킨 고유 효과. export에는 "씨앗 효율 +10/25/50%"가 있었지만 단계 보너스는
+   구현·명세에 없다. 실제로 존재하는 값(PetSkin.effectPct)만 현재 단계에 붙인다 */
+.pet-evo-card__effect {
+  padding: 0.15rem var(--space-2xs);
+  border-radius: var(--radius-input);
+  background: color-mix(in oklch, var(--tribe) 18%, var(--color-card));
+  font-size: var(--text-label);
+  font-weight: 700;
+  color: var(--tribe-cta);
+}
+
+/* ── 토스트 ──────────────────────────────────────────────────────────────── */
+
+.pet-toast {
+  position: fixed;
+  bottom: var(--space-lg);
+  left: 50%;
+  transform: translateX(-50%);
+  z-index: var(--z-toast);
+  padding: var(--space-xs) var(--space-md);
+  border-radius: var(--radius-card);
+  background: linear-gradient(135deg, var(--tribe-cta), var(--tribe-cta-2));
+  box-shadow: 0 8px 24px rgb(42 31 20 / 0.25);
+  color: var(--color-accent-ink);
+  font-size: var(--text-label);
+  font-weight: 700;
+  animation: petSlideIn var(--dur-short) var(--ease-out);
+}
+
+.pet-toast--error {
+  background: var(--color-error);
+}
+
+/* ── 진화 연출 2초 (SPEC.md 5절). 종이색 한 벌로 덮는다 ──────────────────── */
+
 .hm-pet__evolve {
   position: fixed;
   inset: 0;
@@ -58,23 +818,92 @@
   margin: 0;
 }
 
-/* 치장 타일. 버튼이 타일 아래에 붙으므로 위쪽 여백만 준다 */
-.hm-pet__cos .hm-btn {
-  margin-top: var(--space-3xs);
+/* ── 애니메이션 (export의 index.css에서 옮겼다) ──────────────────────────── */
+
+@keyframes petBounce {
+  0%,
+  100% {
+    transform: translateY(0) rotate(-1deg);
+  }
+  50% {
+    transform: translateY(-8px) rotate(1deg);
+  }
 }
 
-/* 미획득 실루엣 (SPEC.md 5절). 이미지가 없어 지금은 글자를 죽여 둔다.
-   이미지가 오면 아래에 .hm-pet__cos--locked img { filter: brightness(0) opacity(.28) }를
-   더하면 된다 — 새 색 값을 만들지 않고 실루엣이 된다 */
-.hm-pet__cos--locked .hm-tile__title {
-  color: var(--color-muted);
-  font-weight: 400;
+@keyframes petFloatSeed {
+  0%,
+  100% {
+    transform: translateY(0) rotate(0deg);
+    opacity: 0.7;
+  }
+  50% {
+    transform: translateY(-12px) rotate(15deg);
+    opacity: 1;
+  }
 }
 
-/* 착용 중인 치장 줄. 펫 화면에서 원판 아래에 붙는다 */
-.hm-pet__worn {
-  display: flex;
-  flex-wrap: wrap;
-  gap: var(--space-3xs);
-  justify-content: center;
+@keyframes petSparkle {
+  0%,
+  100% {
+    opacity: 0;
+    transform: scale(0.5) rotate(0deg);
+  }
+  50% {
+    opacity: 1;
+    transform: scale(1) rotate(180deg);
+  }
+}
+
+@keyframes petSlideIn {
+  from {
+    opacity: 0;
+    transform: translate(-50%, 8px);
+  }
+  to {
+    opacity: 1;
+    transform: translate(-50%, 0);
+  }
+}
+
+/* design.md는 "필수적이지 않은 움직임은 끈다"를 요구한다 */
+@media (prefers-reduced-motion: reduce) {
+  .pet-char__body,
+  .pet-char__sparkle,
+  .pet-room__seed,
+  .pet-toast {
+    animation: none;
+  }
+  .pet-gauge__fill {
+    transition: none;
+  }
+}
+
+/* ── 좁은 화면 ───────────────────────────────────────────────────────────── */
+
+@media (max-width: 768px) {
+  .pet {
+    padding: var(--space-sm);
+  }
+
+  /* 2단을 1단으로. 방 → 배고픔 → 경험치 → 수확 → 투입 → 진화 순으로 흐른다 */
+  .pet__grid {
+    grid-template-columns: 1fr;
+  }
+
+  .pet__top {
+    align-items: flex-start;
+  }
+
+  .pet__top-acts {
+    width: 100%;
+    flex-wrap: wrap;
+  }
+
+  .pet-room {
+    min-height: 15rem;
+  }
+
+  .pet-presets {
+    grid-template-columns: repeat(2, 1fr);
+  }
 }

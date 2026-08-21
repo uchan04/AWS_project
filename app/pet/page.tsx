@@ -1,5 +1,5 @@
 import { getCurrentUserWithSkin } from "@/lib/auth"
-import { cappedStage, idleAccrual } from "@/lib/pet"
+import { cappedStage, hungerFor, idleAccrual } from "@/lib/pet"
 import { prisma } from "@/lib/prisma"
 import { calculateReward } from "@/lib/reward"
 import { TRIBE } from "@/lib/types"
@@ -31,10 +31,15 @@ export default async function PetPage() {
     // 진단 전이면 typeCode가 없다. 기본 펫이 정해지기 전이므로 곰과 색을 임시로 쓴다.
     const tribe = user.typeCode ? TRIBE[user.typeCode] : TRIBE.FAMILY_LIVING
 
+    const now = new Date()
+
     // 방치형으로 모인 씨앗을 화면에 미리 보여준다. 지급은 유저가 버튼을 눌렀을 때
     // POST /api/pet/idle 이 한다 — 페이지를 열기만 해도 쓰기가 나가면 안 된다.
-    const idle = idleAccrual(user.lastIdleClaimAt, new Date())
+    const idle = idleAccrual(user.lastIdleClaimAt, now)
     const idleSeeds = calculateReward(skin, { seeds: idle.seeds }).seeds ?? 0
+
+    // 한 번도 먹이지 않았으면 가입 시각을 기준으로 감쇠한다 (lib/pet.ts hungerFor 주석)
+    const hunger = hungerFor(user.lastFedAt ?? user.createdAt, now)
 
     // 착용 중인 치장. 이미지가 아직 없어 이름만 배지로 보여준다 (SPEC.md 5절)
     const worn = await prisma.userCosmetic.findMany({
@@ -46,13 +51,21 @@ export default async function PetPage() {
     const cloudfront = process.env.CLOUDFRONT_DOMAIN
     const imageUrl = cloudfront && skin ? `${cloudfront}/${skin.imageKeyBase}-${evolutionStage}.png` : null
 
+    // 진화 단계 카드가 단계별 그림을 쓴다. 규칙은 imageUrl과 같은 <base>-<단계>.png다
+    // (prisma/seed/items.ts가 imageKeyBase를 고정해 뒀다)
+    const stageImageUrls = Array.from({ length: stageCount }, (_, i) =>
+      cloudfront && skin ? `${cloudfront}/${skin.imageKeyBase}-${i + 1}.png` : null,
+    )
+
     state = {
       level: user.level,
       exp: user.exp,
       evolutionStage,
       seeds: user.seeds,
+      hunger,
       idleSeeds,
       idleCapped: idle.capped,
+      msToNextSeed: idle.msToNextSeed,
       worn: worn.map((row) => row.item.name),
       animal: skin?.name ?? tribe.animal,
       family: tribe.family,
@@ -65,6 +78,7 @@ export default async function PetPage() {
           ? `${EFFECT_LABEL[skin.effectType] ?? "보너스"} +${skin.effectPct}%`
           : null,
       imageUrl,
+      stageImageUrls,
     }
   } catch (error) {
     console.error("[/pet]", error)
