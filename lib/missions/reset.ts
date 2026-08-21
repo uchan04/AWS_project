@@ -19,18 +19,20 @@ export function getToday(): Date {
  * lastMissionResetAt과 오늘을 비교해 날짜가 달라졌으면 리셋 처리.
  * 과거 UserMission은 삭제하지 않는다 (누적 기록 보존).
  * 만료된 streakCount는 0으로 정리한다.
+ *
+ * 반환: 업데이트된 user. streak가 끊겼거나 lastMissionResetAt이 갱신되면 DB에서 다시 읽는다.
  */
-export async function ensureMissionReset(user: User): Promise<void> {
+export async function ensureMissionReset(user: User): Promise<User> {
   const today = getToday()
   const last = user.lastMissionResetAt
 
   if (last && last >= today) {
     // 같은 날 반복 조회 → 초기화 필요 없음
-    return
+    return user
   }
 
   // 날짜 바뀜 → lastMissionResetAt 갱신
-  await prisma.user.update({
+  let updated = await prisma.user.update({
     where: { id: user.id },
     data: { lastMissionResetAt: today },
   })
@@ -42,10 +44,12 @@ export async function ensureMissionReset(user: User): Promise<void> {
 
     if (user.lastStreakDate < yesterday && user.streakCount > 0) {
       // 어제도 아니고 그보다 오래됐으면 streak 끊김
-      await prisma.user.update({
+      updated = await prisma.user.update({
         where: { id: user.id },
         data: { streakCount: 0 },
       })
     }
   }
+
+  return updated
 }

@@ -94,24 +94,29 @@ export async function buildDashboard(user: User): Promise<DashboardDTO> {
   // 단계 미션
   const typeCode = user.typeCode!
   const stageProgress = await getStageProgress(user.id, typeCode)
-  const stageMissions: StageMissionDTO[] = []
 
-  for (const sp of stageProgress) {
-    const missions = await prisma.mission.findMany({
-      where: { scope: "STAGE", typeCode, stage: sp.stage },
-      orderBy: { order: "asc" },
-    })
+  // 전체 단계 미션 한 번에 조회
+  const allStageMissions = await prisma.mission.findMany({
+    where: { scope: "STAGE", typeCode },
+    orderBy: [{ stage: "asc" }, { order: "asc" }],
+  })
 
-    const stageCompletions = await prisma.userMission.findMany({
-      where: {
-        userId: user.id,
-        missionId: { in: missions.map((m) => m.id) },
-        resetKey: "STAGE",
-      },
-      select: { missionId: true },
-    })
+  const stageMissionIds = allStageMissions.map((m) => m.id)
 
-    const stageCompletedIds = new Set(stageCompletions.map((c) => c.missionId))
+  // 전체 단계 완료 기록 한 번에 조회
+  const allStageCompletions = await prisma.userMission.findMany({
+    where: {
+      userId: user.id,
+      missionId: { in: stageMissionIds },
+      resetKey: "STAGE",
+    },
+    select: { missionId: true },
+  })
+
+  const completedIdSet = new Set(allStageCompletions.map((c) => c.missionId))
+
+  const stageMissions: StageMissionDTO[] = stageProgress.map((sp) => {
+    const missions = allStageMissions.filter((m) => m.stage === sp.stage)
 
     const missionDTOs: MissionDTO[] = missions.map((m) => ({
       id: m.id,
@@ -120,7 +125,7 @@ export async function buildDashboard(user: User): Promise<DashboardDTO> {
       description: m.description,
       requiresPhoto: m.requiresPhoto,
       completionMode: getCompletionMode(m),
-      completed: stageCompletedIds.has(m.id),
+      completed: completedIdSet.has(m.id),
       reward: {
         seeds: m.rewardSeeds,
         starShards: m.rewardShards,
@@ -128,14 +133,14 @@ export async function buildDashboard(user: User): Promise<DashboardDTO> {
       },
     }))
 
-    stageMissions.push({
+    return {
       stage: sp.stage,
       unlocked: sp.unlocked,
       completedCount: sp.completedCount,
       requiredForNextStage: sp.requiredForNextStage,
       missions: missionDTOs,
-    })
-  }
+    }
+  })
 
   // 일간·주간 달성률
   const dailyCompleted = dailyCompletedIds.size
