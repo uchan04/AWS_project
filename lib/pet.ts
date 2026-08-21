@@ -184,3 +184,46 @@ export function idleAccrual(lastClaimAt: Date | null, now: Date): IdleAccrual {
     capped,
   }
 }
+
+// ── 배고픔 (2026-08-21 추가. SPEC.md 5절) ─────────────────────────────────────
+//
+// 마지막으로 씨앗을 먹인 시각(User.lastFedAt)에서 경과한 시간만으로 정해진다.
+// 100 = 배부름, 0 = 비었음. 컬럼 하나(lastFedAt)로 끝나게 이렇게 잡았다 —
+// hunger 값을 따로 저장하면 화면을 열 때마다 감쇠분을 써야 해서 읽기가 쓰기가 된다
+// (방치형 씨앗을 페이지 로드 때 지급하지 않는 것과 같은 이유다).
+//
+// 투입한 씨앗 개수는 배고픔에 영향을 주지 않는다. 1개를 먹여도 100이 된다.
+// "얼마나 먹였나"는 이미 경험치가 표현하고, 배고픔은 "얼마나 들여다봤나"만 본다.
+//
+// 배고픔이 0이 되어도 잃는 것은 없다. 재화·경험치·단계에 손대지 않는 표시 전용 값이다.
+// 대상 이용자에게 벌점형 압박을 주지 않는다는 SPEC.md 5절 취지(랭킹·경쟁 지표 배제)와
+// 같은 이유다. 여기에 페널티를 붙이려면 명세를 먼저 고친다.
+export const HUNGER_MAX = 100
+/** 배부름 100에서 0까지 걸리는 시간. 하루 한 번 들여다보면 유지되는 값이다 */
+export const HUNGER_EMPTY_HOURS = 24
+/** 이 값 아래면 화면이 경고색으로 바뀐다 */
+export const HUNGER_LOW = 30
+
+/**
+ * 배고픔 0~100. since는 User.lastFedAt이고, 한 번도 먹인 적이 없으면
+ * 호출부가 User.createdAt을 넘긴다 — 기준 시각이 아예 없으면 감쇠를 계산할 수 없고,
+ * 그렇다고 신규 유저에게 0을 보여 주면 시작부터 굶긴 것처럼 보인다.
+ */
+export function hungerFor(since: Date | null, now: Date): number {
+  if (!since) return HUNGER_MAX
+
+  const elapsed = now.getTime() - since.getTime()
+  // 기준 시각이 미래면(시계 오차·수동 수정) 감쇠하지 않는다
+  if (elapsed <= 0) return HUNGER_MAX
+
+  const spanMs = HUNGER_EMPTY_HOURS * MS_PER_HOUR
+  const left = HUNGER_MAX * (1 - elapsed / spanMs)
+  return Math.max(0, Math.min(HUNGER_MAX, Math.floor(left)))
+}
+
+/** 배고픔 게이지 옆에 쓸 한 줄. 문구는 화면 두 곳(펫 화면·진화 연출)이 함께 쓴다 */
+export function hungerLabel(hunger: number): string {
+  if (hunger >= 60) return "배부르고 기분이 좋아요"
+  if (hunger >= HUNGER_LOW) return "조금 배고파졌어요"
+  return "배가 고파요. 씨앗을 먹여 주세요"
+}

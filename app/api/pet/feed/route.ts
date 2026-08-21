@@ -1,6 +1,6 @@
 import { fail, ok } from "@/lib/api"
 import { UnauthorizedError, getCurrentUserWithSkin } from "@/lib/auth"
-import { applySeeds } from "@/lib/pet"
+import { HUNGER_MAX, applySeeds } from "@/lib/pet"
 import { prisma } from "@/lib/prisma"
 
 // 소유자: C. 씨앗을 펫 경험치로 투입한다. (SPEC.md 5절)
@@ -27,6 +27,7 @@ export async function POST(request: Request) {
     }
 
     const stageCount = user.activePetSkin?.stageCount ?? 3
+    const now = new Date()
 
     // 씨앗 차감과 성장 반영을 한 트랜잭션에 묶는다.
     // 연타로 두 요청이 겹치면 잔액보다 많이 빠질 수 있어 트랜잭션 안에서 다시 읽는다.
@@ -46,6 +47,8 @@ export async function POST(request: Request) {
           level: growth.level,
           exp: growth.exp,
           evolutionStage: growth.evolutionStage,
+          // 배고픔은 개수가 아니라 "먹인 시각"만 본다 (lib/pet.ts hungerFor)
+          lastFedAt: now,
         },
         select: { seeds: true, level: true, exp: true, evolutionStage: true },
       })
@@ -62,7 +65,8 @@ export async function POST(request: Request) {
         ? `${cloudfront}/${user.activePetSkin.imageKeyBase}-${result.evolutionStage}.png`
         : null
 
-    return ok({ ...result, imageUrl })
+    // 방금 먹였으므로 배고픔은 항상 만복이다. 계산하지 않고 상수를 돌려준다
+    return ok({ ...result, imageUrl, hunger: HUNGER_MAX })
   } catch (error) {
     if (error instanceof UnauthorizedError) return fail("UNAUTHORIZED", error.message, 401)
     console.error("[POST /api/pet/feed]", error)

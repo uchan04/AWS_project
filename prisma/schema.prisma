@@ -113,6 +113,11 @@ model User {
   lastMissionResetAt DateTime?
   lastIdleClaimAt    DateTime?
 
+  // 배고픔 게이지 계산용(SPEC.md 5절). 마지막으로 씨앗을 먹인 시각이다.
+  // 배고픔 값 자체는 저장하지 않는다 — lib/pet.ts hungerFor()가 이 시각에서 계산한다.
+  // null이면 아직 한 번도 먹이지 않은 것이고, 화면은 createdAt을 기준으로 쓴다.
+  lastFedAt DateTime?
+
   attendanceTotal Int @default(0) // 누적 출석일. dayIndex 계산에 사용
 
   createdAt DateTime @default(now())

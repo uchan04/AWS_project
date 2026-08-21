@@ -1,6 +1,6 @@
 import { fail, ok } from "@/lib/api"
 import { UnauthorizedError, getCurrentUserWithSkin } from "@/lib/auth"
-import { cappedStage, idleAccrual } from "@/lib/pet"
+import { cappedStage, hungerFor, idleAccrual } from "@/lib/pet"
 import { calculateReward } from "@/lib/reward"
 
 // 소유자: C. 펫 화면 초기 상태. (SPEC.md 5절)
@@ -9,10 +9,11 @@ export async function GET() {
   try {
     const user = await getCurrentUserWithSkin()
     const stageCount = user.activePetSkin?.stageCount ?? 3
+    const now = new Date()
 
     // 아직 안 받은 방치형 씨앗. 홈 화면(A)에서 "받을 씨앗 N개" 배지로도 쓸 수 있다.
     // 지급은 POST /api/pet/idle 만 한다 — 조회에 쓰기를 섞지 않는다
-    const idle = idleAccrual(user.lastIdleClaimAt, new Date())
+    const idle = idleAccrual(user.lastIdleClaimAt, now)
 
     const evolutionStage = cappedStage(user.level, stageCount)
 
@@ -28,6 +29,8 @@ export async function GET() {
       exp: user.exp,
       evolutionStage,
       seeds: user.seeds,
+      // 한 번도 먹이지 않았으면 가입 시각 기준 (lib/pet.ts hungerFor 주석)
+      hunger: hungerFor(user.lastFedAt ?? user.createdAt, now),
       affinity: user.affinity,
       starShards: user.starShards,
       idle: {
