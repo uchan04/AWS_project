@@ -81,6 +81,12 @@ model User {
   id         String @id @default(cuid())
   cognitoSub String @unique
 
+  // 자체 DB 계정용(A가 E 합의로 추가, 2026-08-21). Cognito로 가입한 계정은 둘 다 null이다.
+  // 자체 계정은 cognitoSub에 "local:<cuid>"를 넣어 Cognito sub(UUID)와 겹치지 않게 한다.
+  // passwordHash는 lib/password.ts의 scrypt 형식("scrypt$<salt>$<hash>")이다. 평문은 저장하지 않는다.
+  email        String? @unique
+  passwordHash String?
+
   // 진단 완료 시 표시명(형용사 + 동물)으로 자동 세팅한다.
   // 이후 유저가 프로필에서 변경할 수 있다. 유니크 제약을 두지 않는다.
   nickname String @default("")

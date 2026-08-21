@@ -1128,3 +1128,102 @@ D가 그 방식으로 먼저 구현했다. 두 가지가 서버 쪽으로 기울
 
 - `getCurrentUser()`는 DB 장애로도 throw한다. 그것까지 이 안내로 받는다 — 미인증과 장애를 구분해 보여줘도 사용자가 누를 버튼은 같다
 - 이미 진단을 마친 유저가 `/diagnosis`에 들어오면 그대로 다시 푼다. 재진단 경로가 그것이므로(SPEC 3절) 막지 않았다
+
+---
+
+## 19. 자체 DB 계정 + 쿠키 로그인 유지 (2026-08-21)
+
+### 팀 공용 테스트 계정
+
+5인이 같은 계정으로 화면을 확인한다. 공유 RDS(`welli`)에 이미 들어 있다.
+
+| 항목 | 값 |
+|---|---|
+| 이메일 | `test@welli.local` |
+| 비밀번호 | `welli-test-1234` |
+| `cognitoSub` | `local:team-test` |
+
+계정이 사라졌거나 비밀번호가 안 맞으면 다시 만든다(있으면 비밀번호만 맞춘다).
+
+```bash
+npx tsx scripts/create-local-user.ts
+```
+
+이 비밀번호는 비밀이 아니다. 공유 개발 DB의 테스트 계정 하나에만 쓰이며 다른 어디에도 쓰지 않는다. **심사·배포 전에 이 행을 지운다.** 각자 계정을 따로 쓰고 싶으면 `/signup`으로 가입하면 된다.
+
+`DEV_AUTH_BYPASS`는 이제 쓰지 않는다. 로컬 `.env`도 `"false"`로 바꿨다 — 로그인을 건너뛰면 "미인증에서 어떻게 보이는가"를 아무도 못 본다.
+
+### 마이그레이션 (A가 적용, E 합의)
+
+`prisma/migrations/20260821020000_user_email_password/` — `User`에 `email TEXT UNIQUE`·`passwordHash TEXT`를 더한다. 둘 다 nullable이라 기존 행에 영향이 없다. 공유 RDS에 적용 완료(`migrate deploy`, 5개 마이그레이션 중 5번째).
+
+다른 4인은 이것만 실행한다.
+
+```bash
+git pull && npx prisma migrate deploy && npx prisma generate
+```
+
+### 인증 경로
+
+| 계정 종류 | `cognitoSub` | 쿠키 | 검증 |
+|---|---|---|---|
+| 자체 DB 계정 | `local:<uuid>` | `session` | `lib/session.ts` HMAC 서명 검증 + `User` 조회. 네트워크 없음 |
+| Cognito (Google 로그인, 예정) | Cognito sub(UUID) | `access_token` | `aws-jwt-verify` |
+
+`getCurrentUser()`는 `session`을 먼저 본다. 쿠키가 있는데 서명이 깨졌거나 만료됐으면 Cognito 경로로 흘리지 않고 바로 401이다 — 흘려보내면 "만료된 세션"과 "쿠키 없음"이 같은 증상이 되어 원인을 못 찾는다.
+
+`session` 쿠키는 `<userId>.<만료시각>.<HMAC>` 형식이고 유지 기간은 7일이다. 세션 테이블을 만들지 않았다 — 서명 안에 만료가 들어 있어 조회가 필요 없다. 대가는 **즉시 무효화가 안 된다는 것**이다(로그아웃은 쿠키만 지운다). 비밀번호 변경으로 기존 세션을 끊어야 한다면 그때 세션 테이블이나 `User.sessionEpoch`가 필요하다.
+
+`SESSION_SECRET`이 비어 있으면 서명하지 않고 즉시 throw한다. 빈 키로 서명하면 누구나 같은 서명을 만들 수 있다.
+
+### 고친 파일 (남의 소유 3개 — 통보 필요)
+
+| 파일 | 소유자 | 변경 |
+|---|---|---|
+| `prisma/schema.prisma` | 전원 합의 | `User.email`·`passwordHash` 추가 |
+| `lib/auth.ts` | E | `session` 쿠키 분기, `localCognitoSub()`, `setLocalSessionCookie()`, `clearSessionCookie()`가 쿠키 두 개를 지움 |
+| `app/api/auth/login/route.ts` | E | `passwordHash`가 있는 계정은 DB에서 검증. Cognito 경로는 그 아래 그대로 |
+| `app/api/auth/signup/route.ts` | E | Cognito `AdminCreateUser` → 자체 DB `create`. 이유: (1) IAM 자격증명이 없어 로컬에서 가입이 아예 안 됐다 (2) 흐름이 "가입 → 문항 → 결과"로 확정되어 가입 직후 `User` 행이 반드시 있어야 한다 |
+| `app/components/Sidebar.tsx` | B | 미인증 버그 수정(아래) |
+
+### 사이드바 미인증 표시 버그
+
+미인증인데 사이드바에 `익명 / 미분류 / Lv.1 / 씨앗 0개 / 시작한 날 … / 로그아웃`이 다 떴다. 원인은 `Sidebar.tsx`가 `fetch` 응답 상태를 보지 않고 401 본문을 폴백으로 메운 것이다 — `diagData.data?.nickname || "익명"`이 채워지므로 `!profile` 조건이 성립하지 않는다. `res.ok`를 확인해 하나라도 실패하면 `setProfile(null)`로 두고, `.catch`에서도 가짜 프로필을 만들지 않게 했다. 함께 로그아웃 버튼의 `alert("… 연동 후 활성화됩니다")`를 실제 `POST /api/auth/logout` 호출로 바꿨다(GET으로 열면 405다).
+
+### 실측 (2026-08-21, `DEV_AUTH_BYPASS=false`)
+
+| 확인 | 결과 |
+|---|---|
+| 올바른 비밀번호로 `POST /api/auth/login` | 200, `Set-Cookie: session=…; Max-Age=604800; HttpOnly; SameSite=lax` |
+| 틀린 비밀번호 | 401 `INVALID_CREDENTIALS` |
+| 쿠키 없이 `GET /api/diagnosis/me` | 401 |
+| 쿠키로 `GET /api/diagnosis/me` | 200 `{"data":null}` (미진단) |
+| `POST /api/auth/signup` 새 이메일 / 중복 / 8자 미만 | 200 / 400 `EMAIL_TAKEN` / 400 `INVALID_PASSWORD` |
+| `POST /api/auth/logout` 후 `me` | 401 |
+| 미인증 `/login` 화면 | `aside` 0개, "익명"·"로그아웃" 없음 |
+| 로그인 후 `/` 새로고침 | `aside` 1개, 사이드바 렌더. 쿠키 유지 확인 |
+| 로그인 상태로 소개 화면의 "시작하기" | `/diagnosis` (미인증이면 `/signup`) |
+
+`npm run build` 통과.
+
+### 남은 것
+
+- `/diagnosis/result`·`/login`·`/signup`에 챗봇 버튼이 뜬다. `app/chat/_components/ChatLauncher.tsx`(D)의 `HIDDEN_PATHS`가 `/diagnosis`만 막는다. D 소유라 손대지 않았다
+- `.env.example`에 `SESSION_SECRET=""`가 없다. E 소유. Amplify 환경변수에도 등록해야 한다 — 없으면 배포본의 모든 로그인이 throw한다
+- 비밀번호 재설정, 로그인 시도 제한, 세션 즉시 무효화, 이메일 소유 확인은 만들지 않았다(차단 23)
+
+### 챗봇 버튼 노출 범위 (2026-08-21, A가 D 파일 수정)
+
+`app/chat/_components/ChatLauncher.tsx`가 숨길 경로 목록(`pathname === "/diagnosis"`)만 갖고 있어 소개·가입·로그인·진단 결과에서 우상단 버튼이 남았다. 허용 목록으로 뒤집었다 — `"/"` 정확히 일치 + `/missions`·`/pet`·`/community` 접두사(하위 경로 `/pet/skins` 등 포함).
+
+경로만으로는 부족했다. **소개 화면과 홈이 둘 다 `"/"`이고 진단 여부로 갈린다.** 그래서 `GET /api/diagnosis/me`를 함께 보고 `data`가 null이면(미인증 포함) 띄우지 않는다. 못 읽었을 때도 숨기는 쪽으로 뒀다 — 진단 전 화면에 챗봇이 뜨는 편이 더 나쁘다.
+
+실측(2026-08-21):
+
+| 화면 | 미진단 | 진단 완료 |
+|---|---|---|
+| `/` | 0개 (소개 화면) | 1개 (홈) |
+| `/missions` `/pet` `/community` | — | 각 1개 |
+| `/login` `/signup` `/diagnosis` `/diagnosis/result` | 0개 | 0개 |
+
+`/diagnosis/result`의 **사이드바는 아직 뜬다**(`aside` 1개). `Sidebar.tsx:106`의 경로 조건은 B 몫으로 남겼다(차단 21).

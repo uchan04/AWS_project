@@ -176,6 +176,8 @@ export default function PetView({ initial }: { initial: PetState }) {
         setEvolvedTo(next.evolvedTo)
         setTimeout(() => setEvolvedTo(null), 2000)
       }
+
+      window.dispatchEvent(new CustomEvent("mission-completed"))
     } catch {
       setToast({ text: "네트워크 연결을 확인해 주세요", error: true })
     } finally {
@@ -201,6 +203,8 @@ export default function PetView({ initial }: { initial: PetState }) {
       setPet((prev) => ({ ...prev, seeds: json.data.seeds, idleSeeds: 0, idleCapped: false }))
       setMsLeft(MS_PER_IDLE_SEED)
       setToast({ text: `씨앗 ${ko(Math.max(0, gained))}개를 수확했어요` })
+      // develop이 넣은 줄이다. 수령으로 씨앗이 늘면 상단 재화 HUD를 갱신해야 한다
+      window.dispatchEvent(new CustomEvent("mission-completed"))
     } catch {
       setToast({ text: "네트워크 연결을 확인해 주세요", error: true })
     } finally {
