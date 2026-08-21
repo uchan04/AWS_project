@@ -1211,3 +1211,19 @@ git pull && npx prisma migrate deploy && npx prisma generate
 - `/diagnosis/result`·`/login`·`/signup`에 챗봇 버튼이 뜬다. `app/chat/_components/ChatLauncher.tsx`(D)의 `HIDDEN_PATHS`가 `/diagnosis`만 막는다. D 소유라 손대지 않았다
 - `.env.example`에 `SESSION_SECRET=""`가 없다. E 소유. Amplify 환경변수에도 등록해야 한다 — 없으면 배포본의 모든 로그인이 throw한다
 - 비밀번호 재설정, 로그인 시도 제한, 세션 즉시 무효화, 이메일 소유 확인은 만들지 않았다(차단 23)
+
+### 챗봇 버튼 노출 범위 (2026-08-21, A가 D 파일 수정)
+
+`app/chat/_components/ChatLauncher.tsx`가 숨길 경로 목록(`pathname === "/diagnosis"`)만 갖고 있어 소개·가입·로그인·진단 결과에서 우상단 버튼이 남았다. 허용 목록으로 뒤집었다 — `"/"` 정확히 일치 + `/missions`·`/pet`·`/community` 접두사(하위 경로 `/pet/skins` 등 포함).
+
+경로만으로는 부족했다. **소개 화면과 홈이 둘 다 `"/"`이고 진단 여부로 갈린다.** 그래서 `GET /api/diagnosis/me`를 함께 보고 `data`가 null이면(미인증 포함) 띄우지 않는다. 못 읽었을 때도 숨기는 쪽으로 뒀다 — 진단 전 화면에 챗봇이 뜨는 편이 더 나쁘다.
+
+실측(2026-08-21):
+
+| 화면 | 미진단 | 진단 완료 |
+|---|---|---|
+| `/` | 0개 (소개 화면) | 1개 (홈) |
+| `/missions` `/pet` `/community` | — | 각 1개 |
+| `/login` `/signup` `/diagnosis` `/diagnosis/result` | 0개 | 0개 |
+
+`/diagnosis/result`의 **사이드바는 아직 뜬다**(`aside` 1개). `Sidebar.tsx:106`의 경로 조건은 B 몫으로 남겼다(차단 21).
