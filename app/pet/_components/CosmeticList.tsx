@@ -1,19 +1,26 @@
 "use client"
 
 import { useState } from "react"
-import type { Rarity, Slot } from "@prisma/client"
+import Link from "next/link"
+import type { Rarity, Slot, TypeCode } from "@prisma/client"
 import "@/styles/tokens.css"
 import "../pet.css"
 
 // 소유자: C. 치장 목록 + 구매 + 착용·해제. (SPEC.md 5절)
 //
+// 2026-08-21: 옛 .hm-pet 어휘를 걷고 펫 홈과 같은 .pet 스코프로 옮겼다. 홈에서
+// 나무판("배경 상점")을 눌러 들어오는 화면이라 색·테두리·나무판이 이어져야 한다.
+// data-tribe가 --tribe를 켜므로 typeCode를 페이지에서 받는다 — 치장 자체는 종족과
+// 무관하지만(SPEC.md 2절) 화면 색은 종족을 따른다.
+//
 // design.md 규칙 두 개가 이 화면을 좁힌다.
 // - "이모지는 마스코트 자리(원판·배지)에만 쓴다." 치장은 마스코트가 아니라 아이템이므로
-//   타일에 이모지를 쓰지 않는다. 이미지가 오면 .hm-tile__face 자리에 <img>가 들어간다
-// - Primary CTA는 화면에 하나뿐이다. 타일 버튼이 여러 개이므로 전부 ghost다
+//   타일에 얼굴 칸을 두지 않는다. 이미지가 오면 .pet-item__img로 <img>가 들어간다
+// - 채운 종족색 면은 화면에 하나다. 착용 중인 칸(.pet-item--on)이 그 하나를 갖고,
+//   타일 버튼은 전부 ghost(테두리만 종족색)다
 //
-// 미획득 실루엣: 이미지가 없어 지금은 이름을 --color-muted로 죽이고 가격 버튼을 붙인다.
-// 이미지가 오면 .hm-pet__cos--locked가 그 <img>에 filter를 걸면 된다.
+// 미획득 실루엣: 이미지가 없어 지금은 점선 테두리 + 죽인 이름으로 표현한다.
+// 이미지가 오면 .pet-item--locked가 그 <img>에 filter를 걸면 된다.
 //
 // 가격은 서버가 내려준 priceAffinity만 쓴다. 등급별 가격표를 여기 복사하면
 // prisma/seed/items.ts의 PRICE_BY_RARITY와 갈라진다.
@@ -33,7 +40,11 @@ export type CosmeticListProps = {
   items: CosmeticRow[]
   progress: { owned: number; total: number }
   affinity: number
+  /** .pet 스코프의 --tribe를 켜는 값. 진단 전이면 null이고 tokens.css :root 기본색으로 떨어진다 */
+  typeCode: TypeCode | null
 }
+
+const ko = (n: number) => n.toLocaleString("ko-KR")
 
 const SLOT_LABEL: Record<Slot, string> = {
   HAT: "모자",
@@ -54,6 +65,7 @@ export default function CosmeticList({
   items: initial,
   progress: initialProgress,
   affinity: initialAffinity,
+  typeCode,
 }: CosmeticListProps) {
   const [items, setItems] = useState(initial)
   const [owned, setOwned] = useState(initialProgress.owned)
@@ -128,65 +140,84 @@ export default function CosmeticList({
     }
   }
 
+  const progressText = `${owned} / ${initialProgress.total} 수집`
+
   return (
-    <main className="hm hm--canvas">
-      <div className="hm__col hm-pet">
-        <div className="hm-status">
-          <h1 className="hm-card__title">치장</h1>
-          <span className="hm__note">
-            {owned} / {initialProgress.total} 수집 · 친밀도 {affinity}
-          </span>
+    <main className="pet pet--shop" data-tribe={typeCode ?? undefined}>
+      <div className="pet__top">
+        <div>
+          <h1 className="pet__title">배경 상점</h1>
+          <p className="pet__lede">친밀도로 모아요. 별도 도감 없이 이 화면이 수집함이에요.</p>
         </div>
 
-        <div className="hm-bar" role="presentation">
-          <div
-            className="hm-bar__fill"
-            style={{
-              width:
-                initialProgress.total > 0 ? `${(owned / initialProgress.total) * 100}%` : "0%",
-            }}
-          />
+        <div className="pet__top-acts">
+          {/* 잔액이 이 화면에만 있으므로 홈의 씨앗 HUD처럼 aria-hidden으로 묻지 않는다 */}
+          <p className="pet-hud" aria-label={`친밀도 ${ko(affinity)}`}>
+            <span className="pet-hud__icon pet-hud__icon--wood" aria-hidden="true">
+              💛
+            </span>
+            <span className="pet-hud__value" aria-hidden="true">
+              {ko(affinity)}
+            </span>
+          </p>
+          <Link className="pet-plank" href="/pet">
+            펫으로
+          </Link>
         </div>
+      </div>
 
-        {error ? (
-          <p className="hm-field__help hm-field__help--error" role="alert">
-            <span aria-hidden="true">⚠ </span>
-            {error}
-          </p>
-        ) : null}
-        {notice ? (
-          <p className="hm-field__help" role="status">
-            {notice}
-          </p>
-        ) : null}
+      {/* 수집 진행률. 별도 도감 화면 대신 이 게이지가 겸한다 (SPEC.md 5절 "제외한 것") */}
+      <div className="pet-gauge" role="img" aria-label={progressText}>
+        <div
+          className="pet-gauge__fill"
+          style={{
+            width: initialProgress.total > 0 ? `${(owned / initialProgress.total) * 100}%` : "0%",
+          }}
+        />
+        <span className="pet-gauge__value" aria-hidden="true">
+          {progressText}
+        </span>
+      </div>
 
-        {SLOTS.map((slot) => {
-          const rows = items.filter((item) => item.slot === slot)
-          if (rows.length === 0) return null
+      {error ? (
+        <p className="pet-msg pet-msg--error" role="alert">
+          {error}
+        </p>
+      ) : null}
+      {notice ? (
+        <p className="pet-msg" role="status">
+          {notice}
+        </p>
+      ) : null}
 
-          return (
-            <div className="hm-card" key={slot}>
-              <div className="hm-card__head">
-                <h2 className="hm-card__title">{SLOT_LABEL[slot]}</h2>
-                <span className="hm__note">한 번에 하나만 착용해요</span>
-              </div>
+      {SLOTS.map((slot) => {
+        const rows = items.filter((item) => item.slot === slot)
+        if (rows.length === 0) return null
 
-              <div className="hm-tiles">
-                {rows.map((item) => {
-                  const price = item.affinityOnly ? item.priceAffinity : null
-                  const tooPoor = price !== null && affinity < price
+        return (
+          <section className="pet-card" key={slot}>
+            <div className="pet-card__head">
+              <h2 className="pet-card__title">{SLOT_LABEL[slot]}</h2>
+              <span className="pet-card__meta">한 번에 하나만 착용해요</span>
+            </div>
 
-                  return (
-                    <div
-                      className={`hm-tile hm-pet__cos${item.owned ? "" : " hm-pet__cos--locked"}`}
-                      key={item.id}
-                    >
-                      <span className="hm-tile__title">{item.name}</span>
-                      <span className="hm-tile__hint">
-                        {RARITY_LABEL[item.rarity]}
-                        {price !== null ? ` · 친밀도 ${price}` : ""}
-                      </span>
+            <div className="pet-shop">
+              {rows.map((item) => {
+                const price = item.affinityOnly ? item.priceAffinity : null
+                const tooPoor = price !== null && affinity < price
 
+                return (
+                  <div
+                    className={`pet-item${item.equipped ? " pet-item--on" : item.owned ? "" : " pet-item--locked"}`}
+                    key={item.id}
+                  >
+                    <span className="pet-item__name">{item.name}</span>
+                    <span className="pet-item__meta">
+                      {RARITY_LABEL[item.rarity]}
+                      {price !== null ? ` · 친밀도 ${ko(price)}` : ""}
+                    </span>
+
+                    <div className="pet-item__act">
                       {item.owned ? (
                         <button
                           type="button"
@@ -194,38 +225,38 @@ export default function CosmeticList({
                           disabled={pending !== null}
                           aria-disabled={pending !== null}
                           aria-pressed={item.equipped}
-                          className="hm-btn hm-btn--ghost"
+                          className="pet-btn pet-btn--ghost"
                         >
                           {item.equipped ? "벗기" : "착용"}
                         </button>
                       ) : price === null ? (
                         // 비매품. 지금 시드에는 없지만 이벤트 지급 아이템이 생기면 여기로 온다
-                        <span className="hm-tile__hint">미획득</span>
+                        <span className="pet-item__meta">미획득</span>
                       ) : (
                         <button
                           type="button"
                           onClick={() => buy(item)}
                           disabled={pending !== null || tooPoor}
                           aria-disabled={pending !== null || tooPoor}
-                          className="hm-btn hm-btn--ghost"
+                          className="pet-btn pet-btn--ghost"
                         >
-                          {tooPoor ? `친밀도 ${price - affinity} 부족` : `친밀도 ${price}`}
+                          {tooPoor ? `${ko(price - affinity)} 부족` : `친밀도 ${ko(price)}`}
                         </button>
                       )}
                     </div>
-                  )
-                })}
-              </div>
+                  </div>
+                )
+              })}
             </div>
-          )
-        })}
+          </section>
+        )
+      })}
 
-        {owned === 0 ? (
-          <p className="hm__note">
-            아직 모은 치장이 없어요. 친밀도는 챗봇 대화와 커뮤니티 활동으로 모을 수 있어요.
-          </p>
-        ) : null}
-      </div>
+      {owned === 0 ? (
+        <p className="pet-msg">
+          아직 모은 배경이 없어요. 친밀도는 챗봇 대화와 커뮤니티 활동으로 모을 수 있어요.
+        </p>
+      ) : null}
     </main>
   )
 }

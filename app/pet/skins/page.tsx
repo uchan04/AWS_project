@@ -1,3 +1,5 @@
+import Link from "next/link"
+import type { TypeCode } from "@prisma/client"
 import { getCurrentUser } from "@/lib/auth"
 import { prisma } from "@/lib/prisma"
 import SkinList, { type SkinRow } from "../_components/SkinList"
@@ -13,9 +15,11 @@ export const dynamic = "force-dynamic"
 export default async function SkinsPage() {
   let skins: SkinRow[]
   let starShards: number
+  let typeCode: TypeCode | null
 
   try {
     const user = await getCurrentUser()
+    typeCode = user.typeCode
 
     const [all, owned] = await Promise.all([
       user.typeCode === null
@@ -43,17 +47,20 @@ export default async function SkinsPage() {
   } catch (error) {
     console.error("[/pet/skins]", error)
     return (
-      <main className="hm hm--canvas">
-        <div className="hm__col hm-pet">
-          <h1 className="hm-card__title">스킨</h1>
-          <div className="hm-card">
-            <p className="hm__lede">스킨 목록을 불러오지 못했어요.</p>
-            <p className="hm__note">잠시 후 다시 들어와 주세요.</p>
-          </div>
+      <main className="pet pet--shop">
+        <div className="pet__top">
+          <h1 className="pet__title">외형 상점</h1>
+          <Link className="pet-plank" href="/pet">
+            펫으로
+          </Link>
+        </div>
+        <div className="pet-card">
+          <h2 className="pet-card__title">외형 목록을 불러오지 못했어요</h2>
+          <span className="pet-card__meta">잠시 후 다시 들어와 주세요.</span>
         </div>
       </main>
     )
   }
 
-  return <SkinList skins={skins} starShards={starShards} />
+  return <SkinList skins={skins} starShards={starShards} typeCode={typeCode} />
 }

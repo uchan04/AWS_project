@@ -91,13 +91,13 @@ export default async function PetPage() {
   } catch (error) {
     console.error("[/pet]", error)
     return (
-      <main className="hm hm--canvas">
-        <div className="hm__col hm-pet">
-          <h1 className="hm-card__title">펫</h1>
-          <div className="hm-card">
-            <p className="hm__lede">펫 정보를 불러오지 못했어요.</p>
-            <p className="hm__note">잠시 후 다시 들어와 주세요.</p>
-          </div>
+      <main className="pet pet--shop">
+        <div className="pet__top">
+          <h1 className="pet__title">펫</h1>
+        </div>
+        <div className="pet-card">
+          <h2 className="pet-card__title">펫 정보를 불러오지 못했어요</h2>
+          <span className="pet-card__meta">잠시 후 다시 들어와 주세요.</span>
         </div>
       </main>
     )

@@ -1,6 +1,7 @@
 "use client"
 
 import { useState } from "react"
+import Link from "next/link"
 import type { TypeCode } from "@prisma/client"
 import { animalEmoji } from "@/lib/pet"
 import { TRIBE } from "@/lib/types"
@@ -13,8 +14,13 @@ import "../pet.css"
 // user.typeCode로 걸러져 있으므로 전부 같은 동물이다. 능력치 효과는 없어졌다 —
 // 바뀌는 것은 외형뿐이고 진화 4단은 기본 외형과 같다.
 //
-// design.md: 타일 버튼이 여러 개이므로 전부 ghost다. 종족색은 CTA에 쓰지 않는다.
-// 이모지는 마스코트 자리(원판·배지)에만 쓴다 — 스킨 타일의 얼굴이 그 자리다.
+// 2026-08-21: 옛 .hm-pet 어휘를 걷고 펫 홈과 같은 .pet 스코프로 옮겼다. 홈에서
+// 나무판("외형 상점")을 눌러 들어오는 화면이라 색·테두리·나무판이 이어져야 한다.
+// data-tribe가 --tribe를 켜므로 typeCode를 페이지에서 받는다 — 목록 행의 typeCode를
+// 쓰지 않는 이유는 목록이 빈 경우(진단 전)에도 스코프가 성립해야 하기 때문이다.
+//
+// design.md: 칸이 여러 개라 타일 버튼은 전부 ghost(테두리만 종족색)다. 채운 종족색
+// 면은 "함께하는 중" 칸 하나가 갖는다. 이모지는 마스코트 자리에만 — 타일 얼굴이 그 자리다.
 
 export type SkinRow = {
   id: string
@@ -30,9 +36,17 @@ export type SkinRow = {
 export type SkinListProps = {
   skins: SkinRow[]
   starShards: number
+  /** .pet 스코프의 --tribe를 켜는 값. 진단 전이면 null이고 tokens.css :root 기본색으로 떨어진다 */
+  typeCode: TypeCode | null
 }
 
-export default function SkinList({ skins: initial, starShards: initialShards }: SkinListProps) {
+const ko = (n: number) => n.toLocaleString("ko-KR")
+
+export default function SkinList({
+  skins: initial,
+  starShards: initialShards,
+  typeCode,
+}: SkinListProps) {
   const [skins, setSkins] = useState(initial)
   const [starShards, setStarShards] = useState(initialShards)
   const [pending, setPending] = useState<string | null>(null)
@@ -87,85 +101,104 @@ export default function SkinList({ skins: initial, starShards: initialShards }: 
   ]
 
   return (
-    <main className="hm hm--canvas">
-      <div className="hm__col hm-pet">
-        <div className="hm-status">
-          <h1 className="hm-card__title">스킨</h1>
-          <span className="hm__note">별조각 {starShards}</span>
+    <main className="pet pet--shop" data-tribe={typeCode ?? undefined}>
+      <div className="pet__top">
+        <div>
+          <h1 className="pet__title">외형 상점</h1>
+          <p className="pet__lede">
+            레벨과 경험치는 외형이 아니라 나에게 붙어 있어요. 바꿔도 그대로예요.
+          </p>
         </div>
 
-        <p className="hm__note">
-          레벨과 경험치는 외형이 아니라 나에게 붙어 있어요. 바꿔도 그대로예요.
+        <div className="pet__top-acts">
+          {/* 잔액이 이 화면에만 있으므로 홈의 씨앗 HUD처럼 aria-hidden으로 묻지 않는다 */}
+          <p className="pet-hud" aria-label={`별조각 ${ko(starShards)}`}>
+            <span className="pet-hud__icon pet-hud__icon--wood" aria-hidden="true">
+              ⭐
+            </span>
+            <span className="pet-hud__value" aria-hidden="true">
+              {ko(starShards)}
+            </span>
+          </p>
+          <Link className="pet-plank" href="/pet">
+            펫으로
+          </Link>
+        </div>
+      </div>
+
+      {error ? (
+        <p className="pet-msg pet-msg--error" role="alert">
+          {error}
         </p>
+      ) : null}
+      {notice ? (
+        <p className="pet-msg" role="status">
+          {notice}
+        </p>
+      ) : null}
 
-        {error ? (
-          <p className="hm-field__help hm-field__help--error" role="alert">
-            <span aria-hidden="true">⚠ </span>
-            {error}
-          </p>
-        ) : null}
-        {notice ? (
-          <p className="hm-field__help" role="status">
-            {notice}
-          </p>
-        ) : null}
+      {groups.map((group) =>
+        group.rows.length === 0 ? null : (
+          <section className="pet-card" key={group.title}>
+            <div className="pet-card__head">
+              <h2 className="pet-card__title">{group.title}</h2>
+              <span className="pet-card__meta">{group.hint}</span>
+            </div>
 
-        {groups.map((group) =>
-          group.rows.length === 0 ? null : (
-            <div className="hm-card" key={group.title}>
-              <div className="hm-card__head">
-                <h2 className="hm-card__title">{group.title}</h2>
-                <span className="hm__note">{group.hint}</span>
-              </div>
+            <div className="pet-shop">
+              {group.rows.map((skin) => {
+                const tribe = TRIBE[skin.typeCode]
+                const price = skin.priceShards
+                const tooPoor = price !== null && starShards < price
+                // 기본 외형은 진단이 지급하므로 미획득 실루엣을 씌우지 않는다 (살 수 있는 것이 아니다)
+                const locked = !skin.owned && price !== null
 
-              <div className="hm-tiles">
-                {group.rows.map((skin) => {
-                  const tribe = TRIBE[skin.typeCode]
-                  const price = skin.priceShards
-                  const tooPoor = price !== null && starShards < price
+                return (
+                  <div
+                    className={`pet-item${skin.active ? " pet-item--on" : locked ? " pet-item--locked" : ""}`}
+                    key={skin.id}
+                  >
+                    <span className="pet-item__face" aria-hidden="true">
+                      {animalEmoji(skin.name)}
+                    </span>
+                    <span className="pet-item__name">{skin.name}</span>
+                    <span className="pet-item__meta">{tribe.family}</span>
 
-                  return (
-                    <div className="hm-tile hm-pet__cos" key={skin.id}>
-                      <span className="hm-tile__face" aria-hidden="true">
-                        {animalEmoji(skin.name)}
-                      </span>
-                      <span className="hm-tile__title">{skin.name}</span>
-                      <span className="hm-tile__hint">{tribe.family}</span>
-
+                    <div className="pet-item__act">
                       {skin.active ? (
-                        <span className="hm-pill">함께하는 중</span>
+                        <span className="pet-item__state">함께하는 중</span>
                       ) : skin.owned ? (
                         <button
                           type="button"
                           onClick={() => call(skin, "activate")}
                           disabled={pending !== null}
                           aria-disabled={pending !== null}
-                          className="hm-btn hm-btn--ghost"
+                          className="pet-btn pet-btn--ghost"
                         >
                           전환
                         </button>
                       ) : price === null ? (
                         // 기본 외형은 진단이 지급한다. 상점에 없다
-                        <span className="hm-tile__hint">진단으로 받아요</span>
+                        <span className="pet-item__meta">진단으로 받아요</span>
                       ) : (
                         <button
                           type="button"
                           onClick={() => call(skin, "buy")}
                           disabled={pending !== null || tooPoor}
                           aria-disabled={pending !== null || tooPoor}
-                          className="hm-btn hm-btn--ghost"
+                          className="pet-btn pet-btn--ghost"
                         >
-                          별조각 {price}
+                          별조각 {ko(price)}
                         </button>
                       )}
                     </div>
-                  )
-                })}
-              </div>
+                  </div>
+                )
+              })}
             </div>
-          ),
-        )}
-      </div>
+          </section>
+        ),
+      )}
     </main>
   )
 }

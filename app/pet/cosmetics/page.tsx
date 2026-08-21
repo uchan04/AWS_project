@@ -1,3 +1,5 @@
+import Link from "next/link"
+import type { TypeCode } from "@prisma/client"
 import { getCurrentUser } from "@/lib/auth"
 import { compareCosmetics } from "@/lib/pet"
 import { prisma } from "@/lib/prisma"
@@ -7,6 +9,7 @@ import "../pet.css"
 
 // 소유자: C. 치장 목록 화면. (SPEC.md 5절)
 // 별도 도감 화면을 만들지 않고 이 화면의 수집 진행률로 겸용한다 (5절 "제외한 것").
+// typeCode는 화면 색(.pet의 data-tribe)에만 쓴다 — 치장은 종족 제한이 없다(SPEC.md 2절).
 
 export const dynamic = "force-dynamic"
 
@@ -14,10 +17,12 @@ export default async function CosmeticsPage() {
   let items: CosmeticRow[]
   let progress: { owned: number; total: number }
   let affinity: number
+  let typeCode: TypeCode | null
 
   try {
     const user = await getCurrentUser()
     affinity = user.affinity
+    typeCode = user.typeCode
 
     const [all, owned] = await Promise.all([
       prisma.cosmeticItem.findMany(),
@@ -45,17 +50,22 @@ export default async function CosmeticsPage() {
   } catch (error) {
     console.error("[/pet/cosmetics]", error)
     return (
-      <main className="hm hm--canvas">
-        <div className="hm__col hm-pet">
-          <h1 className="hm-card__title">치장</h1>
-          <div className="hm-card">
-            <p className="hm__lede">치장 목록을 불러오지 못했어요.</p>
-            <p className="hm__note">잠시 후 다시 들어와 주세요.</p>
-          </div>
+      <main className="pet pet--shop">
+        <div className="pet__top">
+          <h1 className="pet__title">배경 상점</h1>
+          <Link className="pet-plank" href="/pet">
+            펫으로
+          </Link>
+        </div>
+        <div className="pet-card">
+          <h2 className="pet-card__title">배경 목록을 불러오지 못했어요</h2>
+          <span className="pet-card__meta">잠시 후 다시 들어와 주세요.</span>
         </div>
       </main>
     )
   }
 
-  return <CosmeticList items={items} progress={progress} affinity={affinity} />
+  return (
+    <CosmeticList items={items} progress={progress} affinity={affinity} typeCode={typeCode} />
+  )
 }

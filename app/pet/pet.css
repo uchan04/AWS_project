@@ -17,29 +17,10 @@
  * 파란 나무·초록 나무가 된다.
  */
 
-/* ── 다른 펫 화면(치장·외형)과 공유하는 것 ───────────────────────────────────
-   app/pet/cosmetics, app/pet/skins가 .hm-pet / .hm-pet__cos* 를 쓴다. 건드리지 않는다. */
-
-.hm-pet {
-  /* 단일 열 화면이라 진단과 같은 폭을 쓴다 (design.md "폭은 화면이 정한다") */
-  --col-max: 42.5rem;
-  display: grid;
-  gap: var(--space-md);
-  align-content: start;
-}
-
-/* 치장 타일. 버튼이 타일 아래에 붙으므로 위쪽 여백만 준다 */
-.hm-pet__cos .hm-btn {
-  margin-top: var(--space-3xs);
-}
-
-/* 미획득 실루엣 (SPEC.md 5절). 이미지가 없어 지금은 글자를 죽여 둔다.
-   이미지가 오면 아래에 .hm-pet__cos--locked img { filter: brightness(0) opacity(.28) }를
-   더하면 된다 — 새 색 값을 만들지 않고 실루엣이 된다 */
-.hm-pet__cos--locked .hm-tile__title {
-  color: var(--color-muted);
-  font-weight: 400;
-}
+/* 2026-08-21: 옛 .hm-pet / .hm-pet__cos* 를 걷어냈다. 치장·외형 상점이 그 클래스를
+ * 쓰고 있었지만 두 화면 다 아래 .pet 스코프로 옮겼다 — 펫 홈에서 나무판을 눌러
+ * 들어가는 화면이라 색·테두리·나무판이 홈과 이어져야 한다. 상점 전용 규칙은
+ * 파일 아래쪽 "상점 화면" 절에 있다. */
 
 /* ── 펫 홈 화면 ──────────────────────────────────────────────────────────── */
 
@@ -813,6 +794,151 @@
   color: var(--tribe-cta);
 }
 
+/* ── 상점 화면 (외형·배경) ───────────────────────────────────────────────────
+ *
+ * /pet/skins · /pet/cosmetics. 홈과 같은 .pet 스코프를 쓰므로 --tribe 파생값·나무판·
+ * 카드가 그대로 온다. 상점에만 필요한 것이 아래 세 벌이다: 폭 제한, 타일 격자,
+ * 타일 안에 들어가는 ghost 버튼.
+ *
+ * 홈은 2단 그리드로 화면을 다 쓰지만 상점은 목록 한 줄이라 폭을 묶는다.
+ * main 자체에 max-width를 걸지 않고 자식에 거는 이유: .pet이 --color-paper를 깔고
+ * body는 #fff(다크모드 #0a0a0a)라서, main을 좁히면 양옆에 흰 띠가 생긴다. */
+
+.pet--shop > * {
+  width: 100%;
+  max-width: 46rem;
+  margin-inline: auto;
+}
+
+/* 타일 격자. minmax의 min(8rem, 100%)은 320px에서 가로 스크롤을 막는다 (design.md).
+   진화 단계 목록(.pet-evo__list)과 같은 값이다 — 같은 화면군에서 칸 크기가 같아야 한다 */
+.pet-shop {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(min(8rem, 100%), 1fr));
+  gap: var(--space-2xs);
+}
+
+/* 아이템 한 칸. 진화 단계 카드(.pet-evo-card)와 같은 모양을 의도적으로 맞췄다 —
+   펫 화면군 안에서 "칸 하나 = 외형 하나"라는 읽는 법이 같다. 버튼 줄만 더 붙는다 */
+.pet-item {
+  display: grid;
+  justify-items: center;
+  align-content: start;
+  gap: var(--space-3xs);
+  padding: var(--space-sm) var(--space-2xs);
+  border: 2px solid var(--color-rule);
+  border-radius: var(--radius-card);
+  background: var(--color-card);
+  text-align: center;
+}
+
+/* 착용·전환 중. 스킨은 1개, 배경은 슬롯당 1개만 켜지므로 이 면이 화면에서
+   유일한 "희석된 종족색 면"이다 (design.md "종족 원판 1개 + 희석된 면 1개") */
+.pet-item--on {
+  border-color: var(--tribe-cta-2);
+  background: var(--tribe-soft);
+}
+
+/* 미획득 (SPEC.md 5절 "미획득 실루엣"). 점선 테두리 + 죽인 종이색으로 표현한다 */
+.pet-item--locked {
+  border-style: dashed;
+  background: var(--color-paper-2);
+}
+
+/* 마스코트 자리. 스킨 타일만 쓴다 — 치장은 아이템이라 이모지를 얹지 않는다 (design.md) */
+.pet-item__face {
+  display: grid;
+  place-items: center;
+  width: 3.5rem;
+  height: 3.5rem;
+  font-size: 2.25rem;
+  line-height: 1;
+}
+
+/* 실루엣. 이미지가 오면 같은 filter가 그 <img>에도 걸린다 (새 색 값을 만들지 않는다) */
+.pet-item--locked .pet-item__face,
+.pet-item--locked .pet-item__img {
+  filter: grayscale(1);
+  opacity: 0.35;
+}
+
+.pet-item__name {
+  font-family: var(--font-display);
+  font-size: var(--text-body);
+  color: var(--color-ink);
+}
+
+.pet-item--locked .pet-item__name {
+  color: var(--color-muted);
+}
+
+.pet-item__meta {
+  font-size: var(--text-label);
+  color: var(--color-muted);
+}
+
+/* 버튼·배지 자리. 칸마다 같은 높이여야 격자가 들쭉날쭉해지지 않는다 */
+.pet-item__act {
+  display: grid;
+  width: 100%;
+  margin-top: var(--space-3xs);
+}
+
+/* 타일 버튼. 칸이 6개인데 전부 --tribe 면으로 칠하면 종족색이 화면을 덮는다.
+   테두리와 글자만 종족색을 쓰고 면은 비운다 — 채운 면은 위 --on 한 칸이 갖는다 */
+.pet-btn--ghost {
+  min-height: var(--control-h); /* design.md 모바일 하한선: 44px 터치 타깃 */
+  border: 2px solid var(--tribe-line);
+  background: transparent;
+  box-shadow: none;
+  color: var(--tribe-cta);
+  font-size: var(--text-label);
+}
+
+.pet-btn--ghost:disabled {
+  border-color: var(--color-rule);
+  background: transparent;
+  box-shadow: none;
+}
+
+/* 착용·전환 중 배지. 버튼 자리를 대신 채우므로 높이를 버튼과 맞춘다.
+   (홈의 착용 치장 배지는 tokens.css의 작은 .hm-pill이다 — 여기는 칸 높이를 맞춰야 해서 다르다) */
+.pet-item__state {
+  display: grid;
+  place-items: center;
+  min-height: var(--control-h);
+  padding: 0 var(--space-2xs);
+  border: 2px solid var(--tribe-cta-2);
+  border-radius: var(--radius-input);
+  background: var(--color-card);
+  font-size: var(--text-label);
+  font-weight: 700;
+  color: var(--tribe-cta);
+}
+
+/* 안내·오류 한 줄. 홈의 .pet-toast는 떴다 사라지는 값이지만 상점 메시지는 다음
+   동작까지 남아 있어야 한다 — 고정 토스트로 두면 화면 아래에 안 사라지고 붙어 있다 */
+.pet-msg {
+  margin: 0;
+  padding: var(--space-2xs) var(--space-xs);
+  border-radius: var(--radius-input);
+  background: var(--tribe-wash);
+  font-size: var(--text-label);
+  color: var(--color-ink-2);
+}
+
+.pet-msg--error {
+  background: color-mix(in oklch, var(--color-error) 12%, var(--color-paper));
+  color: var(--color-error);
+}
+
+/* 씨앗이 아닌 재화(별조각·친밀도)의 HUD 아이콘 칸. 재화마다 색을 새로 만들지 않고
+   나무판과 같은 계열의 옅은 나무색을 쓴다 — 상점 화면의 나무 어휘와 붙는다.
+   (styles/tokens.css의 "채도 높은 색은 종족색 하나뿐" 예외를 늘리지 않으려는 것) */
+.pet-hud__icon--wood {
+  background: linear-gradient(135deg, #f0d8a8, var(--pet-wood-light));
+}
+
 /* ── 토스트 ──────────────────────────────────────────────────────────────── */
 
 .pet-toast {
@@ -837,7 +963,7 @@
 
 /* ── 진화 연출 2초 (SPEC.md 5절). 종이색 한 벌로 덮는다 ──────────────────── */
 
-.hm-pet__evolve {
+.pet-evolve {
   position: fixed;
   inset: 0;
   z-index: var(--z-modal);
@@ -850,7 +976,7 @@
   text-align: center;
 }
 
-.hm-pet__evolve-title {
+.pet-evolve__title {
   font-family: var(--font-display);
   font-size: var(--text-lg);
   margin: 0;

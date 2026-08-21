@@ -511,12 +511,12 @@ export default function PetView({ initial }: { initial: PetState }) {
       ) : null}
 
       {evolvedTo ? (
-        <div className="hm-pet__evolve" role="status">
+        <div className="pet-evolve" role="status">
           <span className="pet-char__body" aria-hidden="true">
             {petFace}
           </span>
-          <p className="hm-pet__evolve-title">{evolvedTo}단계로 진화했어요</p>
-          <p className="hm__note">{pet.skinName}가 한 단계 자랐습니다</p>
+          <p className="pet-evolve__title">{evolvedTo}단계로 진화했어요</p>
+          <p className="pet-card__meta">{pet.skinName}가 한 단계 자랐습니다</p>
         </div>
       ) : null}
     </main>
