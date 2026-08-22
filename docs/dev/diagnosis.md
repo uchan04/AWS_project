@@ -9,6 +9,7 @@
 
 ## 현재 상태
 - 완료: 미션 41개, 지표 14개 정의, 12문항 + 형용사 문항, `classify()`·`classifySub()`, 무손실 조기 종료, 스냅샷 체크, 화면 3장(진단·결과·홈), 화면 3장 디자인 시스템 적용 + Figma 팔레트·폰트 반영(12장), 진단 API 3종 + 화면 연결, `draft.ts` 제거, 2차 마이그레이션 적용 후 실 DB로 전체 흐름 확인(14장), **스킨·치장 구조 변경을 스키마·실 DB·시드까지 적용(15장)**, 홈 미션 미리보기를 `GET /api/missions`로 교체(`bdcef94`), 결과 화면 판정 근거 3줄(`298ab56`)
+- 완료(2026-08-22): **전수 점검에서 찾은 오류·기능 6건 반영(21장)** — 재진단 잠금, 재진단 시 활성 펫 스킨 초기화 차단, 홈 미션 로딩·실패 구분, 홈 진행 카드, 결과 화면 문구 분기, Google 로그인 CSRF `state` + 세션 7일 통일
 - 진행 중: 없음
 - 미착수: 없음. 근거 3줄의 **Bedrock 실호출 검증만 E의 IAM 키·`BEDROCK_MODEL_ID` 공유 대기**다
 - 컷: 관리자 교차표(`SPEC.md`에 없다), Bedrock 호출 2종(질문 문장 다듬기·자유 입력 enum 변환). 근거는 16장. 펫 이미지는 E가 S3에 올리는 중이다(17장)
@@ -21,6 +22,7 @@
 - `lib/diagnosis/indicators.ts` — 답변 → 지표 14개. 대분류·세부유형이 전부 이 결과만 본다
 - `lib/diagnosis/classify.ts` — `classify()`(3대분류) + `classifySub()`(8세부유형). 순수 함수, LLM·DB 없음
 - `lib/diagnosis/adaptive.ts` — `possibleTypes()` / `canDecide()` / `nextQuestion()`. 무손실 조기 종료
+- `lib/diagnosis/flags.ts` — `REDIAGNOSIS_ENABLED`. 재진단 스위치 하나뿐이다. 클라이언트도 import하므로 서버 전용 모듈을 넣지 않는다(21장)
 - `scripts/check-diagnosis.ts` — `npm run check:diagnosis`
 - `app/diagnosis/page.tsx` — 진단 화면 한 장. 클라이언트 컴포넌트. 답변은 state에만 있고 문항마다 서버를 부르지 않는다. 진행 문구는 `canDecide()`로 갈린다(확정 전 "n번째 질문이에요", 확정 후 "거의 다 왔어요")
 - `app/api/diagnosis/complete/route.ts` — 답변을 받아 서버에서 판정하고 `User`·`DiagnosisSession`을 한 트랜잭션에 저장한다. 응답에 세부유형·지표를 넣지 않는다
@@ -68,7 +70,7 @@ DB가 아직 없다(`DATABASE_URL` 미공유). **DB가 필요 없는 것부터 �
 
 ## 2. 결정한 것과 이유
 
-- 판정은 100% 코드. LLM은 문장 다듬기와 자유 입력 enum 변환만 담당한다
+- 판정은 100% 코드. **LLM이 하는 일은 결과 화면의 근거 3줄 하나뿐이다** — 문장 다듬기·자유 입력 enum 변환은 컷됐다(16장)
 - **답변 → 지표 14개 → 판정** 순서로 한 단계를 끼웠다. 대분류와 세부유형이 같은 지표를 보므로 규칙을 고칠 때 한 곳만 고친다
 - **대분류(3)와 세부유형(8)은 각각 독립으로 판정하고 둘 다 저장한다.** 세부유형에서 대분류를 고정 매핑으로 뽑으면, 미취업빈곤형처럼 주거 상황에 따라 갈려야 하는 유형이 한 집단에 몰려 미션 배정이 틀린다. 관리자 화면은 "대분류 × 세부유형" 교차표로 보므로 8개가 3집단으로 쪼개진 모습은 그대로 보인다
 - **경계선지능청년은 8유형에서 제외했다.** IQ 71~84는 자기보고로 측정할 수 없고, 묻는 것 자체가 낙인이다
@@ -79,7 +81,7 @@ DB가 아직 없다(`DATABASE_URL` 미공유). **DB가 필요 없는 것부터 �
 - 화면은 선택지 버튼만으로 먼저 완성한다. Bedrock이 늦어져도 진단 플로우 전체가 동작해야 한다
 - **`GET /api/diagnosis/me`를 계약에 추가했다.** 원래 계약에는 완료 API와 닉네임 PATCH만 있었다. 결과 화면과 홈이 새로고침·직접 진입을 견뎌야 하는데, 판정 결과를 클라이언트에 다시 저장하면 `draft.ts`를 없앤 이유가 사라진다. 서버에 한 번 더 물어보는 쪽이 싸다
 - **재진단은 닉네임을 덮어쓰지 않는다.** 저장된 닉네임이 이전 판정의 기본 닉네임과 똑같을 때만 새 기본 닉네임으로 바꾼다. 유저가 직접 고친 이름은 유지되고, 종족이 바뀌었는데 "조용한 여우"가 남는 경우는 고쳐진다
-- **재진단은 레벨·경험치·재화·아이템·연속 기록을 건드리지 않는다.** 유형이 바뀌어도 키운 것은 남는다. 활성 펫 스킨만 새 유형의 기본 스킨으로 바꾼다
+- **재진단은 레벨·경험치·재화·아이템·연속 기록을 건드리지 않는다.** 유형이 바뀌어도 키운 것은 남는다. 활성 펫 스킨은 **종족이 바뀔 때만** 새 유형의 기본 스킨으로 옮긴다(2026-08-22 수정, 21-2절). 그전에는 무조건 덮어써서 별조각 2500 스킨의 착용이 풀렸다. **재진단 자체는 현재 잠금 상태다**(21-1절)
 - **완료 API는 기본 펫 스킨이 없어도 실패하지 않는다.** `npm run db:seed`가 C의 `items.ts` 때문에 아직 막혀 있어서, 시드 전에도 진단은 끝까지 되어야 한다
 - **하단 탭을 없애고 사이드바 하나만 쓴다** (2026-08-19, 사용자 결정). E가 "데스크톱은 사이드바 / 모바일은 하단 탭" 이원화를 제안했지만, 내비게이션이 두 벌이면 화면마다 어느 쪽이 뜨는지 확인해야 하고 활성 표시·경로도 두 곳에서 갈린다. 마감이 3일 남은 상태에서 감당할 비용이 아니다. 모바일에서는 같은 사이드바를 아이콘만 남긴 좁은 레일로 줄인다. 진단 문항 화면에서는 내비를 숨긴다(이탈 방지). 적용은 E, 적용되면 A가 `styles/tokens.css`의 `--nav-h`를 지우고 `min-height: 100dvh`로 되돌린다
 - **미션 데이터는 DB가 원본, `prisma/seed/missions.ts`는 그 DB를 채우는 시드다** (B와 합의, 2026-08-19). 화면에 41개 문구를 다시 복사하지 않는다. B는 `시드 → DB Mission → GET /api/missions → 화면`으로 가고, A의 홈 미션 미리보기도 그 API가 생기면 그쪽으로 바꾼다. 그때까지 홈이 `DAILY`를 직접 읽는 것은 임시다 — `prisma/seed/missions.ts:1`이 `import type`뿐이라 Prisma가 클라이언트 번들에 들어가지 않는 것은 빌드 산출물에서 확인했다(`.next/static/chunks`에 `PrismaClient` 없음, 미션 문구는 있음)
@@ -108,7 +110,7 @@ DB가 아직 없다(`DATABASE_URL` 미공유). **DB가 필요 없는 것부터 �
 
 | # | 코드 | 뜻 | 출처 문항 |
 |---|---|---|---|
-| ① | `ALONE` | 1인 가구 (가족과 동거하지 않음) | Q1 |
+| ① | `ALONE` | 가족과 동거하지 않음 (혼자·룸메이트·그 외 세 선택지가 모두 켠다) | Q1 |
 | ② | `HOUSING_UNSTABLE` | 주거 불안정 (월세·공과금 부담, 퇴거 위험) | Q2 |
 | ③ | `MENTAL_UNMET` | 정신건강 진료 미충족 | Q6 |
 | ④ | `PHYSICAL_UNMET` | 신체건강 진료 미충족 | Q6 |
@@ -1298,3 +1300,82 @@ FATAL: remaining connection slots are reserved for roles with the SUPERUSER attr
 ### 부하 재현은 하지 않았다
 
 동시 60~80 요청으로 재현할 수 있지만 마감 전날 팀 4인이 같은 공유 DB를 쓰고 있어 1분간 전원 500이 된다. Postgres FATAL 원문 120건으로 증거가 충분해 생략했다.
+
+---
+
+## 21. 전수 점검 후 수정 6건 (2026-08-22, A)
+
+`develop`을 받아 A 담당 코드를 전부 읽고 "기획 의도와 다른 곳"·"오류가 나는 곳"을 뽑은 뒤 그 목록을 그대로 고쳤다. 복귀점은 로컬 태그 `restore/pre-fix-20260822`(= `fdd3afa`)다. `develop`·`main`에는 올리지 않았다(지시 대기).
+
+검증: `npm run lint` 0 에러(경고 6건은 전부 기존 것), `npm run build` 통과, `npm run check:diagnosis` 통과(시나리오 20 / 경계쌍 3 / 이상 입력 4 / 근거 5, 평균 9.7문항), `npx tsx scripts/check-auth.ts` 통과.
+
+### 21-1. 재진단 잠금 (`4b53b3e`)
+
+"없앤다"가 아니라 **코드는 남기고 입구만 막는다**가 결정이다. 스위치는 `lib/diagnosis/flags.ts`의 `REDIAGNOSIS_ENABLED = false` 하나다.
+
+잠금 지점 3곳:
+
+| 곳 | 하는 일 |
+|---|---|
+| `POST /api/diagnosis/complete` | `user.typeCode`가 있으면 `ALREADY_DIAGNOSED` 400. **실제 차단은 이것뿐이다** |
+| `/diagnosis` (서버 컴포넌트) | 이미 진단했으면 `/diagnosis/result`로 `redirect()` |
+| 홈·결과 화면의 "다시 진단하기" 링크 | `REDIAGNOSIS_ENABLED &&`로 감싸 렌더하지 않는다 |
+
+링크를 지우는 것만으로는 주소창 직접 입력을 못 막는다. 그래서 서버 가드를 먼저 두고 링크는 그다음이다. 문항을 다 풀고 나서 400을 맞는 것보다 `/diagnosis` 진입 시점에 돌려보내는 쪽이 낫다.
+
+**잠근 이유**: 재진단으로 종족이 바뀌면 별조각 2500으로 산 옛 종족 펫 스킨이 상점·목록 어디에도 안 보이는 채 `UserPetSkin`에만 남는다. 환불이냐 유지냐 정책이 없는 상태에서 열어 두면 사용자가 조용히 손해를 본다(13장 "C — 재진단 시 옛 종족 스킨 정책"). 잠금으로 **신규 발생은 0**이 되고 기존 1건만 남는다.
+
+### 21-2. 재진단이 활성 펫 스킨을 초기화하던 버그 (`4b53b3e`)
+
+`POST /api/diagnosis/complete`가 종족 기본 스킨을 `activePetSkinId`에 **무조건** 덮어썼다. 재진단할 때마다 별조각 2500으로 산 스킨의 착용이 풀리고 `calculateReward()`의 캐릭터 배율도 같이 사라졌다. 소유 기록(`UserPetSkin`)은 남으니 데이터 손실은 아니고 착용만 풀렸다.
+
+```ts
+// 종족이 바뀌었거나, 아직 활성 스킨이 없을 때(시드보다 먼저 진단한 계정)만 심는다
+const nextSkinId =
+  defaultSkin && (user.typeCode !== typeCode || !user.activePetSkinId) ? defaultSkin.id : null
+```
+
+잠금과 별개로 고쳤다. 플래그를 다시 켜도 안전해야 한다.
+
+### 21-3. 홈 미션 카드가 로딩 중에 실패 문구를 띄웠다 (`6e1bb88`)
+
+상태가 `MissionsView | null` 하나여서 초깃값 `null`(= 아직 안 읽음)이 실패와 구분되지 않았다. fetch가 끝나기 전에 "미션을 불러오지 못했어요"가 먼저 떴다.
+
+`undefined`(읽는 중) / `null`(실패) / 값(성공) 3분기로 갈랐다.
+
+### 21-4. 홈 "오늘까지의 나" 카드 (`6e1bb88`)
+
+`GET /api/missions`가 이미 `progress.{dailyCompleted,dailyTotal,weeklyCompleted,weeklyTotal,streak}`를 내려주고 있었다(`lib/missions/dashboard.ts`). B 쪽 변경은 없다.
+
+- 오늘·이번 주 달성률 막대 2줄. `styles/tokens.css`의 기존 `.hm-bar`·`.hm-status`를 쓴다(새 CSS 없음. `app/globals.css`는 E 소유)
+- 연속 출석 배지 — `🔥 연속 N일` / 0이면 `오늘부터`
+- `role="progressbar"` + `aria-valuenow`. 분모 0이면 0%로 둔다(`ratioOf()`) — `NaN`이면 `width`가 통째로 무효가 되고 `aria-valuenow`도 깨진다
+- **순위·비교는 넣지 않는다**(`SPEC.md` 5절, 경쟁 지표 의도적 배제). 레벨·경험치도 넣지 않는다 — `/pet`에 이미 있어서 같은 숫자를 두 번 두지 않는다
+
+### 21-5. 결과 화면 재방문 문구 (`0039f46`)
+
+결과 화면은 진단 직후에도 오고, 이름을 바꾸러 다시 들어오는 경로이기도 한데(하단 탭·사이드바) 버튼이 늘 "이 이름으로 시작하기"였다. `AskFlow`가 완료 직후에만 `?new=1`을 붙이고 그때만 시작 문구를 쓴다.
+
+쿼리는 `fetchMe().then()` 콜백 안에서 읽는다. 렌더 중에 `window.location.search`를 읽으면 서버·클라이언트 문구가 달라 하이드레이션이 깨지고, `useEffect` 본문에서 `setState`하면 `react-hooks/set-state-in-effect` lint 에러다.
+
+사이드바의 "다시 진단하기" 버튼은 같은 자리에서 **"이름 바꾸기"**(→ `/diagnosis/result`)로 바꿨다. B 소유 파일이라 사용자 승인을 받았고 B에게 통보한다.
+
+### 21-6. Google 로그인 CSRF `state` + 세션 7일 통일 (`40ab886`)
+
+**(1) `state`가 없었다.** `/api/auth/google`이 `state` 없이 authorize로 보내고 콜백도 검사하지 않았다. 공격자가 자기 `code`로 만든 콜백 링크를 피해자에게 열게 하면 피해자가 공격자 계정에 로그인된다. `/api/auth/google`이 `randomUUID()`를 `oauth_state` 쿠키(httpOnly, `sameSite: "lax"`, 10분)에 심고 authorize 파라미터에도 넣는다. 콜백이 한 번 대조한 뒤 쿠키를 지운다.
+
+`sameSite`는 **`lax`여야 한다.** `strict`면 Cognito에서 돌아오는 최상위 이동에 쿠키가 실리지 않아 정상 로그인이 전부 `state` 불일치로 막힌다.
+
+**(2) Cognito 경로 세션이 1시간이었다.** 처음 본 증상은 "Google로 들어오면 한 시간 뒤 조용히 로그아웃"이었는데, `setSessionCookie()`의 호출부를 grep해 보니 콜백만이 아니라 `POST /api/auth/login`의 Cognito 폴백도 같은 함수를 쓰고 있었다. 액세스 토큰을 그대로 쿠키에 담았고 refresh 흐름이 없어서 두 경로가 다 1시간이었다.
+
+호출부마다 고치지 않고 두 경로가 지나는 `lib/auth.ts` 한 곳으로 모았다.
+
+- `signInWithCognitoToken(accessToken)` 추가 — 토큰을 검증해 계정을 찾거나 만들고, **자체 세션 쿠키(7일)** 를 심는다
+- `setSessionCookie()` 삭제 — `access_token` 쿠키의 유일한 기록자였다
+- `getCurrentUser()`는 그 쿠키를 **읽기만** 남긴다(2026-08-22 이전 발급분. 1시간이면 알아서 사라진다)
+
+`lib/auth.ts`와 `app/api/auth/*`는 E 소유다. E에게 통보한다.
+
+### 배포에 반영되지 않은 것
+
+`feat/diagnosis`가 `develop` 미반영 9커밋이다. 그중 `bd04830`(근거 3줄 `temperature` 제거)이 안 올라가 있어 **프로덕션 결과 화면의 근거 3줄은 여전히 비어 있다.** 이번 6건도 같이 묶여 있다. 머지는 지시를 받고 한다.

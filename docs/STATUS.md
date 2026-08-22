@@ -2,7 +2,9 @@
 
 **모든 세션은 이 문서부터 읽는다.** 그다음 아래 "지금 읽어야 할 문서"만 읽고 시작한다.
 
-최종 갱신: 2026-08-21 (흐름 확정: 소개 → 가입/로그인 → 문항 → 결과 → 홈. 자체 DB 계정 + 쿠키 로그인 유지 완료. D 미션 완료 연동 완료, 차단 17·20·22 해소 + 21의 D 몫 해소. C가 `feat/pet`에 `develop`을 머지하고 `/pet`을 Figma 시안으로 이관 + 배고픔 게이지 + **3단 → 4단 진화** + **공유 DB 반영**(차단 24·25 해소) + **차단 19 해소(북극곰 이미지 키)** + **런타임 3흐름 검증** + **상점 2화면 디자인 이관 — 펫 화면군 3장이 한 어휘가 됐고 C는 남은 코드가 없다** + **`develop` 재머지 후 `develop`에 올림(`4cad58f`)**. 신규 차단 **26번 — `SESSION_SECRET`이 없어 로그인이 500이다**. 남은 차단은 13·14·21·23·26. **신규 차단 27번 — 배포본 간헐 500의 원인은 RDS 커넥션 고갈이다. `DATABASE_URL`에 `connection_limit=1` + 재배포**)
+최종 갱신: **2026-08-22 — A가 전수 점검에서 찾은 오류·기능 6건을 `feat/diagnosis`에 반영했다(4커밋). 재진단 잠금, 재진단 시 활성 펫 스킨 초기화 차단, 홈 미션 로딩·실패 구분, 홈 "오늘까지의 나" 진행 카드, 결과 화면 이름 바꾸기 문구, Google 로그인 CSRF `state` + 모든 로그인 세션 7일 통일. `develop`·`main`은 지시 대기 중이라 미머지(9커밋).** 세부는 아래 "2026-08-22 A 수정 6건" 절.
+
+이전 갱신: 2026-08-21 (흐름 확정: 소개 → 가입/로그인 → 문항 → 결과 → 홈. 자체 DB 계정 + 쿠키 로그인 유지 완료. D 미션 완료 연동 완료, 차단 17·20·22 해소 + 21의 D 몫 해소. C가 `feat/pet`에 `develop`을 머지하고 `/pet`을 Figma 시안으로 이관 + 배고픔 게이지 + **3단 → 4단 진화** + **공유 DB 반영**(차단 24·25 해소) + **차단 19 해소(북극곰 이미지 키)** + **런타임 3흐름 검증** + **상점 2화면 디자인 이관 — 펫 화면군 3장이 한 어휘가 됐고 C는 남은 코드가 없다** + **`develop` 재머지 후 `develop`에 올림(`4cad58f`)**. 신규 차단 **26번 — `SESSION_SECRET`이 없어 로그인이 500이다**. 남은 차단은 13·14·21·23·26. **신규 차단 27번 — 배포본 간헐 500의 원인은 RDS 커넥션 고갈이다. `DATABASE_URL`에 `connection_limit=1` + 재배포**)
 현재 단계: **D2 — 인프라 완료, 기능 5개 병렬 착수 (8/20 기능 동결 예정일)**
 
 팀원 인수인계용 단일 문서는 [`docs/인수인계.md`](인수인계.md)에 있다. 새로 합류하거나 노션으로 공유할 때는 그 문서를 쓴다.
@@ -127,6 +129,24 @@ FATAL: remaining connection slots are reserved for roles with the SUPERUSER attr
 - 상세·재현 시도·다른 에러의 시각 분리는 `docs/dev/diagnosis.md` 20장
 
 같은 조사에서 **이미 죽은 원인 2개**가 확인됐다. `Environment variable not found: DATABASE_URL`(55건)은 16:09:31에 멎었다(job 7의 `.env.production`), `CredentialsProviderError`(12건)는 16:25:50에 멎었다(IAM 컴퓨트 역할). **두 에러가 로그에 함께 있으니 시각을 붙이지 않으면 원인이 갈리지 않는다.** 아직 살아 있는 것은 위 커넥션 건과 `temperature is deprecated`(A의 `bd04830` 미배포), 비로그인 페이지의 `로그인이 필요합니다` throw(C·D)다.
+
+## 2026-08-22 A 수정 6건 (`feat/diagnosis`, 미머지)
+
+복귀점은 로컬 태그 `restore/pre-fix-20260822`(= `fdd3afa`)다. `npm run lint` 0 에러, `npm run build` 통과, `check:diagnosis`·`check-auth` 통과.
+
+| # | 무엇 | 커밋 |
+|---|---|---|
+| 1 | **재진단 잠금** — `lib/diagnosis/flags.ts`의 `REDIAGNOSIS_ENABLED=false`. 차단은 `POST /api/diagnosis/complete` 서버 가드 한 곳. 옛 종족 스킨 환불 정책이 미정이라 입구만 막았다 | `4b53b3e` |
+| 2 | **재진단이 활성 펫 스킨을 초기화하던 버그** — 종족 기본 스킨을 무조건 덮어써 별조각 2500 스킨의 착용과 `calculateReward()` 배율이 풀렸다. 종족이 바뀔 때만 옮긴다 | `4b53b3e` |
+| 3 | **홈 미션 카드가 로딩 중에 실패 문구를 띄우던 버그** — 상태를 `undefined`(읽는 중) / `null`(실패)로 갈랐다 | `6e1bb88` |
+| 4 | **홈 "오늘까지의 나" 카드 추가** — 오늘·이번 주 달성률 막대 + 연속 출석 배지. `GET /api/missions`가 이미 주는 값이라 B 변경 없음. 순위·비교는 없다(SPEC 5절) | `6e1bb88` |
+| 5 | **결과 화면 재방문 문구** — 완료 직후에만 `?new=1`로 "이 이름으로 시작하기", 그 외에는 "이름 저장하기" | `0039f46` |
+| 6 | **Google 로그인 CSRF `state` + 세션 7일 통일** — `oauth_state` 쿠키 대조 추가. Cognito 액세스 토큰(1시간, refresh 없음)을 쿠키에 안 담고 `signInWithCognitoToken()`이 자체 세션(7일)으로 바꾼다 | `40ab886` |
+
+**통보 필요**
+- **E** — `lib/auth.ts`(`setSessionCookie` 삭제, `signInWithCognitoToken` 추가), `app/api/auth/{google,callback,login}`, `lib/oauth.ts`(`OAUTH_STATE_COOKIE`·`OAUTH_STATE_MAX_AGE` 추가). `.env.example`에 `APP_ORIGIN`·`SESSION_SECRET`이 없다. `check:auth`가 `package.json`에 등록돼 있지 않다(`npx tsx scripts/check-auth.ts`로 돌린다). `SPEC.md` 13절 "RDS 퍼블릭 액세스 차단"은 실제와 다르다(5432가 `0.0.0.0/0`) — E가 판단해 고칠 항목
+- **B** — `app/components/Sidebar.tsx`의 "다시 진단하기" 버튼을 같은 자리에서 **"이름 바꾸기"**(→ `/diagnosis/result`)로 바꿨다(사용자 승인). 프로필 화면이 없어 이름 변경 입구가 하단 탭뿐이었다
+- **C** — 재진단이 잠겨 옛 종족 스킨 환불 정책은 **신규 발생 0**이 됐다(기존 사례 1건만 남는다)
 
 **펫 런타임 검증 완료 (2026-08-21).** 프로덕션 빌드 + 실 DB + 팀 공용 계정으로 확인했다. 1차: `/pet` 200, 4단 카드 4장, 배고픔 89 → 투입 후 100, 씨앗 15개 투입 `Lv.3 exp 200 → Lv.4 exp 50`, 잔액 초과 `400`, 방치형 빈 상태 `claimed 0`, 치장 목록 6종 600, 없는 스킨 `404`. 2차(재화 시드 후): **진화 3경계**가 `+25 → Lv.5 evolvedTo 2` / `+950 → Lv.15 evolvedTo 3` / `+1950 → Lv.25 evolvedTo 4`로 전부 `exp 0`에 정확히 착지했다(누적 곡선 100·1,050·3,000 실증), **치장** 구매 600 × 2 → 착용 → 슬롯 교체 시 앞것 자동 해제 → 해제, 재구매 `400 ALREADY_OWNED`, **스킨** 2500 → 0 구매 → 전환 후 `imageKeyBase pets/fox-arctic`. `affinityToday`가 소비 1,200에도 50에서 안 움직여 **일일 상한 우회 방어**까지 확인됐다. 못 본 것은 방치형 실제 수령 하나(별개의 DB 쓰기 필요)이고, 펫 그림은 `CLOUDFRONT_DOMAIN`이 빈 값이라 여전히 이모지로 떨어진다.
 
