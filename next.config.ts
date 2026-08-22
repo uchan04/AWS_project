@@ -6,9 +6,10 @@ import type { NextConfig } from "next";
 // 주지 않으면 아무것도 붙여주지 않는다 — 심사 항목이기도 하고, 실제로 없으면
 // 클릭재킹(iframe에 우리 화면을 얹고 로그인 유도)과 MIME 스니핑이 열려 있다.
 //
-// CSP는 넣지 않는다. 지금 화면 대부분이 style 속성을 인라인으로 쓰고(Figma 이관 방식)
-// Tailwind가 <style>을 주입한다 — 'unsafe-inline'을 켠 CSP는 XSS를 못 막으면서
-// 폰트·이미지 도메인 목록만 유지 부담으로 남는다. 스타일 방식을 정리한 다음 일이다.
+// CSP는 여기가 아니라 middleware.ts에 있다. 요청마다 nonce를 새로 만들어야 하고
+// next.config의 headers()는 정적 문자열만 낼 수 있다.
+// (전에는 "인라인 스타일 때문에 CSP를 아예 넣지 않는다"고 적어뒀는데 잘못된 판단이었다 —
+//  style-src와 script-src는 별개다. 이유는 middleware.ts cspFor() 주석에 있다)
 
 const securityHeaders = [
   // iframe 삽입 차단. 로그인 화면을 얹어 자격증명을 가로채는 경로를 막는다

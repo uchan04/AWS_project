@@ -1,4 +1,3 @@
-@import url('https://fonts.googleapis.com/css2?family=Gowun+Dodum&family=Noto+Sans+KR:wght@400;500;600;700&display=swap');
 @import "tailwindcss";
 
 /* 소유자: E. 전역 스타일. 화면별 어휘는 styles/tokens.css(.hm-*)와 app/pet/pet.css(.pet-*)에 있다.
@@ -22,14 +21,16 @@
 @theme inline {
   --color-background: var(--background);
   --color-foreground: var(--foreground);
-  --font-sans: "Noto Sans KR", system-ui, sans-serif;
-  --font-display: "Gowun Dodum", "Noto Sans KR", sans-serif;
+  /* next/font가 <html>에 심는 변수. app/layout.tsx 참고 —
+     실제 family 이름은 빌드마다 바뀌므로 이름을 직접 쓰지 않는다 */
+  --font-sans: var(--font-noto-sans-kr), system-ui, sans-serif;
+  --font-display: var(--font-gowun-dodum), var(--font-noto-sans-kr), sans-serif;
 }
 
 body {
   background: var(--background);
   color: var(--foreground);
-  font-family: "Noto Sans KR", system-ui, -apple-system, sans-serif;
+  font-family: var(--font-noto-sans-kr), system-ui, -apple-system, sans-serif;
 }
 
 /* 키보드 사용자용 초점 표시. 브라우저 기본값은 종이색 배경에서 잘 안 보인다 */

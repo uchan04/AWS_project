@@ -9,9 +9,9 @@
    hex를 그대로 옮긴다. OKLCH로 변환하면 두 문서의 값이 갈라지고,
    보조 텍스트 #7A6B58 · 강조 #A9542A는 명암비 4.5:1을 맞추려고 조정한 값이라 건드리면 안 된다. */
 
-/* 웹폰트는 CSS @import로 불러온다. app/layout.tsx는 E 소유라 건드리지 않는다.
-   새 npm 의존성도 추가하지 않는다(CLAUDE.md). */
-@import url("https://fonts.googleapis.com/css2?family=Gowun+Dodum&family=Noto+Sans+KR:wght@300;400;500;700&display=swap");
+/* 2026-08-22: 여기 있던 fonts.googleapis.com @import를 지웠다.
+   서체는 app/layout.tsx가 next/font로 자체 호스팅한다(이유는 그 파일 주석).
+   family 이름이 빌드마다 바뀌므로 아래 두 토큰만 쓰고 이름을 직접 쓰지 않는다. */
 
 :root {
   /* 색 — Figma 팔레트. 순수 흑백은 쓰지 않는다.
@@ -36,8 +36,9 @@
   --tribe: var(--color-accent);
   --tribe-ink: var(--color-ink);
 
-  --font-display: "Gowun Dodum", ui-sans-serif, sans-serif;
-  --font-body: "Noto Sans KR", ui-sans-serif, sans-serif;
+  /* next/font가 심는 변수를 받는다. 폰트 로드가 실패해도 뒤 폴백으로 떨어진다 */
+  --font-display: var(--font-gowun-dodum), ui-sans-serif, sans-serif;
+  --font-body: var(--font-noto-sans-kr), ui-sans-serif, sans-serif;
 
   /* 4pt 9단 */
   --space-3xs: 0.25rem;

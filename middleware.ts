@@ -1,6 +1,6 @@
 import { NextResponse, type NextRequest } from "next/server"
 
-// 소유자: E(인프라). 미인증 방문자를 /login으로 보낸다.
+// 소유자: E(인프라). 미인증 방문자를 /login으로 보내고, 요청마다 CSP nonce를 만든다.
 //
 // 왜 필요한가: 지금은 로그인하지 않고 /pet이나 /missions를 열면 각 화면의 try/catch가
 // "불러오지 못했어요" 카드를 그린다. 사용자는 서비스가 고장 난 것으로 읽는다 —
@@ -17,28 +17,93 @@ const LEGACY_COOKIE = "access_token"
 // 로그인 없이 열려야 하는 경로
 const PUBLIC_PATHS = ["/login", "/signup"]
 
+// 사용자 사진을 올리고 내려받는 곳. 버킷 이름이 호스트에 붙는 가상 호스트 방식이라
+// 와일드카드가 필요하다(lib/missions/upload.ts의 S3Client 기본값).
+// 리전을 S3_REGION이 아니라 AWS_REGION에서 읽는 것도 그 파일과 같다.
+const S3_HOST = `https://*.s3.${process.env.AWS_REGION || "us-east-1"}.amazonaws.com`
+
+/**
+ * 요청 1건당 nonce 1개를 만들어 CSP를 붙인다.
+ *
+ * script-src에 nonce + 'strict-dynamic'을 걸면, 공격자가 어떤 경로로든 <script>를
+ * 문서에 심어도 nonce가 없어 실행되지 않는다. 커뮤니티 글·닉네임·채팅처럼
+ * 사용자 문자열이 화면에 들어가는 곳이 여럿이라 이 방어가 실제로 값을 한다.
+ *
+ * style-src는 'unsafe-inline'이다. 이 앱 화면은 Figma에서 옮겨온 style={{...}} 속성으로
+ * 그려진다 — 속성 인라인 스타일은 nonce로 허용할 수 없다(CSP는 style 속성에
+ * nonce를 적용하지 않는다). 여기서 nonce만 걸면 앱이 전부 스타일 없이 뜬다.
+ * script-src가 XSS를 막는 축이고 style-src는 그 축이 아니다 — 둘을 같이 묶어
+ * "그럼 CSP를 아예 안 넣는다"로 가는 것이 전에 한 잘못된 판단이었다.
+ *
+ * font-src가 'self'로 닫힌 것은 서체를 next/font로 자체 호스팅한 결과다.
+ * @import로 fonts.gstatic.com을 쓰던 때는 이 값을 열어야 했다.
+ */
+function cspFor(nonce: string): string {
+  const isDev = process.env.NODE_ENV === "development"
+  return [
+    "default-src 'self'",
+    // 'unsafe-eval'은 dev 전용이다. React가 서버 스택을 브라우저에서 복원할 때 쓴다
+    `script-src 'self' 'nonce-${nonce}' 'strict-dynamic'${isDev ? " 'unsafe-eval'" : ""}`,
+    "style-src 'self' 'unsafe-inline'",
+    // blob: 은 업로드 전 미리보기(URL.createObjectURL), data: 는 인라인 아이콘
+    `img-src 'self' blob: data: ${S3_HOST}`,
+    "font-src 'self'",
+    // presigned PUT은 S3로 직접 나간다. 나머지는 우리 API·채팅 스트림
+    `connect-src 'self' ${S3_HOST}${isDev ? " ws: wss:" : ""}`,
+    "object-src 'none'",
+    "base-uri 'self'",
+    // 로그인 폼이 외부로 POST되는 경로를 막는다
+    "form-action 'self'",
+    // X-Frame-Options: DENY와 같은 뜻. 최신 브라우저는 이쪽을 본다
+    "frame-ancestors 'none'",
+    "frame-src 'none'",
+    "manifest-src 'self'",
+    "worker-src 'self' blob:",
+    // localhost는 http라 dev에서 켜면 자기 자원을 https로 올려 전부 깨진다
+    ...(isDev ? [] : ["upgrade-insecure-requests"]),
+  ].join("; ")
+}
+
 export function middleware(request: NextRequest) {
+  // nonce는 요청마다 새로 만든다. 재사용하면 공격자가 한 번 본 값을 다시 쓸 수 있다
+  const nonce = Buffer.from(crypto.randomUUID()).toString("base64")
+  const csp = cspFor(nonce)
+
+  // Next는 요청 헤더의 CSP에서 'nonce-...'를 꺼내 자기 <script>에 붙인다.
+  // 그래서 응답뿐 아니라 요청 헤더에도 같은 값을 실어야 한다
+  const requestHeaders = new Headers(request.headers)
+  requestHeaders.set("x-nonce", nonce)
+  requestHeaders.set("Content-Security-Policy", csp)
+
+  const pass = () => {
+    const response = NextResponse.next({ request: { headers: requestHeaders } })
+    response.headers.set("Content-Security-Policy", csp)
+    return response
+  }
+
   // 로컬 개발 우회. getCurrentUser()가 쿠키 없이 팀 계정을 돌려주는 모드라
   // 여기서 막으면 로컬에서 아무 화면도 못 연다. 배포 환경에서는 절대 true가 아니다
-  if (process.env.DEV_AUTH_BYPASS === "true") return NextResponse.next()
+  if (process.env.DEV_AUTH_BYPASS === "true") return pass()
 
   const { pathname, search } = request.nextUrl
 
   if (PUBLIC_PATHS.some((p) => pathname === p || pathname.startsWith(`${p}/`))) {
-    return NextResponse.next()
+    return pass()
   }
 
   const hasSession =
     Boolean(request.cookies.get(SESSION_COOKIE)?.value) ||
     Boolean(request.cookies.get(LEGACY_COOKIE)?.value)
 
-  if (hasSession) return NextResponse.next()
+  if (hasSession) return pass()
 
   // 로그인 후 원래 가려던 곳으로 돌아갈 수 있게 남겨둔다.
   // 열린 리다이렉트를 막기 위해 경로만 싣는다 — 절대 URL은 싣지 않는다
   const login = new URL("/login", request.url)
   if (pathname !== "/") login.searchParams.set("next", `${pathname}${search}`)
-  return NextResponse.redirect(login)
+  const redirect = NextResponse.redirect(login)
+  redirect.headers.set("Content-Security-Policy", csp)
+  return redirect
 }
 
 export const config = {

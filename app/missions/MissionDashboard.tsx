@@ -331,7 +331,7 @@ function MissionModal({ mission, color, bg, mascotEmoji, onClose, onComplete }: 
             <div style={{ fontSize: 28, marginBottom: 6 }}>{emoji}</div>
             <h2
               style={{
-                fontFamily: "'Gowun Dodum', sans-serif",
+                fontFamily: "var(--font-display)",
                 fontSize: 20,
                 color: "#2A1F14",
                 margin: "0 0 10px",
@@ -544,7 +544,7 @@ function StepSection({ title, subtitle, missions, color, bg, unlocked = true, pr
         <div>
           <h2
             style={{
-              fontFamily: "'Gowun Dodum', sans-serif",
+              fontFamily: "var(--font-display)",
               fontSize: 19,
               color: "#2A1F14",
               margin: 0,
@@ -601,7 +601,7 @@ function StepSection({ title, subtitle, missions, color, bg, unlocked = true, pr
               <div style={{ fontSize: 32, marginBottom: 8 }}>{locked ? "🔒" : emoji}</div>
               <p
                 style={{
-                  fontFamily: "'Gowun Dodum', sans-serif",
+                  fontFamily: "var(--font-display)",
                   fontSize: 13,
                   color: "#2A1F14",
                   margin: 0,
@@ -652,7 +652,7 @@ function ProgressCard({ title, value, color, bg }: ProgressCardProps) {
       <p style={{ fontSize: 12, color: "#7A6B58", margin: "0 0 6px" }}>{title}</p>
       <p
         style={{
-          fontFamily: "'Gowun Dodum', sans-serif",
+          fontFamily: "var(--font-display)",
           fontSize: 22,
           color,
           fontWeight: 700,
@@ -716,7 +716,7 @@ function AttendanceCalendar({ cycleDay, claimedToday, attendanceTotal, color, bg
       >
         <h3
           style={{
-            fontFamily: "'Gowun Dodum', sans-serif",
+            fontFamily: "var(--font-display)",
             fontSize: 16,
             color: "#2A1F14",
             margin: 0,
@@ -890,7 +890,7 @@ export default function MissionDashboard() {
         <div style={{ fontSize: 64, marginBottom: 12 }}>{mascotEmoji}</div>
         <h1
           style={{
-            fontFamily: "'Gowun Dodum', sans-serif",
+            fontFamily: "var(--font-display)",
             fontSize: 26,
             color: "#2A1F14",
             margin: "0 0 8px",
@@ -972,7 +972,7 @@ export default function MissionDashboard() {
               >
                 <h2
                   style={{
-                    fontFamily: "'Gowun Dodum', sans-serif",
+                    fontFamily: "var(--font-display)",
                     fontSize: 19,
                     color: "#2A1F14",
                     margin: "0 0 4px",

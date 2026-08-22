@@ -1,8 +1,38 @@
 import type { Metadata, Viewport } from "next";
+import { Gowun_Dodum, Noto_Sans_KR } from "next/font/google";
 import "./globals.css";
 import { getSidebarProfile } from "@/lib/profile";
 import { Sidebar } from "./components/Sidebar";
 import { ChatLauncher } from "./chat/_components/ChatLauncher";
+
+// 서체는 next/font로 자기 도메인에서 낸다(2026-08-22).
+//
+// 전에는 app/globals.css와 styles/tokens.css가 각각 fonts.googleapis.com을 @import했다.
+// CSS 안의 @import는 최악의 형태다 — 브라우저가 globals.css를 받아 파싱하기 시작한
+// 뒤에야 폰트 CSS를 요청하고, 그 CSS가 다시 fonts.gstatic.com을 요청한다.
+// 첫 글자가 뜨기까지 왕복 3번이 직렬로 쌓이고, 그 사이 렌더가 막힌다.
+// 게다가 두 파일의 weight 목록이 어긋나 있었다(400;500;600;700 vs 300;400;500;700).
+//
+// next/font는 빌드 시점에 woff2를 받아 /_next/static으로 자체 호스팅한다.
+// 외부 도메인 왕복이 사라지고, size-adjust가 들어간 폴백을 같이 만들어 레이아웃 이동도 없다.
+// 방문자 IP가 Google로 가지 않는 것도 이 서비스에는 의미가 있다.
+//
+// 실제 family 이름은 빌드마다 바뀐다(__Noto_Sans_KR_xxxx). 그래서 화면 코드는
+// 서체 이름을 직접 쓰지 않고 --font-body / --font-display만 쓴다(styles/tokens.css).
+const notoSansKr = Noto_Sans_KR({
+  subsets: ["latin"],
+  // 가변 폰트다. weight를 지정하면 정적 인스턴스로 떨어져 300·600이 합성된다
+  variable: "--font-noto-sans-kr",
+  display: "swap",
+});
+
+const gowunDodum = Gowun_Dodum({
+  subsets: ["latin"],
+  // 굵기가 400 하나뿐인 정적 폰트다(styles/tokens.css:185 참고)
+  weight: "400",
+  variable: "--font-gowun-dodum",
+  display: "swap",
+});
 
 // APP_ORIGIN은 Amplify 환경변수에 있다. 없으면 배포 도메인으로 떨어진다 —
 // metadataBase가 없으면 openGraph 이미지·canonical이 상대경로로 나가서
@@ -53,7 +83,10 @@ export default async function RootLayout({ children }: LayoutProps<"/">) {
   const profile = await getSidebarProfile();
 
   return (
-    <html lang="ko" className="h-full antialiased">
+    <html
+      lang="ko"
+      className={`h-full antialiased ${notoSansKr.variable} ${gowunDodum.variable}`}
+    >
       <body className="h-full flex">
         {/* 사이드바·하단 탭을 Tab으로 다 지나지 않고 본문으로 건너뛴다 (globals.css) */}
         <a className="skip-to-content" href="#main-content">

@@ -8,6 +8,10 @@
 //
 // tokens.css를 import하지 않는다. 스타일시트 로딩이 실패해서 여기 온 경우까지
 // 받아야 하므로 색과 서체를 인라인으로 적는다.
+//
+// 서체도 next/font를 쓰지 않는다. --font-noto-sans-kr은 app/layout.tsx가 <html>에
+// 심는 변수인데 이 파일은 그 레이아웃을 아예 대체한다 — 변수가 없어 무시된다.
+// 시스템 서체가 이 화면의 올바른 답이다.
 
 export default function GlobalError({
   error,
@@ -26,7 +30,7 @@ export default function GlobalError({
           placeItems: "center",
           background: "#F5F0E8",
           color: "#2A1F14",
-          fontFamily: "'Noto Sans KR', system-ui, sans-serif",
+          fontFamily: "system-ui, -apple-system, sans-serif",
           padding: 24,
         }}
       >

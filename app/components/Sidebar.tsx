@@ -169,7 +169,7 @@ export function Sidebar({ profile }: { profile: SidebarProfile | null }) {
                   <p
                     style={{
                       margin: 0,
-                      fontFamily: "'Gowun Dodum', sans-serif",
+                      fontFamily: "var(--font-display)",
                       fontSize: 14,
                       color: "#2A1F14",
                       overflow: "hidden",
@@ -282,7 +282,7 @@ export function Sidebar({ profile }: { profile: SidebarProfile | null }) {
                 style={{
                   fontSize: 13,
                   color: "#5A4A3A",
-                  fontFamily: "'Noto Sans KR', sans-serif",
+                  fontFamily: "var(--font-body)",
                   fontWeight: 500,
                 }}
               >
@@ -329,7 +329,7 @@ export function Sidebar({ profile }: { profile: SidebarProfile | null }) {
                 justifyContent: "space-between",
               }}
             >
-              <h2 style={{ fontFamily: "'Gowun Dodum', sans-serif", fontSize: 18, color: "#2A1F14", margin: 0 }}>내 계정</h2>
+              <h2 style={{ fontFamily: "var(--font-display)", fontSize: 18, color: "#2A1F14", margin: 0 }}>내 계정</h2>
               <button
                 onClick={() => setShowAccount(false)}
                 style={{
@@ -393,7 +393,7 @@ export function Sidebar({ profile }: { profile: SidebarProfile | null }) {
                   <span style={{ display: profile.imageUrl ? "none" : "block" }}>{tribe?.emoji || "🌱"}</span>
                 </div>
                 <div style={{ textAlign: "left" }}>
-                  <p style={{ fontFamily: "'Gowun Dodum', sans-serif", fontSize: 18, color: "#2A1F14", margin: "0 0 3px" }}>
+                  <p style={{ fontFamily: "var(--font-display)", fontSize: 18, color: "#2A1F14", margin: "0 0 3px" }}>
                     {profile.nickname}
                   </p>
                   <p style={{ margin: 0, fontSize: 12, color, fontWeight: 700 }}>{familyLabel}</p>
