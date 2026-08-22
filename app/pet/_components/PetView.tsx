@@ -15,6 +15,7 @@ import {
 } from "@/lib/pet"
 import { EVOLUTION_LEVEL, SEED_TO_EXP, expToNextLevel } from "@/lib/types"
 import PetRoom from "./PetRoom"
+import { ArtImage } from "@/app/components/ArtImage"
 import "@/styles/tokens.css"
 import "../pet.css"
 
@@ -216,16 +217,14 @@ export default function PetView({ initial }: { initial: PetState }) {
   const petFace = (
     <>
       {pet.imageUrl ? (
-        // eslint-disable-next-line @next/next/no-img-element
-        <img
+         
+        // .pet-char__img가 단계별로 5.5~10rem(88~160px)을 정한다. 가장 큰 칸을 기준으로 넘긴다
+        <ArtImage
           className="pet-char__img"
           src={pet.imageUrl}
-          alt=""
-          onError={(e) => {
-            e.currentTarget.style.display = "none"
-            const fallback = e.currentTarget.nextElementSibling as HTMLElement | null
-            if (fallback) fallback.style.display = "block"
-          }}
+          width={160}
+          height={160}
+          fallbackDisplay="block"
         />
       ) : null}
       <span className="pet-char__emoji" style={{ display: pet.imageUrl ? "none" : "block" }}>
@@ -475,8 +474,8 @@ export default function PetView({ initial }: { initial: PetState }) {
               >
                 {current ? <span className="pet-evo-card__now">현재</span> : null}
                 {img ? (
-                  // eslint-disable-next-line @next/next/no-img-element
-                  <img className="pet-evo-card__img" src={img} alt="" aria-hidden="true" />
+                   
+                  <ArtImage className="pet-evo-card__img" src={img} width={64} height={64} decorative />
                 ) : (
                   <span className="pet-evo-card__emoji" aria-hidden="true">
                     {emoji}

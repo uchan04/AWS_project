@@ -16,6 +16,7 @@ import { useEffect, useState } from "react"
 import type { TypeCode } from "@prisma/client"
 import { REDIAGNOSIS_ENABLED } from "@/lib/diagnosis/flags"
 import { TRIBE } from "@/lib/types"
+import { ArtImage } from "./components/ArtImage"
 
 // GET /api/missions(B 소유)가 돌려주는 DashboardDTO 중 홈이 쓰는 부분만 적는다.
 // lib/missions/dashboard.ts의 타입을 import하면 홈이 서버 모듈에 묶인다
@@ -103,16 +104,17 @@ export default function HomeDashboard({
               파일이 없거나 스킨 미착용이면 종족 이모지로 떨어진다 — Sidebar와 같은 방식이다.
               onError로 떨어뜨리는 이유: 이미지 404는 서버가 알 수 없어 서버에서 미리 고를 수 없다 */}
           {petImage ? (
-            // eslint-disable-next-line @next/next/no-img-element
-            <img
+             
+            <ArtImage
               src={petImage}
               alt="펫"
+              // .hm-home__mascot--img가 width 5.5rem · height auto다. height auto는
+              // 이 두 값의 비율로 계산되므로 아트의 실제 비율(380×267)을 넘긴다 —
+              // 정사각으로 넘기면 마스코트 칸이 26px 높아져 헤더가 밀린다
+              width={88}
+              height={62}
               className="hm-home__mascot hm-home__mascot--img hm-float"
-              onError={(e) => {
-                e.currentTarget.style.display = "none"
-                const fallback = e.currentTarget.nextElementSibling as HTMLElement | null
-                if (fallback) fallback.style.display = "block"
-              }}
+              fallbackDisplay="block"
             />
           ) : null}
           <span className="hm-home__mascot hm-float" aria-hidden="true" style={{ display: petImage ? "none" : "block" }}>

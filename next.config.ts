@@ -31,6 +31,16 @@ const securityHeaders = [
 const nextConfig: NextConfig = {
   output: "standalone",
 
+  images: {
+    // public/art의 30장은 내용이 바뀌면 파일명이 바뀐다(scripts/slice-art.ts).
+    // 기본값(4시간)이면 최적화 결과를 하루에 여섯 번 다시 굽는다 — 바뀌지 않는 그림이라
+    // 1년을 준다. 아래 /art/:path* 원본 헤더와 같은 값이다
+    minimumCacheTTL: 31536000,
+    // 원본은 전부 PNG다. 투명도가 있어 JPEG로는 못 바꾸고, WebP는 같은 화질에서
+    // PNG의 1/10 안팎이다(770×288 배경 480KB → 40KB대). AVIF는 굽는 시간이 길어 빼둔다
+    formats: ["image/webp"],
+  },
+
   async headers() {
     return [
       { source: "/:path*", headers: securityHeaders },

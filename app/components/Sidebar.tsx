@@ -8,6 +8,7 @@ import type { SidebarProfile } from "@/lib/profile"
 import type { TypeCode } from "@prisma/client"
 import styles from "./Sidebar.module.css"
 import { useModalA11y } from "./useModalA11y"
+import { ArtImage } from "./ArtImage"
 
 function getBgColor(hex: string): string {
   // colorHex → 배경색 (약한 톤)
@@ -121,17 +122,13 @@ export function Sidebar({ profile }: { profile: SidebarProfile | null }) {
               }}
             >
               {profile.imageUrl ? (
-                // eslint-disable-next-line @next/next/no-img-element
-                <img
+                <ArtImage
                   src={profile.imageUrl}
                   alt="펫"
+                  width={40}
+                  height={40}
                   style={{ width: "100%", height: "100%", objectFit: "cover" }}
-                  onError={(e) => {
-                    e.currentTarget.style.display = "none"
-                    if (e.currentTarget.nextSibling) {
-                      ;(e.currentTarget.nextSibling as HTMLElement).style.display = "block"
-                    }
-                  }}
+                  fallbackDisplay="block"
                 />
               ) : null}
               <span style={{ display: profile.imageUrl ? "none" : "block" }}>{getStageEmoji(profile.typeCode)}</span>
@@ -154,17 +151,13 @@ export function Sidebar({ profile }: { profile: SidebarProfile | null }) {
                 }}
               >
                 {profile.imageUrl ? (
-                  // eslint-disable-next-line @next/next/no-img-element
-                  <img
+                  <ArtImage
                     src={profile.imageUrl}
                     alt="펫"
+                    width={40}
+                    height={40}
                     style={{ width: "100%", height: "100%", objectFit: "cover" }}
-                    onError={(e) => {
-                      e.currentTarget.style.display = "none"
-                      if (e.currentTarget.nextSibling) {
-                        ;(e.currentTarget.nextSibling as HTMLElement).style.display = "block"
-                      }
-                    }}
+                    fallbackDisplay="block"
                   />
                 ) : null}
                 <span style={{ display: profile.imageUrl ? "none" : "block" }}>{getStageEmoji(profile.typeCode)}</span>
@@ -394,17 +387,13 @@ export function Sidebar({ profile }: { profile: SidebarProfile | null }) {
                   }}
                 >
                   {profile.imageUrl ? (
-                    // eslint-disable-next-line @next/next/no-img-element
-                    <img
+                    <ArtImage
                       src={profile.imageUrl}
                       alt="펫"
+                      width={52}
+                      height={52}
                       style={{ width: "100%", height: "100%", objectFit: "cover" }}
-                      onError={(e) => {
-                        e.currentTarget.style.display = "none"
-                        if (e.currentTarget.nextSibling) {
-                          ;(e.currentTarget.nextSibling as HTMLElement).style.display = "block"
-                        }
-                      }}
+                      fallbackDisplay="block"
                     />
                   ) : null}
                   <span style={{ display: profile.imageUrl ? "none" : "block" }}>{tribe?.emoji || "🌱"}</span>

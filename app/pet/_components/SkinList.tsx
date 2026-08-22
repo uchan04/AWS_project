@@ -4,6 +4,7 @@ import { useState } from "react"
 import Link from "next/link"
 import type { TypeCode } from "@prisma/client"
 import { animalEmoji } from "@/lib/pet"
+import { ArtImage } from "@/app/components/ArtImage"
 import { TRIBE } from "@/lib/types"
 import "@/styles/tokens.css"
 import "../pet.css"
@@ -161,18 +162,16 @@ export default function SkinList({
                     key={skin.id}
                   >
                     {skin.imageUrl ? (
-                      // eslint-disable-next-line @next/next/no-img-element
-                      <img
+                       
+                      // 그림이 없으면 이모지로 떨어진다 (PetView와 같은 방식).
+                      // .pet-item__img가 3.5rem(56px) 정사각이다
+                      <ArtImage
                         className="pet-item__img"
                         src={skin.imageUrl}
-                        alt=""
-                        aria-hidden="true"
-                        onError={(e) => {
-                          // 그림이 없으면 이모지로 떨어진다 (PetView와 같은 방식)
-                          e.currentTarget.style.display = "none"
-                          const fallback = e.currentTarget.nextElementSibling as HTMLElement | null
-                          if (fallback) fallback.style.display = "grid"
-                        }}
+                        width={56}
+                        height={56}
+                        decorative
+                        fallbackDisplay="grid"
                       />
                     ) : null}
                     <span

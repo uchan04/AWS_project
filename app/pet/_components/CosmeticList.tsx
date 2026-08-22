@@ -46,6 +46,8 @@ export type CosmeticListProps = {
   typeCode: TypeCode | null
 }
 
+import { ArtImage } from "@/app/components/ArtImage"
+
 const ko = (n: number) => n.toLocaleString("ko-KR")
 
 const SLOT_LABEL: Record<Slot, string> = {
@@ -214,17 +216,16 @@ export default function CosmeticList({
                     key={item.id}
                   >
                     {item.imageUrl ? (
-                      // eslint-disable-next-line @next/next/no-img-element
-                      <img
+                       
+                      // 치장은 마스코트가 아니라 아이템이므로 이모지 폴백을 두지 않는다
+                      // (design.md). 그림이 없으면 ArtImage가 칸을 지우고 이름만 남긴다.
+                      // .pet-item__img--wide가 칸 폭(약 160px) × 3.5rem을 cover로 채운다
+                      <ArtImage
                         className="pet-item__img pet-item__img--wide"
                         src={item.imageUrl}
-                        alt=""
-                        aria-hidden="true"
-                        // 치장은 마스코트가 아니라 아이템이므로 이모지 폴백을 두지 않는다
-                        // (design.md). 그림이 없으면 칸을 지우고 이름만 남긴다
-                        onError={(e) => {
-                          e.currentTarget.style.display = "none"
-                        }}
+                        width={160}
+                        height={56}
+                        decorative
                       />
                     ) : null}
                     <span className="pet-item__name">{item.name}</span>
