@@ -14,6 +14,7 @@
 import Link from "next/link"
 import { useEffect, useState } from "react"
 import type { TypeCode } from "@prisma/client"
+import { REDIAGNOSIS_ENABLED } from "@/lib/diagnosis/flags"
 import { TRIBE } from "@/lib/types"
 import "@/styles/tokens.css"
 import { type MeState, fetchMeState } from "./diagnosis/api"
@@ -21,9 +22,24 @@ import { type MeState, fetchMeState } from "./diagnosis/api"
 // GET /api/missions(B 소유)가 돌려주는 DashboardDTO 중 홈이 쓰는 부분만 적는다.
 // lib/missions/dashboard.ts의 타입을 import하면 홈이 서버 모듈에 묶인다
 type DailyMissionView = { code: string; title: string; completed: boolean; reward: { seeds: number } }
+type ProgressView = {
+  dailyCompleted: number
+  dailyTotal: number
+  weeklyCompleted: number
+  weeklyTotal: number
+  streak: number
+}
+type MissionsView = { dailyMissions: DailyMissionView[]; progress: ProgressView }
 
 // 진단 전 화면에서 세 종족을 나란히 보여줄 때 쓴다
 const TRIBE_LIST = (Object.keys(TRIBE) as TypeCode[]).map((code) => ({ code, ...TRIBE[code] }))
+
+// 달성률 0~100. 분모가 0이면 0으로 둔다 — 미션이 아직 시드되지 않은 DB에서 NaN이 되면
+// style의 width가 통째로 무효가 되고 aria-valuenow도 깨진다
+function ratioOf(done: number, total: number): number {
+  if (total <= 0) return 0
+  return Math.min(100, Math.round((done / total) * 100))
+}
 
 // 시간대 인사. 서버 렌더 시각과 브라우저 시각이 다를 수 있으므로 마운트 후에만 계산한다
 function greetingFor(hour: number): string {
@@ -36,8 +52,9 @@ export default function HomePage() {
   // undefined = 아직 읽는 중. me=null과 구분해야 진단한 사람에게 시작 화면이 깜박이지 않는다
   const [state, setState] = useState<MeState | undefined>(undefined)
   const [greeting, setGreeting] = useState("")
-  // null = 못 읽었다(진단 전·미인증·에러). 빈 배열과 구분해서 안내 문구를 가른다
-  const [daily, setDaily] = useState<DailyMissionView[] | null>(null)
+  // undefined = 아직 읽는 중, null = 못 읽었다(진단 전·미인증·에러).
+  // 둘을 같은 값으로 두면 fetch가 끝나기 전에 실패 문구가 먼저 뜬다(2026-08-22 실측 버그).
+  const [missions, setMissions] = useState<MissionsView | null | undefined>(undefined)
 
   useEffect(() => {
     let alive = true
@@ -60,10 +77,12 @@ export default function HomePage() {
     fetch("/api/missions")
       .then((response) => (response.ok ? response.json() : null))
       .then((body) => {
-        if (alive) setDaily(body?.data?.dailyMissions ?? null)
+        if (!alive) return
+        const data = body?.data
+        setMissions(data?.dailyMissions && data?.progress ? (data as MissionsView) : null)
       })
       .catch(() => {
-        if (alive) setDaily(null)
+        if (alive) setMissions(null)
       })
 
     return () => {
@@ -165,8 +184,66 @@ export default function HomePage() {
           </span>
         </div>
 
+        {/* 진행 카드. 값은 GET /api/missions의 progress 그대로다 — 홈에서 다시 계산하지 않는다.
+            순위·비교는 넣지 않는다(SPEC 5절, 경쟁 지표 의도적 배제) */}
+        {missions && (
+          <div className="hm-card">
+            <div className="hm-card__head">
+              <h2 className="hm-card__title">오늘까지의 나</h2>
+              <span className="hm-pill">
+                <span aria-hidden="true">🔥</span>{" "}
+                {missions.progress.streak > 0 ? `연속 ${missions.progress.streak}일` : "오늘부터"}
+              </span>
+            </div>
+
+            <div className="hm-status">
+              <span className="hm__note">오늘</span>
+              <span className="hm__note">
+                {missions.progress.dailyCompleted}/{missions.progress.dailyTotal}
+              </span>
+            </div>
+            <div
+              className="hm-bar"
+              role="progressbar"
+              aria-label="오늘 미션 달성률"
+              aria-valuemin={0}
+              aria-valuemax={100}
+              aria-valuenow={ratioOf(missions.progress.dailyCompleted, missions.progress.dailyTotal)}
+            >
+              <div
+                className="hm-bar__fill"
+                style={{
+                  width: `${ratioOf(missions.progress.dailyCompleted, missions.progress.dailyTotal)}%`,
+                }}
+              />
+            </div>
+
+            <div className="hm-status">
+              <span className="hm__note">이번 주</span>
+              <span className="hm__note">
+                {missions.progress.weeklyCompleted}/{missions.progress.weeklyTotal}
+              </span>
+            </div>
+            <div
+              className="hm-bar"
+              role="progressbar"
+              aria-label="이번 주 미션 달성률"
+              aria-valuemin={0}
+              aria-valuemax={100}
+              aria-valuenow={ratioOf(missions.progress.weeklyCompleted, missions.progress.weeklyTotal)}
+            >
+              <div
+                className="hm-bar__fill"
+                style={{
+                  width: `${ratioOf(missions.progress.weeklyCompleted, missions.progress.weeklyTotal)}%`,
+                }}
+              />
+            </div>
+          </div>
+        )}
+
         <div className="hm-home__cards">
-          {/* 펫 카드. 레벨·경험치는 DATABASE_URL 공유 후에 넣는다. 없는 숫자를 지어내지 않는다 */}
+          {/* 펫 카드. 레벨·경험치는 /pet에서 보여준다 — 홈에 같은 숫자를 두 번 두지 않는다 */}
           <div className="hm-card hm-card--tribe">
             <div className="hm-card__head">
               <h2 className="hm-card__title">키우기</h2>
@@ -187,11 +264,13 @@ export default function HomePage() {
                 전체 보기
               </Link>
             </div>
-            {daily === null ? (
+            {missions === undefined ? (
+              <p className="hm__note">오늘 미션을 불러오고 있어요…</p>
+            ) : missions === null ? (
               <p className="hm__note">미션을 불러오지 못했어요. 전체 보기에서 확인해 주세요</p>
             ) : (
               <div className="hm-tiles">
-                {daily.slice(0, 4).map((mission) => (
+                {missions.dailyMissions.slice(0, 4).map((mission) => (
                   <div key={mission.code} className="hm-tile">
                     <span className="hm-tile__title">
                       {mission.completed ? "✓ " : ""}
@@ -217,12 +296,15 @@ export default function HomePage() {
           </span>
         </Link>
 
-        <div className="hm-home__foot">
-          <hr className="hm__rule" />
-          <Link href="/diagnosis" className="hm-link">
-            다시 진단하기
-          </Link>
-        </div>
+        {/* 재진단은 잠겨 있다(lib/diagnosis/flags.ts). 플래그를 켜면 이 링크가 돌아온다 */}
+        {REDIAGNOSIS_ENABLED && (
+          <div className="hm-home__foot">
+            <hr className="hm__rule" />
+            <Link href="/diagnosis" className="hm-link">
+              다시 진단하기
+            </Link>
+          </div>
+        )}
       </div>
     </main>
   )
