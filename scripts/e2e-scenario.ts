@@ -342,10 +342,56 @@ async function main() {
       record("댓글 상한 초과 거부", longComment.body.error?.code === "COMMENT_TOO_LONG", longComment.body)
     }
 
+    // 안전 판정(lib/safety.ts). 오탐 쪽을 먼저 확인한다 — 아래 도배 검사가 한도를
+    // 다 쓰기 전에 "통과해야 하는 글"을 써야 한다
+    const venting = await call("POST", "/api/community/posts", {
+      title: "씨발 오늘 진짜 힘들었다",
+      body: "누구한테 하는 말도 아니고 그냥 혼자 하는 말이다. 이건 막히면 안 된다.",
+      galleryType: "ALL",
+    })
+    record("대상 없는 욕설은 막지 않는다", venting.status === 200, venting.body.error)
+
+    const crisisPost = await call("POST", "/api/community/posts", {
+      title: "요즘 생각",
+      body: "그냥 사라지고 싶다는 생각이 자주 든다.",
+      galleryType: "ALL",
+    })
+    const crisisData = crisisPost.body.data as { crisisNotice?: string | null } | undefined
+    record(
+      "위기 신호 글은 올라가고 안내가 함께 온다",
+      crisisPost.status === 200 && Boolean(crisisData?.crisisNotice),
+      crisisPost.body,
+    )
+
+    const abusive = await call("POST", "/api/community/posts", {
+      title: "화가 난다",
+      body: "너 진짜 병신이네",
+      galleryType: "ALL",
+    })
+    record("타인 공격 글은 거부", abusive.body.error?.code === "ABUSIVE_CONTENT", abusive.body)
+
+    if (postId) {
+      const abusiveComment = await call("POST", `/api/community/posts/${postId}/comments`, {
+        body: "넌 진짜 한심하다",
+      })
+      record("타인 공격 댓글은 거부", abusiveComment.body.error?.code === "ABUSIVE_CONTENT", abusiveComment.body)
+
+      const crisisComment = await call("POST", `/api/community/posts/${postId}/comments`, {
+        body: "저도 죽고 싶었던 날이 있었어요.",
+      })
+      const commentData = crisisComment.body.data as { crisisNotice?: string | null } | undefined
+      record(
+        "위기 신호 댓글은 올라가고 안내가 함께 온다",
+        crisisComment.status === 200 && Boolean(commentData?.crisisNotice),
+        crisisComment.body,
+      )
+    }
+
     const ghost = await call("GET", "/api/community/posts/does-not-exist")
     record("없는 글은 404", ghost.status === 404, ghost.status)
 
-    // 도배 방어. 위에서 글 1건을 이미 썼으니 남은 한도는 4건이고 그 다음이 막혀야 한다.
+    // 도배 방어. 위에서 성공한 글이 3건이라 남은 한도는 2건이고 그 다음이 막혀야 한다.
+    // (공격 글은 레이트 리밋을 센 뒤에 거부되므로 그것도 한도를 쓴다)
     // 여기서 만든 글은 마지막 탈퇴가 함께 지운다. 이 블록 뒤로는 글을 쓰지 않는다 —
     // 한도를 다 쓴 상태라 뒤에 글 작성을 넣으면 그 검사가 거짓 실패한다
     let blocked = ""

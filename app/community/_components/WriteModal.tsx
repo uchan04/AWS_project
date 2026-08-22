@@ -5,6 +5,7 @@ import { useRouter } from "next/navigation"
 import type { TypeCode } from "@prisma/client"
 import { TRIBE } from "@/lib/types"
 import { useModalA11y } from "@/app/components/useModalA11y"
+import { CrisisNotice } from "@/app/components/CrisisNotice"
 import { type GalleryTab } from "../_lib/gallery"
 import { TOPICS, type WriteTopic } from "../_lib/topics"
 import { TITLE_MAX, BODY_MAX, remaining } from "../_lib/limits"
@@ -36,6 +37,9 @@ export function WriteModal({ gallery, myTypeCode }: { gallery: GalleryTab; myTyp
   const [body, setBody] = useState("")
   const [pending, setPending] = useState(false)
   const [error, setError] = useState<string | null>(null)
+  // 글이 올라간 뒤에도 창을 열어두고 상담 안내를 띄우는 상태. 닫으면 안내도 사라지므로
+  // 성공 즉시 close()하지 않는다(handleSubmit 참고).
+  const [crisisNotice, setCrisisNotice] = useState<string | null>(null)
   // 모달을 열 때 정한다. 입력 중에는 목록이 바뀌지 않는다.
   const [topics, setTopics] = useState<WriteTopic[]>([])
   const [topicsLoading, setTopicsLoading] = useState(false)
@@ -78,6 +82,7 @@ export function WriteModal({ gallery, myTypeCode }: { gallery: GalleryTab; myTyp
     setTitle("")
     setBody("")
     setError(null)
+    setCrisisNotice(null)
   }
 
   // Escape로 닫기 · 초점 가두기 · 닫을 때 "글 쓰기" 버튼으로 초점 되돌리기.
@@ -103,9 +108,16 @@ export function WriteModal({ gallery, myTypeCode }: { gallery: GalleryTab; myTyp
         setError(json.error.message)
         return
       }
-      close()
       router.refresh()
       window.dispatchEvent(new CustomEvent("user-stats-changed"))
+
+      // 위기 신호가 있으면 창을 닫지 않는다. 글은 이미 올라갔고(위 refresh로 목록에 보인다)
+      // 여기서 닫으면 안내가 뜨자마자 사라져 읽을 시간이 없다.
+      if (json.data?.crisisNotice) {
+        setCrisisNotice(json.data.crisisNotice)
+        return
+      }
+      close()
     } finally {
       setPending(false)
     }
@@ -140,7 +152,11 @@ export function WriteModal({ gallery, myTypeCode }: { gallery: GalleryTab; myTyp
           >
             <div className="mb-5 flex items-center justify-between">
               <h2 id="write-modal-title" className="text-base font-bold text-neutral-900">
-                {isAll ? "전체 커뮤니티에 글쓰기" : `${TRIBE[gallery].animal} 갤러리에 글쓰기`}
+                {crisisNotice
+                  ? "글이 올라갔어요"
+                  : isAll
+                    ? "전체 커뮤니티에 글쓰기"
+                    : `${TRIBE[gallery].animal} 갤러리에 글쓰기`}
               </h2>
               <button
                 type="button"
@@ -152,6 +168,23 @@ export function WriteModal({ gallery, myTypeCode }: { gallery: GalleryTab; myTyp
               </button>
             </div>
 
+            {/* 글이 올라간 뒤 상담 안내만 남기는 상태. 입력 폼을 그대로 두면 방금 올린 글이
+                아직 안 올라간 것처럼 보인다 */}
+            {crisisNotice ? (
+              <>
+                <CrisisNotice message={crisisNotice} />
+                <div className="mt-5 flex justify-end">
+                  <button
+                    type="button"
+                    onClick={close}
+                    className="rounded-xl bg-neutral-900 px-6 py-2.5 text-sm font-bold text-white transition hover:bg-neutral-700"
+                  >
+                    닫기
+                  </button>
+                </div>
+              </>
+            ) : (
+              <>
             {/* 주제 추천(SPEC 8절). GET /api/community/topics가 Bedrock으로 만든다.
                 실패하면 고정 문구(`_lib/topics.ts`)가 그대로 남는다.
                 진단 전이면 topics가 비어 있고, 그때는 영역 자체를 렌더하지 않는다. */}
@@ -234,6 +267,8 @@ export function WriteModal({ gallery, myTypeCode }: { gallery: GalleryTab; myTyp
                 게시하기
               </button>
             </div>
+              </>
+            )}
           </div>
         </div>
       )}

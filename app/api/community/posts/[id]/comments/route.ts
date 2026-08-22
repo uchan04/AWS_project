@@ -6,6 +6,7 @@ import { canAccessGallery } from "@/app/community/_lib/gallery"
 import { COMMENT_MAX } from "@/app/community/_lib/limits"
 import { grantAffinity, COMMENT_AFFINITY } from "@/app/community/_lib/affinity"
 import { recordAttempt, retryAfter } from "@/lib/ratelimit"
+import { containsAbuse, isCrisis, CRISIS_POST_NOTICE } from "@/lib/safety"
 
 // 도배 방어. IP가 아니라 userId로 센다(app/api/community/posts/route.ts와 같은 이유).
 // 댓글은 글보다 가볍게 여러 개 달아도 정상이라 상한을 넉넉히 둔다.
@@ -46,6 +47,12 @@ export async function POST(request: NextRequest, ctx: RouteContext<"/api/communi
     // 검증·권한을 통과한 요청만 센다
     recordAttempt(rateKey, COMMENT_WINDOW_MS)
 
+    // 댓글은 대상이 있는 글이라 공격이 나올 자리가 글보다 많다.
+    // 판정 기준과 이유는 lib/safety.ts와 posts/route.ts의 같은 블록 주석에 있다.
+    if (containsAbuse(body)) {
+      return fail("ABUSIVE_CONTENT", "다른 사람을 향한 말이 담겨 있어요. 표현을 고쳐서 다시 올려주세요", 400)
+    }
+
     const [comment] = await prisma.$transaction([
       prisma.comment.create({
         data: { postId: post.id, userId: user.id, body },
@@ -66,6 +73,8 @@ export async function POST(request: NextRequest, ctx: RouteContext<"/api/communi
         isOwn: true,
       },
       granted,
+      // 위기 신호는 막지 않고 작성자에게만 안내한다(posts/route.ts와 같은 판단)
+      crisisNotice: isCrisis(body) ? CRISIS_POST_NOTICE : null,
     })
   } catch (error) {
     if (error instanceof UnauthorizedError) return fail("UNAUTHORIZED", error.message, 401)

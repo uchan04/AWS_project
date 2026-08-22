@@ -4,6 +4,7 @@ import { useEffect, useState } from "react"
 import type { TypeCode } from "@prisma/client"
 import { authorLabel } from "@/lib/types"
 import { useModalA11y } from "@/app/components/useModalA11y"
+import { CrisisNotice } from "@/app/components/CrisisNotice"
 import { timeAgo } from "../_lib/format"
 import { COMMENT_MAX, remaining } from "../_lib/limits"
 
@@ -57,6 +58,8 @@ export function PostDetailModal({
   const [commentBody, setCommentBody] = useState("")
   const [commentPending, setCommentPending] = useState(false)
   const [affinityNotice, setAffinityNotice] = useState<string | null>(null)
+  // 내 댓글에 위기 신호가 있을 때 나에게만 뜨는 안내. 댓글은 막지 않는다(lib/safety.ts)
+  const [crisisNotice, setCrisisNotice] = useState<string | null>(null)
   const [deletePending, setDeletePending] = useState(false)
   // 어느 댓글이 처리 중인지 구분한다. 단일 boolean이면 삭제 중에 모든 댓글 버튼이 같이 비활성화된다.
   const [deletingCommentId, setDeletingCommentId] = useState<string | null>(null)
@@ -163,6 +166,7 @@ export function PostDetailModal({
       setCommentBody("")
       setPost((prev) => (prev ? { ...prev, commentCount: prev.commentCount + 1 } : prev))
       setAffinityNotice(json.data.granted > 0 ? `친밀도 +${json.data.granted}` : "오늘 친밀도를 이미 다 받았어요")
+      if (json.data.crisisNotice) setCrisisNotice(json.data.crisisNotice)
       window.dispatchEvent(new CustomEvent("user-stats-changed"))
     } finally {
       setCommentPending(false)
@@ -281,6 +285,9 @@ export function PostDetailModal({
                   {affinityNotice}
                 </p>
               )}
+              {/* 한 번 뜨면 내리지 않는다 — 다음 댓글을 쓰면 사라지는 안내는 정작 전화를
+                  걸려던 순간에 화면에서 없어진다(ChatPanel과 같은 판단) */}
+              {crisisNotice && <CrisisNotice message={crisisNotice} />}
               <div className="flex gap-2">
                 <input
                   value={commentBody}

@@ -2,7 +2,9 @@
 
 **모든 세션은 이 문서부터 읽는다.** 그다음 아래 "지금 읽어야 할 문서"만 읽고 시작한다.
 
-최종 갱신: **2026-08-22 — 미션 완료 경로의 id 검증을 한 곳으로 모았다(`4211a74`). 잠긴 단계 미션 id로 POST해 단계를 건너뛰거나, 남의 유형 미션·커리큘럼 밖 슬롯(공유 DB의 `order=4` 9행)을 완료해 보상을 받을 수 있었다. `lib/missions/completion.ts` `loadCompletableMission()`이 존재·유형·슬롯·해금을 보고, 완료 라우트 2곳이 그것만 통과한다. `npm run e2e` 66건 통과.** 세부는 `docs/dev/missions.md` "완료 경로 검증 통합".
+최종 갱신: **2026-08-23 — 위기 신호 대응을 넣었다. 전에는 자해·자살 표현에 대한 처리가 시스템 프롬프트 한 문장뿐이었다(모델이 실패하면 같이 죽는다). `lib/safety.ts`(import 0개)가 정규식으로 판정하고, 챗봇은 Bedrock 호출 전에 고정 응답을 내보내고, 커뮤니티는 글을 막지 않고 작성자에게만 상담 안내를 띄운다. 타인 공격은 **2인칭 지시가 같이 있을 때만** 차단한다 — 욕설 자체는 막지 않는다(대상 없는 자기 발화·자기 비하를 차단하면 서비스가 망가진다). 상담 번호는 109 하나. `npm run check:safety` 42건, `npm run e2e` 75건 통과.** 세부는 `docs/dev/safety.md`.
+
+이전 갱신: **2026-08-22 — 미션 완료 경로의 id 검증을 한 곳으로 모았다(`4211a74`). 잠긴 단계 미션 id로 POST해 단계를 건너뛰거나, 남의 유형 미션·커리큘럼 밖 슬롯(공유 DB의 `order=4` 9행)을 완료해 보상을 받을 수 있었다. `lib/missions/completion.ts` `loadCompletableMission()`이 존재·유형·슬롯·해금을 보고, 완료 라우트 2곳이 그것만 통과한다. `npm run e2e` 66건 통과.** 세부는 `docs/dev/missions.md` "완료 경로 검증 통합".
 
 > **브랜치 주의.** 이 개선 작업(19커밋)은 `feat/diagnosis`가 아니라 **`improve/service-quality`**에 있고, 원격은 `mokoji`(`centreject/mokoji_test`)다. `feat/diagnosis` 기준점은 `a303660`. `develop`·`main`은 지시 대기 중이라 미머지.
 
@@ -30,6 +32,7 @@
 | D | `docs/dev/community.md` + `SPEC.md` 7·8절 |
 | E | `docs/dev/infra.md` + `SPEC.md` 10절 |
 | 성능을 만질 때 | `docs/dev/perf.md` — 측정 방법·기준선·확정된 병목. 최적화 전에 읽는다 |
+| 챗봇·커뮤니티를 만질 때 | `docs/dev/safety.md` — 위기 감지·공격 차단. **정규식을 넓히기 전에 읽는다**(오탐이 미탐보다 위험한 이유) |
 
 `업무분담.md`는 일정·컷 순서를 확인할 때만 읽는다. 매 세션 읽을 필요는 없다.
 `아이디어.md`와 연구보고서 PDF는 미션 콘텐츠를 만들 때(A)만 읽는다.

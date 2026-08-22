@@ -17,6 +17,7 @@
     "slice:art": "tsx scripts/slice-art.ts",
     "check:curriculum": "tsx scripts/check-curriculum.ts",
     "check:community": "tsx scripts/check-community.ts",
+    "check:safety": "tsx scripts/check-safety.ts",
     "e2e": "tsx scripts/e2e-scenario.ts"
   },
   "prisma": {

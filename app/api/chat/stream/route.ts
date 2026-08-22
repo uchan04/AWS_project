@@ -4,6 +4,7 @@ import { STREAM_TIMEOUT_MS, bedrockClient } from "@/lib/bedrock"
 import { prisma } from "@/lib/prisma"
 import { fail } from "@/lib/api"
 import { buildSystemPrompt } from "@/app/chat/_lib/systemPrompt"
+import { isCrisis, CRISIS_REPLY } from "@/lib/safety"
 
 // 최근 대화 이력만 Bedrock에 보낸다. 전체를 매번 보내면 토큰 비용이 누적된다.
 const HISTORY_LIMIT = 20
@@ -21,10 +22,6 @@ export async function POST() {
       return fail("NO_TYPE_CODE", "진단을 먼저 완료해주세요", 400)
     }
 
-    if (!process.env.BEDROCK_MODEL_ID) {
-      return fail("BEDROCK_NOT_CONFIGURED", "AI 응답이 아직 연결되지 않았어요", 500)
-    }
-
     const recent = await prisma.chatMessage.findMany({
       where: { userId: user.id },
       orderBy: { createdAt: "desc" },
@@ -32,8 +29,40 @@ export async function POST() {
     })
     const history = recent.reverse()
 
-    if (history.length === 0 || history[history.length - 1].role !== "USER") {
+    const lastMessage = history[history.length - 1]
+    if (!lastMessage || lastMessage.role !== "USER") {
       return fail("INVALID_STATE", "먼저 메시지를 보내주세요", 400)
+    }
+
+    // 위기 신호는 Bedrock을 부르기 전에, 모델에 맡기지 않고 여기서 처리한다.
+    //
+    // 이 블록이 BEDROCK_MODEL_ID 검사보다 위에 있는 것이 핵심이다. 아래로 내리면
+    // Bedrock이 설정되지 않은 환경에서 자해 신호에 "AI 응답이 아직 연결되지 않았어요"가
+    // 나간다. 위기 대응은 LLM 가용성과 무관해야 한다(lib/safety.ts 참고).
+    //
+    // 응답은 스트림이 아니라 완성된 본문 한 번이다. 클라이언트는 res.body를 그대로
+    // 읽으므로 코드 변경 없이 한 청크로 받는다. 고정 문구를 한 글자씩 흘려보낼 이유가 없다.
+    if (isCrisis(lastMessage.content)) {
+      // 이력에 남긴다 — 다음 턴에 모델이 이 흐름을 보고 이어서 말할 수 있어야 한다.
+      // 저장이 실패해도 응답은 반드시 내보낸다(화면에 안내가 뜨는 것이 이력보다 우선).
+      try {
+        await prisma.chatMessage.create({
+          data: { userId: user.id, role: "ASSISTANT", content: CRISIS_REPLY },
+        })
+      } catch (error) {
+        console.error("위기 응답 저장 실패", error)
+      }
+      return new Response(CRISIS_REPLY, {
+        headers: {
+          "Content-Type": "text/plain; charset=utf-8",
+          // 화면이 전화 걸기 카드를 띄우는 신호. 본문 문자열을 파싱하게 하지 않는다
+          "X-Crisis": "1",
+        },
+      })
+    }
+
+    if (!process.env.BEDROCK_MODEL_ID) {
+      return fail("BEDROCK_NOT_CONFIGURED", "AI 응답이 아직 연결되지 않았어요", 500)
     }
 
     const command = new ConverseStreamCommand({

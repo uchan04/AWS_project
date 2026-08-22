@@ -8,6 +8,7 @@ import { TITLE_MAX, BODY_MAX } from "@/app/community/_lib/limits"
 import { grantAffinity, POST_AFFINITY } from "@/app/community/_lib/affinity"
 import { completeMissionByCode } from "@/lib/missions/completion"
 import { recordAttempt, retryAfter } from "@/lib/ratelimit"
+import { containsAbuse, isCrisis, CRISIS_POST_NOTICE } from "@/lib/safety"
 
 // 도배 방어. 로그인 라우트는 IP로 세지만(clientKey) 여기는 인증된 뒤라 userId로 센다 —
 // IP는 위조되고 공유 회선이면 남까지 막힌다. 글은 한 번 쓰는 데 몇 분이 걸리는 행동이라
@@ -76,6 +77,15 @@ export async function POST(request: NextRequest) {
     // 검증을 통과한 요청만 센다. 빈 제목으로 다섯 번 막히면 정상 사용자가 10분 잠긴다
     recordAttempt(rateKey, POST_WINDOW_MS)
 
+    // 안전 검사(lib/safety.ts). 레이트 리밋을 센 **뒤에** 둔다 — 위 검증 실수와 달리
+    // 남을 공격하는 글은 반복 시도 자체를 늦추는 것이 맞다.
+    //
+    // 낙인 단어(BANNED)는 여기서 검사하지 않는다. 그 목록은 서비스가 사용자를 규정하는
+    // 것을 막는 장치이고, 사용자가 자기 상태를 스스로 말하는 것은 막을 이유가 없다.
+    if (containsAbuse(`${title} ${body}`)) {
+      return fail("ABUSIVE_CONTENT", "다른 사람을 향한 말이 담겨 있어요. 표현을 고쳐서 다시 올려주세요", 400)
+    }
+
     const post = await prisma.post.create({
       data: { userId: user.id, galleryType, title, body },
       include: { user: { select: { nickname: true, typeCode: true } } },
@@ -97,7 +107,12 @@ export async function POST(request: NextRequest) {
       console.error("[DAILY_COMMUNITY_POST] 미션 완료 처리 실패", error)
     }
 
-    return ok({ post, granted })
+    // 위기 신호는 **막지 않는다.** 글은 그대로 올라가고, 작성자에게만 안내를 돌려준다.
+    // 막으면 도움이 가장 필요한 사람의 입을 막는 것이 된다.
+    // 다른 사람에게는 보이지 않는다 — 이 응답은 작성자만 받는다.
+    const crisisNotice = isCrisis(`${title} ${body}`) ? CRISIS_POST_NOTICE : null
+
+    return ok({ post, granted, crisisNotice })
   } catch (error) {
     if (error instanceof UnauthorizedError) return fail("UNAUTHORIZED", error.message, 401)
     throw error
