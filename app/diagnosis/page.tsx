@@ -1,5 +1,7 @@
 import Link from "next/link"
+import { redirect } from "next/navigation"
 import { getCurrentUser } from "@/lib/auth"
+import { REDIAGNOSIS_ENABLED } from "@/lib/diagnosis/flags"
 import AskFlow from "./_components/AskFlow"
 import "@/styles/tokens.css"
 
@@ -25,8 +27,9 @@ import "@/styles/tokens.css"
 export const dynamic = "force-dynamic"
 
 export default async function DiagnosisPage() {
+  let user
   try {
-    await getCurrentUser()
+    user = await getCurrentUser()
   } catch (error) {
     console.error("[/diagnosis]", error)
     return (
@@ -49,6 +52,10 @@ export default async function DiagnosisPage() {
       </main>
     )
   }
+
+  // 재진단이 잠겨 있으면 이미 진단한 사람은 문항을 다시 풀지 않는다.
+  // 문항을 다 풀고 나서 완료 API가 400을 내는 것보다 여기서 돌려보내는 쪽이 낫다.
+  if (!REDIAGNOSIS_ENABLED && user.typeCode) redirect("/diagnosis/result")
 
   return <AskFlow />
 }

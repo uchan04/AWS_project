@@ -427,9 +427,11 @@ export function Sidebar({ profile }: { profile: SidebarProfile | null }) {
               </div>
 
               <div style={{ display: "flex", flexDirection: "column", gap: 8 }}>
+                {/* 재진단은 잠겼다(lib/diagnosis/flags.ts, 2026-08-22 A). 같은 자리를 이름 바꾸기로 쓴다 —
+                    결과 화면에 이름 입력이 이미 있고, 그 화면으로 가는 입구가 하단 탭뿐이었다 */}
                 <button
                   onClick={() => {
-                    window.location.href = "/diagnosis"
+                    window.location.href = "/diagnosis/result"
                   }}
                   style={{
                     width: "100%",
@@ -450,7 +452,7 @@ export function Sidebar({ profile }: { profile: SidebarProfile | null }) {
                     e.currentTarget.style.background = "#F5F0E8"
                   }}
                 >
-                  다시 진단하기
+                  이름 바꾸기
                 </button>
                 <button
                   onClick={() => {
