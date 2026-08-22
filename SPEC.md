@@ -385,7 +385,13 @@ EC2, Docker, Elastic Beanstalk, App Runner, EventBridge, Lambda, WAF, Secrets Ma
 
 ### 보안 설명 카드
 
-Cognito 기반 인증, Amplify 관리형 HTTPS 강제, Prisma parameterized query로 SQL Injection 차단, IAM 최소 권한, S3 버킷 비공개 + presigned URL, RDS는 퍼블릭 액세스 차단.
+Cognito 기반 인증, Amplify 관리형 HTTPS 강제, Prisma parameterized query로 SQL Injection 차단, IAM 최소 권한, S3 버킷 비공개 + presigned URL.
+
+> **RDS 퍼블릭 액세스는 아직 열려 있다 (2026-08-22 실측).** 전에 이 줄에 "RDS는 퍼블릭 액세스 차단"이라고
+> 적혀 있었는데 사실이 아니다 — 인스턴스가 Publicly Accessible이고 보안 그룹(`sg-0e61ffef88ff3726e`)의
+> 5432가 `0.0.0.0/0`이다. 지금 방어는 강한 마스터 비밀번호 하나뿐이다. **발표 전에 닫거나, 못 닫으면
+> 이 카드에서 그 문장을 빼고 "개발 편의를 위해 열어 뒀고 운영 전환 시 VPC 내부로 제한"이라고 말한다.**
+> 없는 통제를 있다고 말하면 심사에서 그 한 줄로 신뢰를 잃는다.
 
 ---
 
@@ -455,7 +461,7 @@ HTTP 상태 코드는 `200` `400` `401` `404` `500`만 쓴다. `message`는 화�
 |---|---|
 | 비용 최적화를 어떻게 했나 | Amplify 서버리스 SSR로 유휴 비용 0, RDS는 `t4g` ARM 최소 인스턴스, 정적 자원은 S3+CloudFront로 분리, LLM은 단일 모델로 호출 경로를 단순화 |
 | 트래픽 관리는 | CloudFront 캐싱 + Amplify 자동 확장. DB 커넥션은 Prisma 커넥션 풀로 제한 |
-| 보안은 | Cognito 인증, HTTPS 강제, Prisma parameterized query, IAM 최소 권한, S3 비공개 + presigned URL, RDS 퍼블릭 액세스 차단 |
+| 보안은 | Cognito 인증, HTTPS 강제, Prisma parameterized query, IAM 최소 권한, S3 비공개 + presigned URL. **RDS 퍼블릭 액세스는 개발 편의로 열어 뒀고 운영 전환 시 VPC 내부로 제한한다**(위 "보안 설명 카드" 경고 참고 — 차단했다고 말하지 않는다) |
 | AI 정확도는 어떻게 담보하나 | 유형 판정은 LLM이 아니라 코드 규칙이 수행. LLM은 결과 화면의 근거 3줄 생성만 담당하고, 그 호출이 실패해도 판정은 바뀌지 않는다. 시나리오 20개 + 경계쌍 3 + 이상 입력 4를 `npm run check:diagnosis`로 고정 |
 | 왜 랭킹이 없나 | 고립은둔청년 대상 서비스에서 순위 비교는 위축과 이탈을 유발한다고 판단해 의도적으로 배제. 협력형 지표로 대체할 계획 |
 | 24시간 동작 증명 | Amplify 배포 URL 상시 접근 가능, CloudWatch 대시보드로 가동 지표 제시 |

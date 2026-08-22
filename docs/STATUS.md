@@ -45,6 +45,7 @@
 
 인프라 차단은 해소됐다(RDS·Cognito·S3·Bedrock 완료). 단 **AWS 리소스 생성이 끝난 것과 `.env`에 값이 온 것은 다르다** — 2026-08-20 로컬 `.env` 확인 결과 채워진 값은 `DATABASE_URL`(+`AWS_REGION`·`BEDROCK_REGION`·`DEV_AUTH_BYPASS=true`)뿐이고 `COGNITO_USER_POOL_ID`·`COGNITO_CLIENT_ID`·`BEDROCK_MODEL_ID`·`BEDROCK_VISION_MODEL_ID`·`S3_BUCKET`·`CLOUDFRONT_DOMAIN`은 **전부 빈 문자열**이다. E에게 개별 공유받아야 한다. 코드가 실제로 읽는 키는 9개이고 `.env`에 다 있다(키 누락은 없다 — 값만 없다). 영향:
 - **빌드·DB·펫·미션·진단은 막히지 않는다.** `DEV_AUTH_BYPASS=true` + `lib/auth.ts` 지연 생성(차단 3) 덕이다
+- **`CLOUDFRONT_DOMAIN`은 이제 아무 코드도 읽지 않는다 (2026-08-22, A).** CloudFront가 모든 경로에 403을 줘서 시트에서 잘라낸 30장을 `public/art/` 아래에 굽고(`scripts/slice-art.ts`) `lib/assets.ts`가 거기서 읽는다. **펫·치장 그림이 이모지로 떨어지는 것은 이제 스킨 미착용이거나 파일이 실제로 없을 때뿐이다.** 이 문서와 `docs/dev/pet.md`·`docs/기능체크리스트.md`의 "`CLOUDFRONT_DOMAIN` 대기" 서술은 낡은 것이다. 사용자 업로드(미션 사진·글 이미지)만 계속 S3 presigned URL이다
 - **챗봇(D)은 로컬에서 실호출이 안 된다.** `app/api/chat/stream/route.ts:25`가 `BEDROCK_MODEL_ID` 없으면 `BEDROCK_NOT_CONFIGURED` 500으로 끊는다. 죽지는 않지만 AI 응답은 못 본다
 - **사진 미션(B)은 업로드가 안 된다.** `S3_BUCKET`이 빈 값이다. 비전 모델은 `lib/missions/vision.ts:7`이 `us.amazon.nova-2-lite-v1:0`으로 폴백하므로 `BEDROCK_VISION_MODEL_ID`는 비어도 된다
 - 실제 Cognito 로그인 경로도 검증 불가(차단 4와 같은 뿌리)

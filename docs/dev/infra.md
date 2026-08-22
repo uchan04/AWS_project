@@ -46,6 +46,11 @@
 
 ## Amplify GitHub 연동 (사용자가 직접 해야 하는 단계)
 
+> **이 절은 끝났다 (2026-08-22 확인).** 실제로 배포가 도는 앱은 아래 적힌 `d36bhb2dnkr0oj`가 아니라
+> **`d2ynoyp44lt46h`**다 — 라이브 URL이 `https://main.d2ynoyp44lt46h.amplifyapp.com`이고
+> `app/layout.tsx:40`의 폴백 도메인도 같은 값이다. `d36bhb2dnkr0oj`는 CLI로 먼저 만들었다가
+> GitHub를 연결하지 않은 앱이다. 아래 절차는 그 앱을 기준으로 쓰인 옛 기록이므로 그대로 따르지 않는다.
+
 CLI로 앱(`welli`, appId `d36bhb2dnkr0oj`)과 환경변수까지는 이미 만들어 놓았다. GitHub 저장소 연결만 남았다.
 
 1. [AWS Amplify 콘솔](https://us-east-1.console.aws.amazon.com/amplify/apps/d36bhb2dnkr0oj)에서 `welli` 앱을 연다

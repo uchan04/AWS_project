@@ -1037,7 +1037,7 @@ B가 `feat/missions`를 `develop`에 머지해(`3adbea5`) 5인 중 4인이 통�
 
 **관리자 세부유형 교차표 — 만들지 않는다.** `SPEC.md`에 "세부유형"도 "교차표"도 없다(grep으로 확인). 결정 변경 2번의 팀 결정으로만 존재하고, `CLAUDE.md`는 SPEC에 없는 기능을 만들지 말라고 한다. `User.subTypeCode`와 `DiagnosisSession.indicators`에 데이터는 쌓이고 있으니 발표에서는 "8개 세부유형을 수집 중이며 화면은 범위 외"로 말할 수 있다.
 
-**펫 이미지 교체 — E가 올리는 중이다(2026-08-20).** `prisma/seed/items.ts`가 이름을 고정해 둔 18개 파일(`pets/fox-1` ~ `pets/bear-polar-3`)을 E가 성장 단계별로 분할·누끼 후 S3에 올리고 있다. `CLOUDFRONT_DOMAIN`이 채워지면 `app/api/pet/route.ts`가 URL을 만들어 내려준다. 홈과 결과 화면의 이모지 마스코트는 그때까지 자리를 잡는 용도다 — 17장 참고.
+~~**펫 이미지 교체 — E가 올리는 중이다(2026-08-20).**~~ **해소(2026-08-22, A).** CloudFront가 모든 경로에 403을 줘서 환경변수를 기다리는 길을 버렸다. 시트에서 잘라낸 30장(펫 6종 × 4단 = 24 + 배경 6)을 `public/art/` 아래에 굽고(`scripts/slice-art.ts`) `lib/assets.ts` 한 곳에서만 URL을 만든다. Amplify Hosting이 `public/`을 자기 CDN으로 내보내므로 CDN을 잃은 것도 아니다. **홈 마스코트도 이모지에서 실제 펫 그림으로 바꿨다**(`app/page.tsx` → `HomeDashboard`의 `petImage`). 이모지로 떨어지는 것은 스킨 미착용이거나 파일이 실제로 없을 때뿐이다.
 
 ---
 
