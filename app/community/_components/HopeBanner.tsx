@@ -21,7 +21,16 @@ export function HopeBanner({ gallery }: { gallery: GalleryTab }) {
       <span aria-hidden="true" className="text-4xl">
         {tribe ? tribe.emoji : "🌿"}
       </span>
-      <p className="text-base leading-relaxed text-neutral-900">{pickHopeMessage(gallery)}</p>
+      {/* 라벨과 문구는 한 <p> 안의 인라인 span 두 개다. 세로로 쌓지 않는다. */}
+      <p className="text-base leading-relaxed text-neutral-900">
+        {tribe && (
+          // 글자라 종족색 원본을 쓴다. 22/55 알파는 면(배경·테두리)용이라 글자에 쓰면 안 읽힌다.
+          <span className="font-bold" style={{ color: tribe.colorHex }}>
+            {tribe.animal}족에게:{" "}
+          </span>
+        )}
+        {pickHopeMessage(gallery)}
+      </p>
     </div>
   )
 }
