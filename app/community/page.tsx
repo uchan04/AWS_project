@@ -2,6 +2,7 @@ import type { TypeCode } from "@prisma/client"
 import { getCurrentUser } from "@/lib/auth"
 import { TRIBE } from "@/lib/types"
 import { GalleryTabs } from "./_components/GalleryTabs"
+import { HopeBanner } from "./_components/HopeBanner"
 import { PostList } from "./_components/PostList"
 import { WriteModal } from "./_components/WriteModal"
 import { resolveGallery, listGalleryPosts, type GalleryTab, type GalleryPost } from "./_lib/gallery"
@@ -52,6 +53,10 @@ export default async function CommunityPage(props: PageProps<"/community">) {
         </div>
         <WriteModal gallery={gallery} />
       </div>
+
+      {/* 희망 문구 배너(SPEC 9절). 탭 위에 둔다 — 글 목록보다 먼저 읽히되
+          제목·글쓰기 버튼을 밀어내지 않는 자리다 */}
+      <HopeBanner gallery={gallery} />
 
       <GalleryTabs active={gallery} myTypeCode={myTypeCode} />
 
