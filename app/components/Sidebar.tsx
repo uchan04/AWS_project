@@ -471,6 +471,33 @@ export function Sidebar({ profile }: { profile: SidebarProfile | null }) {
                 >
                   이름 바꾸기
                 </button>
+                {/* 계정 설정(비밀번호 변경·탈퇴) 입구. 2026-08-22 A 추가 —
+                    가입 이후 계정을 손댈 수 있는 화면이 하나도 없었다 */}
+                <button
+                  onClick={() => {
+                    router.push("/settings")
+                  }}
+                  style={{
+                    width: "100%",
+                    padding: "12px",
+                    background: "#F5F0E8",
+                    border: "1px solid #DDD0BC",
+                    borderRadius: 12,
+                    fontSize: 13,
+                    color: "#5A4A3A",
+                    cursor: "pointer",
+                    fontWeight: 500,
+                    transition: "all 0.15s",
+                  }}
+                  onMouseEnter={(e) => {
+                    e.currentTarget.style.background = "#F0EAD8"
+                  }}
+                  onMouseLeave={(e) => {
+                    e.currentTarget.style.background = "#F5F0E8"
+                  }}
+                >
+                  계정 설정
+                </button>
                 <button
                   onClick={() => {
                     if (!confirm("로그아웃하시겠습니까?")) return

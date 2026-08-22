@@ -350,6 +350,21 @@ body {
   }
 }
 
+/* 되돌릴 수 없는 동작(탈퇴)용. 기본은 테두리만 붉게 둔다 — 면을 채우면 시선이
+   비밀번호 변경보다 탈퇴로 먼저 간다. --color-error는 종이색 대비 AA를 맞춘 값이다 */
+.hm-btn--danger {
+  background: transparent;
+  color: var(--color-error);
+  border-color: var(--color-error);
+}
+
+@media (hover: hover) and (pointer: fine) {
+  .hm-btn--danger:hover {
+    background: var(--color-error);
+    color: var(--color-accent-ink);
+  }
+}
+
 .hm-link {
   align-self: start;
   justify-self: start;
