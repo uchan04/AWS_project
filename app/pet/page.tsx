@@ -1,5 +1,6 @@
+import { redirect } from "next/navigation"
 import { assetUrl, petImageUrl } from "@/lib/assets"
-import { getCurrentUserWithSkin } from "@/lib/auth"
+import { UnauthorizedError, getCurrentUserWithSkin } from "@/lib/auth"
 import { cappedStage, hungerFor, idleAccrual } from "@/lib/pet"
 import { prisma } from "@/lib/prisma"
 import { calculateReward } from "@/lib/reward"
@@ -88,6 +89,10 @@ export default async function PetPage() {
       roomImageUrl,
     }
   } catch (error) {
+    // 미인증이면 "불러오지 못했어요"가 아니라 로그인이다. 미들웨어가 쿠키 "존재"만 보므로
+    // 위조·만료 쿠키를 들고 온 사람이 여기까지 온다 — 그 사람에게 필요한 것도 재로그인이다.
+    // /login은 공개 경로라 리다이렉트 루프가 생기지 않는다.
+    if (error instanceof UnauthorizedError) redirect("/login?next=%2Fpet")
     console.error("[/pet]", error)
     return (
       <main className="pet pet--shop">

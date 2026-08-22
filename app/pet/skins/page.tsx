@@ -1,7 +1,8 @@
 import Link from "next/link"
+import { redirect } from "next/navigation"
 import type { TypeCode } from "@prisma/client"
 import { petImageUrl } from "@/lib/assets"
-import { getCurrentUser } from "@/lib/auth"
+import { UnauthorizedError, getCurrentUser } from "@/lib/auth"
 import { prisma } from "@/lib/prisma"
 import SkinList, { type SkinRow } from "../_components/SkinList"
 import "@/styles/tokens.css"
@@ -48,6 +49,8 @@ export default async function SkinsPage() {
     }))
     starShards = user.starShards
   } catch (error) {
+    // 미인증이면 로그인으로 보낸다. 아래 카드는 DB 장애용이다(app/pet/page.tsx와 같은 이유)
+    if (error instanceof UnauthorizedError) redirect("/login?next=%2Fpet%2Fskins")
     console.error("[/pet/skins]", error)
     return (
       <main className="pet pet--shop">

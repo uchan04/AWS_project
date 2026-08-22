@@ -1,5 +1,6 @@
+import { redirect } from "next/navigation"
 import type { TypeCode } from "@prisma/client"
-import { getCurrentUser } from "@/lib/auth"
+import { UnauthorizedError, getCurrentUser } from "@/lib/auth"
 import { TRIBE } from "@/lib/types"
 import { GalleryTabs } from "./_components/GalleryTabs"
 import { HopeBanner } from "./_components/HopeBanner"
@@ -26,15 +27,17 @@ export default async function CommunityPage(props: PageProps<"/community">) {
     gallery = resolveGallery(tab, user.typeCode)
     posts = await listGalleryPosts(gallery)
   } catch (error) {
+    // 미인증이면 로그인으로 보낸다. 여기 남는 카드는 DB 장애용이다 —
+    // 장애에 "로그인이 필요해요"를 띄우면 이미 로그인한 사람이 로그아웃하고
+    // 다시 로그인하는 헛수고를 한다(/pet과 같은 이유).
+    if (error instanceof UnauthorizedError) redirect("/login?next=%2Fcommunity")
     console.error("[/community]", error)
     return (
       <main className="mx-auto flex max-w-3xl flex-col gap-6 p-4 sm:p-6">
         <h1 className="text-xl font-bold text-neutral-900">커뮤니티</h1>
         <div className="rounded-2xl bg-white p-8 text-center">
-          <p className="text-sm text-neutral-700">로그인이 필요해요</p>
-          <p className="mt-2 text-sm leading-relaxed text-neutral-500">
-            진단을 아직 안 했다면 진단을 먼저 완료해 주세요.
-          </p>
+          <p className="text-sm text-neutral-700">글을 불러오지 못했어요</p>
+          <p className="mt-2 text-sm leading-relaxed text-neutral-500">잠시 후 다시 들어와 주세요.</p>
         </div>
       </main>
     )

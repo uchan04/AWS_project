@@ -1,7 +1,8 @@
 import Link from "next/link"
+import { redirect } from "next/navigation"
 import type { TypeCode } from "@prisma/client"
 import { assetUrl } from "@/lib/assets"
-import { getCurrentUser } from "@/lib/auth"
+import { UnauthorizedError, getCurrentUser } from "@/lib/auth"
 import { compareCosmetics } from "@/lib/pet"
 import { prisma } from "@/lib/prisma"
 import CosmeticList, { type CosmeticRow } from "../_components/CosmeticList"
@@ -51,6 +52,8 @@ export default async function CosmeticsPage() {
       .sort(compareCosmetics)
     progress = { owned: owned.length, total: all.length }
   } catch (error) {
+    // 미인증이면 로그인으로 보낸다. 아래 카드는 DB 장애용이다(app/pet/page.tsx와 같은 이유)
+    if (error instanceof UnauthorizedError) redirect("/login?next=%2Fpet%2Fcosmetics")
     console.error("[/pet/cosmetics]", error)
     return (
       <main className="pet pet--shop">
