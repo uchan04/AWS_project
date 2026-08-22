@@ -94,7 +94,12 @@ export default function SignupPage() {
               </p>
             </div>
 
-            {error && <p className="hm-field__help hm-field__help--error">{error}</p>}
+            {/* 가입 실패 사유(이미 있는 이메일 등)를 스크린리더가 읽게 한다 */}
+            {error && (
+              <p role="alert" className="hm-field__help hm-field__help--error">
+                {error}
+              </p>
+            )}
 
             <button type="submit" disabled={submitting} className="hm-btn hm-card__cta">
               {submitting ? "가입하고 있어요…" : "가입하기"}

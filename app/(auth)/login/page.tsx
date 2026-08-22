@@ -89,7 +89,13 @@ export default function LoginPage() {
               />
             </div>
 
-            {error && <p className="hm-field__help hm-field__help--error">{error}</p>}
+            {/* role="alert"이 없으면 로그인 실패 사유가 스크린리더에 전달되지 않는다 —
+                버튼만 다시 눌러보게 된다 */}
+            {error && (
+              <p role="alert" className="hm-field__help hm-field__help--error">
+                {error}
+              </p>
+            )}
 
             <button type="submit" disabled={submitting} className="hm-btn hm-card__cta">
               {submitting ? "로그인하고 있어요…" : "로그인"}

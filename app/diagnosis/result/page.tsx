@@ -90,7 +90,10 @@ export default function DiagnosisResultPage() {
     return (
       <main className="hm hm--canvas">
         <div className="hm__col">
-          <p className="hm__note">결과를 준비하고 있어요…</p>
+          {/* 결과 계산은 왕복이 있다. 그 사이 화면이 비어 보이지 않게 알린다 */}
+          <p className="hm__note" role="status" aria-live="polite">
+            결과를 준비하고 있어요…
+          </p>
         </div>
       </main>
     )
@@ -215,7 +218,11 @@ export default function DiagnosisResultPage() {
               {/* 닉네임을 문장에 넣지 않는다. 조사(으로/로)가 받침에 따라 갈려서 어색해진다 */}
               {saving ? "저장하고 있어요…" : justDiagnosed ? "이 이름으로 시작하기" : "이름 저장하기"}
             </button>
-            {saveError && <p className="hm-field__help hm-field__help--error">{saveError}</p>}
+            {saveError && (
+              <p role="alert" className="hm-field__help hm-field__help--error">
+                {saveError}
+              </p>
+            )}
 
             {/* 재진단은 잠겨 있다(lib/diagnosis/flags.ts) */}
             {REDIAGNOSIS_ENABLED && (

@@ -7,6 +7,7 @@ import { TRIBE } from "@/lib/types"
 import type { SidebarProfile } from "@/lib/profile"
 import type { TypeCode } from "@prisma/client"
 import styles from "./Sidebar.module.css"
+import { useModalA11y } from "./useModalA11y"
 
 function getBgColor(hex: string): string {
   // colorHex → 배경색 (약한 톤)
@@ -36,6 +37,10 @@ export function Sidebar({ profile }: { profile: SidebarProfile | null }) {
   const router = useRouter()
   const [showAccount, setShowAccount] = useState(false)
   const [compact, setCompact] = useState(false)
+
+  // 내 계정 모달: Escape로 닫기 · 초점 가두기 · 닫을 때 "내 계정" 버튼으로 초점 되돌리기.
+  // 모달을 조건부로 그리므로 showAccount를 같이 넘긴다(app/components/useModalA11y.ts)
+  const accountBoxRef = useModalA11y(() => setShowAccount(false), showAccount)
 
   // 재화·상태 변경 시 갱신(2026-08-21 A 수정).
   // 프로필은 layout.tsx가 서버에서 읽어 props로 주므로 여기서 fetch하지 않는다.
@@ -309,6 +314,11 @@ export function Sidebar({ profile }: { profile: SidebarProfile | null }) {
           onClick={() => setShowAccount(false)}
         >
           <div
+            ref={accountBoxRef}
+            role="dialog"
+            aria-modal="true"
+            aria-labelledby="account-modal-title"
+            tabIndex={-1}
             onClick={(e) => e.stopPropagation()}
             className="screen-enter"
             style={{
@@ -329,9 +339,16 @@ export function Sidebar({ profile }: { profile: SidebarProfile | null }) {
                 justifyContent: "space-between",
               }}
             >
-              <h2 style={{ fontFamily: "var(--font-display)", fontSize: 18, color: "#2A1F14", margin: 0 }}>내 계정</h2>
+              <h2
+                id="account-modal-title"
+                style={{ fontFamily: "var(--font-display)", fontSize: 18, color: "#2A1F14", margin: 0 }}
+              >
+                내 계정
+              </h2>
               <button
+                type="button"
                 onClick={() => setShowAccount(false)}
+                aria-label="내 계정 창 닫기"
                 style={{
                   width: 32,
                   height: 32,

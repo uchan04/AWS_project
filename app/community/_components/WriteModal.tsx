@@ -1,9 +1,10 @@
 "use client"
 
-import { useState } from "react"
+import { useRef, useState } from "react"
 import { useRouter } from "next/navigation"
 import type { TypeCode } from "@prisma/client"
 import { TRIBE } from "@/lib/types"
+import { useModalA11y } from "@/app/components/useModalA11y"
 import { type GalleryTab } from "../_lib/gallery"
 import { TOPICS, type WriteTopic } from "../_lib/topics"
 
@@ -41,6 +42,11 @@ export function WriteModal({ gallery }: { gallery: GalleryTab }) {
     setBody("")
     setError(null)
   }
+
+  // Escape로 닫기 · 초점 가두기 · 닫을 때 "글 쓰기" 버튼으로 초점 되돌리기.
+  // 초점은 제목 칸으로 보낸다 — 기본값이면 ✕ 버튼에 가서 열자마자 닫기가 눌리기 쉽다
+  const titleRef = useRef<HTMLInputElement>(null)
+  const boxRef = useModalA11y(close, isOpen, titleRef)
 
   async function handleSubmit() {
     const trimmedTitle = title.trim()
@@ -87,14 +93,23 @@ export function WriteModal({ gallery }: { gallery: GalleryTab }) {
 
       {isOpen && (
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/35 p-6" onClick={close}>
-          <div className="w-full max-w-lg rounded-3xl bg-white p-8 shadow-2xl" onClick={(e) => e.stopPropagation()}>
+          <div
+            ref={boxRef}
+            role="dialog"
+            aria-modal="true"
+            aria-labelledby="write-modal-title"
+            tabIndex={-1}
+            className="w-full max-w-lg rounded-3xl bg-white p-8 shadow-2xl"
+            onClick={(e) => e.stopPropagation()}
+          >
             <div className="mb-5 flex items-center justify-between">
-              <h2 className="text-base font-bold text-neutral-900">
+              <h2 id="write-modal-title" className="text-base font-bold text-neutral-900">
                 {isAll ? "전체 커뮤니티에 글쓰기" : `${TRIBE[gallery].animal} 갤러리에 글쓰기`}
               </h2>
               <button
                 type="button"
                 onClick={close}
+                aria-label="글쓰기 창 닫기"
                 className="flex h-8 w-8 items-center justify-center rounded-full bg-neutral-100 text-neutral-500 hover:bg-neutral-200"
               >
                 ✕
@@ -128,10 +143,13 @@ export function WriteModal({ gallery }: { gallery: GalleryTab }) {
               </div>
             )}
 
+            {/* placeholder는 접근 가능한 이름이 아니다 — 입력하면 사라져 무슨 칸인지 알 수 없다 */}
             <input
+              ref={titleRef}
               value={title}
               onChange={(e) => setTitle(e.target.value)}
               placeholder="제목을 입력해주세요"
+              aria-label="제목"
               className="mb-3 w-full rounded-xl border border-neutral-300 bg-neutral-50 px-4 py-2.5 text-sm text-neutral-900 placeholder:text-neutral-400 outline-none focus:border-neutral-500"
             />
 
@@ -139,11 +157,16 @@ export function WriteModal({ gallery }: { gallery: GalleryTab }) {
               value={body}
               onChange={(e) => setBody(e.target.value)}
               placeholder={"오늘 있었던 일, 느낀 것을 이야기해봐요\n여기선 뭐든 괜찮아요."}
+              aria-label="본문"
               rows={6}
               className="mb-4 w-full resize-none rounded-xl border border-neutral-300 bg-neutral-50 px-4 py-3 text-sm leading-relaxed text-neutral-900 placeholder:text-neutral-400 outline-none focus:border-neutral-500"
             />
 
-            {error && <p className="mb-3 text-xs text-red-500">{error}</p>}
+            {error && (
+              <p role="alert" className="mb-3 text-xs text-red-500">
+                {error}
+              </p>
+            )}
 
             <div className="flex justify-end">
               <button

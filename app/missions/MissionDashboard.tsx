@@ -2,6 +2,7 @@
 
 import { useState, useRef, useEffect, useCallback } from "react"
 import styles from "./mission-ui.module.css"
+import { useModalA11y } from "@/app/components/useModalA11y"
 import type { DashboardDTO, MissionDTO } from "@/lib/missions/dashboard"
 
 // ─── 미션 화면 전용 색상 (Figma 원본) ──────────────────────────────────────
@@ -127,6 +128,8 @@ interface MissionModalProps {
 }
 
 function MissionModal({ mission, color, bg, mascotEmoji, onClose, onComplete }: MissionModalProps) {
+  // Escape로 닫기 · 초점 가두기 · 닫을 때 초점 되돌리기 (app/components/useModalA11y.ts)
+  const boxRef = useModalA11y(onClose)
   const [proofMode, setProofMode] = useState(false)
   const [proofImage, setProofImage] = useState<string | null>(null)
   const [uploadedFile, setUploadedFile] = useState<File | null>(null)
@@ -281,6 +284,12 @@ function MissionModal({ mission, color, bg, mascotEmoji, onClose, onComplete }: 
       onClick={onClose}
     >
       <div
+        ref={boxRef}
+        role="dialog"
+        aria-modal="true"
+        aria-labelledby="mission-modal-title"
+        aria-describedby="mission-modal-desc"
+        tabIndex={-1}
         onClick={(e) => e.stopPropagation()}
         className="screen-enter"
         style={{
@@ -297,7 +306,9 @@ function MissionModal({ mission, color, bg, mascotEmoji, onClose, onComplete }: 
       >
         <div style={{ background: bg, padding: "36px 32px 32px", textAlign: "center", position: "relative" }}>
           <button
+            type="button"
             onClick={onClose}
+            aria-label="미션 창 닫기"
             style={{
               position: "absolute",
               top: 14,
@@ -330,6 +341,7 @@ function MissionModal({ mission, color, bg, mascotEmoji, onClose, onComplete }: 
           <div style={{ marginTop: 20, paddingTop: 20, borderTop: `1px solid ${color}33` }}>
             <div style={{ fontSize: 28, marginBottom: 6 }}>{emoji}</div>
             <h2
+              id="mission-modal-title"
               style={{
                 fontFamily: "var(--font-display)",
                 fontSize: 20,
@@ -339,7 +351,9 @@ function MissionModal({ mission, color, bg, mascotEmoji, onClose, onComplete }: 
             >
               {mission.title}
             </h2>
-            <p style={{ color: "#7A6B58", fontSize: 13, lineHeight: 1.8, margin: 0 }}>{mission.description}</p>
+            <p id="mission-modal-desc" style={{ color: "#7A6B58", fontSize: 13, lineHeight: 1.8, margin: 0 }}>
+              {mission.description}
+            </p>
           </div>
         </div>
 
@@ -493,8 +507,15 @@ function MissionModal({ mission, color, bg, mascotEmoji, onClose, onComplete }: 
                 </>
               )}
 
+              {/* role="alert"이 있어야 스크린리더가 실패 이유를 읽는다.
+                  없으면 버튼만 다시 눌리고 왜 안 되는지 알 수 없다 */}
               {completeError && (
-                <p style={{ fontSize: 13, color: "#A9542A", marginBottom: 12, textAlign: "center" }}>{completeError}</p>
+                <p
+                  role="alert"
+                  style={{ fontSize: 13, color: "#A9542A", marginBottom: 12, textAlign: "center" }}
+                >
+                  {completeError}
+                </p>
               )}
 
               <button
@@ -837,7 +858,11 @@ export default function MissionDashboard() {
   if (loading) {
     return (
       <div style={{ textAlign: "center", padding: "80px 20px" }}>
-        <p style={{ fontSize: 15, color: "#7A6B58" }}>미션을 불러오는 중...</p>
+        {/* role="status"가 없으면 스크린리더에는 빈 화면이 뜬 것과 같다.
+            aria-live="polite"라서 읽던 문장을 끊지 않고 뒤에 붙여 읽는다 */}
+        <p role="status" aria-live="polite" style={{ fontSize: 15, color: "#7A6B58" }}>
+          미션을 불러오는 중...
+        </p>
       </div>
     )
   }
@@ -845,8 +870,12 @@ export default function MissionDashboard() {
   if (error) {
     return (
       <div style={{ textAlign: "center", padding: "80px 20px" }}>
-        <p style={{ fontSize: 15, color: "#A9542A", marginBottom: 20 }}>{error}</p>
+        {/* 실패는 즉시 알려야 하므로 status가 아니라 alert다 */}
+        <p role="alert" style={{ fontSize: 15, color: "#A9542A", marginBottom: 20 }}>
+          {error}
+        </p>
         <button
+          type="button"
           onClick={loadDashboard}
           style={{
             background: "#4B7A5B",
@@ -991,8 +1020,10 @@ export default function MissionDashboard() {
               </p>
             </div>
             <div style={{ position: "relative" }}>
-              {/* 왼쪽 화살표 */}
+              {/* 왼쪽 화살표. ◀만 두면 스크린리더가 문자 이름을 읽거나 아무것도 읽지 않는다 */}
               <button
+                type="button"
+                aria-label="이전 단계 보기"
                 onClick={() => setStageIndexOverride(Math.max(0, currentStageIndex - 1))}
                 disabled={!hasPrev}
                 style={{
@@ -1015,6 +1046,8 @@ export default function MissionDashboard() {
 
               {/* 오른쪽 화살표 */}
               <button
+                type="button"
+                aria-label="다음 단계 보기"
                 onClick={() => {
                   if (hasNext) {
                     setStageIndexOverride(Math.min(allMissions.length - 1, currentStageIndex + 1))

@@ -3,6 +3,7 @@
 import { useEffect, useState } from "react"
 import type { TypeCode } from "@prisma/client"
 import { authorLabel } from "@/lib/types"
+import { useModalA11y } from "@/app/components/useModalA11y"
 import { timeAgo } from "../_lib/format"
 
 type DetailUser = { nickname: string; typeCode: TypeCode | null }
@@ -40,6 +41,10 @@ export function PostDetailModal({
   onClose: () => void
   onDeleted: () => void
 }) {
+  // Escape로 닫기 · 초점 가두기 · 닫을 때 열었던 글 카드로 초점 되돌리기
+  // (app/components/useModalA11y.ts). PostList가 key={selectedPostId}로 그리므로
+  // 이 컴포넌트는 열릴 때만 마운트된다 — open 인자는 필요 없다
+  const boxRef = useModalA11y(onClose)
   const [post, setPost] = useState<DetailPost | null>(null)
   const [comments, setComments] = useState<DetailComment[]>([])
   const [loading, setLoading] = useState(true)
@@ -166,14 +171,21 @@ export function PostDetailModal({
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/45 p-6" onClick={onClose}>
       <div
+        ref={boxRef}
+        role="dialog"
+        aria-modal="true"
+        aria-label={post ? post.title : "게시글"}
+        tabIndex={-1}
         className="flex max-h-[90vh] w-full max-w-2xl flex-col overflow-hidden rounded-3xl bg-white shadow-2xl"
         onClick={(e) => e.stopPropagation()}
       >
         {loading ? (
-          <div className="p-10 text-center text-sm text-neutral-500">불러오는 중...</div>
+          <div className="p-10 text-center text-sm text-neutral-500" role="status" aria-live="polite">
+            불러오는 중...
+          </div>
         ) : error || !post ? (
           <div className="flex flex-col gap-4 p-10 text-center text-sm text-neutral-500">
-            <p>{error ?? "게시글을 찾을 수 없어요"}</p>
+            <p role="alert">{error ?? "게시글을 찾을 수 없어요"}</p>
             <button
               type="button"
               onClick={onClose}
@@ -203,6 +215,7 @@ export function PostDetailModal({
                 <button
                   type="button"
                   onClick={onClose}
+                  aria-label="게시글 창 닫기"
                   className="flex h-9 w-9 items-center justify-center rounded-full bg-neutral-100 text-neutral-500 hover:bg-neutral-200"
                 >
                   ✕
@@ -255,8 +268,18 @@ export function PostDetailModal({
             </div>
 
             <div className="flex flex-col gap-2 border-t border-neutral-200 px-7 py-4">
-              {actionError && <p className="text-xs text-red-500">{actionError}</p>}
-              {affinityNotice && <p className="text-xs text-neutral-400">{affinityNotice}</p>}
+              {/* 좋아요·댓글 결과는 화면 아래 작은 글씨로만 뜬다.
+                  live region이 없으면 눌러도 아무 일도 안 일어난 것처럼 읽힌다 */}
+              {actionError && (
+                <p role="alert" className="text-xs text-red-500">
+                  {actionError}
+                </p>
+              )}
+              {affinityNotice && (
+                <p role="status" aria-live="polite" className="text-xs text-neutral-400">
+                  {affinityNotice}
+                </p>
+              )}
               <div className="flex gap-2">
                 <input
                   value={commentBody}

@@ -94,7 +94,10 @@ export default function HomePage() {
     return (
       <main className="hm hm--canvas">
         <div className="hm__col">
-          <p className="hm__note">불러오고 있어요…</p>
+          {/* 스크린리더에 "지금 불러오는 중"이 전달되게 한다. 없으면 빈 화면으로 읽힌다 */}
+          <p className="hm__note" role="status" aria-live="polite">
+            불러오고 있어요…
+          </p>
         </div>
       </main>
     )
@@ -267,9 +270,13 @@ export default function HomePage() {
               </Link>
             </div>
             {missions === undefined ? (
-              <p className="hm__note">오늘 미션을 불러오고 있어요…</p>
+              <p className="hm__note" role="status" aria-live="polite">
+                오늘 미션을 불러오고 있어요…
+              </p>
             ) : missions === null ? (
-              <p className="hm__note">미션을 불러오지 못했어요. 전체 보기에서 확인해 주세요</p>
+              <p className="hm__note" role="alert">
+                미션을 불러오지 못했어요. 전체 보기에서 확인해 주세요
+              </p>
             ) : (
               <div className="hm-tiles">
                 {missions.dailyMissions.slice(0, 4).map((mission) => (
