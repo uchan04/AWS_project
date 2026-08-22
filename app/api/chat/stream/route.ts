@@ -1,5 +1,6 @@
-import { BedrockRuntimeClient, ConverseStreamCommand } from "@aws-sdk/client-bedrock-runtime"
+import { ConverseStreamCommand } from "@aws-sdk/client-bedrock-runtime"
 import { getCurrentUserWithSkin, UnauthorizedError } from "@/lib/auth"
+import { STREAM_TIMEOUT_MS, bedrockClient } from "@/lib/bedrock"
 import { prisma } from "@/lib/prisma"
 import { fail } from "@/lib/api"
 import { buildSystemPrompt } from "@/app/chat/_lib/systemPrompt"
@@ -7,9 +8,8 @@ import { buildSystemPrompt } from "@/app/chat/_lib/systemPrompt"
 // 최근 대화 이력만 Bedrock에 보낸다. 전체를 매번 보내면 토큰 비용이 누적된다.
 const HISTORY_LIMIT = 20
 
-const client = new BedrockRuntimeClient({
-  region: process.env.BEDROCK_REGION || process.env.AWS_REGION || "us-east-1",
-})
+// 타임아웃·재시도 설정은 lib/bedrock.ts에 있다. 스트리밍은 청크 사이 유휴 기준이라 넉넉하다
+const client = bedrockClient(STREAM_TIMEOUT_MS)
 
 // 사용자 발화 저장(app/api/chat/messages)이 끝난 뒤 클라이언트가 이어서 호출한다.
 // 이 라우트는 메시지를 저장하지도, 친밀도를 지급하지도 않는다 — 어시스턴트 응답 생성·저장만 한다.

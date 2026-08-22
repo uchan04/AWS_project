@@ -8,12 +8,14 @@
 // 프롬프트 구성은 lib/diagnosis/reason.ts와 같은 방식이다: Tool을 강제해 형식을 고정하고,
 // 낙인 단어는 모델의 선의에 맡기지 않고 출력에서 직접 걸러낸다.
 
-import { BedrockRuntimeClient, ConverseCommand } from "@aws-sdk/client-bedrock-runtime"
+import { ConverseCommand } from "@aws-sdk/client-bedrock-runtime"
 import type { TypeCode } from "@prisma/client"
+import { ONESHOT_TIMEOUT_MS, bedrockClient } from "@/lib/bedrock"
 import { BANNED } from "@/lib/diagnosis/reason"
 import { TRIBE } from "@/lib/types"
 
-const bedrock = new BedrockRuntimeClient({ region: process.env.BEDROCK_REGION || "us-east-1" })
+// 타임아웃·재시도 설정은 lib/bedrock.ts에 있다. 글쓰기 창을 여는 길목이라 특히 상한이 필요하다
+const bedrock = bedrockClient(ONESHOT_TIMEOUT_MS)
 
 export type SuggestedTopic = { title: string; draft: string }
 

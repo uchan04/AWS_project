@@ -1,8 +1,8 @@
-import { BedrockRuntimeClient, ConverseCommand } from "@aws-sdk/client-bedrock-runtime"
+import { ConverseCommand } from "@aws-sdk/client-bedrock-runtime"
+import { ONESHOT_TIMEOUT_MS, bedrockClient } from "@/lib/bedrock"
 
-const bedrock = new BedrockRuntimeClient({
-  region: process.env.BEDROCK_REGION || "us-east-1",
-})
+// 타임아웃·재시도 설정은 lib/bedrock.ts에 있다. 사진 판정은 단발 호출이다
+const bedrock = bedrockClient(ONESHOT_TIMEOUT_MS)
 
 const MODEL_ID = process.env.BEDROCK_VISION_MODEL_ID || "us.amazon.nova-2-lite-v1:0"
 const BUCKET = process.env.S3_BUCKET || ""
