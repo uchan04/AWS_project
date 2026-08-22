@@ -29,6 +29,7 @@
 | C | `docs/dev/pet.md` + `SPEC.md` 5·6절 |
 | D | `docs/dev/community.md` + `SPEC.md` 7·8절 |
 | E | `docs/dev/infra.md` + `SPEC.md` 10절 |
+| 성능을 만질 때 | `docs/dev/perf.md` — 측정 방법·기준선·확정된 병목. 최적화 전에 읽는다 |
 
 `업무분담.md`는 일정·컷 순서를 확인할 때만 읽는다. 매 세션 읽을 필요는 없다.
 `아이디어.md`와 연구보고서 PDF는 미션 콘텐츠를 만들 때(A)만 읽는다.
@@ -202,6 +203,18 @@ git checkout <자기브랜치> && git merge origin/develop && npx prisma migrate
 **인증 방식 확정**: `httpOnly` 쿠키(`access_token`)다. `lib/auth.ts`가 `cookies()`를 읽고 로그인 라우트가 `setSessionCookie()`로 심는다. 클라이언트가 `Authorization` 헤더를 실을 일은 없다 — 레포 전체에 그 호출부는 0건이다.
 
 GitHub 원격 — https://github.com/uchan04/AWS_project
+
+## 2026-08-23 성능 측정·최적화 3건 (`improve/service-quality`)
+
+측정 먼저, 최적화 나중 순서로 했다. 세부와 재측정 절차는 `docs/dev/perf.md`.
+
+**측정으로 확정된 물리량**: RDS가 us-east-1이라 한국에서 쿼리 왕복 1회 = **180ms**. 응답 시간은 행 수가 아니라 **순차 왕복 횟수**의 함수다. Prisma의 `include`는 to-one 관계도 쿼리를 따로 내므로 한 줄이 왕복 1회다.
+
+1. `getCurrentUserWithSkin()`이 같은 유저 행을 두 번 읽었다 → 스킨만 따로 읽어 왕복 3회 → 2회. 루트 레이아웃이 매 페이지에서 부르므로 **모든 화면 −180ms** (`/pet` 728→552, `/settings` 551→370, `/api/pet` 540→361)
+2. 미션·홈이 마운트 후 `fetch("/api/missions")`로 데이터를 읽었다 → 서버 렌더로 옮김. `/missions` **LCP 4324→856ms**, `/` **CLS 0.2807→0**
+3. Bedrock 클라이언트 4곳에 타임아웃이 없었다(SDK 기본값 = 무제한 대기 + 재시도 3회) → `lib/bedrock.ts` 하나로 모으고 단발 20초 / 스트리밍 60초 · 재시도 2회. 리전 해석도 통일
+
+E2E 70건 통과 · 실패 0건(기준선과 같음). 새 의존성 없음. 공유 파일 `lib/auth.ts`를 고쳤다 — **반환 형태와 동작은 같다**(쿼리 횟수만 줄었다).
 
 ## origin 브랜치 상태 (2026-08-20 재확인)
 

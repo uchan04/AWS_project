@@ -1,0 +1,253 @@
+# 성능 개발 문서
+
+`improve/service-quality` 브랜치. 2026-08-23.
+
+측정 없는 최적화는 하지 않는다. 이 문서는 **무엇을 어떻게 재봤는지**를 남긴다 —
+다음 사람이 같은 방법으로 다시 재서 회귀를 잡을 수 있어야 한다.
+
+## 현재 상태
+
+- 완료: 측정 도구 확립, 병목 3건 식별, 3건 전부 수정 + 전후 실측
+- 미착수: `/community` 첫 페이지 쿼리(현재 552ms, 이미 서버 렌더라 왕복 구조가 최선), API 응답 캐시
+
+## 측정한 물리량 — 이게 전부의 근거다
+
+**RDS가 us-east-1이고 접속은 한국에서 한다. 쿼리 왕복 1회 = 180ms.**
+
+이 하나로 거의 모든 수치가 설명된다. 응답 시간은 읽은 행 수나 SQL 복잡도가 아니라
+**순차 왕복 횟수**의 함수다. 인덱스를 더 붙이거나 `select`를 좁히는 것으로는 거의
+움직이지 않고, 왕복을 하나 없애면 정확히 180ms가 빠진다.
+
+확인 방법: 같은 화면에서 쿼리 개수만 다른 두 경로를 재보면 차이가 180ms의 정수배로 나온다.
+
+주의할 것 두 가지:
+
+- **Prisma의 `include`는 to-one 관계도 쿼리를 따로 낸다.** `include: { activePetSkin: true }`
+  한 줄이 왕복 1회다. JOIN이 아니다. (`relationJoins` 프리뷰 기능을 켜면 달라지지만 켜지 않았다)
+- **`Promise.all`로 감싸지 않은 두 `await`는 순차다.** 서로를 필요로 하지 않는 쿼리
+  둘을 순서대로 쓰면 그냥 360ms다. 실제로 홈에서 이 실수가 있었다(아래 3번).
+
+## 측정 방법 — 그대로 재현할 수 있다
+
+프로덕션 빌드로만 잰다. `next dev`는 요청마다 컴파일해서 숫자가 의미 없다.
+
+```bash
+npm run build
+npx next start -p 3101
+```
+
+`.claude/launch.json`에 이 프로덕션 설정이 들어 있다(`preview_start`용).
+
+### 서버 응답 시간 (TTFB)
+
+```bash
+# 로그인해서 쿠키를 받아둔다
+curl -s -c /tmp/ck.txt -X POST http://localhost:3101/api/auth/login \
+  -H 'Content-Type: application/json' \
+  -d '{"email":"test@welli.local","password":"welli-test-1234"}'
+
+# 12회 재서 중위값을 본다. 첫 1~2회는 연결 풀이 차가워서 버린다
+for i in $(seq 1 12); do
+  curl -s -b /tmp/ck.txt -o /dev/null -w '%{time_total}\n' http://localhost:3101/missions
+done | sort -n
+```
+
+**중위값을 쓴다.** 평균은 꼬리 한 건에 끌려간다. 최솟값도 같이 본다 — 최솟값이
+안 내려가면 구조가 안 바뀐 것이고, 중위값만 내려간 건 운이다.
+
+### 브라우저 지표 (LCP / CLS / long task)
+
+`PerformanceObserver`에 `buffered: true`를 줘야 관찰자를 붙이기 전에 발생한
+이벤트도 잡힌다. 이걸 빼면 LCP가 항상 비어 있게 나온다.
+
+```js
+new PerformanceObserver((list) => { /* ... */ })
+  .observe({ type: "largest-contentful-paint", buffered: true })
+// layout-shift, longtask도 같은 방식
+```
+
+CLS는 `layout-shift` 엔트리의 `value` 합이고, 원인을 찾을 때는 `sources`의
+노드를 본다. `hadRecentInput: true`인 것은 세지 않는다(사용자 입력에 의한 이동).
+
+클라이언트 fetch가 실제로 없어졌는지는 `PerformanceObserver`의 `resource` 타입에서
+`initiatorType === "fetch"`를 세면 된다. 0건이어야 한다.
+
+### 기준선 (2026-08-23 시점, 시장 기준)
+
+Core Web Vitals의 "good" 임계값을 그대로 쓴다. 데모 프로젝트라 목표를 낮춰 잡을
+이유가 없다 — 심사자도 이 숫자로 본다.
+
+| 지표 | 목표 |
+|---|---|
+| LCP | 2500ms 이하 |
+| CLS | 0.1 이하 |
+| INP | 200ms 이하 |
+
+## 고친 것 3건
+
+### 1. `getCurrentUserWithSkin()`의 유저 행 재조회 — `lib/auth.ts`
+
+같은 행을 두 번 읽고 있었다. `getCurrentUser()`가 유저를 읽고(왕복 1),
+그 다음 줄이 `include`와 함께 같은 행을 다시 읽었다(왕복 2 — 유저 + 스킨).
+합쳐서 3회.
+
+`activePetSkinId`는 `User`의 컬럼이라(`prisma/schema.prisma:113`) 첫 조회로 이미 손에
+있다. 스킨만 따로 읽으면 왕복 2회로 끝나고, 진단 전 유저(스킨 없음)는 1회다.
+
+**왜 이게 가장 컸는가**: `app/layout.tsx:83`이 사이드바를 그리려고
+`getSidebarProfile()` → `getCurrentUserWithSkin()`을 **매 페이지 요청마다** 부른다.
+한 곳을 고쳐서 8개 화면 전부가 180ms 빠졌다.
+
+반환 형태는 `include` 버전과 같다. 스킨 id가 지워진 행을 가리키는 경우에도
+`include`가 `null`을 줬으므로 동작이 같다.
+
+| 경로 | 이전 | 이후 |
+|---|---|---|
+| `/pet` | 728ms | **552ms** |
+| `/settings` | 551ms | **370ms** |
+| `/pet/cosmetics` | 538ms | **371ms** |
+| `/pet/skins` | 539ms | **369ms** |
+| `/api/pet` | 540ms | **361ms** |
+
+### 2. 미션·홈의 클라이언트 fetch — `app/missions/page.tsx`, `app/page.tsx`
+
+`app/missions/page.tsx`는 `return <MissionDashboard />` 한 줄이었고, 데이터는
+클라이언트가 마운트된 뒤 `useEffect`의 `fetch("/api/missions")`로 가져왔다.
+순서가 이렇게 된다:
+
+```
+HTML 도착(TTFB) → JS 다운로드·실행 → fetch 시작 → 응답 → 첫 미션 렌더
+```
+
+같은 코드베이스의 `/community`는 서버 렌더다. 렌더 방식만 다른 두 화면을 재보면:
+
+| 화면 | 렌더 방식 | TTFB | LCP |
+|---|---|---|---|
+| `/missions` | 클라이언트 fetch | 539ms | **4324ms** |
+| `/community` | 서버 렌더 | 901ms | **1332ms** |
+
+TTFB가 더 느린 쪽이 LCP는 3배 빨랐다. 서버에서 조립해 내려보내면 왕복이
+임계 경로에서 통째로 빠진다.
+
+서버에서 **같은 함수를 부른다** — `getCurrentUser` → `ensureMissionReset` →
+`buildDashboard`. `GET /api/missions`와 조립 순서가 같다. 그 라우트는 지우지 않았다:
+미션을 완료한 뒤 목록을 다시 읽는 데 계속 쓴다. 로직을 복사하지 않고 같은 함수 둘을
+부르므로 두 경로의 값이 갈라질 수 없다.
+
+`DashboardDTO`는 `Date` 없이 원시값만 담고 있어서 RSC 경계를 그대로 넘어간다 —
+API가 돌려주는 JSON과 바이트가 같다. 변환 계층이 필요 없었다.
+
+클라이언트는 `initial`/`initialError` prop을 받아 초기 state로 쓰고, 이펙트에서
+early-return 한다. **이 early-return이 없으면 서버 렌더를 해 두고도 마운트 직후
+왕복 1회를 그대로 낸다** — 임계 경로에서 안 빠진다.
+
+prop을 생략하면(`undefined`) 예전처럼 스스로 불러온다. 기존 호출부를 깨지 않는다.
+
+| 지표 | 이전 | 이후 |
+|---|---|---|
+| `/missions` LCP | 4324ms | **856ms** |
+| `/missions` 클라 fetch | 1건 | **0건** |
+| `/missions` CLS | 0.0001 | 0 |
+
+### 3. 홈의 순차 왕복과 CLS — `app/page.tsx`, `app/HomeDashboard.tsx`
+
+홈을 서버 렌더로 옮긴 첫 판본이 **오히려 느려졌다**(551 → 912ms).
+`getCurrentUserWithSkin()`이 `buildDashboard` 앞에 순차로 붙어서다. 둘은 서로를
+필요로 하지 않으므로 `Promise.all`로 묶었다.
+
+| | 시간 |
+|---|---|
+| 순차 | 912ms |
+| 병렬 | **728ms** |
+
+`Promise.all`에 그냥 넣으면 안 됐다 — **하나만 깨져도 전체가 거부**되므로 스킨 읽기
+실패가 홈 전체를 에러 화면으로 만든다. 전에는 그게 `try/catch` 안이었다. 마스코트
+그림 하나이고 이모지 폴백이 있으니 `.catch(() => null)`로 삼킨다.
+
+CLS도 같이 잡혔다. 이전 실측: **CLS 0.2807**, 밀림 1건, 발생 시각 2280ms —
+`fetch`가 끝난 그 시점이고 원인 노드가 `DIV.hm-home__cards` · `A.hm-row` ·
+`H1.hm-home__name`이었다. "오늘의 나" 카드가 없던 자리에 끼어들어 아래를 전부
+밀어냈다. HTML에 처음부터 들어 있으면 밀어낼 것이 없다.
+
+**두 번째 CLS 원인**은 인사말이었다. `greeting`은 브라우저 시각으로 정해야 해서
+(서버 시각으로 렌더하면 하이드레이션이 어긋난다) 첫 렌더에 빈 문자열이고, 그러면
+그 `<p>`의 높이가 0이다. 값이 들어오는 순간 한 줄만큼 아래가 밀린다.
+`{greeting || " "}`로 줄 높이를 미리 잡았다. 일반 공백은 JSX에서 잘리므로
+반드시 U+00A0이어야 한다.
+
+| 지표 | 이전 | 이후 |
+|---|---|---|
+| `/` CLS | 0.2807 | **0** (밀림 0건) |
+| `/` LCP | 804ms | 1148ms (`IMG.hm-home__mascot`) |
+| `/` 클라 fetch | 1건 (1447ms) | **0건** |
+
+LCP가 늘어난 것은 회귀가 아니다. 이전의 804ms는 **미션 카드가 아직 없는 화면**의
+LCP였다 — 잴 대상이 덜 그려진 상태다. 1148ms는 완성된 화면의 값이고, 그 시점 이후로
+레이아웃이 움직이지 않는다. 목표 2500ms 안이다.
+
+### 4. Bedrock 타임아웃 — `lib/bedrock.ts` (신규)
+
+성능이라기보다 **최악의 경우 응답 시간**이다. `BedrockRuntimeClient`를 만드는 곳이
+4군데였고 어디에도 타임아웃이 없었다. SDK 기본값은 **요청 타임아웃 없음 + 재시도 3회**라,
+Bedrock이 응답하지 않으면 요청이 그 자리에 매달린다. 사진 판정 · 주제 추천 ·
+판정 근거 3줄은 모두 화면을 막는 호출이다.
+
+리전 해석도 갈라져 있었다 — 3곳은 `BEDROCK_REGION || "us-east-1"`, 1곳만
+`BEDROCK_REGION || AWS_REGION || "us-east-1"`.
+
+`lib/bedrock.ts` 하나로 모았다. 단발 호출 20초 / 스트리밍은 청크 사이 유휴 60초,
+재시도 2회.
+
+구현 주의점 두 가지:
+
+- `requestHandler`는 **객체 리터럴로 넘긴다.** SDK v3의 타입이
+  `Record<string, unknown>`을 허용한다. `@smithy/node-http-handler`를 직접 import하면
+  전이 의존성에 묶여 SDK 업그레이드 때 조용히 깨진다.
+- **`requestTimeout`만 쓴다.** `connectionTimeout`은 `NodeHttpHandler`에만 있고
+  `NodeHttp2Handler`에는 없다. `bedrock-runtime`의 기본 핸들러가 후자다.
+
+실측: `/api/community/topics`가 실패까지 2.2~2.4초(정상 경로). 상한이 없던 이전에는
+무응답 시 걸리는 시간에 상한이 없었다.
+
+## 같이 고친 버그 1건
+
+`app/missions/MissionDashboard.tsx`의 "다시 시도" 버튼이 아무 일도 하지 않았다.
+`loadDashboard()`가 성공해도 `error` state를 비우지 않아서, 에러 화면 분기가
+`dashboard` 분기보다 위에 있는 탓에 새로 받아온 데이터를 계속 가렸다.
+`setError(null)`을 앞에 뒀다.
+
+측정하다 발견한 것이지 성능과는 무관하다.
+
+## 결정한 것과 이유
+
+- **`GET /api/missions`를 지우지 않았다.** 서버 렌더로 옮겼어도 미션 완료 후 재조회에
+  쓴다. 페이지와 라우트가 같은 함수(`buildDashboard`)를 부르므로 중복이 아니다
+- **`initial` prop은 optional이다.** 생략하면 예전 동작(스스로 fetch)이다. 기존
+  호출부와 테스트를 깨지 않는다
+- **인사말을 서버로 옮기지 않았다.** 서버 시각으로 렌더하면 시간대가 다른 사용자에게
+  하이드레이션 불일치가 난다. 자리만 미리 잡는 쪽이 맞다
+- **`lib/prisma.ts`는 건드리지 않았다.** 커넥션 풀 설정을 만지는 것은 왕복 횟수를
+  줄이는 것보다 효과가 작고 위험이 크다
+- **인덱스를 추가하지 않았다.** 병목이 행 수가 아니라 왕복 횟수라는 것이 측정으로
+  확인됐다. 인덱스로는 180ms가 안 움직인다
+- **새 의존성 0개.** 측정은 `curl`과 브라우저 `PerformanceObserver`로 했고, 측정용
+  스크립트는 `.next/`(gitignore) 안에 임시로 뒀다
+
+## 검증
+
+- `npx tsc --noEmit` 통과
+- `npm run lint` 통과 (에러 0 · 경고 0)
+- `npm run build` 통과. `/missions`가 라우트 표에서 `ƒ`(dynamic)로 바뀐 것 확인
+- `npm run e2e` **70건 통과 · 0건 실패** — 기준선과 같다
+- `/missions`·`/` 초기 HTML을 접근성 트리로 확인: 출석 캘린더 7일 그리드, 일일 미션
+  5개와 씨앗 보상, 단계 미션 2/100과 해당 3개, 진행률 바, 사이드바 재화 —
+  전부 서버 HTML에 들어 있다
+
+## 남은 것
+
+- `/community` 552ms. 이미 서버 렌더이고 왕복 구조가 최선에 가깝다. 더 줄이려면
+  목록 쿼리와 사이드바 쿼리를 합쳐야 하는데 소유 경계를 넘는다
+- `/api/missions` p95를 라우트 단독으로 다시 재지 않았다. 화면 경로에서 빠졌으므로
+  급하지 않다
+- RDS 리전이 us-east-1인 것 자체가 최대 병목이다. ap-northeast-2로 옮기면 왕복이
+  180ms → 10ms대가 된다. **공유 DB라 손대지 않는다** — 팀 결정 사항이다

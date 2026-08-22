@@ -61,7 +61,8 @@
 - `POST /api/upload/verify` — 사진 판정 + 통과 시 완료
 
 ### 화면
-- `app/missions/MissionDashboard.tsx` — 기존 Figma JSX 보존, API 연결, ProgressCard, AttendanceCalendar
+- `app/missions/page.tsx` — **서버에서 대시보드를 조립해 props로 내려보낸다**(2026-08-23). 전에는 `return <MissionDashboard />` 한 줄이었고 데이터는 클라이언트 `fetch("/api/missions")`가 가져왔다 — LCP 4324ms의 원인이었다. 조립 순서는 라우트와 같은 함수를 쓴다(`ensureMissionReset` → `buildDashboard`). 세부는 `docs/dev/perf.md`
+- `app/missions/MissionDashboard.tsx` — 기존 Figma JSX 보존, API 연결, ProgressCard, AttendanceCalendar. `initial`/`initialError` prop을 받으면 마운트 fetch를 건너뛴다(prop 생략 시 예전 동작)
 - `app/missions/mission-ui.module.css` — 애니메이션 keyframes
 
 ## 결정한 것과 이유
