@@ -15,7 +15,8 @@
     "check:diagnosis": "tsx scripts/check-diagnosis.ts",
     "check:auth": "tsx scripts/check-auth.ts",
     "slice:art": "tsx scripts/slice-art.ts",
-    "check:curriculum": "tsx scripts/check-curriculum.ts"
+    "check:curriculum": "tsx scripts/check-curriculum.ts",
+    "check:community": "tsx scripts/check-community.ts"
   },
   "prisma": {
     "seed": "tsx prisma/seed.ts"

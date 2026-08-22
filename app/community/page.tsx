@@ -54,7 +54,7 @@ export default async function CommunityPage(props: PageProps<"/community">) {
               : `${TRIBE[gallery].animal} 종족 전용 공간이에요 · 나만 볼 수 있어요`}
           </p>
         </div>
-        <WriteModal gallery={gallery} />
+        <WriteModal gallery={gallery} myTypeCode={myTypeCode} />
       </div>
 
       {/* 희망 문구 배너(SPEC 9절). 탭 위에 둔다 — 글 목록보다 먼저 읽히되
