@@ -156,7 +156,13 @@ export async function buildDashboard(user: User): Promise<DashboardDTO> {
   const daysPassed = Math.floor((new Date().getTime() - mondayOfThisWeek.getTime()) / 86400000) + 1
   const weeklyTotal = Math.min(daysPassed * 5, 35)
 
-  const cycleDay = user.attendanceTotal > 0 ? ((user.attendanceTotal - 1) % 7) + 1 : 1
+  // 오늘이 7일 주기의 몇 일차인가. 아직 안 받았으면 "받게 될 날", 받았으면 "받은 날"이다.
+  // 옛 식은 언제나 "받은 날"을 줘서 수령 전에는 캘린더가 하루 앞선 칸을 강조했다.
+  // 지급 쪽 식(lib/missions/attendance.ts dayIndex)과 같은 규칙이어야 한다
+  const cycleDay =
+    claimedToday > 0
+      ? ((Math.max(1, user.attendanceTotal) - 1) % 7) + 1
+      : (user.attendanceTotal % 7) + 1
 
   return {
     dailyMissions,

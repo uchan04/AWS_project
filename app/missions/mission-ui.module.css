@@ -121,3 +121,23 @@
 .missionSlideOut {
   animation: missionSlideOut 0.28s ease-in forwards;
 }
+
+/* 무한 반복 애니메이션 10종이 한 화면에 뜬다. 전정기관 장애나 편두통이 있는 사용자에게는
+   멈춰야 한다(WCAG 2.3.3). 카드 전환은 0.3초짜리 1회라 남겨도 되지만, 사용자가 "동작 줄이기"를
+   켰다는 것은 그것까지 원하지 않는다는 뜻이므로 같이 끈다 */
+@media (prefers-reduced-motion: reduce) {
+  .mascotWalk,
+  .mascotStretch,
+  .mascotDrink,
+  .mascotEat,
+  .mascotRest,
+  .mascotLook,
+  .mascotWrite,
+  .mascotMusic,
+  .mascotPhoto,
+  .mascotFloat,
+  .missionSlideIn,
+  .missionSlideOut {
+    animation: none;
+  }
+}

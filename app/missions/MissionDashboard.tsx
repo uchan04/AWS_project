@@ -26,6 +26,11 @@ const CHARACTER_EMOJI = {
 
 type CharacterKey = keyof typeof CHARACTER_COLOR
 
+// 서버 기준과 같아야 한다 (lib/missions/upload.ts ALLOWED_TYPES·MAX_SIZE).
+// 여기서 먼저 걸러야 3MB를 다 올린 뒤에 거절당하는 일이 없다
+const PHOTO_TYPES = ["image/jpeg", "image/png"]
+const PHOTO_MAX_BYTES = 3 * 1024 * 1024
+
 // ─── 애니메이션 매핑 (CSS Module class) ───────────────────────────────────
 
 const ANIM_CLASS: Record<string, string> = {
@@ -152,15 +157,37 @@ function MissionModal({ mission, color, bg, mascotEmoji, onClose, onComplete }: 
         return
       }
 
+      // 서버(lib/missions/upload.ts)와 같은 기준으로 먼저 걸러 왕복을 아낀다
+      if (!PHOTO_TYPES.includes(uploadedFile.type)) {
+        setCompleteError("JPG 또는 PNG 사진만 올릴 수 있어요")
+        return
+      }
+      if (uploadedFile.size > PHOTO_MAX_BYTES) {
+        setCompleteError("사진 크기는 3MB 이하여야 해요")
+        return
+      }
+
       setCompleting(true)
       setCompleteError(null)
 
       try {
-        // 1. presigned URL 받기
-        const presignRes = await fetch("/api/missions/upload/presigned", {
+        // 1. presigned URL 받기.
+        //
+        // 2026-08-22: /api/missions/upload/* 대신 /api/upload/* 를 쓴다. 같은 일을 하는
+        //   라우트가 두 벌 있었고 쓰던 쪽이 방어가 없었다 —
+        //   fileKey 소유권 검사 없음(남의 사진 key로 내 미션을 통과시킬 수 있었다),
+        //   용량·형식 검사 없음, 시스템 프롬프트 없음, passed 타입 검증 없음
+        //   (모델이 문자열을 주면 truthy로 통과), 친밀도 일일 상한 우회.
+        //   /api/upload/* 는 lib/missions/upload.ts + vision.ts + completion.ts 를 거쳐
+        //   그 다섯 가지를 다 막는다. 단계 잠금 확인도 여기에만 있다
+        const presignRes = await fetch("/api/upload/presign", {
           method: "POST",
           headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({ contentType: uploadedFile.type }),
+          body: JSON.stringify({
+            missionId: mission.id,
+            contentType: uploadedFile.type,
+            fileSize: uploadedFile.size,
+          }),
         })
         const presignJson = await presignRes.json()
 
@@ -169,7 +196,7 @@ function MissionModal({ mission, color, bg, mascotEmoji, onClose, onComplete }: 
           return
         }
 
-        const { uploadUrl, fileKey } = presignJson.data
+        const { uploadUrl, s3Key } = presignJson.data
 
         // 2. S3에 직접 업로드
         const uploadRes = await fetch(uploadUrl, {
@@ -184,10 +211,10 @@ function MissionModal({ mission, color, bg, mascotEmoji, onClose, onComplete }: 
         }
 
         // 3. Bedrock Vision 검증
-        const verifyRes = await fetch("/api/missions/upload/verify", {
+        const verifyRes = await fetch("/api/upload/verify", {
           method: "POST",
           headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({ missionId: mission.id, fileKey }),
+          body: JSON.stringify({ missionId: mission.id, s3Key }),
         })
         const verifyJson = await verifyRes.json()
 
@@ -201,7 +228,8 @@ function MissionModal({ mission, color, bg, mascotEmoji, onClose, onComplete }: 
           return
         }
 
-        if (verifyJson.data.alreadyCompleted) {
+        // 통과했는데 새로 완료되지 않았으면 이미 받은 미션이다
+        if (!verifyJson.data.completed) {
           setCompleteError("이미 완료한 미션입니다")
           return
         }
@@ -285,7 +313,11 @@ function MissionModal({ mission, color, bg, mascotEmoji, onClose, onComplete }: 
           >
             ×
           </button>
+          {/* 2026-08-22: ANIM_CLASS가 정의만 돼 있고 어디에도 안 붙어 있었다.
+              mission-ui.module.css의 미션별 동작 애니메이션 10종이 전부 죽어 있었고
+              캡션("함께 걷고 있어요")만 떠서 문구와 화면이 어긋났다 */}
           <div
+            className={ANIM_CLASS[animType] ?? ANIM_CLASS.default}
             style={{
               fontSize: 120,
               lineHeight: 1,
@@ -405,10 +437,17 @@ function MissionModal({ mission, color, bg, mascotEmoji, onClose, onComplete }: 
 
                   {proofMode && (
                     <div style={{ marginBottom: 12 }}>
-                      <input ref={fileRef} type="file" accept="image/jpeg,image/jpg,image/png,image/webp" style={{ display: "none" }} onChange={handleFile} />
+                      <input ref={fileRef} type="file" accept="image/jpeg,image/png" style={{ display: "none" }} onChange={handleFile} />
                       {proofImage ? (
                         <div style={{ position: "relative", borderRadius: 14, overflow: "hidden", aspectRatio: "16/9" }}>
-                          <img src={proofImage} alt="proof" style={{ width: "100%", height: "100%", objectFit: "cover" }} />
+                          {/* FileReader가 만든 data: URL이다. next/image는 data URL을 최적화하지
+                              못하고 unoptimized로 감싸면 <img>와 같아진다 */}
+                          {/* eslint-disable-next-line @next/next/no-img-element */}
+                          <img
+                            src={proofImage}
+                            alt="올린 인증 사진 미리보기"
+                            style={{ width: "100%", height: "100%", objectFit: "cover" }}
+                          />
                           <button
                             onClick={() => {
                               setProofImage(null)
@@ -666,19 +705,34 @@ function AttendanceCalendar({ cycleDay, claimedToday, attendanceTotal, color, bg
         padding: "20px",
       }}
     >
-      <h3
+      <div
         style={{
-          fontFamily: "'Gowun Dodum', sans-serif",
-          fontSize: 16,
-          color: "#2A1F14",
+          display: "flex",
+          alignItems: "baseline",
+          justifyContent: "space-between",
+          gap: 8,
           margin: "0 0 12px",
         }}
       >
-        출석 캘린더
-      </h3>
+        <h3
+          style={{
+            fontFamily: "'Gowun Dodum', sans-serif",
+            fontSize: 16,
+            color: "#2A1F14",
+            margin: 0,
+          }}
+        >
+          출석 캘린더
+        </h3>
+        {/* 격자는 이번 주기만 보여주므로 누적은 따로 적는다 — 안 적으면 7일마다
+            성과가 0으로 리셋된 것처럼 보인다 */}
+        <span style={{ fontSize: 12, color: "#7A6B58" }}>누적 {attendanceTotal}일</span>
+      </div>
       <div style={{ display: "flex", gap: 8, marginBottom: 14 }}>
         {[1, 2, 3, 4, 5, 6, 7].map((day) => {
-          const done = attendanceTotal >= day || (day === cycleDay && claimedToday)
+          // 7일 주기 격자다. attendanceTotal >= day로 판정하면 8일차 이후로는
+          // 7칸이 영구히 다 채워져서 주기가 사라진다 — 이번 주기 안에서만 본다
+          const done = day < cycleDay || (day === cycleDay && claimedToday)
           return (
             <div
               key={day}

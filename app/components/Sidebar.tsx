@@ -431,7 +431,7 @@ export function Sidebar({ profile }: { profile: SidebarProfile | null }) {
                     결과 화면에 이름 입력이 이미 있고, 그 화면으로 가는 입구가 하단 탭뿐이었다 */}
                 <button
                   onClick={() => {
-                    window.location.href = "/diagnosis/result"
+                    router.push("/diagnosis/result")
                   }}
                   style={{
                     width: "100%",
@@ -460,6 +460,10 @@ export function Sidebar({ profile }: { profile: SidebarProfile | null }) {
                     // /api/auth/logout은 POST만 받는다(GET으로 열면 405). 쿠키 두 개를 지운다
                     void fetch("/api/auth/logout", { method: "POST", redirect: "manual" }).finally(
                       () => {
+                        // 로그아웃은 일부러 전체 새로고침이다. router.push는 RSC 캐시를 남겨
+                        // 쿠키가 지워진 뒤에도 사이드바가 방금 로그아웃한 사람의 닉네임·재화를
+                        // 그대로 보여준다(lib/profile.ts는 루트 레이아웃에서 한 번만 읽는다).
+                        // eslint-disable-next-line @next/next/no-location-assign-relative-destination
                         window.location.href = "/login"
                       }
                     )

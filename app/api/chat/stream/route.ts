@@ -1,4 +1,3 @@
-import type { NextRequest } from "next/server"
 import { BedrockRuntimeClient, ConverseStreamCommand } from "@aws-sdk/client-bedrock-runtime"
 import { getCurrentUserWithSkin, UnauthorizedError } from "@/lib/auth"
 import { prisma } from "@/lib/prisma"
@@ -14,7 +13,7 @@ const client = new BedrockRuntimeClient({
 
 // 사용자 발화 저장(app/api/chat/messages)이 끝난 뒤 클라이언트가 이어서 호출한다.
 // 이 라우트는 메시지를 저장하지도, 친밀도를 지급하지도 않는다 — 어시스턴트 응답 생성·저장만 한다.
-export async function POST(_request: NextRequest) {
+export async function POST() {
   try {
     const user = await getCurrentUserWithSkin()
 
