@@ -1,31 +1,35 @@
-import type { TypeCode } from "@prisma/client"
 import { TRIBE } from "@/lib/types"
-import { hopeMessageOfWeek } from "../_lib/hope"
+import type { GalleryTab } from "../_lib/gallery"
+import { pickHopeMessage } from "../_lib/banner"
 
-// 희망 문구 배너(SPEC 9절). 서버 컴포넌트다 — 문구가 주 단위로만 바뀌므로
-// 클라이언트에서 계산할 이유가 없고, 서버에서 고르면 하이드레이션 불일치도 없다.
-//
-// 전체 갤러리는 종족이 없어 TRIBE에 키가 없다. WriteModal·ChatPanel과 같은 방식으로
-// 중립색을 이 파일에 둔다(lib/types.ts는 공유 파일이라 건드리지 않는다).
-const NEUTRAL_COLOR = "#9CA3AF"
-
-export function HopeBanner({ gallery }: { gallery: TypeCode | "ALL" }) {
-  const accent = gallery === "ALL" ? NEUTRAL_COLOR : TRIBE[gallery].colorHex
+/**
+ * 희망 문구 배너(SPEC.md 9절). 서버 컴포넌트다 — 상호작용이 없어 클라이언트로 내릴 이유가 없다.
+ *
+ * 색은 유저의 종족이 아니라 지금 보고 있는 gallery를 따른다. 전체 탭에서는 중립색,
+ * 종족 갤러리에서는 그 종족색이라 배너가 "지금 어느 공간에 있는지"를 같이 알려준다.
+ */
+export function HopeBanner({ gallery }: { gallery: GalleryTab }) {
+  const isAll = gallery === "ALL"
+  const tribe = isAll ? null : TRIBE[gallery]
 
   return (
-    // 왼쪽 굵은 선만 종족 색으로 둔다. 배경 전체를 종족 색으로 채우면 글 목록보다
-    // 배너가 먼저 눈에 들어와 커뮤니티가 공지판처럼 보인다.
-    // color-mix로 같은 색의 아주 옅은 배경을 만든다 — 종족마다 색 상수를 또 두지 않는다.
-    //
-    // <aside>가 아니라 <div>다. Sidebar가 이미 <aside>를 쓰고 있어서 이름 없는
-    // complementary 랜드마크가 둘이 되면 스크린리더 랜드마크 목록이 혼란해진다.
     <div
-      className="hope-banner rounded-2xl border-l-4 px-5 py-4"
-      style={{ borderLeftColor: accent, backgroundColor: `color-mix(in srgb, ${accent} 8%, white)` }}
+      className={"flex items-center gap-4 rounded-2xl border p-5 " + (isAll ? "border-neutral-200 bg-neutral-50" : "")}
+      // 종족색은 Tailwind로 표현할 수 없어 인라인이다. 22/55는 PostCard의 연한 배경 관습을 따른다.
+      style={tribe ? { backgroundColor: `${tribe.colorHex}22`, borderColor: `${tribe.colorHex}55` } : undefined}
     >
-      <p className="text-[11px] font-semibold tracking-wide text-neutral-500">이번 주의 말</p>
-      <p className="mt-1.5 text-sm leading-relaxed font-medium text-neutral-800">
-        {hopeMessageOfWeek()}
+      <span aria-hidden="true" className="text-4xl">
+        {tribe ? tribe.emoji : "🌿"}
+      </span>
+      {/* 라벨과 문구는 한 <p> 안의 인라인 span 두 개다. 세로로 쌓지 않는다. */}
+      <p className="text-base leading-relaxed text-neutral-900">
+        {tribe && (
+          // 글자라 종족색 원본을 쓴다. 22/55 알파는 면(배경·테두리)용이라 글자에 쓰면 안 읽힌다.
+          <span className="font-bold" style={{ color: tribe.colorHex }}>
+            {tribe.animal}족에게:{" "}
+          </span>
+        )}
+        {pickHopeMessage(gallery)}
       </p>
     </div>
   )

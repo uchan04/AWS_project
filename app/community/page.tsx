@@ -57,11 +57,12 @@ export default async function CommunityPage(props: PageProps<"/community">) {
         <WriteModal gallery={gallery} myTypeCode={myTypeCode} />
       </div>
 
-      {/* 희망 문구 배너(SPEC 9절). 탭 위에 둔다 — 글 목록보다 먼저 읽히되
-          제목·글쓰기 버튼을 밀어내지 않는 자리다 */}
-      <HopeBanner gallery={gallery} />
-
       <GalleryTabs active={gallery} myTypeCode={myTypeCode} />
+
+      {/* 희망 문구 배너(SPEC 9절). 탭 아래에 둔다 — 배너 문구가 지금 고른 탭에 따라
+          갈리므로("고양잇과족에게:"), 원인인 탭이 결과인 배너보다 위에 있어야 읽힌다.
+          위에 두면 아래 탭을 눌러 위가 바뀌는 순서가 된다 */}
+      <HopeBanner gallery={gallery} />
 
       {posts.length === 0 ? (
         <p className="py-24 text-center text-sm leading-relaxed text-neutral-500">

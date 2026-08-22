@@ -6,8 +6,9 @@
 import assert from "node:assert/strict"
 import { TOPIC_COUNT, validateTopics } from "@/lib/community/topics"
 import { TOPICS } from "@/app/community/_lib/topics"
-import { hopeMessageOfWeek, HOPE_MESSAGES } from "@/app/community/_lib/hope"
-import type { TypeCode } from "@prisma/client"
+import { pickHopeMessage, HOPE_MESSAGES } from "@/app/community/_lib/banner"
+import { BANNED } from "@/lib/diagnosis/reason"
+import type { GalleryType, TypeCode } from "@prisma/client"
 
 const GOOD = [
   { title: "오늘 창밖 풍경", draft: "커튼을 열었더니 밖이 생각보다 밝았다. 잠깐 그대로 서 있었다." },
@@ -61,24 +62,50 @@ for (const [code, list] of Object.entries(TOPICS) as [TypeCode, typeof GOOD][]) 
   }
 }
 
-// 희망 문구 배너(SPEC 9절). 한 주 안에서는 같은 문구가 나오고, 주가 넘어가면 바뀐다
+// 희망 문구 배너(SPEC 9절). 갤러리 4개가 각자 배열을 갖는다(app/community/_lib/banner.ts).
+// 한 주 안에서는 같은 문구가 나오고, 주가 넘어가면 바뀐다.
 const WEEK_MS = 7 * 24 * 60 * 60 * 1000
 const base = new Date(1_780_000_000_000)
-assert.equal(
-  hopeMessageOfWeek(base),
-  hopeMessageOfWeek(new Date(base.getTime() + 6 * 24 * 60 * 60 * 1000)),
-  "같은 주에는 같은 문구다",
-)
-const overWeeks = new Set(
-  Array.from({ length: HOPE_MESSAGES.length }, (_, i) => hopeMessageOfWeek(new Date(base.getTime() + i * WEEK_MS))),
-)
-assert.equal(overWeeks.size, HOPE_MESSAGES.length, "문구 개수만큼 주가 지나면 전부 한 번씩 나온다")
-assert.equal(
-  hopeMessageOfWeek(base),
-  hopeMessageOfWeek(new Date(base.getTime() + HOPE_MESSAGES.length * WEEK_MS)),
-  "한 바퀴 돌면 처음 문구로 돌아온다",
-)
+const GALLERIES = Object.keys(HOPE_MESSAGES) as GalleryType[]
+
+assert.equal(GALLERIES.length, 4, "갤러리 4개(전체 + 종족 3)에 각각 문구 배열이 있다")
+
+let hopeChecked = 0
+for (const gallery of GALLERIES) {
+  const messages = HOPE_MESSAGES[gallery]
+  assert.ok(messages.length >= 3, `${gallery} 문구가 3개보다 적다 (SPEC 9절: 3~5개)`)
+
+  assert.equal(
+    pickHopeMessage(gallery, base),
+    pickHopeMessage(gallery, new Date(base.getTime() + 6 * 24 * 60 * 60 * 1000)),
+    `${gallery}: 같은 주에는 같은 문구다`,
+  )
+
+  const overWeeks = new Set(
+    Array.from({ length: messages.length }, (_, i) =>
+      pickHopeMessage(gallery, new Date(base.getTime() + i * WEEK_MS)),
+    ),
+  )
+  assert.equal(overWeeks.size, messages.length, `${gallery}: 문구 개수만큼 주가 지나면 전부 한 번씩 나온다`)
+
+  assert.equal(
+    pickHopeMessage(gallery, base),
+    pickHopeMessage(gallery, new Date(base.getTime() + messages.length * WEEK_MS)),
+    `${gallery}: 한 바퀴 돌면 처음 문구로 돌아온다`,
+  )
+
+  // banner.ts 상단 주석의 톤 규칙 중 "유형명을 절대 쓰지 않는다"를 실제로 검사한다.
+  // 주제 추천과 같은 목록(lib/diagnosis/reason.ts의 BANNED)을 쓴다 — 배너는 로그인한
+  // 모든 사람이 보는 자리라 낙인 단어가 새면 주제 추천보다 노출이 크다
+  for (const message of messages) {
+    const hit = BANNED.find((word) => message.includes(word))
+    assert.equal(hit, undefined, `${gallery}: 배너 문구에 낙인 단어 "${hit}"가 있다 — "${message}"`)
+    // "~해보세요"류 조언 금지도 같은 주석의 규칙이다. 조언은 압박으로 읽힌다
+    assert.ok(!/해\s?보세요|하세요|해야/.test(message), `${gallery}: 배너 문구가 조언이다 — "${message}"`)
+    hopeChecked += 1
+  }
+}
 
 console.log(
-  `community 체크 통과 (주제 검증 11, 고정 문구 ${fallbackChecked}개, 희망 문구 3) — 고정 문구는 LLM 실패 시 대비책이다`,
+  `community 체크 통과 (주제 검증 11, 고정 문구 ${fallbackChecked}개, 희망 문구 ${hopeChecked}개 × 갤러리 ${GALLERIES.length}갤러리) — 고정 문구는 LLM 실패 시 대비책이다`,
 )
