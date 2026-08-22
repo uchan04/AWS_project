@@ -9,7 +9,9 @@
 // 미인증도 여기까지 온다 — middleware.ts가 "/"를 공개 경로로 둔다. 그래야 소개 화면이
 // 보인다. 실제 인증은 각 API·보호 페이지의 첫 줄이 계속 한다.
 
-import { UnauthorizedError, getCurrentUser } from "@/lib/auth"
+import { petImageUrl } from "@/lib/assets"
+import { UnauthorizedError, getCurrentUserWithSkin } from "@/lib/auth"
+import { cappedStage } from "@/lib/pet"
 import { Intro } from "./_components/Intro"
 import HomeDashboard from "./HomeDashboard"
 import "@/styles/tokens.css"
@@ -20,7 +22,9 @@ export const dynamic = "force-dynamic"
 export default async function HomePage() {
   let user
   try {
-    user = await getCurrentUser()
+    // 활성 스킨까지 읽는다 — 홈 마스코트를 실제 펫 그림으로 띄우기 위한 것이다.
+    // 레이아웃이 같은 요청에서 이미 이 함수를 부르므로 쿼리는 늘지 않는다(lib/auth.ts의 cache)
+    user = await getCurrentUserWithSkin()
   } catch (error) {
     if (error instanceof UnauthorizedError) return <Intro authed={false} />
     // DB 장애다. 미인증 화면을 띄우면 이미 계정이 있는 사람에게 가입을 권하게 된다
@@ -41,5 +45,12 @@ export default async function HomePage() {
   // 진단이 중간에 끊긴 상태라 종족 표시가 반쪽이 된다(lib/profile.ts의 diagnosed와 같은 기준)
   if (!user.typeCode || !user.adjective) return <Intro authed />
 
-  return <HomeDashboard nickname={user.nickname || "익명"} typeCode={user.typeCode} />
+  // 스킨이 없으면(아직 아무것도 착용하지 않은 계정) null이고, 그때만 이모지로 떨어진다.
+  // 기본값 4는 prisma/seed/items.ts의 stageCount와 같다(lib/profile.ts와 같은 이유)
+  const skin = user.activePetSkin
+  const petImage = skin ? petImageUrl(skin.imageKeyBase, cappedStage(user.level, skin.stageCount)) : null
+
+  return (
+    <HomeDashboard nickname={user.nickname || "익명"} typeCode={user.typeCode} petImage={petImage} />
+  )
 }

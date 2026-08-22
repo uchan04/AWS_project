@@ -43,12 +43,17 @@ function greetingFor(hour: number): string {
   return "오늘도 수고했어요"
 }
 
+/**
+ * @param petImage 활성 스킨의 현재 단계 그림. 착용한 스킨이 없으면 null이고 그때만 이모지다.
+ */
 export default function HomeDashboard({
   nickname,
   typeCode,
+  petImage,
 }: {
   nickname: string
   typeCode: TypeCode
+  petImage: string | null
 }) {
   const [greeting, setGreeting] = useState("")
   // undefined = 아직 읽는 중, null = 못 읽었다(에러).
@@ -94,8 +99,23 @@ export default function HomeDashboard({
               <span aria-hidden="true">{tribe.emoji}</span> {tribe.family}
             </span>
           </div>
-          {/* 펫 이미지는 S3 업로드 전이다. 지금은 이모지 마스코트가 자리를 잡는다 */}
-          <span className="hm-home__mascot hm-float" aria-hidden="true">
+          {/* 활성 스킨의 현재 단계 그림. 아트는 public/art/pets에 구워져 있다(scripts/slice-art.ts).
+              파일이 없거나 스킨 미착용이면 종족 이모지로 떨어진다 — Sidebar와 같은 방식이다.
+              onError로 떨어뜨리는 이유: 이미지 404는 서버가 알 수 없어 서버에서 미리 고를 수 없다 */}
+          {petImage ? (
+            // eslint-disable-next-line @next/next/no-img-element
+            <img
+              src={petImage}
+              alt="펫"
+              className="hm-home__mascot hm-home__mascot--img hm-float"
+              onError={(e) => {
+                e.currentTarget.style.display = "none"
+                const fallback = e.currentTarget.nextElementSibling as HTMLElement | null
+                if (fallback) fallback.style.display = "block"
+              }}
+            />
+          ) : null}
+          <span className="hm-home__mascot hm-float" aria-hidden="true" style={{ display: petImage ? "none" : "block" }}>
             {tribe.emoji}
           </span>
         </div>
