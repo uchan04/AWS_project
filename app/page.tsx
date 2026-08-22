@@ -189,7 +189,9 @@ export default function HomePage() {
         {missions && (
           <div className="hm-card">
             <div className="hm-card__head">
-              <h2 className="hm-card__title">오늘까지의 나</h2>
+              {/* 제목이 길면 375px에서 두 줄로 접히고 옆의 배지가 밀린다. .hm-card__head는
+                  다른 카드도 쓰는 공유 클래스라 CSS 대신 문구를 짧게 잡았다 */}
+              <h2 className="hm-card__title">오늘의 나</h2>
               <span className="hm-pill">
                 <span aria-hidden="true">🔥</span>{" "}
                 {missions.progress.streak > 0 ? `연속 ${missions.progress.streak}일` : "오늘부터"}

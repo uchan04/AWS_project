@@ -38,16 +38,24 @@ export async function GET(request: Request) {
     return NextResponse.redirect(new URL("/login", origin))
   }
 
-  const tokenResponse = await fetch(`https://${domain}/oauth2/token`, {
-    method: "POST",
-    headers: { "content-type": "application/x-www-form-urlencoded" },
-    body: new URLSearchParams({
-      grant_type: "authorization_code",
-      client_id: process.env.COGNITO_CLIENT_ID ?? "",
-      code,
-      redirect_uri: `${origin}/api/auth/callback`,
-    }),
-  })
+  // fetch 자체가 throw하는 경우(DNS 실패, Cognito 장애, 타임아웃)도 감싼다.
+  // 감싸지 않으면 로그인 실패가 500 스택 페이지로 나온다 — /login으로 돌려보내는 쪽이 낫다
+  let tokenResponse: Response
+  try {
+    tokenResponse = await fetch(`https://${domain}/oauth2/token`, {
+      method: "POST",
+      headers: { "content-type": "application/x-www-form-urlencoded" },
+      body: new URLSearchParams({
+        grant_type: "authorization_code",
+        client_id: process.env.COGNITO_CLIENT_ID ?? "",
+        code,
+        redirect_uri: `${origin}/api/auth/callback`,
+      }),
+    })
+  } catch (error) {
+    console.error("GET /api/auth/callback: 토큰 엔드포인트에 닿지 못했다", error)
+    return NextResponse.redirect(new URL("/login", origin))
+  }
 
   if (!tokenResponse.ok) {
     // 실패 응답 본문에는 토큰이 없다(에러 코드뿐이라 남겨도 안전하다).
