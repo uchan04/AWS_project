@@ -5,6 +5,16 @@
 //  2) redirect_uri가 `https://localhost:3000/api/auth/callback`으로 나가 Cognito가 redirect_mismatch로 거부했다
 // 둘 다 값의 출처를 한 곳으로 모아 막는다.
 
+/**
+ * OAuth state 쿠키 이름. /api/auth/google이 심고 /api/auth/callback이 한 번 읽고 지운다.
+ * SameSite=Lax여야 한다 — Strict면 Cognito에서 돌아오는 최상위 이동에 쿠키가 실리지 않아
+ * 정상 로그인이 전부 state 불일치로 막힌다.
+ */
+export const OAUTH_STATE_COOKIE = "oauth_state"
+
+/** state 쿠키 수명(초). 로그인 화면에서 머뭇거릴 시간은 주고, 오래 남겨두지는 않는다 */
+export const OAUTH_STATE_MAX_AGE = 600
+
 /** 스킴·끝 슬래시·경로를 벗긴 Cognito 도메인. 없으면 null (호출부가 503으로 안내한다) */
 export function cognitoDomain(): string | null {
   const raw = process.env.COGNITO_DOMAIN?.trim()

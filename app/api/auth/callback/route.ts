@@ -4,9 +4,10 @@
 // redirect_uri는 /api/auth/google이 authorize에 보낸 값과 문자 단위로 같아야 한다.
 // 그래서 양쪽 모두 lib/oauth.ts의 appOrigin()만 쓴다.
 
+import { cookies } from "next/headers"
 import { NextResponse } from "next/server"
-import { setSessionCookie } from "@/lib/auth"
-import { appOrigin, cognitoDomain } from "@/lib/oauth"
+import { signInWithCognitoToken } from "@/lib/auth"
+import { OAUTH_STATE_COOKIE, appOrigin, cognitoDomain } from "@/lib/oauth"
 
 export async function GET(request: Request) {
   const url = new URL(request.url)
@@ -23,6 +24,17 @@ export async function GET(request: Request) {
   }
 
   if (!code || !domain) {
+    return NextResponse.redirect(new URL("/login", origin))
+  }
+
+  // CSRF 방어(A, 2026-08-22). state가 없거나 /api/auth/google이 심은 쿠키와 다르면 버린다.
+  // 이걸 검사하지 않으면 공격자가 자기 code로 만든 링크를 피해자에게 열게 해서
+  // 피해자를 공격자 계정에 로그인시킬 수 있다. 쿠키는 한 번 쓰고 지운다.
+  const jar = await cookies()
+  const expectedState = jar.get(OAUTH_STATE_COOKIE)?.value
+  jar.delete(OAUTH_STATE_COOKIE)
+  if (!expectedState || url.searchParams.get("state") !== expectedState) {
+    console.error("GET /api/auth/callback: state 불일치")
     return NextResponse.redirect(new URL("/login", origin))
   }
 
@@ -43,11 +55,19 @@ export async function GET(request: Request) {
     return NextResponse.redirect(new URL("/login", origin))
   }
 
-  const tokens = (await tokenResponse.json()) as { access_token?: string; expires_in?: number }
+  const tokens = (await tokenResponse.json()) as { access_token?: string }
   if (!tokens.access_token) {
     return NextResponse.redirect(new URL("/login", origin))
   }
 
-  await setSessionCookie(tokens.access_token, tokens.expires_in ?? 3600)
+  // Cognito 토큰(1시간)을 쿠키에 담지 않는다. 자체 세션 쿠키(7일)로 바꾼다 — 그러지 않으면
+  // Google로 들어온 사용자만 한 시간 뒤 조용히 로그아웃된다.
+  const user = await signInWithCognitoToken(tokens.access_token)
+  if (!user) {
+    console.error("GET /api/auth/callback: 액세스 토큰 검증 실패")
+    return NextResponse.redirect(new URL("/login", origin))
+  }
+
+  // 진단 전이면 결과가 없으니 홈이 소개 화면을 띄운다. 별도 분기가 필요하지 않다
   return NextResponse.redirect(new URL("/", origin))
 }

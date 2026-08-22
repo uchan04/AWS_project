@@ -7,7 +7,7 @@ import {
   UserNotFoundException,
 } from "@aws-sdk/client-cognito-identity-provider"
 import { fail, ok } from "@/lib/api"
-import { setLocalSessionCookie, setSessionCookie } from "@/lib/auth"
+import { setLocalSessionCookie, signInWithCognitoToken } from "@/lib/auth"
 import { verifyPassword } from "@/lib/password"
 import { prisma } from "@/lib/prisma"
 
@@ -49,7 +49,10 @@ export async function POST(request: Request) {
     const accessToken = auth.AuthenticationResult?.AccessToken
     if (!accessToken) return fail("LOGIN_FAILED", "로그인에 실패했습니다", 401)
 
-    await setSessionCookie(accessToken, auth.AuthenticationResult?.ExpiresIn ?? 3600)
+    // Cognito 토큰은 쿠키에 담지 않는다. 자체 세션(7일)으로 바꿔 자체 계정과 수명을 맞춘다
+    if (!(await signInWithCognitoToken(accessToken))) {
+      return fail("LOGIN_FAILED", "로그인에 실패했습니다", 401)
+    }
     return ok({})
   } catch (error) {
     if (error instanceof NotAuthorizedException || error instanceof UserNotFoundException) {

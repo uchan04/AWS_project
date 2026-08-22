@@ -67,19 +67,42 @@ export async function getCurrentUser(): Promise<User> {
     return user
   }
 
+  // 2026-08-22 이전에 발급된 Cognito 쿠키를 위한 경로. 새 로그인은 위의 세션 쿠키만 심는다.
+  // 이 쿠키는 1시간이면 만료되므로 남아 있는 것도 곧 사라진다.
   const token = jar.get("access_token")?.value ?? null
   if (!token) throw new UnauthorizedError()
 
+  const user = await userFromCognitoToken(token)
+  if (!user) throw new UnauthorizedError()
+  return user
+}
+
+/** Cognito 액세스 토큰 → 우리 계정. 없으면 만든다. 토큰이 유효하지 않으면 null */
+async function userFromCognitoToken(accessToken: string): Promise<User | null> {
   try {
-    const payload = await getVerifier().verify(token)
-    return prisma.user.upsert({
+    const payload = await getVerifier().verify(accessToken)
+    return await prisma.user.upsert({
       where: { cognitoSub: payload.sub },
       update: {},
       create: { cognitoSub: payload.sub },
     })
   } catch {
-    throw new UnauthorizedError()
+    return null
   }
+}
+
+/**
+ * Cognito로 인증한 직후(이메일 로그인 폴백·Google 콜백) 세션을 심는다. 실패하면 null.
+ *
+ * Cognito 액세스 토큰을 쿠키에 그대로 담지 않는다(A, 2026-08-22). 그 토큰은 1시간이면
+ * 만료되고 refresh 흐름이 없어서 Google로 들어온 사용자만 한 시간 뒤 조용히 로그아웃됐다.
+ * 여기서 자체 세션 쿠키(7일)로 바꿔 자체 계정과 수명을 맞춘다.
+ */
+export async function signInWithCognitoToken(accessToken: string): Promise<User | null> {
+  const user = await userFromCognitoToken(accessToken)
+  if (!user) return null
+  await setLocalSessionCookie(user.id)
+  return user
 }
 
 /**
@@ -93,17 +116,6 @@ export async function getCurrentUserWithSkin(): Promise<User & { activePetSkin: 
     include: { activePetSkin: true },
   })
   return full
-}
-
-/** app/api/auth/* 가 로그인 성공 후 이 쿠키를 심는다. 이메일·Google 로그인 모두 동일하게 쓴다. */
-export async function setSessionCookie(accessToken: string, expiresInSeconds: number) {
-  ;(await cookies()).set("access_token", accessToken, {
-    httpOnly: true,
-    secure: process.env.NODE_ENV === "production",
-    sameSite: "lax",
-    path: "/",
-    maxAge: expiresInSeconds,
-  })
 }
 
 /**
