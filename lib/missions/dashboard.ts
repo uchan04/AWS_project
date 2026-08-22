@@ -1,7 +1,8 @@
 import type { User } from "@prisma/client"
 import { prisma } from "@/lib/prisma"
 import { getTodayKey, getToday } from "./reset"
-import { computeStageProgress } from "./stages"
+import { computeStageProgress, currentStageOf, isGraduated } from "./stages"
+import { MISSIONS_PER_STAGE, TOTAL_STAGES, bandLabel } from "./bands"
 
 export type CompletionMode = "BUTTON" | "PHOTO" | "EVENT"
 
@@ -25,6 +26,8 @@ export type StageMissionDTO = {
   unlocked: boolean
   completedCount: number
   requiredForNextStage: number
+  /** 구간 이름("방 안에서", "한마디 건네기" …). 유형 이름은 절대 넣지 않는다 */
+  bandLabel: string
   missions: MissionDTO[]
 }
 
@@ -43,8 +46,26 @@ export type DashboardDTO = {
     claimedToday: boolean
     attendanceTotal: number
   }
+  /**
+   * 단계 진행 요약. stageMissions는 현재 단계 주변만 담고 있으므로
+   * "37 / 100"을 그리려면 이 값이 따로 필요하다
+   */
+  stages: {
+    current: number
+    total: number
+    graduated: boolean
+  }
   userTypeCode: string | null
 }
+
+/**
+ * 응답에 실을 단계 창(窓). 현재 단계 앞뒤 2단계.
+ *
+ * 100단계 × 3미션을 다 실으면 응답이 300개 미션이 된다. 화면은 캐러셀로
+ * 한 번에 한 단계만 보여주므로 앞뒤 두 칸만 있으면 화살표를 눌러도 끊기지 않고,
+ * 끝에 닿으면 다음 요청이 새 창을 가져온다.
+ */
+const STAGE_WINDOW = 2
 
 function getCompletionMode(mission: { code: string; requiresPhoto: boolean }): CompletionMode {
   if (mission.requiresPhoto) return "PHOTO"
@@ -80,11 +101,16 @@ export async function buildDashboard(user: User): Promise<DashboardDTO> {
         select: { missionId: true },
       }),
       prisma.mission.findMany({
-        where: { scope: "STAGE", typeCode },
+        // order 상한 이유는 lib/missions/stages.ts getStageProgress 주석에 있다
+        where: { scope: "STAGE", typeCode, order: { lte: MISSIONS_PER_STAGE } },
         orderBy: [{ stage: "asc" }, { order: "asc" }],
       }),
       prisma.userMission.findMany({
-        where: { userId: user.id, resetKey: "STAGE", mission: { scope: "STAGE", typeCode } },
+        where: {
+          userId: user.id,
+          resetKey: "STAGE",
+          mission: { scope: "STAGE", typeCode, order: { lte: MISSIONS_PER_STAGE } },
+        },
         select: { missionId: true },
       }),
       prisma.userMission.count({
@@ -120,8 +146,14 @@ export async function buildDashboard(user: User): Promise<DashboardDTO> {
   // getStageProgress()를 호출하면 같은 두 쿼리를 다시 낸다.
   const completedIdSet = new Set(allStageCompletions.map((c) => c.missionId))
   const stageProgress = computeStageProgress(allStageMissions, completedIdSet)
+  const currentStage = currentStageOf(stageProgress)
 
-  const stageMissions: StageMissionDTO[] = stageProgress.map((sp) => {
+  const windowStart = Math.max(1, currentStage - STAGE_WINDOW)
+  const windowEnd = Math.min(TOTAL_STAGES, currentStage + STAGE_WINDOW)
+
+  const stageMissions: StageMissionDTO[] = stageProgress
+    .filter((sp) => sp.stage >= windowStart && sp.stage <= windowEnd)
+    .map((sp) => {
     const missions = allStageMissions.filter((m) => m.stage === sp.stage)
 
     const missionDTOs: MissionDTO[] = missions.map((m) => ({
@@ -144,6 +176,7 @@ export async function buildDashboard(user: User): Promise<DashboardDTO> {
       unlocked: sp.unlocked,
       completedCount: sp.completedCount,
       requiredForNextStage: sp.requiredForNextStage,
+      bandLabel: bandLabel(sp.stage),
       missions: missionDTOs,
     }
   })
@@ -178,6 +211,11 @@ export async function buildDashboard(user: User): Promise<DashboardDTO> {
       cycleDay,
       claimedToday: claimedToday > 0,
       attendanceTotal: user.attendanceTotal,
+    },
+    stages: {
+      current: currentStage,
+      total: TOTAL_STAGES,
+      graduated: isGraduated(stageProgress),
     },
     userTypeCode: user.typeCode,
   }

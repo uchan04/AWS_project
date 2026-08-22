@@ -785,7 +785,10 @@ export default function MissionDashboard() {
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState<string | null>(null)
   const [selected, setSelected] = useState<MissionDTO | null>(null)
-  const [currentStageIndex, setCurrentStageIndex] = useState(0)
+  // 캐러셀 위치. null이면 "지금 서 있는 단계"를 보여준다(아래 defaultIndex).
+  // 절대 인덱스를 state에 박아두면 미션을 완료해 창이 옮겨간 뒤 엉뚱한 단계를 가리킨다 —
+  // 그래서 새로 불러올 때마다 null로 되돌린다
+  const [stageIndexOverride, setStageIndexOverride] = useState<number | null>(null)
 
   const loadDashboard = useCallback(async () => {
     try {
@@ -797,6 +800,7 @@ export default function MissionDashboard() {
         return
       }
       setDashboard(json.data)
+      setStageIndexOverride(null)
       setLoading(false)
     } catch {
       setError("네트워크 오류가 발생했습니다")
@@ -940,6 +944,17 @@ export default function MissionDashboard() {
         const allMissions = dashboard.stageMissions
         if (allMissions.length === 0) return null
 
+        // 서버는 지금 단계 앞뒤 2칸만 보내준다(lib/missions/dashboard.ts STAGE_WINDOW).
+        // 기본으로 보여줄 칸은 "지금 서 있는 단계"다 — 100단계 캐러셀을 1단계부터 열면
+        // 37단계 사용자가 화살표를 36번 눌러야 한다
+        const defaultIndex = Math.max(
+          0,
+          allMissions.findIndex((sm) => sm.stage === dashboard.stages.current),
+        )
+        const currentStageIndex = Math.min(
+          allMissions.length - 1,
+          stageIndexOverride ?? defaultIndex,
+        )
         const currentMission = allMissions[currentStageIndex]
         const hasPrev = currentStageIndex > 0
         const hasNext = currentStageIndex < allMissions.length - 1
@@ -947,24 +962,38 @@ export default function MissionDashboard() {
         return (
           <div style={{ marginBottom: 36 }}>
             <div>
-              <h2
+              <div
                 style={{
-                  fontFamily: "'Gowun Dodum', sans-serif",
-                  fontSize: 19,
-                  color: "#2A1F14",
-                  margin: "0 0 4px",
+                  display: "flex",
+                  alignItems: "baseline",
+                  justifyContent: "space-between",
+                  gap: 8,
                 }}
               >
-                추가 미션
-              </h2>
+                <h2
+                  style={{
+                    fontFamily: "'Gowun Dodum', sans-serif",
+                    fontSize: 19,
+                    color: "#2A1F14",
+                    margin: "0 0 4px",
+                  }}
+                >
+                  단계 미션
+                </h2>
+                <span style={{ fontSize: 12, color: "#7A6B58" }}>
+                  {dashboard.stages.current} / {dashboard.stages.total} 단계
+                </span>
+              </div>
               <p style={{ fontSize: 12, color: "#7A6B58", margin: "0 0 14px" }}>
-                단계를 완료하면 새로운 미션이 열려요
+                {dashboard.stages.graduated
+                  ? "100단계를 모두 지났어요. 여기까지 온 것 자체가 결과예요."
+                  : "3개 중 2개를 하면 다음 단계가 열려요"}
               </p>
             </div>
             <div style={{ position: "relative" }}>
               {/* 왼쪽 화살표 */}
               <button
-                onClick={() => setCurrentStageIndex((i) => Math.max(0, i - 1))}
+                onClick={() => setStageIndexOverride(Math.max(0, currentStageIndex - 1))}
                 disabled={!hasPrev}
                 style={{
                   position: "absolute",
@@ -988,7 +1017,7 @@ export default function MissionDashboard() {
               <button
                 onClick={() => {
                   if (hasNext) {
-                    setCurrentStageIndex((i) => Math.min(allMissions.length - 1, i + 1))
+                    setStageIndexOverride(Math.min(allMissions.length - 1, currentStageIndex + 1))
                   }
                 }}
                 disabled={!hasNext}
@@ -1011,13 +1040,17 @@ export default function MissionDashboard() {
               </button>
 
               <StepSection
-                title={`단계 ${currentMission.stage}`}
+                title={`${currentMission.stage}단계 · ${currentMission.bandLabel}`}
                 missions={currentMission.missions}
                 color={color}
                 bg={bg}
                 mascotEmoji={mascotEmoji}
                 unlocked={currentMission.unlocked}
-                progress={currentMission.unlocked ? `${currentMission.completedCount} / 4 완료` : "🔒 이전 단계를 먼저 완료해 주세요"}
+                progress={
+                  currentMission.unlocked
+                    ? `${currentMission.completedCount} / ${currentMission.missions.length} 완료`
+                    : `🔒 앞 단계에서 ${currentMission.requiredForNextStage}개를 먼저 해주세요`
+                }
                 onSelect={setSelected}
               />
             </div>
