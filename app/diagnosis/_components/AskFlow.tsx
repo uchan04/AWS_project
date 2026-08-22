@@ -54,7 +54,9 @@ export default function AskFlow() {
     setError(null)
     try {
       await completeDiagnosis(all)
-      router.push("/diagnosis/result")
+      // ?new=1로 "방금 마쳤다"를 알린다. 결과 화면은 이름을 바꾸러 다시 들어오는 경로이기도 해서
+      // 버튼 문구가 갈린다(이 이름으로 시작하기 / 이름 저장하기)
+      router.push("/diagnosis/result?new=1")
     } catch (caught) {
       setError(caught instanceof Error ? caught.message : "잠시 후 다시 시도해 주세요")
     }
