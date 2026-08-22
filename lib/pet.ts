@@ -1,5 +1,5 @@
 import type { Rarity, Slot } from "@prisma/client"
-import { SEED_TO_EXP, TRIBE, evolutionStageFor, expToNextLevel } from "@/lib/types"
+import { EVOLUTION_LEVEL, SEED_TO_EXP, TRIBE, evolutionStageFor, expToNextLevel } from "@/lib/types"
 
 // 소유자: C. 펫 성장 계산. 순수 함수만 둔다 (DB·요청 객체를 모르게 유지해야 체크 스크립트로 검증된다).
 // 수치 근거는 SPEC.md 5절. 곡선 상수는 lib/types.ts(A 소유)에 있으므로 여기서 다시 정의하지 않는다.
@@ -246,4 +246,109 @@ export function hungerLabel(hunger: number): string {
   if (hunger >= 60) return "배부르고 기분이 좋아요"
   if (hunger >= HUNGER_LOW) return "조금 배고파졌어요"
   return "배가 고파요. 씨앗을 먹여 주세요"
+}
+
+// ── 다음 목표를 개수로 말한다 (2026-08-23 추가) ────────────────────────────────
+//
+// 화면이 지금까지 `Lv.25 마지막 진화`만 보여 줬다. 실제로 서비스되는 육성 게임
+// (다마고치·포켓캠프·My Talking Tom)은 전부 다음 목표를 **남은 개수**로 알려 준다 —
+// "Lv.25"는 지금 내가 무엇을 얼마나 해야 하는지 알려 주지 않는다.
+//
+// 경험치 곡선(lib/types.ts)이 expToNextLevel(L) = L × 100이므로 레벨 N까지의 누적은
+// 100 × (1+2+…+(N-1)) = 50 × N × (N-1)이다. 씨앗은 그 값을 SEED_TO_EXP로 나눈 것.
+// 곡선을 고치면 이 식도 같이 틀리므로 check:pet이 applySeeds를 실제로 돌려 교차 검증한다.
+
+function expAtLevel(level: number): number {
+  const n = Math.max(1, Math.floor(level))
+  return 50 * n * (n - 1)
+}
+
+/**
+ * 다음 진화까지 남은 씨앗 개수. 마지막 단계(4)에 이미 닿았으면 null.
+ * stage는 도달할 단계 번호라 화면이 "성체까지"처럼 이름을 붙일 수 있다.
+ */
+export function seedsToNextStage(level: number, exp: number): { stage: number; seeds: number } | null {
+  const gates = [EVOLUTION_LEVEL.STAGE2, EVOLUTION_LEVEL.STAGE3, EVOLUTION_LEVEL.STAGE4]
+  const target = gates.find((gate) => Math.floor(level) < gate)
+  if (target === undefined) return null
+
+  const need = expAtLevel(target) - (expAtLevel(level) + Math.max(0, Math.floor(exp)))
+  // 경계에서 0이 나오면 "0개만 더"가 되어 이상하다. 최소 1로 올린다
+  return { stage: evolutionStageFor(target), seeds: Math.max(1, Math.ceil(need / SEED_TO_EXP)) }
+}
+
+// ── 펫의 한 줄 (2026-08-23 추가) ──────────────────────────────────────────────
+//
+// 벤치마크한 5종(Finch, 다마고치, ねこあつめ, My Talking Tom, 포켓캠프) 중 4종은
+// 펫이 사용자에게 **먼저 말을 건다.** 우리 화면은 이름과 고정 단계 설명만 있어서
+// 상태를 알려면 게이지를 읽어야 했다. 같은 숫자를 두 번 보여 주는 대신 펫이 말한다.
+//
+// 문구를 지시문("씨앗을 먹여 주세요")이 아니라 1인칭 상태("배가 조금 고파요")로 쓴다.
+// 고립은둔 청년에게 앱이 할 일을 지시하면 그 자체가 압박이 된다 — SPEC.md 5절이
+// 랭킹·경쟁 지표를 뺀 것과 같은 이유다. hungerLabel의 지시형 문구는 게이지 옆에
+// 그대로 남겨 둔다(그쪽은 접근성 라벨이라 상태를 명확히 말해야 한다).
+//
+// 순수 함수다. DB도 시각도 읽지 않고 저장하는 값도 없다 — check:pet이 검증한다.
+
+export type PetMoodTone = "hungry" | "harvest" | "soon" | "calm"
+export type PetMood = {
+  tone: PetMoodTone
+  /** 말풍선에 그대로 넣는 한 줄 */
+  text: string
+}
+
+// level로 골라 리렌더마다 바뀌지 않는다. Math.random()을 쓰면 1초 타이머가 돌 때마다
+// 대사가 바뀌어 읽을 수 없다(PetView의 idle 카운터가 매초 리렌더를 낸다).
+const CALM_LINES = [
+  "여기 같이 있어 줘서 좋아요",
+  "오늘도 와 줬네요",
+  "창밖이 조용해요. 우리도 조용히 있어요",
+  "천천히 해도 괜찮아요",
+  "아무것도 안 해도 돼요. 그냥 있어 줄래요",
+]
+
+/**
+ * 우선순위는 "지금 행동할 수 있는 것"이 위다.
+ * 배고픔 → 씨앗 상한(더 안 쌓이니 손해가 진행 중) → 진화 임박 → 떨어진 씨앗 → 평온.
+ */
+export function petMood(state: {
+  hunger: number
+  level: number
+  exp: number
+  idleSeeds: number
+  idleCapped: boolean
+}): PetMood {
+  if (state.hunger < HUNGER_LOW) return { tone: "hungry", text: "배가 조금 고파요…" }
+
+  if (state.idleCapped || state.idleSeeds >= IDLE_MAX_SEEDS) {
+    return { tone: "harvest", text: "씨앗이 가득 쌓였어요. 더는 안 늘어나요" }
+  }
+
+  const next = seedsToNextStage(state.level, state.exp)
+  if (next && next.seeds <= 10) {
+    return { tone: "soon", text: `씨앗 ${next.seeds}개만 더 먹으면 뭔가 달라질 것 같아요` }
+  }
+
+  if (state.idleSeeds > 0) {
+    return { tone: "harvest", text: `방에 씨앗 ${state.idleSeeds}개가 떨어져 있어요` }
+  }
+
+  return { tone: "calm", text: CALM_LINES[Math.max(1, Math.floor(state.level)) % CALM_LINES.length] }
+}
+
+/**
+ * 쓰다듬었을 때의 반응. 누른 횟수를 넘기면 같은 말이 연속으로 나오지 않는다.
+ * 재화도 저장값도 움직이지 않는다 — 누르는 것 자체가 보상인 상호작용이다
+ * (My Talking Tom·다마고치가 같은 구조다).
+ */
+export const PET_TOUCH_REPLIES = [
+  "헤헤, 간지러워요",
+  "좋아요. 조금 더요",
+  "손이 따뜻하네요",
+  "여기 있어 줘서 고마워요",
+  "오늘 하루는 어땠어요?",
+]
+
+export function petTouchReply(count: number): string {
+  return PET_TOUCH_REPLIES[Math.abs(Math.floor(count)) % PET_TOUCH_REPLIES.length]
 }

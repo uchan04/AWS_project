@@ -12,6 +12,9 @@ import {
   animalEmoji,
   expProgress,
   hungerLabel,
+  petMood,
+  petTouchReply,
+  seedsToNextStage,
 } from "@/lib/pet"
 import { EVOLUTION_LEVEL, SEED_TO_EXP, expToNextLevel } from "@/lib/types"
 import PetRoom from "./PetRoom"
@@ -89,15 +92,13 @@ function stageRange(stage: number): string {
   return `Lv.${EVOLUTION_LEVEL.STAGE4}+`
 }
 
-/** 다음 진화까지 남은 것. 최종 단계면 null */
-function nextMilestone(level: number): string | null {
-  if (level < EVOLUTION_LEVEL.STAGE2) return `Lv.${EVOLUTION_LEVEL.STAGE2} 첫 진화`
-  if (level < EVOLUTION_LEVEL.STAGE3) return `Lv.${EVOLUTION_LEVEL.STAGE3} 다음 진화`
-  if (level < EVOLUTION_LEVEL.STAGE4) return `Lv.${EVOLUTION_LEVEL.STAGE4} 마지막 진화`
-  return null
-}
-
 const FEED_PRESETS = [1, 10, 50, 100]
+
+/** 반응 대사가 화면에 머무는 시간. 이보다 짧으면 읽기 전에 사라진다 */
+const REACTION_MS = 3000
+
+/** 먹였을 때의 반응. 진화 여부와 무관하게 항상 뜬다 */
+const FEED_REPLY = "맛있어요! 힘이 나요"
 
 const ko = (n: number) => n.toLocaleString("ko-KR")
 
@@ -108,13 +109,22 @@ export default function PetView({ initial }: { initial: PetState }) {
   const [evolvedTo, setEvolvedTo] = useState<number | null>(null)
   const [amount, setAmount] = useState(1)
   const [msLeft, setMsLeft] = useState(initial.msToNextSeed)
+  // 쓰다듬기·먹이기 반응. 3초 뒤 사라지고 다시 petMood()의 상태 한 줄로 돌아간다.
+  // burst는 파티클 span의 key다 — 값이 바뀌면 remount되어 CSS 애니메이션이 처음부터 다시 돈다
+  // (같은 요소의 class만 갈면 연속 클릭에서 두 번째부터 애니메이션이 재생되지 않는다)
+  const [reaction, setReaction] = useState<{ text: string; eat: boolean } | null>(null)
+  const [burst, setBurst] = useState(0)
+  const [touches, setTouches] = useState(0)
 
   const need = expToNextLevel(pet.level)
   const progress = expProgress(pet.level, pet.exp)
   const emoji = animalEmoji(pet.animal)
   // 단일 형태(친밀도 캐릭터)는 단계 크기를 쓰지 않는다. 중간 크기로 고정한다
   const stage = pet.stageCount > 1 ? Math.min(pet.evolutionStage, MAX_STAGE) : 2
-  const milestone = nextMilestone(pet.level)
+  // 다음 진화까지 남은 씨앗. 최종 단계면 null (lib/pet.ts seedsToNextStage)
+  const nextStage = seedsToNextStage(pet.level, pet.exp)
+  // 펫이 스스로 상태를 말한다. 반응 대사가 있으면 그동안은 그쪽이 이긴다
+  const mood = petMood(pet)
   // evolutionStageFor가 MAX_STAGE에서 멈추므로 카드도 그 수를 넘기지 않는다
   const stages = Array.from({ length: Math.min(pet.stageCount, MAX_STAGE) }, (_, i) => i + 1)
   const feedable = Math.min(amount, pet.seeds)
@@ -141,6 +151,28 @@ export default function PetView({ initial }: { initial: PetState }) {
     }, 1000)
     return () => clearInterval(tick)
   }, [pet.idleCapped, pet.idleSeeds])
+
+  // 반응 대사 정리. burst에 걸어야 3초 안에 다시 누른 경우 타이머가 새로 시작한다
+  useEffect(() => {
+    if (!reaction) return
+    const t = setTimeout(() => setReaction(null), REACTION_MS)
+    return () => clearTimeout(t)
+  }, [reaction, burst])
+
+  function react(text: string, eat = false) {
+    setReaction({ text, eat })
+    setBurst((n) => n + 1)
+  }
+
+  /**
+   * 쓰다듬기. 재화도 저장값도 움직이지 않는다 — 서버를 부르지 않는 순수 상호작용이다.
+   * 벤치마크(My Talking Tom·다마고치)에서 펫을 만지는 것은 이 장르의 기본 동작이고,
+   * 우리 화면은 그동안 펫을 눌러도 아무 일이 없었다.
+   */
+  function pat() {
+    react(petTouchReply(touches))
+    setTouches((n) => n + 1)
+  }
 
   async function feed(seeds: number) {
     if (pending || seeds < 1 || seeds > pet.seeds) return
@@ -171,6 +203,8 @@ export default function PetView({ initial }: { initial: PetState }) {
       }))
       setAmount(1)
       setToast({ text: `씨앗 ${ko(seeds)}개를 먹였어요. 경험치 +${ko(seeds * SEED_TO_EXP)}` })
+      // 진화하지 않는 대부분의 먹이기에도 반응을 남긴다. 지금까지는 숫자만 바뀌었다
+      react(FEED_REPLY, true)
 
       // 진화 풀스크린 연출 2초 (SPEC.md 5절)
       if (next.evolvedTo) {
@@ -267,6 +301,27 @@ export default function PetView({ initial }: { initial: PetState }) {
               <span className="pet-room__seed">🍃</span>
             </div>
 
+            {/* 방에 떨어진 씨앗을 직접 주워 수확한다. ねこあつめ(고양이 모으기)처럼
+                방치형 보상은 방 안의 물건을 눌러 받는 것이 이 장르의 기본 동작이다.
+                아래 "받기" 버튼과 같은 claim()을 부른다 — 이건 대체가 아니라 추가다.
+                카드 쪽 버튼을 지우면 방 그림을 볼 수 없는 사용자가 수확을 못 한다 */}
+            {pet.idleSeeds > 0 ? (
+              <button
+                type="button"
+                className="pet-room__pickup"
+                onClick={claim}
+                disabled={pending}
+                aria-label={`방에 떨어진 씨앗 ${ko(pet.idleSeeds)}개 줍기`}
+              >
+                <span className="pet-room__pickup-icon" aria-hidden="true">
+                  🌱
+                </span>
+                <span className="pet-room__pickup-text" aria-hidden="true">
+                  씨앗 {ko(pet.idleSeeds)}개 줍기
+                </span>
+              </button>
+            ) : null}
+
             <div className="pet-char" data-stage={stage}>
               <span className="pet-char__badge">Lv.{pet.level}</span>
               {/* 반짝임 3개. 위치·타이밍이 각각 달라 pet.css가 data-i로 구분한다 */}
@@ -280,9 +335,28 @@ export default function PetView({ initial }: { initial: PetState }) {
                 ✨
               </span>
 
-              <span className="pet-char__body" aria-hidden="true">
-                {petFace}
-              </span>
+              {/* 눌러서 쓰다듬는다. span이던 것을 button으로 감쌌다 —
+                  키보드로도 닿아야 하고, 그림 자체는 aria-hidden이라 라벨을 여기 붙인다 */}
+              <button
+                type="button"
+                className="pet-char__touch"
+                onClick={pat}
+                aria-label={`${pet.skinName} 쓰다듬기`}
+              >
+                <span className="pet-char__body" aria-hidden="true">
+                  {petFace}
+                </span>
+              </button>
+
+              {/* 반응 파티클. key가 바뀌면 remount되어 애니메이션이 처음부터 다시 돈다 */}
+              {reaction ? (
+                <span className="pet-char__burst" key={burst} aria-hidden="true">
+                  <span data-i="1">{reaction.eat ? "🌱" : "💗"}</span>
+                  <span data-i="2">{reaction.eat ? "✨" : "💗"}</span>
+                  <span data-i="3">{reaction.eat ? "🌿" : "💗"}</span>
+                </span>
+              ) : null}
+
               <span className="pet-char__shadow" aria-hidden="true" />
 
               <p className="pet-char__name">{pet.skinName}</p>
@@ -301,6 +375,19 @@ export default function PetView({ initial }: { initial: PetState }) {
                 </span>
               ) : null}
             </div>
+
+            {/* 펫이 스스로 말한다. aria-live를 걸지 않는다 — 같은 내용을 배고픔·경험치
+                게이지와 토스트가 이미 알리고, 여기에 live를 걸면 먹일 때마다
+                "맛있어요"와 토스트가 겹쳐 읽힌다.
+
+                .pet-char 안이 아니라 방 직속이고, DOM에서 .pet-char **뒤**에 둔다.
+                - 펫 위쪽 바깥(bottom: 100%)에 붙였더니 320px에서 방을 73px 넘어가
+                  overflow: hidden에 잘렸다(실측). 그래서 방 위쪽 고정으로 바꿨다.
+                - z-index가 같으면 DOM 순서가 위아래를 정한다. 앞에 두면 좁은 화면에서
+                  펫 머리가 글자를 덮는다 — 읽히는 쪽이 위여야 한다 */}
+            <p className="pet-bubble" data-tone={reaction ? (reaction.eat ? "eat" : "touch") : mood.tone}>
+              {reaction?.text ?? mood.text}
+            </p>
           </div>
 
           {/* 배고픔. 0이 되어도 잃는 것은 없다 (lib/pet.ts hungerFor 주석) */}
@@ -346,9 +433,15 @@ export default function PetView({ initial }: { initial: PetState }) {
                 {ko(pet.exp)} / {ko(need)}
               </span>
             </div>
+            {/* 지금까지 `Lv.25 마지막 진화`만 보여 줬다. 그 문구는 지금 무엇을 얼마나
+                해야 하는지 알려 주지 않는다. 벤치마크한 육성 게임은 전부 남은 개수를 쓴다 */}
             <p className="pet-card__foot">
               <span>현재 Lv.{pet.level}</span>
-              <span>{milestone ?? "마지막 단계예요"}</span>
+              <span>
+                {nextStage
+                  ? `${STAGE_NAME[nextStage.stage - 1] ?? `${nextStage.stage}단계`}까지 씨앗 ${ko(nextStage.seeds)}개`
+                  : "마지막 단계예요"}
+              </span>
             </p>
           </div>
 

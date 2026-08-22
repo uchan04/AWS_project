@@ -277,6 +277,48 @@
   animation: petFloatSeed 2.8s var(--ease-in-out) 1.5s infinite;
 }
 
+/* 방에 떨어진 씨앗 줍기 (2026-08-23).
+   방치형 보상을 방 안에서 직접 주울 수 있게 만든 버튼이다 — ねこあつめ(고양이 모으기)처럼
+   방 안 물건을 눌러 받는 것이 이 장르의 기본 동작이고, 지금까지는 카드 안의 "받기"
+   버튼 하나뿐이었다. 오른쪽 카드의 버튼은 그대로 남는다(같은 claim()을 부른다).
+
+   위 장식 씨앗과 달리 pointer-events를 살린다. z-index는 .pet-char와 같은 값이고
+   DOM에서 먼저 나오므로 펫이 위에 그려진다 — 쓰다듬기를 가리지 않는다. */
+.pet-room__pickup {
+  position: absolute;
+  bottom: var(--space-sm);
+  left: var(--space-sm);
+  z-index: var(--z-raised);
+  display: inline-flex;
+  align-items: center;
+  gap: var(--space-3xs);
+  padding: var(--space-3xs) var(--space-xs);
+  border: 2px solid var(--color-card);
+  border-radius: var(--radius-pill);
+  background: var(--pet-seed);
+  box-shadow: 0 4px 12px rgb(42 31 20 / 0.28);
+  color: #fff;
+  font-family: var(--font-display);
+  font-size: var(--text-label);
+  font-weight: 700;
+  cursor: pointer;
+  animation: petPickupBob 1.6s var(--ease-in-out) infinite;
+}
+
+.pet-room__pickup:hover {
+  background: var(--pet-seed-2);
+}
+
+.pet-room__pickup:disabled {
+  cursor: default;
+  opacity: 0.6;
+  animation: none;
+}
+
+.pet-room__pickup-icon {
+  font-size: var(--text-md);
+}
+
 /* ── 펫 캐릭터 ───────────────────────────────────────────────────────────── */
 
 /* 펫은 방 **중앙 하단**에 고정한다 (2026-08-21 사용자 확정).
@@ -331,11 +373,96 @@
   animation: petSparkle 3s var(--ease-in-out) 1s infinite;
 }
 
+/* 말풍선 (2026-08-23).
+   펫이 자기 상태를 한 줄로 말한다 (lib/pet.ts petMood). 벤치마크한 5종 중 4종
+   (Finch·다마고치·My Talking Tom·포켓캠프)이 펫에게 말을 시킨다.
+
+   **방의 위쪽에 고정한다.** 처음에는 .pet-char 위쪽 바깥(bottom: 100%)에 띄웠는데,
+   320px에서 방(min-height 15rem = 240px)에 4단 펫 그림 160px + 이름 + 설명이 이미
+   가득 차 말풍선이 방 위로 73px 삐져나갔다. .pet-room은 overflow: hidden이라
+   그대로 잘렸다(브라우저에서 실측). 펫 높이와 무관하게 항상 보이는 자리로 옮긴다.
+   max-width를 방 기준으로 잡아 좌우로도 잘리지 않는다. */
+.pet-bubble {
+  position: absolute;
+  top: var(--space-xs);
+  left: 50%;
+  z-index: var(--z-raised);
+  width: max-content;
+  max-width: min(14rem, calc(100% - 2 * var(--space-md)));
+  margin: 0;
+  padding: var(--space-3xs) var(--space-xs);
+  transform: translateX(-50%);
+  border: 2px solid var(--tribe-line);
+  border-radius: var(--radius-card);
+  background: color-mix(in oklch, var(--color-card) 94%, transparent);
+  box-shadow: 0 4px 12px rgb(42 31 20 / 0.18);
+  color: var(--color-ink);
+  font-size: var(--text-label);
+  line-height: 1.45;
+  text-align: center;
+  animation: petBubbleIn var(--dur-short) var(--ease-out) both;
+}
+
+/* 지금 눌러서 해결할 수 있는 상태만 테두리를 세운다. 나머지는 그냥 하는 말이다 */
+.pet-bubble[data-tone="harvest"] {
+  border-color: var(--pet-seed);
+}
+.pet-bubble[data-tone="hungry"],
+.pet-bubble[data-tone="soon"] {
+  border-color: var(--tribe-cta);
+}
+
+/* 쓰다듬기. 그림 자체가 버튼이라 자체 상자를 만들지 않는다 */
+.pet-char__touch {
+  display: grid;
+  padding: 0;
+  border: 0;
+  border-radius: var(--radius-pill);
+  background: none;
+  cursor: pointer;
+}
+
+.pet-char__touch:focus-visible {
+  outline: 2px solid var(--tribe-cta);
+  outline-offset: 4px;
+}
+
+/* 눌린 느낌. transition을 걸지 않아 즉시 반응한다 — 직접 조작의 피드백은
+   prefers-reduced-motion에서도 남겨 두는 편이 맞다(장식이 아니다) */
+.pet-char__touch:active .pet-char__body {
+  transform: scale(0.94);
+}
+
 .pet-char__body {
   display: grid;
   place-items: center;
   filter: drop-shadow(0 8px 16px rgb(42 31 20 / 0.25));
   animation: petBounce 2.5s var(--ease-in-out) infinite;
+}
+
+/* 쓰다듬기·먹이기 파티클. React가 key로 remount하므로 여기서 재생을 다시 걸 필요가 없다 */
+.pet-char__burst {
+  position: absolute;
+  inset: 0;
+  pointer-events: none;
+}
+
+.pet-char__burst span {
+  position: absolute;
+  bottom: 35%;
+  font-size: var(--text-md);
+  animation: petBurst 900ms var(--ease-out) both;
+}
+.pet-char__burst span[data-i="1"] {
+  left: 4%;
+}
+.pet-char__burst span[data-i="2"] {
+  left: 44%;
+  animation-delay: 120ms;
+}
+.pet-char__burst span[data-i="3"] {
+  left: 82%;
+  animation-delay: 240ms;
 }
 
 /* 진화 단계별 크기. SPEC.md 5절은 "CSS transform 수준"까지만 요구한다.
@@ -1046,11 +1173,53 @@
   }
 }
 
-/* design.md는 "필수적이지 않은 움직임은 끈다"를 요구한다 */
+/* 말풍선이 나타날 때. translateX(-50%)를 유지해야 가운데 정렬이 풀리지 않는다 */
+@keyframes petBubbleIn {
+  from {
+    opacity: 0;
+    transform: translate(-50%, -6px);
+  }
+  to {
+    opacity: 1;
+    transform: translate(-50%, 0);
+  }
+}
+
+@keyframes petBurst {
+  from {
+    opacity: 0;
+    transform: translateY(0) scale(0.6);
+  }
+  35% {
+    opacity: 1;
+  }
+  to {
+    opacity: 0;
+    transform: translateY(-3.5rem) scale(1.1);
+  }
+}
+
+@keyframes petPickupBob {
+  0%,
+  100% {
+    transform: translateY(0);
+  }
+  50% {
+    transform: translateY(-4px);
+  }
+}
+
+/* design.md는 "필수적이지 않은 움직임은 끈다"를 요구한다.
+   새 애니메이션을 추가하면 여기에도 넣는다 — 빠뜨리면 조용히 규칙이 깨진다.
+   .pet-char__burst는 animation: none으로 두면 파티클이 그 자리에 3초간 그대로 보인다.
+   움직임 없이 "반응했다"는 신호는 남으므로 의도한 결과다. */
 @media (prefers-reduced-motion: reduce) {
   .pet-char__body,
   .pet-char__sparkle,
+  .pet-char__burst span,
   .pet-room__seed,
+  .pet-room__pickup,
+  .pet-bubble,
   .pet-toast {
     animation: none;
   }
@@ -1080,9 +1249,11 @@
     flex-wrap: wrap;
   }
 
-  .pet-room {
-    min-height: 15rem;
-  }
+  /* 모바일에서 방을 15rem(240px)으로 줄이던 규칙을 지웠다 (2026-08-23).
+     그 값은 3단 진화 시절 것이다. 4단 그림이 10rem이 되면서 .pet-char 전체 높이가
+     252px가 되어 240px 방을 12px 넘어갔고, overflow: hidden이라 펫 머리와 Lv 배지가
+     320px에서 잘렸다(실측). 방 높이만 데스크톱과 같이 두면 전부 들어간다 —
+     방은 이 화면의 본문이라 높이를 아끼는 쪽이 손해다. */
 
   .pet-presets {
     grid-template-columns: repeat(2, 1fr);

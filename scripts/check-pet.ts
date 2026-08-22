@@ -16,6 +16,10 @@ import {
   hungerFor,
   hungerLabel,
   idleAccrual,
+  PET_TOUCH_REPLIES,
+  petMood,
+  petTouchReply,
+  seedsToNextStage,
 } from "../lib/pet"
 import { EVOLUTION_LEVEL, SEED_TO_EXP, TRIBE, expToNextLevel } from "../lib/types"
 
@@ -360,5 +364,101 @@ assert.equal(hungerLabel(100), hungerLabel(60))
 assert.notEqual(hungerLabel(60), hungerLabel(59))
 assert.notEqual(hungerLabel(HUNGER_LOW), hungerLabel(HUNGER_LOW - 1))
 assert.equal(hungerLabel(0), hungerLabel(HUNGER_LOW - 1))
+
+// ── 다음 진화까지 남은 씨앗 (seedsToNextStage) ────────────────────────────────
+//
+// **applySeeds로 교차 검증한다.** 이 함수는 누적 경험치를 닫힌 식(50·N·(N-1))으로
+// 계산하는데, 곡선(expToNextLevel)이 바뀌면 그 식이 조용히 틀린다. 그러면 화면이
+// "씨앗 320개"라고 말한 뒤 실제로는 진화하지 않는다. 실제 함수를 돌려 확인한다.
+for (const [level, exp] of [
+  [1, 0],
+  [1, 50],
+  [3, 120],
+  [4, 399],
+  [7, 0],
+  [14, 700],
+  [20, 55],
+  [24, 2_399],
+] as const) {
+  const next = seedsToNextStage(level, exp)
+  assert.ok(next, `Lv.${level}은 아직 다음 진화가 있어야 한다`)
+
+  const before = cappedStage(level, 4)
+  const grown = applySeeds({ level, exp, evolutionStage: before }, next.seeds)
+  assert.equal(
+    grown.evolutionStage,
+    next.stage,
+    `Lv.${level} exp ${exp}에서 씨앗 ${next.seeds}개로 ${next.stage}단계에 닿아야 한다`,
+  )
+
+  // 1개 적게 넣으면 아직 진화하지 않는다 = 개수가 최소값이다
+  if (next.seeds > 1) {
+    const short = applySeeds({ level, exp, evolutionStage: before }, next.seeds - 1)
+    assert.equal(short.evolutionStage, before, `Lv.${level}: 안내한 개수가 실제보다 많다`)
+  }
+}
+
+// 마지막 단계에 닿으면 더 이상 목표가 없다
+assert.equal(seedsToNextStage(EVOLUTION_LEVEL.STAGE4, 0), null)
+assert.equal(seedsToNextStage(EVOLUTION_LEVEL.STAGE4 + 30, 500), null)
+
+// docs/dev/pet.md에 적어 둔 누적 씨앗 값과 맞는지 확인한다 (Lv.15 = 1,050 / Lv.25 = 3,000)
+assert.equal(seedsToNextStage(1, 0)?.seeds, 100) // Lv.5 = 5×5×4 = 100
+assert.equal(seedsToNextStage(5, 0)?.seeds, 1_050 - 100)
+assert.equal(seedsToNextStage(15, 0)?.seeds, 3_000 - 1_050)
+
+// 경계에서 0개가 나오지 않는다. "씨앗 0개만 더"는 문장이 되지 않는다
+assert.ok((seedsToNextStage(4, expToNextLevel(4) - 1)?.seeds ?? 0) >= 1)
+
+// ── 펫의 한 줄 (petMood) ──────────────────────────────────────────────────────
+//
+// 우선순위가 뒤집히면 배고픈 펫이 "씨앗이 떨어져 있어요"라고 말한다.
+const FULL = { hunger: 100, level: 7, exp: 0, idleSeeds: 0, idleCapped: false }
+
+assert.equal(petMood({ ...FULL, hunger: HUNGER_LOW - 1 }).tone, "hungry")
+assert.equal(petMood({ ...FULL, hunger: HUNGER_LOW }).tone, "calm")
+
+// 배고픔이 씨앗보다 먼저다
+assert.equal(petMood({ ...FULL, hunger: 0, idleSeeds: IDLE_MAX_SEEDS, idleCapped: true }).tone, "hungry")
+
+// 상한에 닿으면 진화 임박보다 먼저 말한다 — 그쪽은 지금 손해가 진행 중이다
+assert.equal(petMood({ ...FULL, level: 4, exp: 399, idleCapped: true }).tone, "harvest")
+assert.equal(petMood({ ...FULL, idleSeeds: IDLE_MAX_SEEDS }).tone, "harvest")
+
+// 진화 임박(10개 이하)은 떨어진 씨앗보다 먼저다
+assert.equal(petMood({ ...FULL, level: 4, exp: 399, idleSeeds: 3 }).tone, "soon")
+assert.match(petMood({ ...FULL, level: 4, exp: 399 }).text, /씨앗 1개/)
+
+assert.equal(petMood({ ...FULL, idleSeeds: 5 }).tone, "harvest")
+assert.match(petMood({ ...FULL, idleSeeds: 5 }).text, /5개/)
+
+// 아무 일도 없으면 평온한 한 줄. 같은 상태를 두 번 물으면 같은 답이 나와야 한다
+// (매초 리렌더에서 대사가 흔들리면 읽을 수 없다)
+assert.equal(petMood(FULL).tone, "calm")
+assert.equal(petMood(FULL).text, petMood(FULL).text)
+assert.notEqual(petMood(FULL).text, petMood({ ...FULL, level: 8 }).text)
+
+// 마지막 단계에 닿은 펫은 "진화 임박"을 말하지 않는다 (seedsToNextStage가 null)
+assert.equal(petMood({ ...FULL, level: EVOLUTION_LEVEL.STAGE4 + 5 }).tone, "calm")
+
+// 어떤 상태에서도 빈 문장이 나오지 않는다
+for (const hunger of [0, HUNGER_LOW, 100]) {
+  for (const level of [1, 5, 15, 25, 60]) {
+    for (const idleSeeds of [0, 1, IDLE_MAX_SEEDS]) {
+      const mood = petMood({ hunger, level, exp: 0, idleSeeds, idleCapped: false })
+      assert.ok(mood.text.trim().length > 0, `빈 대사: hunger ${hunger} Lv.${level} 씨앗 ${idleSeeds}`)
+    }
+  }
+}
+
+// ── 쓰다듬기 반응 (petTouchReply) ─────────────────────────────────────────────
+// 연속으로 눌렀을 때 같은 말이 이어 나오지 않는다
+assert.notEqual(petTouchReply(0), petTouchReply(1))
+assert.equal(petTouchReply(0), petTouchReply(PET_TOUCH_REPLIES.length))
+// 음수·소수·큰 수에서 undefined가 나오지 않는다 (인덱스 계산 실수 방어)
+for (const n of [-1, -7, 0.5, 3.9, 1_000_001]) {
+  assert.equal(typeof petTouchReply(n), "string", `petTouchReply(${n})`)
+  assert.ok(petTouchReply(n).length > 0)
+}
 
 console.log("pet 체크 통과")
