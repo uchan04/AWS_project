@@ -14,7 +14,17 @@ import { NextResponse, type NextRequest } from "next/server"
 const SESSION_COOKIE = "session"
 const LEGACY_COOKIE = "access_token"
 
-// 로그인 없이 열려야 하는 경로
+// 로그인 없이 열려야 하는 경로.
+//
+// "/"가 여기 있는 이유(2026-08-22): 전에는 홈도 막혀서 처음 온 사람이 주소를 치면
+// 설명 한 줄 없는 로그인 폼부터 봤다. app/page.tsx에 비로그인 소개 화면(종족 소개·
+// "낙인을 만들지 않아요"·시작하기 버튼)이 이미 있는데 도달할 수 없는 코드였다.
+// 첫 화면이 전환의 전부인 서비스에서 랜딩이 없는 것은 기능 누락이다.
+// 홈은 fetch 실패를 미인증으로 취급하고, 레이아웃도 프로필 null을 이미 견딘다
+// (lib/profile.ts는 null을 돌려주고 Sidebar·ChatLauncher는 그리지 않는다).
+// 홈은 하위 경로가 없으므로 아래 접두사 규칙에 섞지 않고 따로 본다 —
+// "/"를 이 배열에 넣으면 startsWith("//")가 우연히 거짓이라 동작은 하지만,
+// 읽는 사람에게는 "전부 공개"로 보인다.
 const PUBLIC_PATHS = ["/login", "/signup"]
 
 // 사용자 사진을 올리고 내려받는 곳. 버킷 이름이 호스트에 붙는 가상 호스트 방식이라
@@ -87,7 +97,7 @@ export function middleware(request: NextRequest) {
 
   const { pathname, search } = request.nextUrl
 
-  if (PUBLIC_PATHS.some((p) => pathname === p || pathname.startsWith(`${p}/`))) {
+  if (pathname === "/" || PUBLIC_PATHS.some((p) => pathname === p || pathname.startsWith(`${p}/`))) {
     return pass()
   }
 
@@ -99,8 +109,9 @@ export function middleware(request: NextRequest) {
 
   // 로그인 후 원래 가려던 곳으로 돌아갈 수 있게 남겨둔다.
   // 열린 리다이렉트를 막기 위해 경로만 싣는다 — 절대 URL은 싣지 않는다
+  // "/"는 위에서 이미 통과했으므로 여기 오는 경로는 항상 홈이 아니다
   const login = new URL("/login", request.url)
-  if (pathname !== "/") login.searchParams.set("next", `${pathname}${search}`)
+  login.searchParams.set("next", `${pathname}${search}`)
   const redirect = NextResponse.redirect(login)
   redirect.headers.set("Content-Security-Policy", csp)
   return redirect
