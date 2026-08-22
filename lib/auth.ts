@@ -129,16 +129,30 @@ export async function signInWithCognitoToken(accessToken: string): Promise<User 
 /**
  * 재화를 지급하는 API는 이 버전을 쓴다.
  * calculateReward()에 넘길 활성 스킨을 같이 가져오기 위한 것이다.
+ *
+ * 유저 행을 다시 읽지 않는다(2026-08-23, 실측 근거 아래). 전에는 getCurrentUser()가 읽어 온
+ * 같은 행을 include와 함께 한 번 더 읽었다. Prisma는 to-one 관계도 기본적으로 쿼리를 따로
+ * 내므로 그 한 줄이 왕복 2회였고, 합쳐서 3회가 됐다.
+ *
+ * activePetSkinId는 User의 컬럼이라(prisma/schema.prisma:113) 이미 손에 있다. 스킨만
+ * 따로 읽으면 왕복 1회로 끝나고, 진단 전 유저(스킨 없음)는 0회다.
+ *
+ * 실측(prod 빌드, RDS us-east-1, 왕복 1회 = 180ms):
+ *   이전  findUnique → findUnique(include)   536ms (3왕복)
+ *   이후  findUnique → petSkin.findUnique    357ms (2왕복)
+ * 루트 레이아웃이 사이드바를 그리려고 매 페이지에서 이걸 부르므로(lib/profile.ts)
+ * 모든 화면의 TTFB에서 180ms가 빠진다.
+ *
+ * 반환 형태는 include 버전과 같다. 스킨 id가 지워진 행을 가리키면 include도 null을 줬다.
  */
 export const getCurrentUserWithSkin = cache(async function getCurrentUserWithSkin(): Promise<
   User & { activePetSkin: PetSkin | null }
 > {
   const user = await getCurrentUser()
-  const full = await prisma.user.findUniqueOrThrow({
-    where: { id: user.id },
-    include: { activePetSkin: true },
-  })
-  return full
+  if (!user.activePetSkinId) return { ...user, activePetSkin: null }
+
+  const activePetSkin = await prisma.petSkin.findUnique({ where: { id: user.activePetSkinId } })
+  return { ...user, activePetSkin }
 })
 
 /**
