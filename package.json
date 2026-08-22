@@ -12,7 +12,9 @@
     "db:seed": "tsx prisma/seed.ts",
     "check:reward": "tsx scripts/check-reward.ts",
     "check:pet": "tsx scripts/check-pet.ts",
-    "check:diagnosis": "tsx scripts/check-diagnosis.ts"
+    "check:diagnosis": "tsx scripts/check-diagnosis.ts",
+    "check:auth": "tsx scripts/check-auth.ts",
+    "slice:art": "tsx scripts/slice-art.ts"
   },
   "prisma": {
     "seed": "tsx prisma/seed.ts"

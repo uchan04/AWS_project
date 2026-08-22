@@ -12,6 +12,20 @@ import { login } from "../api"
 
 export default function LoginPage() {
   const router = useRouter()
+
+  // 미들웨어가 미인증 방문자를 여기로 보낼 때 원래 가려던 경로를 next로 남긴다
+  // (middleware.ts). 로그인 후 그 자리로 돌려보낸다 — 없으면 항상 홈으로 튕겨서
+  // 링크로 받은 커뮤니티 글을 열 수 없다.
+  //
+  // useSearchParams가 아니라 제출 시점에 location에서 읽는다 — 훅을 쓰면 이 페이지가
+  // Suspense 경계를 요구해서 빌드가 경고를 낸다. 값이 필요한 시점은 제출 한 번뿐이다.
+  //
+  // 경로만 받는다. "//evil.com"이나 "https://evil.com"이 오면 홈으로 떨어뜨린다 —
+  // 검증 없이 넘기면 우리 도메인에서 시작하는 피싱 링크를 만들 수 있다(열린 리다이렉트)
+  function nextPathFromUrl(): string {
+    const requested = new URLSearchParams(window.location.search).get("next")
+    return requested && requested.startsWith("/") && !requested.startsWith("//") ? requested : "/"
+  }
   const [email, setEmail] = useState("")
   const [password, setPassword] = useState("")
   const [submitting, setSubmitting] = useState(false)
@@ -23,7 +37,7 @@ export default function LoginPage() {
     setError(null)
     try {
       await login(email, password)
-      router.push("/")
+      router.push(nextPathFromUrl())
       // 사이드바 프로필은 layout.tsx가 서버에서 읽는다. 레이아웃은 클라이언트 이동으로
       // 재렌더되지 않으니 refresh 없이는 로그인 직후 홈에서 사이드바가 안 뜬다
       // (새로고침해야 뜨던 그 버그다. 2026-08-21 A 수정, E 통보)
