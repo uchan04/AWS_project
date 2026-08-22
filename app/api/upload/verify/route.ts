@@ -1,11 +1,9 @@
 import { getCurrentUserWithSkin } from "@/lib/auth"
 import { ok, fail } from "@/lib/api"
-import { prisma } from "@/lib/prisma"
 import { verifyS3Object } from "@/lib/missions/upload"
 import { verifyMissionPhoto } from "@/lib/missions/vision"
-import { completeMission } from "@/lib/missions/completion"
+import { completeMission, loadCompletableMission } from "@/lib/missions/completion"
 import { getTodayKey } from "@/lib/missions/reset"
-import { getStageProgress } from "@/lib/missions/stages"
 
 export async function POST(req: Request) {
   try {
@@ -22,23 +20,13 @@ export async function POST(req: Request) {
       return fail("DIAGNOSIS_NOT_COMPLETED", "진단을 먼저 완료해주세요", 400)
     }
 
-    const mission = await prisma.mission.findUnique({ where: { id: missionId } })
-    if (!mission) {
-      return fail("MISSION_NOT_FOUND", "미션을 찾을 수 없습니다", 404)
-    }
+    // 존재·소유 유형·커리큘럼 슬롯·단계 해금을 한 곳에서 본다 (loadCompletableMission 주석 참고)
+    const loaded = await loadCompletableMission(user.id, user.typeCode, missionId)
+    if (loaded.error) return loaded.error
+    const mission = loaded.mission
 
     if (!mission.requiresPhoto) {
       return fail("PHOTO_NOT_REQUIRED", "사진이 필요하지 않은 미션입니다", 400)
-    }
-
-    // 단계 미션 해금 확인
-    if (mission.scope === "STAGE") {
-      const stageProgress = await getStageProgress(user.id, user.typeCode)
-      const currentStage = stageProgress.find((sp) => sp.stage === mission.stage)
-
-      if (!currentStage?.unlocked) {
-        return fail("STAGE_LOCKED", "이전 단계를 먼저 완료해주세요", 400)
-      }
     }
 
     // S3 객체 확인

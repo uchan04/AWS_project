@@ -1,7 +1,10 @@
-import type { User, PetSkin } from "@prisma/client"
+import type { User, PetSkin, TypeCode, Mission } from "@prisma/client"
 import { prisma } from "@/lib/prisma"
+import { fail } from "@/lib/api"
 import { calculateReward, capAffinity } from "@/lib/reward"
 import { getTodayKey, getToday } from "./reset"
+import { MISSIONS_PER_STAGE } from "./bands"
+import { getStageProgress } from "./stages"
 
 export type MissionCompletionResult = {
   newlyCompleted: boolean
@@ -14,6 +17,47 @@ export type MissionCompletionResult = {
 }
 
 type ActorWithSkin = User & { activePetSkin: PetSkin | null }
+
+/**
+ * 클라이언트가 보낸 missionId를 검증해 미션을 돌려준다. 완료 계열 라우트는 전부 이걸 통과해야 한다.
+ *
+ * `findUnique(id)`만 하면 화면에 뜨지 않는 미션도 완료된다. 대시보드(`dashboard.ts`)와
+ * 해금 계산(`stages.ts`)은 `typeCode` 일치와 `order <= MISSIONS_PER_STAGE`로 이미 걸러 놓는데,
+ * 완료 경로에만 그 조건이 없어서 다음 두 가지가 뚫려 있었다.
+ *
+ * 1. **잠긴 단계 건너뛰기** — 대시보드는 잠긴 단계의 미션 id도 `unlocked: false`와 함께 내려준다.
+ *    그 id로 바로 POST하면 100단계를 순서 없이 긁을 수 있었다(단계 해금 검사가 라우트에만
+ *    있었고, 두 라우트가 각자 복사해 갖고 있었다).
+ * 2. **커리큘럼 밖 슬롯** — 공유 DB에 `order = 4`인 옛 단계 미션 9행이 남아 있다.
+ *    화면 쿼리에서는 빠지는데 완료는 되고 보상까지 나갔다.
+ *
+ * 남의 유형 미션과 커리큘럼 밖 슬롯은 "없는 것"으로 본다 — 존재를 알려 줄 이유가 없다.
+ */
+export async function loadCompletableMission(
+  userId: string,
+  typeCode: TypeCode,
+  missionId: string
+): Promise<{ mission: Mission; error?: undefined } | { mission?: undefined; error: Response }> {
+  const mission = await prisma.mission.findUnique({ where: { id: missionId } })
+
+  const outOfScope =
+    mission?.scope === "STAGE" &&
+    (mission.typeCode !== typeCode || mission.order > MISSIONS_PER_STAGE)
+
+  if (!mission || outOfScope) {
+    return { error: fail("MISSION_NOT_FOUND", "미션을 찾을 수 없습니다", 404) }
+  }
+
+  if (mission.scope === "STAGE") {
+    const progress = await getStageProgress(userId, typeCode)
+    const stage = progress.find((sp) => sp.stage === mission.stage)
+    if (!stage?.unlocked) {
+      return { error: fail("STAGE_LOCKED", "이전 단계를 먼저 완료해주세요", 400) }
+    }
+  }
+
+  return { mission }
+}
 
 /**
  * 일반 미션 완료 공통 함수.

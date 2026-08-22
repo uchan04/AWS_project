@@ -227,6 +227,20 @@ async function main() {
     const ghost = await call("POST", "/api/missions/does-not-exist/complete")
     record("없는 미션은 404나 400", ghost.status === 404 || ghost.status === 400, ghost.status)
 
+    // 대시보드는 잠긴 단계의 미션 id도 내려준다. 그 id로 바로 POST하면 100단계를 순서 없이
+    // 긁을 수 있어야 안 된다 — 막는 곳은 lib/missions/completion.ts loadCompletableMission다
+    const lockedStage = data?.stageMissions?.find((s) => s.unlocked === false)
+    const lockedId = lockedStage?.missions?.[0]?.id
+    record("잠긴 단계가 응답에 있다", Boolean(lockedId), lockedStage?.stage)
+    if (lockedId) {
+      const skip = await call("POST", `/api/missions/${lockedId}/complete`)
+      record(
+        "잠긴 단계 미션은 완료되지 않는다",
+        skip.body.error?.code === "STAGE_LOCKED",
+        { stage: lockedStage?.stage, status: skip.status, body: skip.body }
+      )
+    }
+
     const claim = await call("POST", "/api/missions/attendance/claim")
     record("출석 수령", claim.status === 200, claim.body.error)
     const claimAgain = await call("POST", "/api/missions/attendance/claim")
