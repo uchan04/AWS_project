@@ -1,5 +1,6 @@
 import type { TypeCode } from "@prisma/client"
 import { unstable_rethrow } from "next/navigation"
+import { petImageUrl } from "@/lib/assets"
 import { UnauthorizedError, getCurrentUserWithSkin } from "@/lib/auth"
 import { cappedStage } from "@/lib/pet"
 
@@ -30,8 +31,8 @@ export async function getSidebarProfile(): Promise<SidebarProfile | null> {
   try {
     const user = await getCurrentUserWithSkin()
     const skin = user.activePetSkin
-    const cloudfront = process.env.CLOUDFRONT_DOMAIN
-    const stage = cappedStage(user.level, skin?.stageCount ?? 3)
+    // 기본값 4는 prisma/seed/items.ts의 stageCount와 같다. 3을 쓰면 성체 그림이 안 뜬다
+    const stage = cappedStage(user.level, skin?.stageCount ?? 4)
 
     return {
       nickname: user.nickname || "익명",
@@ -41,7 +42,7 @@ export async function getSidebarProfile(): Promise<SidebarProfile | null> {
       starShards: user.starShards,
       level: user.level,
       createdAt: user.createdAt.toISOString(),
-      imageUrl: cloudfront && skin ? `${cloudfront}/${skin.imageKeyBase}-${stage}.png` : null,
+      imageUrl: skin ? petImageUrl(skin.imageKeyBase, stage) : null,
       diagnosed: Boolean(user.typeCode && user.adjective),
     }
   } catch (error) {

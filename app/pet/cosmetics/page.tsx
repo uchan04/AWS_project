@@ -1,5 +1,6 @@
 import Link from "next/link"
 import type { TypeCode } from "@prisma/client"
+import { assetUrl } from "@/lib/assets"
 import { getCurrentUser } from "@/lib/auth"
 import { compareCosmetics } from "@/lib/pet"
 import { prisma } from "@/lib/prisma"
@@ -44,6 +45,8 @@ export default async function CosmeticsPage() {
         priceAffinity: item.priceAffinity,
         owned: ownedById.has(item.id),
         equipped: ownedById.get(item.id)?.equipped ?? false,
+        // imageKey에 확장자가 이미 붙어 있다(prisma/seed/items.ts: "cosmetics/bg-1.png")
+        imageUrl: assetUrl(item.imageKey),
       }))
       .sort(compareCosmetics)
     progress = { owned: owned.length, total: all.length }

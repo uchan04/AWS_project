@@ -855,6 +855,23 @@
   line-height: 1;
 }
 
+/* 실제 그림. 이모지 얼굴 칸과 같은 크기를 써서 격자가 흔들리지 않는다.
+   그림은 배경이 투명한 누끼(scripts/slice-art.ts)라 contain으로 넣는다 */
+.pet-item__img {
+  width: 3.5rem;
+  height: 3.5rem;
+  object-fit: contain;
+}
+
+/* 배경 치장은 가로로 긴 풍경(770×288)이다. 정사각 칸에 contain으로 넣으면 띠처럼
+   얇아져 무슨 배경인지 안 보인다. 칸 폭을 다 쓰고 cover로 한 조각을 보여준다 */
+.pet-item__img--wide {
+  width: 100%;
+  height: 3.5rem;
+  object-fit: cover;
+  border-radius: var(--radius-input);
+}
+
 /* 실루엣. 이미지가 오면 같은 filter가 그 <img>에도 걸린다 (새 색 값을 만들지 않는다) */
 .pet-item--locked .pet-item__face,
 .pet-item--locked .pet-item__img {

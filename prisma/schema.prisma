@@ -100,7 +100,7 @@ model User {
 
   level          Int @default(1)
   exp            Int @default(0)
-  evolutionStage Int @default(1) // 1~3
+  evolutionStage Int @default(1) // 1~4 (알·아기·청소년·성체. PetSkin.stageCount가 상한)
 
   seeds      Int @default(0)
   starShards Int @default(0)

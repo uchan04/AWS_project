@@ -1,3 +1,4 @@
+import { assetUrl, petImageUrl } from "@/lib/assets"
 import { getCurrentUserWithSkin } from "@/lib/auth"
 import { cappedStage, hungerFor, idleAccrual } from "@/lib/pet"
 import { prisma } from "@/lib/prisma"
@@ -48,20 +49,18 @@ export default async function PetPage() {
     })
 
     const evolutionStage = cappedStage(user.level, stageCount)
-    const cloudfront = process.env.CLOUDFRONT_DOMAIN
-    const imageUrl = cloudfront && skin ? `${cloudfront}/${skin.imageKeyBase}-${evolutionStage}.png` : null
+    const imageUrl = skin ? petImageUrl(skin.imageKeyBase, evolutionStage) : null
 
     // 착용한 배경이 방 배경이 된다 (2026-08-21 사용자 확정). 슬롯당 1개라 첫 행이 유일하다.
-    // 없으면 null이고 PetRoom이 기본 방 SVG를 그린다 — 지금은 UserCosmetic이 0행이라 전원 기본 방이다.
+    // 없으면 null이고 PetRoom이 기본 방 SVG를 그린다.
     // imageKey에 확장자가 이미 붙어 있다(prisma/seed/items.ts: "cosmetics/bg-1.png").
     const wornBackground = worn.find((row) => row.item.slot === "BACKGROUND")
-    const roomImageUrl =
-      cloudfront && wornBackground ? `${cloudfront}/${wornBackground.item.imageKey}` : null
+    const roomImageUrl = wornBackground ? assetUrl(wornBackground.item.imageKey) : null
 
     // 진화 단계 카드가 단계별 그림을 쓴다. 규칙은 imageUrl과 같은 <base>-<단계>.png다
     // (prisma/seed/items.ts가 imageKeyBase를 고정해 뒀다)
     const stageImageUrls = Array.from({ length: stageCount }, (_, i) =>
-      cloudfront && skin ? `${cloudfront}/${skin.imageKeyBase}-${i + 1}.png` : null,
+      skin ? petImageUrl(skin.imageKeyBase, i + 1) : null,
     )
 
     state = {

@@ -1,5 +1,6 @@
 import Link from "next/link"
 import type { TypeCode } from "@prisma/client"
+import { petImageUrl } from "@/lib/assets"
 import { getCurrentUser } from "@/lib/auth"
 import { prisma } from "@/lib/prisma"
 import SkinList, { type SkinRow } from "../_components/SkinList"
@@ -42,6 +43,8 @@ export default async function SkinsPage() {
       priceShards: skin.priceShards,
       owned: ownedIds.has(skin.id),
       active: skin.id === user.activePetSkinId,
+      // 상점 썸네일은 성체(마지막 단계)를 보여준다. GET /api/pet/skins도 같은 규칙이다
+      imageUrl: petImageUrl(skin.imageKeyBase, skin.stageCount),
     }))
     starShards = user.starShards
   } catch (error) {

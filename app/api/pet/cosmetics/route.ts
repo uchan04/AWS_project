@@ -1,4 +1,5 @@
 import { fail, ok } from "@/lib/api"
+import { assetUrl } from "@/lib/assets"
 import { UnauthorizedError, getCurrentUser } from "@/lib/auth"
 import { compareCosmetics } from "@/lib/pet"
 import { prisma } from "@/lib/prisma"
@@ -38,6 +39,8 @@ export async function GET() {
         priceAffinity: item.priceAffinity,
         owned: ownedById.has(item.id),
         equipped: ownedById.get(item.id)?.equipped ?? false,
+        // imageKey에 확장자가 이미 붙어 있다(prisma/seed/items.ts: "cosmetics/bg-1.png")
+        imageUrl: assetUrl(item.imageKey),
       }))
       .sort(compareCosmetics)
 

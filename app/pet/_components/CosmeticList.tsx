@@ -34,6 +34,8 @@ export type CosmeticRow = {
   priceAffinity: number | null
   owned: boolean
   equipped: boolean
+  /** 배경 썸네일. public/art에서 온다 (lib/assets.ts). 없으면 그림 칸 없이 이름만 뜬다 */
+  imageUrl?: string | null
 }
 
 export type CosmeticListProps = {
@@ -211,6 +213,20 @@ export default function CosmeticList({
                     className={`pet-item${item.equipped ? " pet-item--on" : item.owned ? "" : " pet-item--locked"}`}
                     key={item.id}
                   >
+                    {item.imageUrl ? (
+                      // eslint-disable-next-line @next/next/no-img-element
+                      <img
+                        className="pet-item__img pet-item__img--wide"
+                        src={item.imageUrl}
+                        alt=""
+                        aria-hidden="true"
+                        // 치장은 마스코트가 아니라 아이템이므로 이모지 폴백을 두지 않는다
+                        // (design.md). 그림이 없으면 칸을 지우고 이름만 남긴다
+                        onError={(e) => {
+                          e.currentTarget.style.display = "none"
+                        }}
+                      />
+                    ) : null}
                     <span className="pet-item__name">{item.name}</span>
                     <span className="pet-item__meta">
                       {RARITY_LABEL[item.rarity]}

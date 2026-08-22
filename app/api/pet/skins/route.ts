@@ -1,4 +1,5 @@
 import { fail, ok } from "@/lib/api"
+import { petImageUrl } from "@/lib/assets"
 import { UnauthorizedError, getCurrentUser } from "@/lib/auth"
 import { prisma } from "@/lib/prisma"
 
@@ -43,6 +44,8 @@ export async function GET() {
         priceShards: skin.priceShards,
         owned: ownedIds.has(skin.id),
         active: skin.id === user.activePetSkinId,
+        // 상점 썸네일은 성체(마지막 단계)를 보여준다 — 사는 것은 다 자란 모습이다
+        imageUrl: petImageUrl(skin.imageKeyBase, skin.stageCount),
       })),
     })
   } catch (error) {
