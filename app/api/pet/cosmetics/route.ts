@@ -1,7 +1,7 @@
 import { fail, ok } from "@/lib/api"
 import { assetUrl } from "@/lib/assets"
 import { UnauthorizedError, getCurrentUser } from "@/lib/auth"
-import { compareCosmetics } from "@/lib/pet"
+import { compareCosmetics, SHIPPED_COSMETIC } from "@/lib/pet"
 import { prisma } from "@/lib/prisma"
 
 // 소유자: C. 치장 목록 조회 + 착용·해제. (SPEC.md 5절)
@@ -20,7 +20,7 @@ export async function GET() {
     const user = await getCurrentUser()
 
     const [items, owned] = await Promise.all([
-      prisma.cosmeticItem.findMany(),
+      prisma.cosmeticItem.findMany({ where: SHIPPED_COSMETIC }),
       prisma.userCosmetic.findMany({
         where: { userId: user.id },
         select: { itemId: true, equipped: true },
@@ -45,13 +45,15 @@ export async function GET() {
       .sort(compareCosmetics)
 
     // 별도 도감 화면을 만들지 않고 이 진행률로 겸용한다 (SPEC.md 5절 "제외한 것").
-    // 분모는 하드코딩하지 않는다 — 시드가 늘면 자동으로 따라간다
+    // 분모는 하드코딩하지 않는다 — 시드가 늘면 자동으로 따라간다.
+    // 분자는 owned.length가 아니라 list에서 센다 — 낡은 치장을 이미 가진 계정이 있어서
+    // (pruneCosmetics가 "보유자가 있으면 남긴다") 그대로 쓰면 6분의 7이 나온다
     //
     // affinity는 상점 잔액이다. GET /api/pet/skins가 starShards를 내려주는 것과 같은 형태다
     return ok({
       affinity: user.affinity,
       items: list,
-      progress: { owned: owned.length, total: items.length },
+      progress: { owned: list.filter((item) => item.owned).length, total: items.length },
     })
   } catch (error) {
     if (error instanceof UnauthorizedError) return fail("UNAUTHORIZED", error.message, 401)

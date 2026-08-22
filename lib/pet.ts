@@ -119,6 +119,23 @@ export function compareCosmetics(
   )
 }
 
+/**
+ * 치장을 읽는 모든 곳이 쓰는 where 조각. **낡은 행을 코드에서 배제한다.**
+ *
+ * 공유 개발 DB에 `backgrounds/forest-autumn-*.png`를 가리키는 CosmeticItem 5행이 남아 있다.
+ * `prisma/seed/items.ts`의 COSMETICS는 6종뿐이고 그 그림은 `public/art/`에 굽지도 않았다
+ * (scripts/slice-art.ts). 결과로 치장 목록에 뜨지 않는 칸 5개가 생기고,
+ * 수집 진행률 분모가 6이 아니라 11이 됐다.
+ *
+ * 지우는 코드는 이미 있다(prisma/seed/items.ts pruneCosmetics). 하지만 그건 시드 실행이고
+ * 공유 DB에 쓰기를 낸다 — 지금은 손대지 않기로 한 곳이다. 낡은 미션 행(order = 4)을
+ * 코드에서 배제한 것과 같은 방식으로 읽는 쪽에서 뺀다.
+ *
+ * 기준은 "구워 둔 그림이 있는 것"이다. 새 치장을 넣을 땐 imageKey를 `cosmetics/`로 시작하게
+ * 두면 된다 — 아니면 여기 걸려 목록에서 조용히 사라진다.
+ */
+export const SHIPPED_COSMETIC = { imageKey: { startsWith: "cosmetics/" } } as const
+
 // ── 방치형 자동 획득 (SPEC.md 5절) ────────────────────────────────────────────
 //
 // SPEC.md 5절은 "lastIdleClaimAt과 현재 시각의 차이로 씨앗을 누적하고 상한 12시간분"까지만

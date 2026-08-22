@@ -1,5 +1,6 @@
 import { fail, ok } from "@/lib/api"
 import { UnauthorizedError, getCurrentUser } from "@/lib/auth"
+import { SHIPPED_COSMETIC } from "@/lib/pet"
 import { prisma } from "@/lib/prisma"
 
 // 소유자: C. 친밀도 전용 치장 구매. (SPEC.md 5절)
@@ -40,7 +41,9 @@ export async function POST(request: Request) {
       return fail("INVALID_ITEM", "구매할 치장을 지정해 주세요")
     }
 
-    const item = await prisma.cosmeticItem.findUnique({ where: { id: itemId } })
+    // 목록에서 배제한 낡은 행(lib/pet.ts SHIPPED_COSMETIC)은 화면에 없지만 id를 알면
+    // 직접 부를 수 있다. 친밀도를 내고 뜨지 않는 배경을 받게 되므로 여기서도 막는다
+    const item = await prisma.cosmeticItem.findFirst({ where: { id: itemId, ...SHIPPED_COSMETIC } })
     if (!item) return fail("ITEM_NOT_FOUND", "없는 치장입니다", 404)
 
     // 판매 대상인지 확인한다. 둘 다 시드가 채우지만, 나중에 비매품(이벤트 지급 등)이

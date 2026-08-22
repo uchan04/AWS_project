@@ -3,7 +3,7 @@ import { redirect } from "next/navigation"
 import type { TypeCode } from "@prisma/client"
 import { assetUrl } from "@/lib/assets"
 import { UnauthorizedError, getCurrentUser } from "@/lib/auth"
-import { compareCosmetics } from "@/lib/pet"
+import { compareCosmetics, SHIPPED_COSMETIC } from "@/lib/pet"
 import { prisma } from "@/lib/prisma"
 import CosmeticList, { type CosmeticRow } from "../_components/CosmeticList"
 import "@/styles/tokens.css"
@@ -27,7 +27,9 @@ export default async function CosmeticsPage() {
     typeCode = user.typeCode
 
     const [all, owned] = await Promise.all([
-      prisma.cosmeticItem.findMany(),
+      // 낡은 치장 행을 배제한다(lib/pet.ts SHIPPED_COSMETIC). 이 화면이 첫 그림을 그리므로
+      // 빼지 않으면 뜨지 않는 칸 5개가 그대로 보인다
+      prisma.cosmeticItem.findMany({ where: SHIPPED_COSMETIC }),
       prisma.userCosmetic.findMany({
         where: { userId: user.id },
         select: { itemId: true, equipped: true },
@@ -50,7 +52,8 @@ export default async function CosmeticsPage() {
         imageUrl: assetUrl(item.imageKey),
       }))
       .sort(compareCosmetics)
-    progress = { owned: owned.length, total: all.length }
+    // 분자를 items에서 센다 — 이유는 app/api/pet/cosmetics/route.ts 주석과 같다
+    progress = { owned: items.filter((item) => item.owned).length, total: all.length }
   } catch (error) {
     // 미인증이면 로그인으로 보낸다. 아래 카드는 DB 장애용이다(app/pet/page.tsx와 같은 이유)
     if (error instanceof UnauthorizedError) redirect("/login?next=%2Fpet%2Fcosmetics")

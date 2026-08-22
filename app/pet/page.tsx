@@ -1,7 +1,7 @@
 import { redirect } from "next/navigation"
 import { assetUrl, petImageUrl } from "@/lib/assets"
 import { UnauthorizedError, getCurrentUserWithSkin } from "@/lib/auth"
-import { cappedStage, hungerFor, idleAccrual } from "@/lib/pet"
+import { cappedStage, hungerFor, idleAccrual, SHIPPED_COSMETIC } from "@/lib/pet"
 import { prisma } from "@/lib/prisma"
 import { calculateReward } from "@/lib/reward"
 import { TRIBE } from "@/lib/types"
@@ -45,7 +45,9 @@ export default async function PetPage() {
 
     // 착용 중인 치장 (SPEC.md 5절)
     const worn = await prisma.userCosmetic.findMany({
-      where: { userId: user.id, equipped: true },
+      // 낡은 치장을 착용한 채인 계정이 있다(lib/pet.ts SHIPPED_COSMETIC). 빼지 않으면
+      // 방 배경이 뜨지 않는 그림으로 덮여 기본 방 SVG도 안 나온다
+      where: { userId: user.id, equipped: true, item: SHIPPED_COSMETIC },
       select: { item: { select: { name: true, slot: true, imageKey: true } } },
     })
 
