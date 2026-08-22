@@ -31,14 +31,12 @@ export function canWriteToGallery(): boolean {
   return true
 }
 
-/** 전체 탭은 필터 없이 전부 보여준다 — ALL로 저장된 글과 종족 갤러리 글이 함께 뜬다. */
-function galleryTypeFilter(gallery: GalleryTab) {
-  return gallery === "ALL" ? {} : { galleryType: gallery }
-}
-
 export function listGalleryPosts(gallery: GalleryTab) {
+  // "ALL"도 galleryType 조건에 넣는다. 전체 탭은 "모든 글"이 아니라 "전체 커뮤니티
+  // 갤러리에 쓴 글"을 보여주는 곳이다. 조건을 빼면 종족 갤러리 글까지 전체 탭에 뜨는데,
+  // 종족 갤러리는 "그 종족만 볼 수 있다"고 약속하고 받은 글이라 다른 종족에 노출되면 안 된다.
   return prisma.post.findMany({
-    where: { deletedAt: null, ...galleryTypeFilter(gallery) },
+    where: { deletedAt: null, galleryType: gallery },
     orderBy: { createdAt: "desc" },
     take: POST_LIST_LIMIT,
     include: { user: { select: { nickname: true, typeCode: true } } },
