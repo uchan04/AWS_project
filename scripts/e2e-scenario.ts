@@ -15,6 +15,10 @@
 // 끝나면 둘 다 탈퇴로 지운다. 중간에 실패해 남으면 이메일이 `e2e-`로 시작하는
 // 행이 남으므로 다음 실행에 영향은 없다.
 
+// 상한 값을 여기 복사하지 않는다. 라우트가 읽는 그 파일을 읽어야 값이 바뀔 때 같이 따라온다.
+// limits.ts는 lib/missions/bands.ts처럼 import가 없어서 스크립트에서도 그냥 불러올 수 있다.
+import { TITLE_MAX, BODY_MAX, COMMENT_MAX } from "../app/community/_lib/limits"
+
 const BASE = process.argv[2] ?? "http://localhost:3000"
 const EMAIL = `e2e-${Date.now()}@welli.local`
 const OTHER_EMAIL = `e2e-other-${Date.now()}@welli.local`
@@ -315,8 +319,45 @@ async function main() {
       record("남도 이 글을 볼 수 있다", otherView.status === 200, otherView.body.error)
     }
 
+    // 길이 상한(app/community/_lib/limits.ts). 화면 maxLength는 우회되므로 서버가 막아야 한다.
+    // 상한 초과는 레이트 리밋 카운트에 들어가지 않는다(recordAttempt는 검증 통과 후에 부른다)
+    const longTitle = await call("POST", "/api/community/posts", {
+      title: "가".repeat(TITLE_MAX + 1),
+      body: "본문",
+      galleryType: "ALL",
+    })
+    record("제목 상한 초과 거부", longTitle.body.error?.code === "TITLE_TOO_LONG", longTitle.body)
+
+    const longBody = await call("POST", "/api/community/posts", {
+      title: "제목",
+      body: "가".repeat(BODY_MAX + 1),
+      galleryType: "ALL",
+    })
+    record("본문 상한 초과 거부", longBody.body.error?.code === "BODY_TOO_LONG", longBody.body)
+
+    if (postId) {
+      const longComment = await call("POST", `/api/community/posts/${postId}/comments`, {
+        body: "가".repeat(COMMENT_MAX + 1),
+      })
+      record("댓글 상한 초과 거부", longComment.body.error?.code === "COMMENT_TOO_LONG", longComment.body)
+    }
+
     const ghost = await call("GET", "/api/community/posts/does-not-exist")
     record("없는 글은 404", ghost.status === 404, ghost.status)
+
+    // 도배 방어. 위에서 글 1건을 이미 썼으니 남은 한도는 4건이고 그 다음이 막혀야 한다.
+    // 여기서 만든 글은 마지막 탈퇴가 함께 지운다. 이 블록 뒤로는 글을 쓰지 않는다 —
+    // 한도를 다 쓴 상태라 뒤에 글 작성을 넣으면 그 검사가 거짓 실패한다
+    let blocked = ""
+    for (let i = 0; i < 8 && !blocked; i++) {
+      const flood = await call("POST", "/api/community/posts", {
+        title: `도배 ${i}`,
+        body: "레이트 리밋 검증용",
+        galleryType: "ALL",
+      })
+      if (flood.body.error?.code === "TOO_MANY_ATTEMPTS") blocked = `${i + 2}번째에서 막힘`
+    }
+    record("연속 글 작성은 레이트 리밋에 막힌다", blocked !== "", blocked || "8번 더 써도 안 막혔다")
   }
 
   // --- 7. 챗봇 저장 ---

@@ -7,6 +7,7 @@ import { TRIBE } from "@/lib/types"
 import { useModalA11y } from "@/app/components/useModalA11y"
 import { type GalleryTab } from "../_lib/gallery"
 import { TOPICS, type WriteTopic } from "../_lib/topics"
+import { TITLE_MAX, BODY_MAX, remaining } from "../_lib/limits"
 
 // 전체 갤러리는 종족이 없어 TRIBE에 키가 없다. lib/types.ts는 A 소유 공유 파일이라
 // 건드리지 않고, ChatPanel이 NEUTRAL_COLOR를 자기 파일에 둔 것과 같은 방식으로 여기 둔다.
@@ -188,8 +189,14 @@ export function WriteModal({ gallery, myTypeCode }: { gallery: GalleryTab; myTyp
               onChange={(e) => setTitle(e.target.value)}
               placeholder="제목을 입력해주세요"
               aria-label="제목"
-              className="mb-3 w-full rounded-xl border border-neutral-300 bg-neutral-50 px-4 py-2.5 text-sm text-neutral-900 placeholder:text-neutral-400 outline-none focus:border-neutral-500"
+              // maxLength는 UX다. 실제 거절은 서버(app/api/community/posts/route.ts)가 한다
+              maxLength={TITLE_MAX}
+              className="mb-1 w-full rounded-xl border border-neutral-300 bg-neutral-50 px-4 py-2.5 text-sm text-neutral-900 placeholder:text-neutral-400 outline-none focus:border-neutral-500"
             />
+            {/* 제목은 100자를 쓸 일이 드물어 20자 남았을 때만 띄운다 — 늘 띄우면 잔소리가 된다 */}
+            <p className="mb-2 h-4 text-right text-xs text-neutral-400">
+              {remaining(title, TITLE_MAX) <= 20 ? `${title.length} / ${TITLE_MAX}자` : ""}
+            </p>
 
             <textarea
               value={body}
@@ -197,8 +204,18 @@ export function WriteModal({ gallery, myTypeCode }: { gallery: GalleryTab; myTyp
               placeholder={"오늘 있었던 일, 느낀 것을 이야기해봐요\n여기선 뭐든 괜찮아요."}
               aria-label="본문"
               rows={6}
-              className="mb-4 w-full resize-none rounded-xl border border-neutral-300 bg-neutral-50 px-4 py-3 text-sm leading-relaxed text-neutral-900 placeholder:text-neutral-400 outline-none focus:border-neutral-500"
+              maxLength={BODY_MAX}
+              className="mb-1 w-full resize-none rounded-xl border border-neutral-300 bg-neutral-50 px-4 py-3 text-sm leading-relaxed text-neutral-900 placeholder:text-neutral-400 outline-none focus:border-neutral-500"
             />
+            {/* 본문은 길게 쓰다가 잘리면 놀란다. 늘 띄우고 200자 남으면 색을 바꾼다 */}
+            <p
+              className={`mb-3 text-right text-xs ${
+                remaining(body, BODY_MAX) <= 200 ? "text-amber-600" : "text-neutral-400"
+              }`}
+              aria-live="polite"
+            >
+              {body.length} / {BODY_MAX}자
+            </p>
 
             {error && (
               <p role="alert" className="mb-3 text-xs text-red-500">

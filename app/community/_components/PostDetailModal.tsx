@@ -5,6 +5,7 @@ import type { TypeCode } from "@prisma/client"
 import { authorLabel } from "@/lib/types"
 import { useModalA11y } from "@/app/components/useModalA11y"
 import { timeAgo } from "../_lib/format"
+import { COMMENT_MAX, remaining } from "../_lib/limits"
 
 type DetailUser = { nickname: string; typeCode: TypeCode | null }
 
@@ -286,6 +287,10 @@ export function PostDetailModal({
                   onChange={(e) => setCommentBody(e.target.value)}
                   onKeyDown={(e) => e.key === "Enter" && handleComment()}
                   placeholder="따뜻한 댓글을 남겨봐요"
+                  // placeholder는 접근 가능한 이름이 아니다 — 입력하면 사라진다
+                  aria-label="댓글"
+                  // maxLength는 UX다. 실제 거절은 서버가 한다
+                  maxLength={COMMENT_MAX}
                   className="flex-1 rounded-xl border border-neutral-300 bg-neutral-50 px-4 py-2.5 text-sm text-neutral-900 placeholder:text-neutral-400 outline-none focus:border-neutral-500"
                 />
                 <button
@@ -297,6 +302,12 @@ export function PostDetailModal({
                   전송
                 </button>
               </div>
+              {/* 한 줄 입력이라 늘 띄우면 시끄럽다. 50자 남았을 때만 */}
+              {remaining(commentBody, COMMENT_MAX) <= 50 && (
+                <p className="mt-1 text-right text-xs text-amber-600" aria-live="polite">
+                  {commentBody.length} / {COMMENT_MAX}자
+                </p>
+              )}
             </div>
           </>
         )}
