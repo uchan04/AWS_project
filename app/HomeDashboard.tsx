@@ -28,7 +28,7 @@ type ProgressView = {
   weeklyTotal: number
   streak: number
 }
-type MissionsView = { dailyMissions: DailyMissionView[]; progress: ProgressView }
+export type MissionsView = { dailyMissions: DailyMissionView[]; progress: ProgressView }
 
 // 달성률 0~100. 분모가 0이면 0으로 둔다 — 미션이 아직 시드되지 않은 DB에서 NaN이 되면
 // style의 width가 통째로 무효가 되고 aria-valuenow도 깨진다
@@ -46,20 +46,25 @@ function greetingFor(hour: number): string {
 
 /**
  * @param petImage 활성 스킨의 현재 단계 그림. 착용한 스킨이 없으면 null이고 그때만 이모지다.
+ * @param initialMissions 서버가 조립해 넘긴 오늘의 미션·진행률(app/page.tsx).
+ *   값이나 null이 오면 fetch를 하지 않는다 — 첫 HTML에 이미 들어 있다.
+ *   undefined(프로퍼티 생략)면 예전처럼 스스로 불러온다.
  */
 export default function HomeDashboard({
   nickname,
   typeCode,
   petImage,
+  initialMissions,
 }: {
   nickname: string
   typeCode: TypeCode
   petImage: string | null
+  initialMissions?: MissionsView | null
 }) {
   const [greeting, setGreeting] = useState("")
   // undefined = 아직 읽는 중, null = 못 읽었다(에러).
   // 둘을 같은 값으로 두면 fetch가 끝나기 전에 실패 문구가 먼저 뜬다(2026-08-22 실측 버그).
-  const [missions, setMissions] = useState<MissionsView | null | undefined>(undefined)
+  const [missions, setMissions] = useState<MissionsView | null | undefined>(initialMissions)
 
   useEffect(() => {
     let alive = true
@@ -73,6 +78,15 @@ export default function HomeDashboard({
       setMissions(next)
     }
 
+    // 서버가 넘겼으면 같은 것을 다시 부르지 않는다. 인사말만 브라우저 시각으로 정한다 —
+    // 이건 서버에서 못 한다(서버 시각으로 렌더하면 하이드레이션이 어긋난다)
+    if (initialMissions !== undefined) {
+      settle(initialMissions)
+      return () => {
+        alive = false
+      }
+    }
+
     fetch("/api/missions")
       .then((response) => (response.ok ? response.json() : null))
       .then((body) => {
@@ -84,7 +98,7 @@ export default function HomeDashboard({
     return () => {
       alive = false
     }
-  }, [])
+  }, [initialMissions])
 
   const tribe = TRIBE[typeCode]
 
@@ -94,7 +108,10 @@ export default function HomeDashboard({
         {/* 인사말·이름은 왼쪽, 마스코트는 오른쪽. Figma 홈 헤더 구성이다 */}
         <div className="hm-home__head">
           <div className="hm-home__who">
-            <p className="hm__note">{greeting}</p>
+            {/* 인사말은 마운트 후에 정해진다(브라우저 시각). 빈 문자열이면 이 줄의 높이가
+                0이라 인사말이 들어오는 순간 아래가 전부 밀린다 — CLS 원인 하나였다.
+                줄바꿈 없는 공백으로 한 줄 높이를 미리 잡아 둔다 */}
+            <p className="hm__note">{greeting || " "}</p>
             <h1 className="hm-home__name">{nickname}</h1>
             <span className="hm-pill">
               <span aria-hidden="true">{tribe.emoji}</span> {tribe.family}

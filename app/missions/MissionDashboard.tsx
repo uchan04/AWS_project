@@ -801,10 +801,22 @@ function AttendanceCalendar({ cycleDay, claimedToday, attendanceTotal, color, bg
 
 // ─── Main dashboard ────────────────────────────────────────────────────────
 
-export default function MissionDashboard() {
-  const [dashboard, setDashboard] = useState<DashboardDTO | null>(null)
-  const [loading, setLoading] = useState(true)
-  const [error, setError] = useState<string | null>(null)
+/**
+ * initial / initialError는 서버가 조립해 넘긴다(app/missions/page.tsx).
+ * 둘 중 하나가 있으면 마운트 시 fetch를 하지 않는다 — 첫 화면이 이미 HTML에 들어 있다.
+ * 둘 다 null인 경우는 남겨 둔다: 이 컴포넌트를 서버 데이터 없이 쓰는 곳이 생기면
+ * 예전처럼 스스로 불러온다.
+ */
+export default function MissionDashboard({
+  initial = null,
+  initialError = null,
+}: {
+  initial?: DashboardDTO | null
+  initialError?: string | null
+} = {}) {
+  const [dashboard, setDashboard] = useState<DashboardDTO | null>(initial)
+  const [loading, setLoading] = useState(!initial && !initialError)
+  const [error, setError] = useState<string | null>(initialError)
   const [selected, setSelected] = useState<MissionDTO | null>(null)
   // 캐러셀 위치. null이면 "지금 서 있는 단계"를 보여준다(아래 defaultIndex).
   // 절대 인덱스를 state에 박아두면 미션을 완료해 창이 옮겨간 뒤 엉뚱한 단계를 가리킨다 —
@@ -812,6 +824,9 @@ export default function MissionDashboard() {
   const [stageIndexOverride, setStageIndexOverride] = useState<number | null>(null)
 
   const loadDashboard = useCallback(async () => {
+    // 성공해도 error를 비우지 않으면 "다시 시도" 버튼이 아무 일도 하지 않는다.
+    // 에러 화면 분기가 dashboard 분기보다 위에 있어서, 새로 받아온 데이터가 가려진다
+    setError(null)
     try {
       const res = await fetch("/api/missions")
       const json = await res.json()
@@ -830,6 +845,10 @@ export default function MissionDashboard() {
   }, [])
 
   useEffect(() => {
+    // 서버가 이미 넘겼으면 같은 것을 다시 부르지 않는다. 이 조건이 없으면 서버 렌더를
+    // 해 두고도 마운트 직후 왕복 1회를 그대로 낸다 — 임계 경로에서 빠지지 않는다
+    if (initial || initialError) return
+
     let mounted = true
     async function load() {
       try {
@@ -853,7 +872,7 @@ export default function MissionDashboard() {
     return () => {
       mounted = false
     }
-  }, [])
+  }, [initial, initialError])
 
   if (loading) {
     return (
