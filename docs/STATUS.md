@@ -2,7 +2,11 @@
 
 **모든 세션은 이 문서부터 읽는다.** 그다음 아래 "지금 읽어야 할 문서"만 읽고 시작한다.
 
-최종 갱신: **2026-08-22 — A가 계정 관리와 시도 제한을 `feat/diagnosis`에 반영했다(3커밋). 로그인·가입 레이트 리밋(`lib/ratelimit.ts`), 비밀번호 변경, 회원 탈퇴, `/settings` 화면, E2E 시나리오 스크립트(`npm run e2e` 64건 통과). 차단 23번이 절반 해소됐다.** 세부는 `docs/dev/diagnosis.md` 22장.
+최종 갱신: **2026-08-22 — 미션 완료 경로의 id 검증을 한 곳으로 모았다(`4211a74`). 잠긴 단계 미션 id로 POST해 단계를 건너뛰거나, 남의 유형 미션·커리큘럼 밖 슬롯(공유 DB의 `order=4` 9행)을 완료해 보상을 받을 수 있었다. `lib/missions/completion.ts` `loadCompletableMission()`이 존재·유형·슬롯·해금을 보고, 완료 라우트 2곳이 그것만 통과한다. `npm run e2e` 66건 통과.** 세부는 `docs/dev/missions.md` "완료 경로 검증 통합".
+
+> **브랜치 주의.** 이 개선 작업(19커밋)은 `feat/diagnosis`가 아니라 **`improve/service-quality`**에 있고, 원격은 `mokoji`(`centreject/mokoji_test`)다. `feat/diagnosis` 기준점은 `a303660`. `develop`·`main`은 지시 대기 중이라 미머지.
+
+이전 갱신: **2026-08-22 — 계정 관리와 시도 제한(3커밋). 로그인·가입 레이트 리밋(`lib/ratelimit.ts`), 비밀번호 변경, 회원 탈퇴, `/settings` 화면, E2E 시나리오 스크립트(`npm run e2e`). 차단 23번이 절반 해소됐다.** 세부는 `docs/dev/diagnosis.md` 22장.
 
 이전 갱신: **2026-08-22 — A가 전수 점검에서 찾은 오류·기능 6건을 `feat/diagnosis`에 반영했다(4커밋). 재진단 잠금, 재진단 시 활성 펫 스킨 초기화 차단, 홈 미션 로딩·실패 구분, 홈 "오늘까지의 나" 진행 카드, 결과 화면 이름 바꾸기 문구, Google 로그인 CSRF `state` + 모든 로그인 세션 7일 통일. `develop`·`main`은 지시 대기 중이라 미머지(12커밋).** 세부는 아래 "2026-08-22 A 수정 6건" 절.
 
@@ -104,7 +108,7 @@
 
 21. **`/diagnosis/result`에 사이드바가 뜬다 (B 담당. D 몫은 해소)** — 2026-08-21 브라우저 실측: `/diagnosis/result`는 `aside` 1개 + "마음 친구 열기" 1개, `/login`은 챗봇 1개(위 20번), `/diagnosis`는 둘 다 0개다. 결과 화면은 아직 홈이 아니라 진단의 마지막 장이므로 둘 다 숨겨야 한다. **D 몫(챗봇 버튼)은 해소됐다** — 위 20번과 같은 변경으로 `ChatLauncher`가 허용 목록 방식이 되면서 `/diagnosis/result`가 목록에 없어 버튼이 렌더되지 않는다. **B 몫은 그대로 남는다** — `app/components/Sidebar.tsx:106`의 `pathname === "/diagnosis"`를 경로 목록으로 바꿔 `/diagnosis/result`도 숨겨야 한다(한 줄이다). 경로 숨김은 **A 소유 파일이 아니라 A가 고치지 않았다**(`CLAUDE.md` 2절). 다만 같은 파일의 **미인증 표시 버그는 A가 고쳤다(B에게 통보 필요)** — 401 본문을 폴백으로 메워서 로그인 전에도 `익명 / 미분류 / Lv.1 / 씨앗 0개 / 로그아웃`이 떴다. `res.ok`를 확인해 실패면 `setProfile(null)`로 두고, 로그아웃 버튼의 `alert(…)`를 실제 `POST /api/auth/logout`으로 바꿨다. 상세는 `docs/dev/diagnosis.md` 19절
 22. ~~**자체 DB 계정 컬럼이 공유 DB에 없다**~~ — **해소(2026-08-21, A가 E 합의로 적용)**. `prisma/migrations/20260821020000_user_email_password/`가 `User`에 `email TEXT UNIQUE`·`passwordHash TEXT`를 더한다. 둘 다 nullable이라 기존 행에 영향이 없다. 공유 RDS에 `migrate deploy` 완료(마이그레이션 5개). **다른 4인은 `git pull && npx prisma migrate deploy && npx prisma generate`.** 이어서 가입·로그인이 자체 DB 계정으로 동작한다(`/signup`은 Cognito `AdminCreateUser`를 쓰지 않는다 — IAM 자격증명이 없어 로컬에서 가입이 아예 안 됐고, 확정 흐름상 가입 직후 `User` 행이 있어야 한다). Google 로그인만 Cognito를 계속 쓴다. **팀 공용 테스트 계정: `test@welli.local` / `welli-test-1234`** (공유 개발 DB 전용. 심사·배포 전에 삭제한다. 재생성은 `npx tsx scripts/create-local-user.ts`). `DEV_AUTH_BYPASS`는 이제 쓰지 않는다 — 로컬 `.env`도 `false`다
-23. **자체 로그인의 보안 항목 — 절반 해소 (2026-08-22, A)** — 지금 있는 것: scrypt 해싱(`lib/password.ts`), HMAC 서명 세션 쿠키(`lib/session.ts`, `SESSION_SECRET` 없으면 즉시 throw), **로그인 시도 제한**(`lib/ratelimit.ts`. IP당 5분 10회 실패, 성공하면 초기화. 가입은 1시간 5회), **비밀번호 변경**(`POST /api/auth/password`, 현재 비밀번호 재확인), **회원 탈퇴**(`POST /api/auth/withdraw`, 하드 삭제 + 자식 9표 FK 순서), `/settings` 화면, `scripts/check-auth.ts` 단정 30건, `npm run e2e` 64건. **여전히 미룬 것**: 비밀번호 재설정(메일 발송 경로 없음 — SES 미검증, 새 의존성 금지. **자체 계정은 비밀번호를 잊으면 복구 수단이 없다**), 세션 즉시 무효화(DB 세션 표가 없어 만료 전 강제 로그아웃이 안 된다 — 비밀번호를 바꿔도 다른 기기는 최대 7일 산다), 이메일 소유 확인(`CLAUDE.md` 8절에서 의도적 제외). 레이트 리밋은 인메모리라 **Lambda 인스턴스마다 따로 센다** — 실질 한도가 인스턴스 수만큼 늘어난다(전역 한도는 Redis/DB 카운터가 필요해서 미룬다). `DEV_AUTH_BYPASS`는 배포 환경에서 절대 `true`가 되면 안 된다 — 모든 방문자가 같은 계정으로 들어온다
+23. **자체 로그인의 보안 항목 — 절반 해소 (2026-08-22, A)** — 지금 있는 것: scrypt 해싱(`lib/password.ts`), HMAC 서명 세션 쿠키(`lib/session.ts`, `SESSION_SECRET` 없으면 즉시 throw), **로그인 시도 제한**(`lib/ratelimit.ts`. IP당 5분 10회 실패, 성공하면 초기화. 가입은 1시간 5회), **비밀번호 변경**(`POST /api/auth/password`, 현재 비밀번호 재확인), **회원 탈퇴**(`POST /api/auth/withdraw`, 하드 삭제 + 자식 9표 FK 순서), `/settings` 화면, `scripts/check-auth.ts` 단정 30건, `npm run e2e` 66건. **여전히 미룬 것**: 비밀번호 재설정(메일 발송 경로 없음 — SES 미검증, 새 의존성 금지. **자체 계정은 비밀번호를 잊으면 복구 수단이 없다**), 세션 즉시 무효화(DB 세션 표가 없어 만료 전 강제 로그아웃이 안 된다 — 비밀번호를 바꿔도 다른 기기는 최대 7일 산다), 이메일 소유 확인(`CLAUDE.md` 8절에서 의도적 제외). 레이트 리밋은 인메모리라 **Lambda 인스턴스마다 따로 센다** — 실질 한도가 인스턴스 수만큼 늘어난다(전역 한도는 Redis/DB 카운터가 필요해서 미룬다). `DEV_AUTH_BYPASS`는 배포 환경에서 절대 `true`가 되면 안 된다 — 모든 방문자가 같은 계정으로 들어온다
 
 ## 2026-08-21 펫 4단 진화·배고픔으로 생긴 차단 — 둘 다 해소
 

@@ -10,7 +10,7 @@
 ## 현재 상태
 - 완료: 미션 41개, 지표 14개 정의, 12문항 + 형용사 문항, `classify()`·`classifySub()`, 무손실 조기 종료, 스냅샷 체크, 화면 3장(진단·결과·홈), 화면 3장 디자인 시스템 적용 + Figma 팔레트·폰트 반영(12장), 진단 API 3종 + 화면 연결, `draft.ts` 제거, 2차 마이그레이션 적용 후 실 DB로 전체 흐름 확인(14장), **스킨·치장 구조 변경을 스키마·실 DB·시드까지 적용(15장)**, 홈 미션 미리보기를 `GET /api/missions`로 교체(`bdcef94`), 결과 화면 판정 근거 3줄(`298ab56`)
 - 완료(2026-08-22): **전수 점검에서 찾은 오류·기능 6건 반영(21장)** — 재진단 잠금, 재진단 시 활성 펫 스킨 초기화 차단, 홈 미션 로딩·실패 구분, 홈 진행 카드, 결과 화면 문구 분기, Google 로그인 CSRF `state` + 세션 7일 통일
-- 완료(2026-08-22): **계정 관리와 시도 제한(22장)** — `lib/ratelimit.ts` 로그인·가입 레이트 리밋, `POST /api/auth/password` 비밀번호 변경, `POST /api/auth/withdraw` 회원 탈퇴, `/settings` 화면, `scripts/e2e-scenario.ts` E2E 시나리오 64건
+- 완료(2026-08-22): **계정 관리와 시도 제한(22장)** — `lib/ratelimit.ts` 로그인·가입 레이트 리밋, `POST /api/auth/password` 비밀번호 변경, `POST /api/auth/withdraw` 회원 탈퇴, `/settings` 화면, `scripts/e2e-scenario.ts` E2E 시나리오 66건
 - 진행 중: 없음
 - 미착수: 없음. 근거 3줄의 **Bedrock 실호출 검증만 E의 IAM 키·`BEDROCK_MODEL_ID` 공유 대기**다
 - 컷: 관리자 교차표(`SPEC.md`에 없다), Bedrock 호출 2종(질문 문장 다듬기·자유 입력 enum 변환). 근거는 16장. 펫 이미지는 E가 S3에 올리는 중이다(17장)
@@ -23,7 +23,7 @@
 - `app/api/auth/password/route.ts` — 비밀번호 변경. 세션 쿠키만으로는 못 바꾸고 현재 비밀번호를 다시 받는다
 - `app/api/auth/withdraw/route.ts` — 회원 탈퇴. 하드 삭제 + 자식 9표 FK 순서 삭제
 - `app/settings/page.tsx`, `app/settings/SettingsForm.tsx` — 계정 설정 화면. 탈퇴는 2단 확인
-- `scripts/e2e-scenario.ts` — `npm run e2e`. 가입→진단→미션→펫→커뮤니티→챗봇→설정→탈퇴 64건
+- `scripts/e2e-scenario.ts` — `npm run e2e`. 가입→진단→미션→펫→커뮤니티→챗봇→설정→탈퇴 66건
 - `lib/diagnosis/questions.ts` — 12문항 + 형용사 문항의 서버 원본. 선택지가 어떤 지표를 켜는지도 여기 있다
 - `lib/diagnosis/indicators.ts` — 답변 → 지표 14개. 대분류·세부유형이 전부 이 결과만 본다
 - `lib/diagnosis/classify.ts` — `classify()`(3대분류) + `classifySub()`(8세부유형). 순수 함수, LLM·DB 없음
@@ -1452,7 +1452,7 @@ Cognito 사용자 풀은 건드리지 않는다. IAM 권한이 없고, 로그인
 
 `npm run e2e` → `scripts/e2e-scenario.ts`. 기본 대상은 `http://localhost:3000`이고 **로컬에만 쓴다.**
 
-단위 체크(`check:diagnosis` 등)는 순수 함수만 본다. 실제로 깨지는 곳은 라우트 사이 연결이다 — 인증이 안 붙어 401, 재화가 안 붙어 400, 삭제 순서가 어긋나 500. 가입 → 진단 → 미션 → 펫 → 커뮤니티 → 챗봇 저장 → 계정 설정 → 탈퇴를 HTTP로 그대로 따라가며 **64건**을 검사한다.
+단위 체크(`check:diagnosis` 등)는 순수 함수만 본다. 실제로 깨지는 곳은 라우트 사이 연결이다 — 인증이 안 붙어 401, 재화가 안 붙어 400, 삭제 순서가 어긋나 500. 가입 → 진단 → 미션 → 펫 → 커뮤니티 → 챗봇 저장 → 계정 설정 → 탈퇴를 HTTP로 그대로 따라가며 **66건**을 검사한다.
 
 - `fetch`에는 쿠키 저장소가 없어 `Set-Cookie`를 직접 모은다. 값이 빈 `Set-Cookie`는 삭제 신호다(로그아웃·탈퇴)
 - **계정을 두 개 만든다.** 두 번째("관찰자")가 첫 번째의 글에 댓글·좋아요를 남긴다 — 22-3의 FK 순서는 그 상황에서만 검증된다. 탈퇴 후 글이 사라졌는지도 살아 있는 관찰자 세션으로 본다(미인증으로 부르면 401이라 지워졌는지 알 수 없다)

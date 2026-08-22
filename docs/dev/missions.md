@@ -24,7 +24,23 @@
 - 보상은 구간에 비례한다. 씨앗 `18 + 구간×4`(22~58), 별조각 `구간-2`(3구간부터, 0~8). **친밀도는 0** — 주면 커뮤니티·채팅 지급과 겹쳐 하루 상한을 미션만으로 채운다
 - 사진 미션은 유형당 38~41슬롯, 3구간부터
 - 화면은 `currentStageOf()`가 정한 단계를 기본으로 띄운다. 1단계부터 열면 37단계 사용자가 화살표를 36번 눌러야 한다
-- **옛 시드가 만든 단계당 4번째 미션 9개가 실 DB에 남아 있다.** FK 때문에 지우려면 완료 기록도 지워야 해서, `getStageProgress()`가 `order <= 3`으로 배제한다. 정리는 `scripts/prune-orphan-stage-missions.ts --apply`
+- **옛 시드가 만든 단계당 4번째 미션 9개가 실 DB에 남아 있다.** 지우지 않고 **코드에서 배제한다**(공유 DB는 손대지 않기로 했다). 조회 4곳(`dashboard.ts:105`·`:112`, `stages.ts:92`·`:99`)이 `order <= MISSIONS_PER_STAGE`로 거르고, 완료 경로도 2026-08-22에 같은 조건을 갖췄다(아래). `scripts/prune-orphan-stage-missions.ts`는 남겨 두지만 실행하지 않는다
+
+## 완료 경로 검증 통합 (2026-08-22, A)
+
+완료 라우트 두 곳이 각자 `findUnique(id)` → 404 → 단계 해금 검사를 **복사해** 갖고 있었고, 조회 쪽에는 있던 두 조건이 어느 쪽에도 없었다.
+
+| 뚫려 있던 것 | 어떻게 뚫렸나 |
+|---|---|
+| 잠긴 단계 건너뛰기 | 대시보드는 잠긴 단계의 미션 id도 `unlocked: false`와 함께 내려준다. 그 id로 바로 POST하면 순서를 무시하고 100단계를 긁을 수 있다 — 라우트의 해금 검사가 이걸 막고 있었지만 두 라우트에 복사돼 있어 한쪽만 고치면 갈라진다 |
+| 남의 유형 단계 미션 | `typeCode` 일치 검사가 없었다. 조회로는 안 나오지만 완료는 됐다 |
+| 커리큘럼 밖 슬롯 | 위 `order = 4` 9행. 화면에는 안 뜨는데 완료되고 보상까지 나갔다 |
+
+`lib/missions/completion.ts`의 `loadCompletableMission(userId, typeCode, missionId)` 하나로 합쳤다. 존재·유형·슬롯 상한·단계 해금을 순서대로 보고 `{ mission }` 또는 `{ error: Response }`를 준다. 남의 유형과 슬롯 밖은 `STAGE_LOCKED`가 아니라 **404 `MISSION_NOT_FOUND`** — 존재를 알려 줄 이유가 없다.
+
+- `app/api/missions/[missionId]/complete/route.ts` — 검사 3블록을 3줄로 교체
+- `app/api/upload/verify/route.ts` — 같음. `requiresPhoto` 검사만 라우트에 남았다(이 라우트만의 조건이다)
+- `npm run e2e`에 단정 2건 추가 — 잠긴 단계 id를 응답에서 꺼내 POST하고 `STAGE_LOCKED`를 확인한다. 남의 유형·슬롯 밖은 클라이언트가 id를 알 수 없어 HTTP로 재현할 수 없다(코드 검사로만 방어)
 
 ## 구현한 파일
 
@@ -32,7 +48,7 @@
 - `lib/missions/reset.ts` — 날짜 helper, 접속 시점 초기화
 - `lib/missions/stages.ts` — 단계 해금 계산
 - `lib/missions/dashboard.ts` — 전체 DTO 조립
-- `lib/missions/completion.ts` — 공통 완료 함수, completeMissionByCode()
+- `lib/missions/completion.ts` — 공통 완료 함수, completeMissionByCode(), `loadCompletableMission()`(완료 전 검증. 위 절 참고)
 - `lib/missions/attendance.ts` — 출석 7일 주기, P2002 idempotent
 - `lib/missions/upload.ts` — S3 presigned URL, 객체 검증
 - `lib/missions/vision.ts` — Bedrock Converse + Nova Tool Use
