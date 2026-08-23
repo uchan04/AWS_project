@@ -352,3 +352,89 @@ export const PET_TOUCH_REPLIES = [
 export function petTouchReply(count: number): string {
   return PET_TOUCH_REPLIES[Math.abs(Math.floor(count)) % PET_TOUCH_REPLIES.length]
 }
+
+// ── 시간대 인사 (2026-08-23 추가) ─────────────────────────────────────────────
+//
+// 벤치마크한 육성 게임 5종 중 4종이 접속 시각에 따라 다른 인사를 한다. 하루에 한 번
+// 열어도 같은 문장만 나오면 "저장된 그림"으로 읽히고, 바뀌면 살아 있는 것으로 읽힌다.
+//
+// **시각을 읽는 것은 이 함수가 아니라 호출부다.** 서버(Lambda·UTC)와 브라우저(KST)의
+// getHours()가 9시간 다르므로, 서버에서 렌더한 인사와 클라이언트 첫 렌더의 인사가
+// 어긋나 hydration 경고가 난다. 호출부는 마운트 후에만 시각을 읽는다.
+// 인자를 받는 순수 함수라 check:pet이 경계값을 검증할 수 있다.
+
+export type TimeOfDay = "dawn" | "morning" | "afternoon" | "evening" | "night"
+
+/** 0~23시를 5구간으로 나눈다. 범위를 벗어난 값은 0~23으로 감아 넣는다 */
+export function timeOfDay(hour: number): TimeOfDay {
+  const h = ((Math.floor(hour) % 24) + 24) % 24
+  if (h < 6) return "dawn"
+  if (h < 11) return "morning"
+  if (h < 17) return "afternoon"
+  if (h < 22) return "evening"
+  return "night"
+}
+
+// 지시문이 아니라 1인칭 상태로 쓴다(CALM_LINES와 같은 이유).
+// 새벽·밤은 특히 조심한다 — 이 시간에 앱을 여는 사람에게 "일찍 자라"는 말은 훈계다.
+const TIME_GREETING: Record<TimeOfDay, string> = {
+  dawn: "이 시간에 깨어 있었네요. 저도 같이 있을게요",
+  morning: "좋은 아침이에요. 창문 한 번 열어 볼래요?",
+  afternoon: "오늘 하루 어떻게 가고 있어요?",
+  evening: "저녁이네요. 오늘 여기까지 온 것으로 충분해요",
+  night: "하루가 끝났어요. 조용히 있어도 괜찮아요",
+}
+
+export function timeGreeting(hour: number): string {
+  return TIME_GREETING[timeOfDay(hour)]
+}
+
+// ── 호흡 안내 (2026-08-23 추가. /pet/rest) ────────────────────────────────────
+//
+// 4-4-6 주기. 4-7-8(Weil)은 7초 참기가 처음 하는 사람에게 길어 중간에 포기하고,
+// Calm·Headspace의 기본 안내도 들이쉬기보다 내쉬기를 길게 잡는다(부교감 우세).
+// 합이 14초라 3분(180초)이 12.86주기 — 딱 맞지 않아도 된다. 카운트다운을 보여 주는
+// 화면이 아니라 "아무것도 안 하는" 화면이라 주기가 끊기는 자리가 없다.
+//
+// 순수 함수다. 경계(0, 4, 8, 14)를 check:pet이 못 박는다.
+export const BREATH_CYCLE = [
+  { phase: "in", seconds: 4, label: "천천히 들이쉬어요" },
+  { phase: "hold", seconds: 4, label: "잠깐 멈춰요" },
+  { phase: "out", seconds: 6, label: "길게 내쉬어요" },
+] as const
+
+export type BreathPhase = (typeof BREATH_CYCLE)[number]["phase"]
+
+/** 한 주기 길이(초). 14 */
+export const BREATH_CYCLE_SECONDS = BREATH_CYCLE.reduce((sum, s) => sum + s.seconds, 0)
+
+/**
+ * 시작 후 경과 초 → 지금 어느 단계이고 그 단계가 몇 초 남았는지.
+ * 원(circle) 크기와 안내 문구가 같은 값에서 나와야 어긋나지 않는다.
+ */
+export function breathAt(elapsedSeconds: number): {
+  phase: BreathPhase
+  label: string
+  /** 이 단계 안에서의 진행도 0~1. 원의 지름에 쓴다 */
+  progress: number
+  /** 이 단계가 끝나기까지 남은 초(올림). 1 이상이다 */
+  remaining: number
+} {
+  const t = Math.max(0, elapsedSeconds) % BREATH_CYCLE_SECONDS
+  let start = 0
+  for (const step of BREATH_CYCLE) {
+    if (t < start + step.seconds) {
+      const into = t - start
+      return {
+        phase: step.phase,
+        label: step.label,
+        progress: into / step.seconds,
+        remaining: Math.max(1, Math.ceil(step.seconds - into)),
+      }
+    }
+    start += step.seconds
+  }
+  // BREATH_CYCLE_SECONDS로 나눈 나머지는 항상 마지막 구간 안에 들어오므로 닿지 않는다
+  const last = BREATH_CYCLE[BREATH_CYCLE.length - 1]
+  return { phase: last.phase, label: last.label, progress: 1, remaining: 1 }
+}

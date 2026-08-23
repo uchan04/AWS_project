@@ -1,6 +1,11 @@
 import assert from "node:assert/strict"
 import { COSMETICS, PET_SKINS, PRICE_BY_RARITY } from "../prisma/seed/items"
 import {
+  BREATH_CYCLE,
+  BREATH_CYCLE_SECONDS,
+  breathAt,
+  timeGreeting,
+  timeOfDay,
   HUNGER_EMPTY_HOURS,
   HUNGER_LOW,
   HUNGER_MAX,
@@ -21,7 +26,7 @@ import {
   petTouchReply,
   seedsToNextStage,
 } from "../lib/pet"
-import { EVOLUTION_LEVEL, SEED_TO_EXP, TRIBE, expToNextLevel } from "../lib/types"
+import { EVOLUTION_LEVEL, SEED_TO_EXP, TRIBE, expToNextLevel, withSubject } from "../lib/types"
 
 // npm run check:pet
 // 성장 곡선과 진화 임계값은 SPEC.md 5절 수치다. 로직을 고쳤으면 이걸 돌려본다.
@@ -460,5 +465,90 @@ for (const n of [-1, -7, 0.5, 3.9, 1_000_001]) {
   assert.equal(typeof petTouchReply(n), "string", `petTouchReply(${n})`)
   assert.ok(petTouchReply(n).length > 0)
 }
+
+// ── 시간대 인사 (timeOfDay / timeGreeting) ────────────────────────────────────
+// 경계값. 5구간의 시작·끝을 못 박는다 — 구간을 옮기면 여기서 걸린다
+assert.equal(timeOfDay(0), "dawn")
+assert.equal(timeOfDay(5), "dawn")
+assert.equal(timeOfDay(6), "morning")
+assert.equal(timeOfDay(10), "morning")
+assert.equal(timeOfDay(11), "afternoon")
+assert.equal(timeOfDay(16), "afternoon")
+assert.equal(timeOfDay(17), "evening")
+assert.equal(timeOfDay(21), "evening")
+assert.equal(timeOfDay(22), "night")
+assert.equal(timeOfDay(23), "night")
+
+// 24시간을 감아 넣는다. getHours()가 24를 주는 일은 없지만 음수·소수는 들어올 수 있다
+assert.equal(timeOfDay(24), "dawn")
+assert.equal(timeOfDay(-1), "night")
+assert.equal(timeOfDay(3.9), "dawn")
+
+// 5구간 전부 서로 다른 문장이고, 빈 문장이 없다
+{
+  const lines = new Set<string>()
+  for (let h = 0; h < 24; h += 1) {
+    const line = timeGreeting(h)
+    assert.ok(line.trim().length > 0, `빈 인사: ${h}시`)
+    lines.add(line)
+  }
+  assert.equal(lines.size, 5)
+}
+
+// ── 호흡 안내 (breathAt) ──────────────────────────────────────────────────────
+assert.equal(BREATH_CYCLE_SECONDS, 14)
+assert.equal(BREATH_CYCLE.length, 3)
+// 내쉬기가 들이쉬기보다 길어야 한다(부교감 우세). 값을 줄이면 여기서 걸린다
+assert.ok(BREATH_CYCLE[2].seconds > BREATH_CYCLE[0].seconds)
+
+// 구간 경계. 4초에 들이쉬기가 끝나고, 8초에 참기가 끝난다
+assert.equal(breathAt(0).phase, "in")
+assert.equal(breathAt(3.9).phase, "in")
+assert.equal(breathAt(4).phase, "hold")
+assert.equal(breathAt(7.9).phase, "hold")
+assert.equal(breathAt(8).phase, "out")
+assert.equal(breathAt(13.9).phase, "out")
+// 주기가 감긴다 — 14초는 다시 들이쉬기다
+assert.equal(breathAt(14).phase, "in")
+assert.equal(breathAt(180).phase, breathAt(180 % BREATH_CYCLE_SECONDS).phase)
+
+// progress는 구간 안에서 0에서 시작해 1 미만으로 끝난다(원 지름 계산이 튀지 않게)
+assert.equal(breathAt(0).progress, 0)
+assert.equal(breathAt(4).progress, 0)
+assert.equal(breathAt(8).progress, 0)
+for (let t = 0; t < 3 * BREATH_CYCLE_SECONDS; t += 0.5) {
+  const b = breathAt(t)
+  assert.ok(b.progress >= 0 && b.progress < 1, `progress 범위 벗어남: ${t}초 → ${b.progress}`)
+  // 남은 초를 0으로 보여 주면 카운트다운이 0에서 멈춘 것처럼 보인다. 최소 1이다
+  assert.ok(b.remaining >= 1, `remaining < 1: ${t}초`)
+  assert.ok(b.label.trim().length > 0)
+}
+// 음수(시계 오차)에서도 죽지 않는다
+assert.equal(breathAt(-5).phase, "in")
+
+// ── 주격 조사 (withSubject) ───────────────────────────────────────────────────
+//
+// 종족 동물명을 문장에 넣는 곳이 "…가"를 하드코딩하고 있어 곰족만 "곰가"를 봤다.
+// 종족은 진단으로 갈리므로 개발자 계정으로는 평생 못 보는 버그다. 값을 못 박는다.
+assert.equal(withSubject("곰"), "곰이")
+assert.equal(withSubject("여우"), "여우가")
+assert.equal(withSubject("고양이"), "고양이가")
+
+// 세 종족 전부. 종족이 늘어도 조사가 어긋나지 않는다
+for (const tribe of Object.values(TRIBE)) {
+  const sentence = withSubject(tribe.animal)
+  assert.ok(
+    sentence.endsWith("이") || sentence.endsWith("가"),
+    `${tribe.animal}: 조사가 붙지 않았다`,
+  )
+  // 받침 유무와 조사가 맞는지 — 동물명 마지막 글자로 직접 다시 계산해 교차 검증한다
+  const code = tribe.animal.charCodeAt(tribe.animal.length - 1)
+  const hasFinal = (code - 0xac00) % 28 !== 0
+  assert.equal(sentence, `${tribe.animal}${hasFinal ? "이" : "가"}`, `${tribe.animal}: 조사 어긋남`)
+}
+
+// 빈 문자열·한글 아닌 글자에서 죽지 않는다
+assert.equal(withSubject(""), "")
+assert.equal(withSubject("Welli"), "Welli가")
 
 console.log("pet 체크 통과")

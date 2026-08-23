@@ -1228,6 +1228,222 @@
   }
 }
 
+/* ── 쉼 화면 (/pet/rest) ─────────────────────────────────────────────────── */
+/*
+ * 펫 홈보다 어둡고 차분하게 간다. 색은 종족 토큰(--tribe-*)에서 파생한다 —
+ * 원안(develop)은 #1E1A17·#2A241F 같은 값을 컴포넌트 안에 하드코딩해서
+ * 종족색과 무관한 화면이 되어 있었다.
+ */
+
+.pet-rest {
+  min-height: 100vh;
+  gap: var(--space-md);
+  background: var(--color-paper-2);
+  /* 1280px 실측(2026-08-23): 폭을 안 잡으면 "고민 태우기" 입력칸이 942px이 된다.
+     모니터를 가로지르며 한 줄을 쓰는 칸이다. 42rem(672px)은 한 줄이 한글 40자 안쪽에
+     들어오는 폭이다 — 읽기 좋은 한 줄 길이(45~75자)의 아래쪽에 맞췄다.
+     이 화면은 "아무것도 안 하기"라 좁은 단이 넓은 단보다 낫다. */
+  max-width: 42rem;
+  margin-inline: auto;
+}
+
+.pet-rest__bar {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--space-2xs);
+}
+
+.pet-rest__stage {
+  display: grid;
+  justify-items: center;
+  gap: var(--space-sm);
+  padding: var(--space-lg) var(--space-md);
+  border: 3px solid var(--tribe-line);
+  border-radius: var(--radius-card);
+  background: radial-gradient(circle at 50% 30%, var(--tribe-wash), var(--color-card) 70%);
+}
+
+.pet-rest__title {
+  margin: 0;
+  font-family: var(--font-display);
+  font-size: var(--text-lg);
+  color: var(--color-ink);
+}
+
+.pet-rest__lede {
+  margin: 0;
+  max-width: 32ch;
+  text-align: center;
+  font-size: var(--text-label);
+  line-height: 1.7;
+  color: var(--color-ink-2);
+}
+
+/* 호흡 원. 지름은 JS가 --breath(0.7~1.15)로 넣는다.
+   transition을 1s로 두면 1초 타이머 사이가 메워져 계단이 보이지 않는다 */
+.pet-rest__breath {
+  position: relative;
+  display: grid;
+  place-items: center;
+  width: 11rem;
+  height: 11rem;
+}
+
+.pet-rest__breath-ring {
+  position: absolute;
+  width: 100%;
+  height: 100%;
+  border: 4px solid var(--tribe-cta);
+  border-radius: 50%;
+  background: color-mix(in oklch, var(--tribe) 16%, var(--color-card));
+  transform: scale(var(--breath, 1));
+  transition: transform 1s linear;
+}
+
+.pet-rest__breath-count {
+  position: relative;
+  font-family: var(--font-display);
+  font-size: var(--text-lg);
+  color: var(--tribe-cta);
+}
+
+.pet-rest__breath-label {
+  margin: 0;
+  font-size: var(--text-body);
+  font-weight: 700;
+  color: var(--color-ink);
+}
+
+.pet-rest__pet {
+  display: grid;
+  justify-items: center;
+  gap: var(--space-3xs);
+}
+
+.pet-rest__pet-img {
+  width: 7rem;
+  height: auto;
+  filter: drop-shadow(0 6px 10px rgb(0 0 0 / 0.12));
+}
+
+.pet-rest__pet-emoji {
+  font-size: 4rem;
+  line-height: 1;
+}
+
+.pet-rest__pet-line,
+.pet-rest__meta {
+  margin: 0;
+  text-align: center;
+  font-size: var(--text-label);
+  color: var(--color-muted);
+}
+
+/* ── 고민 태우기 ─────────────────────────────────────────────────────────── */
+
+.pet-burn {
+  display: grid;
+  gap: var(--space-2xs);
+}
+
+.pet-burn__lede {
+  line-height: 1.7;
+}
+
+.pet-burn__label {
+  font-size: var(--text-label);
+  font-weight: 700;
+  color: var(--color-ink);
+}
+
+.pet-burn__input {
+  width: 100%;
+  box-sizing: border-box;
+  padding: var(--space-2xs);
+  border: 2px solid var(--tribe-line);
+  border-radius: var(--radius-input);
+  background: var(--color-paper);
+  font: inherit;
+  font-size: var(--text-body);
+  line-height: 1.7;
+  color: var(--color-ink);
+  resize: vertical;
+}
+
+.pet-burn__input:focus-visible {
+  outline: 2px solid var(--tribe-cta);
+  outline-offset: 2px;
+}
+
+.pet-burn__done {
+  display: grid;
+  justify-items: center;
+  gap: var(--space-2xs);
+  padding: var(--space-sm) 0;
+}
+
+/* 불꽃 3개는 한 줄, 안내 문구는 그 아래 줄로 내린다(flex-basis: 100%) */
+.pet-burn__fire {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: flex-end;
+  justify-content: center;
+  gap: var(--space-2xs);
+  padding: var(--space-sm) 0;
+}
+
+.pet-burn__flame {
+  font-size: 2.25rem;
+  line-height: 1;
+  animation: pet-burn-flicker 0.7s var(--ease-in-out) infinite alternate;
+}
+
+.pet-burn__flame[data-i="2"] {
+  animation-delay: 0.2s;
+  font-size: 2.75rem;
+}
+
+.pet-burn__flame[data-i="3"] {
+  animation-delay: 0.4s;
+}
+
+.pet-burn__status {
+  margin: 0;
+  flex-basis: 100%;
+  text-align: center;
+  font-size: var(--text-label);
+  line-height: 1.7;
+  color: var(--color-ink-2);
+}
+
+.pet-burn__again {
+  justify-self: center;
+}
+
+/* 태우는 것은 연출이지 정보가 아니다. 흔들림을 끄고 크기만 남긴다 */
+@media (prefers-reduced-motion: reduce) {
+  .pet-burn__flame {
+    animation: none;
+  }
+
+  .pet-rest__breath-ring {
+    transition: none;
+  }
+}
+
+@keyframes pet-burn-flicker {
+  from {
+    transform: translateY(0) scale(1);
+    opacity: 0.85;
+  }
+  to {
+    transform: translateY(-6px) scale(1.12);
+    opacity: 1;
+  }
+}
+
 /* ── 좁은 화면 ───────────────────────────────────────────────────────────── */
 
 @media (max-width: 768px) {
@@ -1257,5 +1473,20 @@
 
   .pet-presets {
     grid-template-columns: repeat(2, 1fr);
+  }
+}
+
+/* 320px 실측(2026-08-23): 사이드바 레일 64px + .pet 패딩 16×2 + .pet-card 패딩 16×2 =
+   껍데기가 96px이라 "고민 태우기" 입력칸이 194px밖에 안 남았다. 한글 9자쯤에서 줄이 바뀐다.
+   레일은 전역 레이아웃(E 소유)이라 손대지 않고, 내 카드 패딩만 줄여 32px을 되돌린다.
+   360px을 기준으로 잡은 것은 이 값이 실제로 팔리는 가장 좁은 기기(iPhone SE 375,
+   Galaxy S 계열 360)의 하한이기 때문이다. */
+@media (max-width: 360px) {
+  .pet {
+    padding: var(--space-2xs);
+  }
+
+  .pet-card {
+    padding: var(--space-2xs);
   }
 }
