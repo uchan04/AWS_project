@@ -1,5 +1,6 @@
 import type { User } from "@prisma/client"
 import { prisma } from "@/lib/prisma"
+import { listClaimedDates } from "./attendance"
 import { getTodayKey, getToday } from "./reset"
 import { computeStageProgress } from "./stages"
 
@@ -42,6 +43,12 @@ export type DashboardDTO = {
     cycleDay: number
     claimedToday: boolean
     attendanceTotal: number
+    /** KST 기준 오늘(YYYY-MM-DD). 화면은 브라우저 시간대로 오늘을 정하지 않는다 */
+    todayKey: string
+    /** todayKey가 속한 달(YYYY-MM). claimedDates가 어느 달인지 알려준다 */
+    month: string
+    /** 그 달의 실제 출석 완료 날짜. 다른 달은 GET /api/missions/attendance?month=로 읽는다 */
+    claimedDates: string[]
   }
   userTypeCode: string | null
 }
@@ -69,8 +76,15 @@ export async function buildDashboard(user: User): Promise<DashboardDTO> {
   // 서로 의존하지 않으므로 순차로 기다릴 이유가 없다. RDS가 us-east-1이라 왕복 1회가
   // 176ms다 — 순차로 6번 기다리면 그것만 1초가 넘는다.
   // 완료 기록은 앞 쿼리의 missionId 목록 대신 관계 필터로 같은 집합을 고른다.
-  const [dailyMissionsRaw, dailyCompletions, allStageMissions, allStageCompletions, weeklyCount, claimedToday] =
-    await Promise.all([
+  const [
+    dailyMissionsRaw,
+    dailyCompletions,
+    allStageMissions,
+    allStageCompletions,
+    weeklyCount,
+    claimedToday,
+    claimedDatesThisMonth,
+  ] = await Promise.all([
       prisma.mission.findMany({
         where: { scope: "DAILY" },
         orderBy: { order: "asc" },
@@ -97,6 +111,8 @@ export async function buildDashboard(user: User): Promise<DashboardDTO> {
       prisma.attendanceClaim.count({
         where: { userId: user.id, claimDate: todayDate },
       }),
+      // 이번 달 출석 날짜. 첫 화면이 추가 요청 없이 캘린더를 그리도록 여기서 같이 읽는다
+      listClaimedDates(user.id, today.slice(0, 7)),
     ])
 
   const dailyCompletedIds = new Set(dailyCompletions.map((c) => c.missionId))
@@ -172,6 +188,9 @@ export async function buildDashboard(user: User): Promise<DashboardDTO> {
       cycleDay,
       claimedToday: claimedToday > 0,
       attendanceTotal: user.attendanceTotal,
+      todayKey: today,
+      month: today.slice(0, 7),
+      claimedDates: claimedDatesThisMonth,
     },
     userTypeCode: user.typeCode,
   }

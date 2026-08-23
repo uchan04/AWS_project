@@ -1,11 +1,14 @@
 import type { User } from "@prisma/client"
 import { prisma } from "@/lib/prisma"
+import { kstDateKey } from "./calendar"
 
-const TZ = "Asia/Seoul"
-
-/** 서버 기준 오늘 날짜를 YYYY-MM-DD로 반환 */
+/**
+ * 서버 기준(Asia/Seoul) 오늘 날짜를 YYYY-MM-DD로 반환.
+ * 실제 계산은 calendar.ts가 한다 — 출석 캘린더가 클라이언트에서 같은 규칙을 써야 하고,
+ * 이 모듈은 prisma를 물고 있어 클라이언트에서 import할 수 없다.
+ */
 export function getTodayKey(): string {
-  return new Date().toLocaleString("sv-SE", { timeZone: TZ }).split(" ")[0]
+  return kstDateKey(new Date())
 }
 
 /** 날짜 비교용 Date 객체 (UTC 자정) */
