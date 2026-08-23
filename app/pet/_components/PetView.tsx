@@ -5,16 +5,19 @@ import Link from "next/link"
 import type { TypeCode } from "@prisma/client"
 import {
   HUNGER_LOW,
+  HUNGER_MAX,
   IDLE_CAP_HOURS,
   IDLE_MAX_SEEDS,
   IDLE_SEEDS_PER_HOUR,
   MS_PER_IDLE_SEED,
   animalEmoji,
+  applySeeds,
   expProgress,
   hungerLabel,
   petMood,
   petTouchReply,
   seedsToNextStage,
+  timeGreeting,
 } from "@/lib/pet"
 import { EVOLUTION_LEVEL, SEED_TO_EXP, expToNextLevel } from "@/lib/types"
 import PetRoom from "./PetRoom"
@@ -115,6 +118,10 @@ export default function PetView({ initial }: { initial: PetState }) {
   const [reaction, setReaction] = useState<{ text: string; eat: boolean } | null>(null)
   const [burst, setBurst] = useState(0)
   const [touches, setTouches] = useState(0)
+  // 지금 몇 시인가. **마운트 후에만 읽는다** — 서버는 UTC(Lambda), 브라우저는 KST라
+  // 서버 렌더 값과 클라이언트 첫 렌더 값이 9시간 어긋나 hydration 경고가 난다.
+  // null인 동안은 시간대 인사 없이 기존 문구가 나온다
+  const [hour, setHour] = useState<number | null>(null)
 
   const need = expToNextLevel(pet.level)
   const progress = expProgress(pet.level, pet.exp)
@@ -128,6 +135,20 @@ export default function PetView({ initial }: { initial: PetState }) {
   // evolutionStageFor가 MAX_STAGE에서 멈추므로 카드도 그 수를 넘기지 않는다
   const stages = Array.from({ length: Math.min(pet.stageCount, MAX_STAGE) }, (_, i) => i + 1)
   const feedable = Math.min(amount, pet.seeds)
+
+  // 시각을 마운트 직후에 한 번, 그 뒤 10분마다 다시 읽는다.
+  // setTimeout(0)을 거치는 이유는 두 가지다 — effect 본문에서 곧바로 setState하면
+  // 리렌더가 연쇄되고(react-hooks/set-state-in-effect), 화면을 밤 11시 59분에
+  // 열어 둔 사람에게 다음 날 아침까지 "하루가 끝났어요"가 남는다
+  useEffect(() => {
+    const sync = () => setHour(new Date().getHours())
+    const first = setTimeout(sync, 0)
+    const every = setInterval(sync, 10 * 60 * 1000)
+    return () => {
+      clearTimeout(first)
+      clearInterval(every)
+    }
+  }, [])
 
   // 토스트 2.5초 후 사라짐
   useEffect(() => {
@@ -178,6 +199,29 @@ export default function PetView({ initial }: { initial: PetState }) {
     if (pending || seeds < 1 || seeds > pet.seeds) return
     setPending(true)
 
+    // 낙관적 갱신. Bedrock이 아니라 RDS(us-east-1) 왕복이라 400~900ms인데, 그동안
+    // 게이지가 멈춰 있으면 버튼이 안 눌린 것처럼 읽힌다.
+    //
+    // 예측값을 손으로 계산하지 않고 서버가 쓰는 것과 **같은** applySeeds()를 부른다.
+    // 레벨이 한 번에 여러 개 오르는 경우(씨앗 100개)를 근사식으로 처리하면 화면이
+    // 잠깐 틀린 레벨·단계를 보여 주고 응답이 오면서 되돌아가 깜빡인다.
+    // 배고픔은 서버가 lastFedAt을 now로 밀므로 100이 된다(lib/pet.ts hungerFor).
+    const before = pet
+    const guess = applySeeds(
+      { level: pet.level, exp: pet.exp, evolutionStage: pet.evolutionStage },
+      seeds,
+      pet.stageCount,
+    )
+    setPet((prev) => ({
+      ...prev,
+      level: guess.level,
+      exp: guess.exp,
+      evolutionStage: guess.evolutionStage,
+      // 씨앗 차감만 예측한다. 스킨 배율(effectPct)은 획득에만 붙고 소모에는 붙지 않는다
+      seeds: Math.max(0, prev.seeds - seeds),
+      hunger: HUNGER_MAX,
+    }))
+
     try {
       const res = await fetch("/api/pet/feed", {
         method: "POST",
@@ -187,6 +231,9 @@ export default function PetView({ initial }: { initial: PetState }) {
       const json = await res.json()
 
       if (!res.ok) {
+        // 예측을 되돌린다. 씨앗이 줄어든 화면을 남기면 실제로는 있는 씨앗을
+        // 못 쓰는 상태가 되고, 새로고침 전까지 사용자가 그걸 알 방법이 없다
+        setPet(before)
         setToast({ text: json?.error?.message ?? "잠시 후 다시 시도해 주세요", error: true })
         return
       }
@@ -214,6 +261,7 @@ export default function PetView({ initial }: { initial: PetState }) {
 
       window.dispatchEvent(new CustomEvent("user-stats-changed"))
     } catch {
+      setPet(before)
       setToast({ text: "네트워크 연결을 확인해 주세요", error: true })
     } finally {
       setPending(false)
@@ -225,16 +273,23 @@ export default function PetView({ initial }: { initial: PetState }) {
     if (pending || pet.idleSeeds < 1) return
     setPending(true)
 
+    // 방에 떨어진 씨앗을 눌렀을 때 바로 사라져야 한다 — 이건 "주웠다"는 동작이라
+    // 응답을 기다리는 동안 씨앗이 그대로 남아 있으면 두 번 누르게 된다.
+    // 실제 지급량은 서버가 다시 계산하므로(스킨 배율 포함) 보유량은 예측하지 않는다.
+    const before = pet
+    setPet((prev) => ({ ...prev, idleSeeds: 0, idleCapped: false }))
+
     try {
       const res = await fetch("/api/pet/idle", { method: "POST" })
       const json = await res.json()
 
       if (!res.ok) {
+        setPet(before)
         setToast({ text: json?.error?.message ?? "잠시 후 다시 시도해 주세요", error: true })
         return
       }
 
-      const gained = json.data.seeds - pet.seeds
+      const gained = json.data.seeds - before.seeds
       setPet((prev) => ({ ...prev, seeds: json.data.seeds, idleSeeds: 0, idleCapped: false }))
       setMsLeft(MS_PER_IDLE_SEED)
       setToast({ text: `씨앗 ${ko(Math.max(0, gained))}개를 수확했어요` })
@@ -242,6 +297,7 @@ export default function PetView({ initial }: { initial: PetState }) {
       // 2026-08-21 머지: develop이 이벤트 이름을 user-stats-changed로 바꿨다(35746be)
       window.dispatchEvent(new CustomEvent("user-stats-changed"))
     } catch {
+      setPet(before)
       setToast({ text: "네트워크 연결을 확인해 주세요", error: true })
     } finally {
       setPending(false)
@@ -282,6 +338,11 @@ export default function PetView({ initial }: { initial: PetState }) {
             <span className="pet-hud__icon">🌱</span>
             <span className="pet-hud__value">{ko(pet.seeds)}</span>
           </p>
+          {/* 여기로 들어가는 유일한 입구다. 홈이나 미션에서 링크하지 않는다 —
+              쉬는 화면을 다른 화면이 권하면 "쉬어라"는 지시가 된다 */}
+          <Link className="pet-plank" href="/pet/rest">
+            잠깐 쉬기
+          </Link>
           <Link className="pet-plank" href="/pet/skins">
             외형 상점
           </Link>
@@ -385,8 +446,12 @@ export default function PetView({ initial }: { initial: PetState }) {
                   overflow: hidden에 잘렸다(실측). 그래서 방 위쪽 고정으로 바꿨다.
                 - z-index가 같으면 DOM 순서가 위아래를 정한다. 앞에 두면 좁은 화면에서
                   펫 머리가 글자를 덮는다 — 읽히는 쪽이 위여야 한다 */}
+            {/* 급한 상태(배고픔·수확·진화 임박)가 없을 때만 시간대 인사로 바꾼다.
+                CALM_LINES는 레벨로 골라 같은 레벨에서 항상 같은 문장이 나왔다 —
+                하루에 한 번 여는 사용자에게는 고정 문구와 다를 게 없었다 */}
             <p className="pet-bubble" data-tone={reaction ? (reaction.eat ? "eat" : "touch") : mood.tone}>
-              {reaction?.text ?? mood.text}
+              {reaction?.text ??
+                (mood.tone === "calm" && hour !== null ? timeGreeting(hour) : mood.text)}
             </p>
           </div>
 
