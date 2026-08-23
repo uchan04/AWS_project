@@ -34,6 +34,7 @@ export async function POST(req: Request, { params }: { params: Promise<{ mission
       actor: user,
       missionId,
       resetKey,
+      mission, // loadCompletableMission이 방금 읽은 행이다. 다시 읽지 않는다(왕복 1회 절약)
     })
 
     return ok(result)

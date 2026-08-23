@@ -62,16 +62,26 @@ export async function loadCompletableMission(
 /**
  * 일반 미션 완료 공통 함수.
  * P2002는 중복으로 보고 idempotent 결과 반환.
+ *
+ * `mission`을 넘기면 여기서 다시 읽지 않는다. 호출부는 모두 직전에 같은 행을 이미 읽는다 —
+ * `loadCompletableMission()`은 검증하려고, `completeMissionByCode()`는 code로 id를 찾으려고.
+ * RDS가 us-east-1이라 그 재조회 한 번이 왕복 1회(180ms)다(`scripts/perf-write-path.ts`).
+ * 넘기지 않으면 예전처럼 읽으므로 기존 호출부는 그대로 돌아간다.
  */
 export async function completeMission(params: {
   actor: ActorWithSkin
   missionId: string
   resetKey: string
   photoKey?: string
+  mission?: Mission
 }): Promise<MissionCompletionResult> {
   const { actor, missionId, resetKey, photoKey } = params
 
-  const mission = await prisma.mission.findUnique({ where: { id: missionId } })
+  // 넘겨받은 행이 정말 이 missionId의 행인지 본다. 어긋나면 남의 미션 보상이 나간다
+  const mission =
+    params.mission?.id === missionId
+      ? params.mission
+      : await prisma.mission.findUnique({ where: { id: missionId } })
   if (!mission) {
     throw new Error("미션을 찾을 수 없습니다")
   }
@@ -217,5 +227,6 @@ export async function completeMissionByCode(params: {
     actor,
     missionId: mission.id,
     resetKey: today,
+    mission, // 방금 code로 읽은 행이다. 다시 읽지 않는다
   })
 }
