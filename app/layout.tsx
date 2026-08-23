@@ -5,7 +5,7 @@ import { Sidebar } from "./components/Sidebar";
 import { ChatLauncher } from "./chat/_components/ChatLauncher";
 
 export const metadata: Metadata = {
-  title: "함께 걷는 하루",
+  title: "모꼬지",
   description: "고립은둔청년 맞춤형 사회 복귀 서비스",
 };
 
