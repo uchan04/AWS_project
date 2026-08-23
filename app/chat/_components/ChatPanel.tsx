@@ -3,7 +3,7 @@
 import { useEffect, useRef, useState } from "react"
 import { useModalA11y } from "@/app/components/useModalA11y"
 import type { TypeCode } from "@prisma/client"
-import { TRIBE } from "@/lib/types"
+import { TRIBE, withSubject } from "@/lib/types"
 import { timeAgo } from "@/app/community/_lib/format"
 import { POST_AFFINITY, COMMENT_AFFINITY, CHAT_TURN_AFFINITY } from "@/app/community/_lib/affinity"
 import { CHAT_STARTERS } from "@/app/chat/_lib/starters"
@@ -309,19 +309,31 @@ export function ChatPanel({ onClose }: { onClose?: () => void }) {
                     {streamingText ? (
                       streamingText
                     ) : (
-                      <div className="flex gap-1 py-1">
-                        <span
-                          className="h-1.5 w-1.5 animate-bounce rounded-full bg-neutral-400"
-                          style={{ animationDelay: "0ms" }}
-                        />
-                        <span
-                          className="h-1.5 w-1.5 animate-bounce rounded-full bg-neutral-400"
-                          style={{ animationDelay: "150ms" }}
-                        />
-                        <span
-                          className="h-1.5 w-1.5 animate-bounce rounded-full bg-neutral-400"
-                          style={{ animationDelay: "300ms" }}
-                        />
+                      // 점 3개만 있던 자리다. Bedrock 첫 토큰까지 2~4초가 걸려서 그동안
+                      // 화면이 "멈춘 것"으로 읽혔다. 종족 이름을 써 기다리는 대상을 밝힌다.
+                      // 동물명은 TRIBE가 정본이다 — typeCode.includes()로 분기하지 않는다
+                      // (유형 코드가 늘면 조용히 "고양이"로 떨어진다)
+                      <div className="py-1">
+                        <div className="flex gap-1">
+                          <span
+                            className="h-1.5 w-1.5 animate-bounce rounded-full bg-neutral-400"
+                            style={{ animationDelay: "0ms" }}
+                          />
+                          <span
+                            className="h-1.5 w-1.5 animate-bounce rounded-full bg-neutral-400"
+                            style={{ animationDelay: "150ms" }}
+                          />
+                          <span
+                            className="h-1.5 w-1.5 animate-bounce rounded-full bg-neutral-400"
+                            style={{ animationDelay: "300ms" }}
+                          />
+                        </div>
+                        {typeCode ? (
+                          <p className="mt-1.5 text-[11px] text-neutral-500">
+                            {withSubject(TRIBE[typeCode].animal)} 당신의 이야기에 고개를 끄덕이고
+                            있어요…
+                          </p>
+                        ) : null}
                       </div>
                     )}
                   </div>
