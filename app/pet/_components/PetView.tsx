@@ -367,12 +367,17 @@ export default function PetView({ initial }: { initial: PetState }) {
         </div>
 
         <div className="pet__top-acts">
-          {/* 보유 씨앗 HUD. 같은 숫자를 아래 "씨앗 투입" 카드가 글자로 다시 쓰므로
-              스크린리더에 두 번 읽히지 않게 여기서는 숨긴다 */}
-          <p className="pet-hud" aria-hidden="true">
-            <span className="pet-hud__icon">🌱</span>
-            <span className="pet-hud__value">{ko(pet.seeds)}</span>
-          </p>
+          {/* 보유 씨앗 HUD를 지웠다 (2026-08-23). 같은 숫자가 이 화면에 세 벌이었다 —
+              여기, "씨앗 투입" 카드의 `보유 N개`, 그리고 사이드바의 `🌱 씨앗 N개`.
+              셋 중 이것이 가장 약하다:
+              - `aria-hidden="true"`라 스크린리더에는 애초에 없었다(접근성 자산 0).
+              - `.pet__top`이 sticky가 아니라 스크롤하면 사라진다 — "항상 보이는 재화"라는
+                HUD의 존재 이유를 못 한다. 실제로 항상 보이는 것은 사이드바다.
+              - 사이드바는 `user-stats-changed`로 갱신되고, 조작 지점(스테퍼·프리셋)에서
+                상한을 말해야 하는 것은 카드의 `보유 N개`다.
+              상점 2화면(SkinList·CosmeticList)의 .pet-hud는 남긴다 — 그쪽 잔액은
+              구매 판단에 쓰이고 `aria-label`도 제대로 달려 있다.
+              덤으로 .pet__top-acts의 flex 항목이 4개에서 3개가 됐다(320px에서 나무판 3개가 붙어 있었다) */}
           {/* 여기로 들어가는 유일한 입구다. 홈이나 미션에서 링크하지 않는다 —
               쉬는 화면을 다른 화면이 권하면 "쉬어라"는 지시가 된다 */}
           <Link className="pet-plank" href="/pet/rest">
@@ -524,10 +529,13 @@ export default function PetView({ initial }: { initial: PetState }) {
               aria-valuemax={need}
               aria-valuenow={pet.exp}
             >
+              {/* 게이지 안에 {exp} / {need}를 겹쳐 쓰던 것을 지웠다 (2026-08-23).
+                  바로 위 .pet-card__meta가 **같은 문자열**을 이미 쓴다 — 8px 간격으로
+                  같은 숫자가 두 번이었다. 지운 쪽이 게이지 안이다:
+                  움직이는 그라디언트 위 글자라 대비가 채움률에 따라 변하고,
+                  같은 화면의 다른 카드 2장(배고픔·씨앗 투입)은 meta 하나만 쓴다.
+                  배경 상점의 .pet-gauge__value는 그 게이지의 **유일한** 라벨이라 남는다 */}
               <div className="pet-gauge__fill" style={{ width: `${progress * 100}%` }} />
-              <span className="pet-gauge__value">
-                {ko(pet.exp)} / {ko(need)}
-              </span>
             </div>
             {/* 지금까지 `Lv.25 마지막 진화`만 보여 줬다. 그 문구는 지금 무엇을 얼마나
                 해야 하는지 알려 주지 않는다. 벤치마크한 육성 게임은 전부 남은 개수를 쓴다 */}
@@ -712,7 +720,10 @@ export default function PetView({ initial }: { initial: PetState }) {
       <section className="pet-card pet-evo">
         <div className="pet-card__head">
           <h2 className="pet-card__title">🌟 진화 단계</h2>
-          {pet.effectLabel ? <span className="pet-card__meta">{pet.effectLabel}</span> : null}
+          {/* 헤더의 effectLabel을 지웠다 (2026-08-23). 같은 섹션 안 "현재" 카드가
+              같은 문자열을 이미 쓴다(.pet-evo-card__effect). 카드 쪽을 남긴 이유는
+              그쪽이 "어느 단계에 붙은 효과인가"를 같이 말하기 때문이다 —
+              헤더 meta는 4칸을 다 본 뒤에도 같은 말을 반복하는 것뿐이었다 */}
         </div>
         <div className="pet-evo__list">
           {stages.map((s) => {

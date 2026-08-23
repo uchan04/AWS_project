@@ -33,6 +33,56 @@ const TABS: { href: string; label: string; emoji: string; desc: string }[] = [
   { href: "/community", label: "커뮤니티", emoji: "💬", desc: "같은 종족 모임" },
 ]
 
+/**
+ * 프로필 아바타 원. 좁은 폭 사이드바·넓은 폭 사이드바·내 계정 모달 세 곳이
+ * **같은 22줄을 복사**하고 있었다(2026-08-23 정리). 값은 크기와 배경뿐이 달랐다.
+ *
+ * 이미지가 404면 종족 이모지로 떨어진다. 404는 서버가 알 수 없어 onError로만
+ * 알 수 있으므로(ArtImage) <img>와 <span>을 둘 다 그려 두고 display로 가린다.
+ */
+function Avatar({
+  imageUrl,
+  emoji,
+  size,
+  fontSize = 22,
+  plain = false,
+}: {
+  imageUrl: string | null
+  emoji: string
+  size: number
+  fontSize?: number
+  /** 모달 쪽은 흰 원판 없이 그림만 쓴다 */
+  plain?: boolean
+}) {
+  return (
+    <div
+      style={{
+        width: size,
+        height: size,
+        borderRadius: "50%",
+        background: plain ? undefined : "white",
+        display: "flex",
+        alignItems: "center",
+        justifyContent: "center",
+        fontSize,
+        overflow: "hidden",
+      }}
+    >
+      {imageUrl ? (
+        <ArtImage
+          src={imageUrl}
+          alt="펫"
+          width={size}
+          height={size}
+          style={{ width: "100%", height: "100%", objectFit: "cover" }}
+          fallbackDisplay="block"
+        />
+      ) : null}
+      <span style={{ display: imageUrl ? "none" : "block" }}>{emoji}</span>
+    </div>
+  )
+}
+
 export function Sidebar({ profile }: { profile: SidebarProfile | null }) {
   const pathname = usePathname()
   const router = useRouter()
@@ -108,60 +158,12 @@ export function Sidebar({ profile }: { profile: SidebarProfile | null }) {
               justifyContent: "center",
             }}
           >
-            <div
-              style={{
-                width: 40,
-                height: 40,
-                borderRadius: "50%",
-                background: "white",
-                display: "flex",
-                alignItems: "center",
-                justifyContent: "center",
-                fontSize: 22,
-                overflow: "hidden",
-              }}
-            >
-              {profile.imageUrl ? (
-                <ArtImage
-                  src={profile.imageUrl}
-                  alt="펫"
-                  width={40}
-                  height={40}
-                  style={{ width: "100%", height: "100%", objectFit: "cover" }}
-                  fallbackDisplay="block"
-                />
-              ) : null}
-              <span style={{ display: profile.imageUrl ? "none" : "block" }}>{getTribeEmoji(profile.typeCode)}</span>
-            </div>
+            <Avatar imageUrl={profile.imageUrl} emoji={getTribeEmoji(profile.typeCode)} size={40} />
           </div>
         ) : (
           <div style={{ margin: "16px 16px 8px", background: bg, borderRadius: 16, padding: "16px" }}>
             <div style={{ display: "flex", alignItems: "center", gap: 10, marginBottom: 10 }}>
-              <div
-                style={{
-                  width: 40,
-                  height: 40,
-                  borderRadius: "50%",
-                  background: "white",
-                  display: "flex",
-                  alignItems: "center",
-                  justifyContent: "center",
-                  fontSize: 22,
-                  overflow: "hidden",
-                }}
-              >
-                {profile.imageUrl ? (
-                  <ArtImage
-                    src={profile.imageUrl}
-                    alt="펫"
-                    width={40}
-                    height={40}
-                    style={{ width: "100%", height: "100%", objectFit: "cover" }}
-                    fallbackDisplay="block"
-                  />
-                ) : null}
-                <span style={{ display: profile.imageUrl ? "none" : "block" }}>{getTribeEmoji(profile.typeCode)}</span>
-              </div>
+              <Avatar imageUrl={profile.imageUrl} emoji={getTribeEmoji(profile.typeCode)} size={40} />
               <div style={{ flex: 1, minWidth: 0 }}>
                 <div style={{ display: "flex", alignItems: "center", gap: 6, marginBottom: 2 }}>
                   <p
@@ -374,62 +376,26 @@ export function Sidebar({ profile }: { profile: SidebarProfile | null }) {
                   gap: 16,
                 }}
               >
-                <div
-                  style={{
-                    width: 52,
-                    height: 52,
-                    display: "flex",
-                    alignItems: "center",
-                    justifyContent: "center",
-                    fontSize: 52,
-                    overflow: "hidden",
-                    borderRadius: "50%",
-                  }}
-                >
-                  {profile.imageUrl ? (
-                    <ArtImage
-                      src={profile.imageUrl}
-                      alt="펫"
-                      width={52}
-                      height={52}
-                      style={{ width: "100%", height: "100%", objectFit: "cover" }}
-                      fallbackDisplay="block"
-                    />
-                  ) : null}
-                  <span style={{ display: profile.imageUrl ? "none" : "block" }}>{tribe?.emoji || "🌱"}</span>
-                </div>
+                <Avatar
+                  imageUrl={profile.imageUrl}
+                  emoji={getTribeEmoji(profile.typeCode)}
+                  size={52}
+                  fontSize={52}
+                  plain
+                />
                 <div style={{ textAlign: "left" }}>
                   <p style={{ fontFamily: "var(--font-display)", fontSize: 18, color: "#2A1F14", margin: "0 0 3px" }}>
                     {profile.nickname}
                   </p>
                   <p style={{ margin: 0, fontSize: 12, color, fontWeight: 700 }}>{familyLabel}</p>
+                  {/* 정보 칸 3개(펫 레벨·보유 씨앗·시작한 날)를 지우고 시작한 날만 여기로 옮겼다
+                      (2026-08-23). 이 모달은 사이드바 **위에** 열리는데 사이드바 프로필 카드가
+                      `Lv.N`과 `🌱 씨앗 N개`를 이미 말하고 있다 — 같은 값이 60px 옆에 두 번이었다.
+                      시작한 날만 사이드바에 없는 정보다. 모달이 실제로 하는 일은 정보 표시가
+                      아니라 행동 3개(이름 바꾸기·계정 설정·로그아웃)다.
+                      덤으로 `1fr 1fr` 격자에 항목 3개라 마지막 칸이 혼자 한 줄이던 것도 없어졌다 */}
+                  <p style={{ margin: "5px 0 0", fontSize: 11, color: "#7A6B58" }}>📅 {joinDate}부터</p>
                 </div>
-              </div>
-
-              <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 8, marginBottom: 20 }}>
-                {[
-                  { label: "펫 레벨", value: `Lv.${profile.level}`, emoji: "⭐" },
-                  { label: "보유 씨앗", value: `${profile.seeds}개`, emoji: "🌱" },
-                  { label: "시작한 날", value: joinDate, emoji: "📅" },
-                ].map((item) => (
-                  <div
-                    key={item.label}
-                    style={{
-                      display: "flex",
-                      alignItems: "center",
-                      gap: 10,
-                      padding: "11px 14px",
-                      background: "#F5F0E8",
-                      borderRadius: 14,
-                    }}
-                  >
-                    <span style={{ fontSize: 16 }}>{item.emoji}</span>
-                    <div>
-                      <p style={{ margin: 0, fontSize: 10, color: "#9A8A76" }}>{item.label}</p>
-                      <p style={{ margin: 0, fontSize: 13, color: "#2A1F14", fontWeight: 600 }}>{item.value}</p>
-                    </div>
-                  </div>
-                ))}
               </div>
 
               <div style={{ display: "flex", flexDirection: "column", gap: 8 }}>

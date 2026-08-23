@@ -553,6 +553,16 @@ interface StepSectionProps {
   bg: string
   mascotEmoji: string
   unlocked?: boolean
+  /**
+   * 제목 오른쪽 알약. **단계 섹션만 쓴다** — `2 / 3 완료`이거나 잠금 안내이고,
+   * 그 값은 화면 어디에도 다시 나오지 않는다.
+   *
+   * 일일 미션 섹션은 2026-08-23에 이 값을 넘기지 않게 바꿨다. 거기서 넘긴 것은
+   * `${dailyCompleted} / ${dailyTotal}`이었고 200px 위 `오늘 달성률` ProgressCard가
+   * **같은 문자열**을 이미 쓴다. 집중 카드의 `나머지 N개는 아래에 있어요`까지 합치면
+   * 한 화면에서 같은 사실이 세 번이었다. ProgressCard 쪽을 남긴 이유는 그것이
+   * `이번 주`·`연속 달성`과 3칸 한 세트라 하나만 빼면 격자가 어긋나기 때문이다.
+   */
   progress?: string
   onSelect: (m: MissionDTO) => void
 }
@@ -1148,7 +1158,6 @@ export default function MissionDashboard({
               color={color}
               bg={bg}
               mascotEmoji={mascotEmoji}
-              progress={`${dashboard.progress.dailyCompleted} / ${dashboard.progress.dailyTotal}`}
               onSelect={setSelected}
             />
           </>
