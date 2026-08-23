@@ -2,7 +2,9 @@
 
 **모든 세션은 이 문서부터 읽는다.** 그다음 아래 "지금 읽어야 할 문서"만 읽고 시작한다.
 
-최종 갱신: **2026-08-23 — `develop`(antigravity 작업)을 검토해 **살릴 것만** 가져오고 깨진 것은 버렸다. 가장 값이 큰 것은 `POST /api/upload/presign`의 권한 검사다 — `findUnique(id)`만 해서 **남의 유형 미션이나 잠긴 단계의 미션 id로도 presigned PUT URL이 나갔다**(미션은 완료되지 않지만 버킷에는 쓸 수 있었다). 완료 경로와 같은 `loadCompletableMission()`을 태워 막았다. 새 화면 `/pet/rest`(호흡 4-4-6 · Web Audio로 만든 빗소리 · 고민 태우기)를 미션·DB·재화와 완전히 분리해 새로 짰다 — 이 화면에서 얻는 것이 하나도 없는 것이 설계다. 미션에는 "오늘 이거 하나만" 집중 카드. **곰족만 "곰가"를 보던 조사 버그**를 `withSubject()`(받침 판정)로 고쳤다. 버린 것: `0%%`로 깨진 키프레임 2개(Lightning CSS가 빈 껍데기로 컴파일한다), CSP에 막혀 아무 일도 안 하던 외부 빗소리 CDN 링크, 공유 DB `dailyTotal`을 5→6으로 미는 `DAILY_REST` 시드, `.env.example`의 `SESSION_SECRET` 예시값. `check:*` 7종·`tsc`·`lint`·`build` 전부 통과, `npm run e2e` **75건 통과**. 브라우저 실측으로 320px·1280px 폭과 낙관적 갱신 지연(80ms)까지 확인했다.** 세부는 `docs/dev/pet.md` "쉼 화면과 develop 선별 반영", `docs/dev/missions.md`.
+최종 갱신: **2026-08-23 — `/missions` 지연의 4번째 병목을 찾아 고쳤다. TTFB **743ms → 376ms(49% 감소)**, `buildDashboard()` **542ms → 182ms(66% 감소)**. 원인은 예상과 달랐다 — `Promise.all`로 감싸도 왕복 1회가 보장되지 않는다. Postgres는 처음 보는 SQL 문에 prepare 왕복을 한 번 더 쓰고 **그 캐시가 연결마다 따로**여서, 병렬 6개가 연결 25개에 흩어지면 저트래픽 앱은 예열을 끝내지 못하고 벽시계가 왕복 1~4회를 계속 오간다. 손댈 수 있는 레버는 **문의 개수**뿐이었고, 6개 중 2개(미션 카탈로그)는 시드로만 바뀌는 불변 데이터였다 — `lib/missions/catalog.ts`(TTL 5분·진행 중 요청 합침)로 옮겨 쿼리 6→4개, 카탈로그 80.8KB→0KB. **추측으로 고치지 않았다**: 링크(40/40 전부 177ms)·연결 풀·N+1·페이로드 크기(79% 줄여도 2% 느려졌다)·`connection_limit`(낮추면 그만큼 직렬화, 1→1086ms)을 계측으로 하나씩 각하했다. `DATABASE_URL`은 **손대지 않았다** — 기본값 25가 가장 빨랐다. 계측 스크립트 12개를 `scripts/perf-*`로 남겨 누구나 재측정할 수 있다. `npm run e2e` **75건 통과**, `check:*` 7종·`tsc`·`lint`·`build` 전부 통과.** 세부는 `docs/dev/perf.md` "고친 것 4번째", `docs/dev/missions.md`.
+
+이전 갱신: **2026-08-23 — `develop`(antigravity 작업)을 검토해 **살릴 것만** 가져오고 깨진 것은 버렸다. 가장 값이 큰 것은 `POST /api/upload/presign`의 권한 검사다 — `findUnique(id)`만 해서 **남의 유형 미션이나 잠긴 단계의 미션 id로도 presigned PUT URL이 나갔다**(미션은 완료되지 않지만 버킷에는 쓸 수 있었다). 완료 경로와 같은 `loadCompletableMission()`을 태워 막았다. 새 화면 `/pet/rest`(호흡 4-4-6 · Web Audio로 만든 빗소리 · 고민 태우기)를 미션·DB·재화와 완전히 분리해 새로 짰다 — 이 화면에서 얻는 것이 하나도 없는 것이 설계다. 미션에는 "오늘 이거 하나만" 집중 카드. **곰족만 "곰가"를 보던 조사 버그**를 `withSubject()`(받침 판정)로 고쳤다. 버린 것: `0%%`로 깨진 키프레임 2개(Lightning CSS가 빈 껍데기로 컴파일한다), CSP에 막혀 아무 일도 안 하던 외부 빗소리 CDN 링크, 공유 DB `dailyTotal`을 5→6으로 미는 `DAILY_REST` 시드, `.env.example`의 `SESSION_SECRET` 예시값. `check:*` 7종·`tsc`·`lint`·`build` 전부 통과, `npm run e2e` **75건 통과**. 브라우저 실측으로 320px·1280px 폭과 낙관적 갱신 지연(80ms)까지 확인했다.** 세부는 `docs/dev/pet.md` "쉼 화면과 develop 선별 반영", `docs/dev/missions.md`.
 
 이전 갱신: **2026-08-23 — 실서비스 육성 게임 5종(Finch·다마고치 Uni·ねこあつめ·My Talking Tom·포켓캠프)과 `/pet`을 대조해 5개를 고쳤다. 펫이 말풍선으로 자기 상태를 말하고(`petMood()`), 그림을 누르면 쓰다듬어지고, 먹이면 반응이 뜨고, 방에 떨어진 씨앗을 눌러 줍고, 다음 진화가 레벨이 아니라 **남은 씨앗 개수**로 표시된다. 재화 경로는 하나도 늘리지 않았다(쓰다듬기는 무보상, 줍기는 기존 `claim()`). **브라우저 320px 실측에서 원래 있던 버그 2개를 찾았다** — 모바일 방 높이 `15rem`이 3단 진화 시절 값이라 펫 머리·Lv 배지가 잘려 있었다. `npm run check:pet` 통과, `npm run e2e` 75건 통과.** 세부는 `docs/dev/pet.md`.
 
@@ -211,7 +213,7 @@ git checkout <자기브랜치> && git merge origin/develop && npx prisma migrate
 
 GitHub 원격 — https://github.com/uchan04/AWS_project
 
-## 2026-08-23 성능 측정·최적화 3건 (`improve/service-quality`)
+## 2026-08-23 성능 측정·최적화 4건 (`improve/service-quality`)
 
 측정 먼저, 최적화 나중 순서로 했다. 세부와 재측정 절차는 `docs/dev/perf.md`.
 
@@ -221,7 +223,11 @@ GitHub 원격 — https://github.com/uchan04/AWS_project
 2. 미션·홈이 마운트 후 `fetch("/api/missions")`로 데이터를 읽었다 → 서버 렌더로 옮김. `/missions` **LCP 4324→856ms**, `/` **CLS 0.2807→0**
 3. Bedrock 클라이언트 4곳에 타임아웃이 없었다(SDK 기본값 = 무제한 대기 + 재시도 3회) → `lib/bedrock.ts` 하나로 모으고 단발 20초 / 스트리밍 60초 · 재시도 2회. 리전 해석도 통일
 
+4. 1~3을 고친 뒤에도 `/missions`가 743ms(왕복 4회분)였다. `Promise.all` 안인데도 그랬다 — Postgres의 prepare 왕복은 **연결마다** 따로 캐시되므로 병렬은 그 예열을 나눠 갖지 못한다. 불변 데이터인 미션 카탈로그를 `lib/missions/catalog.ts`로 옮겨 쿼리 6→4개. `/missions` **743→376ms**, `/api/missions` **716→367ms**, `/` **730→380ms**
+
 E2E 70건 통과 · 실패 0건(기준선과 같음). 새 의존성 없음. 공유 파일 `lib/auth.ts`를 고쳤다 — **반환 형태와 동작은 같다**(쿼리 횟수만 줄었다).
+
+4번은 새 파일 하나(`lib/missions/catalog.ts`)와 그 호출부 2곳만 고쳤다 — 공유 파일은 건드리지 않았다. E2E는 4번 이후 **75건 통과**. **보고만 하고 바꾸지 않은 것**: `DATABASE_URL`에 `connection_limit`이 없어 Prisma가 클라이언트당 25개를 연다(인스턴스 사용 가능 76개). 5인 × 25 + Amplify면 고갈 위험이지만 값을 낮추면 그만큼 느려진다 — **E 소유 공유 인프라라 팀 결정 사항이다**.
 
 ## origin 브랜치 상태 (2026-08-20 재확인)
 

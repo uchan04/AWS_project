@@ -25,7 +25,7 @@
 - 보상은 구간에 비례한다. 씨앗 `18 + 구간×4`(22~58), 별조각 `구간-2`(3구간부터, 0~8). **친밀도는 0** — 주면 커뮤니티·채팅 지급과 겹쳐 하루 상한을 미션만으로 채운다
 - 사진 미션은 유형당 38~41슬롯, 3구간부터
 - 화면은 `currentStageOf()`가 정한 단계를 기본으로 띄운다. 1단계부터 열면 37단계 사용자가 화살표를 36번 눌러야 한다
-- **옛 시드가 만든 단계당 4번째 미션 9개가 실 DB에 남아 있다.** 지우지 않고 **코드에서 배제한다**(공유 DB는 손대지 않기로 했다). 조회 4곳(`dashboard.ts:105`·`:112`, `stages.ts:92`·`:99`)이 `order <= MISSIONS_PER_STAGE`로 거르고, 완료 경로도 2026-08-22에 같은 조건을 갖췄다(아래). `scripts/prune-orphan-stage-missions.ts`는 남겨 두지만 실행하지 않는다
+- **옛 시드가 만든 단계당 4번째 미션 9개가 실 DB에 남아 있다.** 지우지 않고 **코드에서 배제한다**(공유 DB는 손대지 않기로 했다). 조회 3곳(`catalog.ts:71`, `dashboard.ts:108`, `stages.ts:98`)이 `order <= MISSIONS_PER_STAGE`로 거르고, 완료 경로도 2026-08-22에 같은 조건을 갖췄다(아래). `scripts/prune-orphan-stage-missions.ts`는 남겨 두지만 실행하지 않는다
 
 ## 완료 경로 검증 통합 (2026-08-22, A)
 
@@ -122,3 +122,54 @@ const rest = focus ? dashboard.dailyMissions.filter((m) => m.id !== focus.id) : 
 `POST /api/upload/presign`이 `findUnique(id)`만 해서 **남의 유형 미션이나 잠긴 단계의 미션 id로도 presigned PUT URL이 나갔다.** 미션은 완료되지 않지만 S3 버킷에는 쓸 수 있었다. 코드에 있던 `// TODO: 단계 해금 확인 추가 가능`이 그 구멍이다.
 
 완료 경로와 **같은** `loadCompletableMission()`을 태우도록 바꿨다. 검증이 한 곳에만 있으므로 완료 조건이 바뀌어도 업로드 쪽이 뒤처지지 않는다.
+
+## /missions 지연 절감 (2026-08-23, A)
+
+`/missions`가 정상 상태에서도 TTFB 743ms였다. RDS가 us-east-1이라 왕복 1회가 177ms이므로 왕복 4회분이다. 측정 없이 손대지 않으려고 계측 스크립트를 먼저 만들었다(`scripts/perf-*.ts`, 전부 읽기 전용).
+
+**후보를 하나씩 각하한 순서**가 이 절의 핵심이다. 같은 증상을 다시 만나면 이 순서로 다시 좁힌다.
+
+| 후보 | 실측 | 판정 |
+|---|---|---|
+| 링크·네트워크 | `SELECT 1` 40회가 40/40 전부 177±4ms | 각하. 링크는 완벽하다 (`perf-rtt.ts`) |
+| 연결 풀 지연 생성 | raw 6개 동시 묶음이 1회차 9.2배, 이후 12회 연속 1.0배 · 연결 수 34 고정 | 1회차만. 정상 상태 원인 아님 (`perf-converge.ts`) |
+| N+1 / 관계 필터 펼침 | ORM 쿼리마다 SQL **정확히 1문** | 각하 (`perf-sqlcount.ts`) |
+| 페이로드 크기 | STAGE 300행을 `{id, stage}`로 줄여 80.8KB → 16.7KB(79% 감소)했으나 벽시계는 2% **증가** | 각하. 페이로드는 원인이 아니었다 (`perf-dashboard-ab.ts` 초판) |
+| `connection_limit` 조정 | 1 → 1086ms(=6×181, 완전 직렬) · 2 → 540ms · 5 → 541ms · 10 → 534ms · **기본 25 → 365ms** | 각하. 낮추면 그만큼 직렬화된다. **E 소유 `DATABASE_URL`은 손댈 이유가 없다** (`perf-limit.ts`) |
+| **prepare 왕복 × 연결 수** | 처음 보는 문을 내는 연결은 왕복 2회(362ms), 두 번째부터 180ms 고정 | **← 원인** (`perf-prepare.ts`) |
+
+Postgres 확장 프로토콜에서 처음 보는 문은 prepare에 왕복을 한 번 더 쓴다. 그 캐시는 **연결마다** 따로다. 순차 실행은 같은 연결을 재사용해 2회차부터 적중하지만, `buildDashboard`는 6개를 `Promise.all`로 내 서로 다른 연결에 흩어진다. 풀 상한이 25면 채워야 할 조합이 문 6개 × 연결 25개 = 준비 150회이고, 저트래픽 앱은 그 예열을 끝내지 못한다. 그래서 벽시계가 182~728ms(왕복 1~4회)를 계속 오갔다 — `perf-sqlcount.ts`가 한 묶음 안의 engine duration을 179 / 352 / 353 / 354 / 358 / 717ms로 **혼재**하게 찍은 것이 그 증거다.
+
+레버는 **문의 개수**뿐이었다. 그리고 6개 중 2개는 사용자와 무관했다 — 미션 카탈로그는 시드 스크립트로만 바뀌는 불변 데이터인데 요청마다 다시 읽고 있었다.
+
+| 파일 | 역할 |
+|---|---|
+| `lib/missions/catalog.ts` | 신규. `getDailyMissionCatalog()`·`getStageMissionCatalog(typeCode)`. TTL 5분, 진행 중 요청 합침(Promise를 캐시), 실패 시 즉시 무효화, `clearMissionCatalog()` |
+| `lib/missions/dashboard.ts` | DB 쿼리 6개 → 4개. 카탈로그 80.8KB → 0KB |
+| `lib/missions/stages.ts` | `getStageProgress()` DB 쿼리 2개 → 1개 (완료 API 경로) |
+
+- **TTL을 둔 이유** — 시드를 다시 돌렸을 때 서버 재시작 없이 5분 안에 반영된다. 미션 문구가 5분 늦게 뜨는 것은 문제가 아니고, 대신 "재시작 전까지 옛 문구가 박혀 있다"는 함정을 없앤다
+- **진행 중 요청을 합친 이유** — 캐시가 비었을 때 동시 요청 N개가 같은 쿼리를 N번 내는 것을 막는다
+- 메모리는 유형 8개 × 300행 ≈ 600KB 상한. 프로세스별이므로 Amplify 인스턴스마다 따로 예열된다
+
+**전후** (같은 세션에서 번갈아 12회, `perf-dashboard-ab.ts`)
+
+```
+buildDashboard  p50 542ms -> 182ms (66% 감소). 왕복 정확히 1회로 수렴 고정
+DTO 동등성      현재 단계·창 안 미션 수·일일 완료 전부 일치
+```
+
+**정상 상태 TTFB** (경로당 10표본, `bash scripts/perf-ttfb.sh 3101 10`)
+
+| 경로 | 전 | 후 | |
+|---|---|---|---|
+| `/missions` | 743ms | **376ms** | 49% 감소. 진동 363~729ms → 374~379ms로 안정 |
+| `/api/missions` | 716ms | **367ms** | 49% 감소 |
+| `/` | 730ms | **380ms** | 48% 감소 |
+| `/pet` `/community` `/settings` `/api/pet` `/api/community/posts` | — | 변화 없음 | 미션 경로를 타지 않는다 |
+
+376ms는 왕복 2회다 — `getCurrentUser()` 1회 + `buildDashboard()` 1회. 이 둘은 순서 의존이라(사용자 행을 읽어야 대시보드를 만든다) 현재 구조의 바닥이다. 더 줄이려면 세션 쿠키에 표시용 필드를 담는 식이 되는데, 재화·streak가 낡은 값으로 뜨는 대가가 178ms보다 크다.
+
+검증: `npm run e2e` 75/75, `check:*` 7종, `tsc --noEmit`, `lint`, `build` 전부 통과.
+
+**남긴 것** — `lib/missions/completion.ts`의 `mission.findUnique` 3곳은 단건 조회라 캐시 인덱스를 만들지 않았다. 사용자 탭 1회당 왕복 1회이고, 유형 8개 전체를 id로 색인하는 복잡도가 그 178ms보다 비싸다.
