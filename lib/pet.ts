@@ -310,14 +310,27 @@ const CALM_LINES = [
 /**
  * 우선순위는 "지금 행동할 수 있는 것"이 위다.
  * 배고픔 → 씨앗 상한(더 안 쌓이니 손해가 진행 중) → 진화 임박 → 떨어진 씨앗 → 평온.
+ *
+ * `hour`는 급한 상태가 없을 때(tone `calm`)만 쓴다 — 그때만 시간대 인사로 바꾼다.
+ * null/미지정이면 CALM_LINES를 레벨로 골라 쓴다. 이게 **서버 렌더와 첫 페인트의 값**이다:
+ * 서버(UTC)와 브라우저(KST)의 `getHours()`가 9시간 달라 서버에서 시각을 읽으면
+ * hydration이 어긋난다. 그래서 호출부가 마운트 후에 시각을 넣어 준다.
+ *
+ * 2026-08-23: 이 분기가 화면 쪽에 `mood.tone === "calm" ? timeGreeting(hour) : mood.text`로
+ * 있었다. 그러면 CALM_LINES 5줄이 **첫 페인트에만** 스치고 사실상 죽은 문구가 된다 —
+ * 어느 문장이 실제로 나오는지 화면 코드를 읽어야 알 수 있었다. 여기로 합쳐
+ * check:pet이 "hour를 주면 시간대 인사, 안 주면 CALM_LINES"를 못 박는다.
  */
-export function petMood(state: {
-  hunger: number
-  level: number
-  exp: number
-  idleSeeds: number
-  idleCapped: boolean
-}): PetMood {
+export function petMood(
+  state: {
+    hunger: number
+    level: number
+    exp: number
+    idleSeeds: number
+    idleCapped: boolean
+  },
+  hour?: number | null,
+): PetMood {
   if (state.hunger < HUNGER_LOW) return { tone: "hungry", text: "배가 조금 고파요…" }
 
   if (state.idleCapped || state.idleSeeds >= IDLE_MAX_SEEDS) {
@@ -333,7 +346,24 @@ export function petMood(state: {
     return { tone: "harvest", text: `방에 씨앗 ${state.idleSeeds}개가 떨어져 있어요` }
   }
 
+  if (hour !== undefined && hour !== null) return { tone: "calm", text: timeGreeting(hour) }
   return { tone: "calm", text: CALM_LINES[Math.max(1, Math.floor(state.level)) % CALM_LINES.length] }
+}
+
+/**
+ * 레벨이 올랐을 때의 반응. 오르지 않았으면 null이고 호출부가 먹이기 기본 대사로 떨어진다.
+ *
+ * API(app/api/pet/feed)가 gainedLevels를 돌려주는데도 화면이 그걸 **버리고** 있었다.
+ * 진화(4번)에만 연출이 있어서 그 사이 스물네 번의 레벨업은 게이지가 0으로 돌아가는
+ * 것으로만 보였다 — 벤치마크한 육성 게임 5종은 전부 레벨업을 따로 알린다.
+ *
+ * 숫자 뒤에 조사를 붙이지 않는다. "Lv.5이/가"는 숫자를 읽는 법(오/다섯)에 따라 받침이
+ * 갈려 어느 쪽을 써도 틀린 문장이 된다(withSubject는 한글 종성만 본다). 레벨 값으로 문장을 끝낸다.
+ */
+export function levelUpReply(gainedLevels: number, level: number): string | null {
+  if (gainedLevels < 1) return null
+  if (gainedLevels === 1) return `레벨이 올랐어요! 이제 Lv.${level}`
+  return `레벨이 ${gainedLevels} 올랐어요! 이제 Lv.${level}`
 }
 
 /**
@@ -387,6 +417,31 @@ const TIME_GREETING: Record<TimeOfDay, string> = {
 
 export function timeGreeting(hour: number): string {
   return TIME_GREETING[timeOfDay(hour)]
+}
+
+// ── 함께한 기록 (2026-08-23 추가) ─────────────────────────────────────────────
+//
+// 벤치마크 5종 전부가 **누적된 것**을 보여 준다 — 다마고치는 나이(일수), Finch는 여정
+// 기록, ねこあつめ는 온 고양이 수, 포켓캠프는 앨범이다. 우리 화면에는 "지금 상태"
+// (레벨·게이지·단계)만 있고 **지나온 것**이 없었다. 하루 접속을 여러 주 이어 온 사용자와
+// 오늘 처음 온 사용자의 화면이 레벨 말고는 같다.
+//
+// 이 서비스에서는 그게 특히 아쉬운 자리다. 랭킹·경쟁 지표를 배제한 것은(SPEC.md 5절)
+// **남과 비교**하지 않겠다는 뜻이고, 자기 누적을 보여 주는 것은 그 반대가 아니다.
+// 비교 대상이 과거의 자신이면 "얼마나 부족한지"가 아니라 "얼마나 왔는지"가 나온다.
+//
+// 캘린더 날짜 차이가 아니라 **경과 시간**으로 센다. 서버는 UTC고 브라우저는 KST라
+// 달력으로 세면 자정 근처에서 두 값이 하루 어긋난다(timeGreeting과 같은 문제).
+// 가입 당일이 1일째다 — 0일째라고 말하는 화면은 "아직 아무것도 아니다"로 읽힌다.
+
+const MS_PER_DAY = 24 * MS_PER_HOUR
+
+/** 가입일부터 오늘까지 며칠째인가. 가입 당일이 1이고 그 아래로 내려가지 않는다 */
+export function daysTogether(createdAt: Date | null, now: Date): number {
+  if (!createdAt) return 1
+  const elapsed = now.getTime() - createdAt.getTime()
+  if (elapsed <= 0) return 1
+  return Math.floor(elapsed / MS_PER_DAY) + 1
 }
 
 // ── 호흡 안내 (2026-08-23 추가. /pet/rest) ────────────────────────────────────

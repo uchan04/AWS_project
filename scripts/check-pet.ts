@@ -17,10 +17,12 @@ import {
   applySeeds,
   cappedStage,
   compareCosmetics,
+  daysTogether,
   expProgress,
   hungerFor,
   hungerLabel,
   idleAccrual,
+  levelUpReply,
   PET_TOUCH_REPLIES,
   petMood,
   petTouchReply,
@@ -456,6 +458,32 @@ for (const hunger of [0, HUNGER_LOW, 100]) {
   }
 }
 
+// hour를 넣으면 평온한 한 줄이 시간대 인사로 바뀐다. 안 넣으면 CALM_LINES다.
+// 이 분기가 화면 쪽에 있던 동안 CALM_LINES 5줄은 첫 페인트에만 스쳐 사실상 죽어 있었다
+assert.equal(petMood(FULL, 9).text, timeGreeting(9))
+assert.equal(petMood(FULL, 2).text, timeGreeting(2))
+assert.notEqual(petMood(FULL, 9).text, petMood(FULL, 23).text)
+// null·미지정은 서버 렌더의 값이다(서버 UTC / 브라우저 KST라 시각을 서버에서 읽지 않는다)
+assert.equal(petMood(FULL, null).text, petMood(FULL).text)
+// 급한 상태에서는 시각을 무시한다 — 배고픈 펫이 "좋은 아침"이라고 말하면 안 된다
+assert.equal(petMood({ ...FULL, hunger: 0 }, 9).text, petMood({ ...FULL, hunger: 0 }).text)
+assert.equal(petMood({ ...FULL, idleSeeds: 5 }, 9).tone, "harvest")
+
+// ── 레벨업 축하 (levelUpReply) ────────────────────────────────────────────────
+// 오르지 않았으면 null이다. 빈 문자열을 돌려주면 호출부의 ?? 폴백이 걸리지 않아
+// 말풍선이 빈 채로 3초 떠 있는다
+assert.equal(levelUpReply(0, 5), null)
+assert.equal(levelUpReply(-1, 5), null)
+// 한 단계와 여러 단계의 문장이 다르고, 도달한 레벨을 반드시 말한다
+assert.match(levelUpReply(1, 5) as string, /Lv\.5$/)
+assert.match(levelUpReply(3, 12) as string, /3 올랐어요/)
+assert.match(levelUpReply(3, 12) as string, /Lv\.12$/)
+assert.notEqual(levelUpReply(1, 5), levelUpReply(3, 5))
+// 숫자 뒤에 주격 조사를 붙이지 않는다 — "Lv.5이/가"는 읽는 법에 따라 받침이 갈린다
+for (const gained of [1, 2, 9]) {
+  assert.doesNotMatch(levelUpReply(gained, 5) as string, /\d\s*(이|가)\b/)
+}
+
 // ── 쓰다듬기 반응 (petTouchReply) ─────────────────────────────────────────────
 // 연속으로 눌렀을 때 같은 말이 이어 나오지 않는다
 assert.notEqual(petTouchReply(0), petTouchReply(1))
@@ -493,6 +521,20 @@ assert.equal(timeOfDay(3.9), "dawn")
     lines.add(line)
   }
   assert.equal(lines.size, 5)
+}
+
+// ── 함께한 기록 (daysTogether) ────────────────────────────────────────────────
+{
+  const now = new Date("2026-08-23T12:00:00Z")
+  // 가입 당일은 1일째다. 0일째라고 말하는 화면은 "아직 아무것도 아니다"로 읽힌다
+  assert.equal(daysTogether(now, now), 1)
+  assert.equal(daysTogether(new Date("2026-08-23T00:00:00Z"), now), 1)
+  // 경과 시간으로 센다. 달력으로 세면 서버(UTC)와 브라우저(KST)가 자정 근처에서 갈린다
+  assert.equal(daysTogether(new Date("2026-08-22T11:00:00Z"), now), 2)
+  assert.equal(daysTogether(new Date("2026-07-24T12:00:00Z"), now), 31)
+  // 기준 시각이 없거나 미래면 1로 떨어진다 (시계 오차·수동 수정)
+  assert.equal(daysTogether(null, now), 1)
+  assert.equal(daysTogether(new Date("2026-09-01T00:00:00Z"), now), 1)
 }
 
 // ── 호흡 안내 (breathAt) ──────────────────────────────────────────────────────

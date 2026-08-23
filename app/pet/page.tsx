@@ -1,7 +1,7 @@
 import { redirect } from "next/navigation"
 import { assetUrl, petImageUrl } from "@/lib/assets"
 import { UnauthorizedError, getCurrentUserWithSkin } from "@/lib/auth"
-import { cappedStage, hungerFor, idleAccrual, SHIPPED_COSMETIC } from "@/lib/pet"
+import { cappedStage, daysTogether, hungerFor, idleAccrual, SHIPPED_COSMETIC } from "@/lib/pet"
 import { prisma } from "@/lib/prisma"
 import { calculateReward } from "@/lib/reward"
 import { TRIBE } from "@/lib/types"
@@ -43,13 +43,21 @@ export default async function PetPage() {
     // 한 번도 먹이지 않았으면 가입 시각을 기준으로 감쇠한다 (lib/pet.ts hungerFor 주석)
     const hunger = hungerFor(user.lastFedAt ?? user.createdAt, now)
 
-    // 착용 중인 치장 (SPEC.md 5절)
-    const worn = await prisma.userCosmetic.findMany({
-      // 낡은 치장을 착용한 채인 계정이 있다(lib/pet.ts SHIPPED_COSMETIC). 빼지 않으면
-      // 방 배경이 뜨지 않는 그림으로 덮여 기본 방 SVG도 안 나온다
-      where: { userId: user.id, equipped: true, item: SHIPPED_COSMETIC },
-      select: { item: { select: { name: true, slot: true, imageKey: true } } },
-    })
+    // 두 질의를 **동시에** 보낸다. RDS가 us-east-1이라 순서대로 await하면 왕복이
+    // 하나씩 쌓인다(약 175ms/회 실측 — docs/dev/perf.md). 서로 의존하지 않는 읽기다
+    const [worn, missionsDone] = await Promise.all([
+      // 착용 중인 치장 (SPEC.md 5절)
+      prisma.userCosmetic.findMany({
+        // 낡은 치장을 착용한 채인 계정이 있다(lib/pet.ts SHIPPED_COSMETIC). 빼지 않으면
+        // 방 배경이 뜨지 않는 그림으로 덮여 기본 방 SVG도 안 나온다
+        where: { userId: user.id, equipped: true, item: SHIPPED_COSMETIC },
+        select: { item: { select: { name: true, slot: true, imageKey: true } } },
+      }),
+      // 함께한 기록 카드용 누적 완료 수. UserMission 한 행이 완료 한 번이고
+      // (completedAt이 not null인 스키마다) 일일 미션은 resetKey가 날짜별로 갈려
+      // 같은 미션을 다른 날 한 것도 각각 센다 — "지금까지 몇 번 해냈나"가 맞다
+      prisma.userMission.count({ where: { userId: user.id } }),
+    ])
 
     const evolutionStage = cappedStage(user.level, stageCount)
     const imageUrl = skin ? petImageUrl(skin.imageKeyBase, evolutionStage) : null
@@ -89,6 +97,9 @@ export default async function PetPage() {
       imageUrl,
       stageImageUrls,
       roomImageUrl,
+      daysTogether: daysTogether(user.createdAt, now),
+      missionsDone,
+      attendanceTotal: user.attendanceTotal,
     }
   } catch (error) {
     // 미인증이면 "불러오지 못했어요"가 아니라 로그인이다. 미들웨어가 쿠키 "존재"만 보므로

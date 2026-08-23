@@ -684,10 +684,15 @@
 
 /* ── 버튼 ────────────────────────────────────────────────────────────────── */
 
+/* display/text-decoration은 <a>도 이 클래스를 쓰기 때문에 있다 (씨앗 0개 빈 상태의
+   "오늘의 미션 보기"). 인라인 요소에는 min-height와 width가 먹지 않는다 */
 .pet-btn {
+  display: grid;
+  place-items: center;
   min-height: var(--control-h);
   padding: 0 var(--space-sm);
   border: none;
+  text-decoration: none;
   border-radius: var(--radius-input);
   background: linear-gradient(135deg, var(--tribe-cta), var(--tribe-cta-2));
   box-shadow: 0 4px 0 var(--tribe-cta-shadow);
@@ -783,9 +788,12 @@
   color: var(--color-muted);
 }
 
+/* 프리셋이 4개에서 5개("전부")로 늘었다. repeat(5, 1fr)로 못 박으면 320px에서
+   한 칸이 30px대가 되어 "100개"가 잘린다. auto-fit이면 들어가는 만큼만 한 줄에 놓고
+   나머지는 다음 줄로 내려간다 — 모바일 전용 repeat(2, 1fr) 규칙도 이걸로 대체했다 */
 .pet-presets {
   display: grid;
-  grid-template-columns: repeat(4, 1fr);
+  grid-template-columns: repeat(auto-fit, minmax(3.25rem, 1fr));
   gap: var(--space-3xs);
 }
 
@@ -817,6 +825,60 @@
 .pet-preset:disabled {
   color: var(--color-muted);
   cursor: not-allowed;
+}
+
+/* ── 씨앗 0개 빈 상태 (2026-08-23) ───────────────────────────────────────────
+   조작부를 회색으로 늘어놓는 대신 다음 행동 하나만 남긴다. 카드 안쪽이라
+   테두리를 다시 두르지 않는다 — 카드 안의 카드는 깊이만 늘린다 */
+
+.pet-empty {
+  display: grid;
+  gap: var(--space-2xs);
+  padding: var(--space-2xs) 0;
+  text-align: center;
+}
+
+.pet-empty__text {
+  font-size: var(--text-body);
+  color: var(--color-ink-2);
+}
+
+.pet-empty__hint {
+  font-size: var(--text-label);
+  color: var(--color-muted);
+}
+
+/* ── 함께한 기록 (2026-08-23) ────────────────────────────────────────────────
+   숫자 3개를 나란히 둔다. auto-fit이라 320px에서는 한 줄에 2개가 들어가고
+   남은 하나가 아래로 내려간다 — 세 칸을 고정하면 "1,234일"이 잘린다.
+   dl/dt/dd다. 라벨과 값의 관계가 마크업에 남아야 스크린리더가 짝으로 읽는다 */
+
+.pet-log {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(min(5.5rem, 100%), 1fr));
+  gap: var(--space-3xs);
+}
+
+.pet-log__item {
+  display: grid;
+  gap: 0.1rem;
+  padding: var(--space-2xs);
+  border: 2px solid var(--tribe-line);
+  border-radius: var(--radius-input);
+  background: var(--tribe-wash);
+  text-align: center;
+}
+
+.pet-log__label {
+  font-size: var(--text-label);
+  color: var(--color-muted);
+}
+
+.pet-log__value {
+  margin: 0;
+  font-size: var(--text-md);
+  font-weight: 700;
+  color: var(--color-ink);
 }
 
 /* ── 진화 단계 ───────────────────────────────────────────────────────────── */
@@ -1471,9 +1533,8 @@
      320px에서 잘렸다(실측). 방 높이만 데스크톱과 같이 두면 전부 들어간다 —
      방은 이 화면의 본문이라 높이를 아끼는 쪽이 손해다. */
 
-  .pet-presets {
-    grid-template-columns: repeat(2, 1fr);
-  }
+  /* .pet-presets의 repeat(2, 1fr) 고정을 지웠다 (2026-08-23). 프리셋이 5개가 되면서
+     2열이면 3줄이 된다 — 기본 규칙의 auto-fit이 폭을 보고 알아서 나눈다 */
 }
 
 /* 320px 실측(2026-08-23): 사이드바 레일 64px + .pet 패딩 16×2 + .pet-card 패딩 16×2 =

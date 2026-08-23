@@ -1,6 +1,6 @@
 "use client"
 
-import { useEffect, useState } from "react"
+import { useEffect, useRef, useState } from "react"
 import Link from "next/link"
 import type { TypeCode } from "@prisma/client"
 import {
@@ -14,10 +14,10 @@ import {
   applySeeds,
   expProgress,
   hungerLabel,
+  levelUpReply,
   petMood,
   petTouchReply,
   seedsToNextStage,
-  timeGreeting,
 } from "@/lib/pet"
 import { EVOLUTION_LEVEL, SEED_TO_EXP, expToNextLevel } from "@/lib/types"
 import PetRoom from "./PetRoom"
@@ -71,6 +71,12 @@ export type PetState = {
   stageImageUrls: (string | null)[]
   /** 착용한 배경 치장의 이미지. null이면 기본 방 SVG가 나온다 */
   roomImageUrl: string | null
+  /** 가입일부터 며칠째인가. 가입 당일이 1이다 (lib/pet.ts daysTogether) */
+  daysTogether: number
+  /** 지금까지 완료한 미션 수(누적). 같은 미션을 다른 날 한 것도 각각 센다 */
+  missionsDone: number
+  /** 누적 출석일 */
+  attendanceTotal: number
 }
 
 // 단계 이름·문구. 단계 임계값은 lib/types.ts의 EVOLUTION_LEVEL이 정본이라
@@ -122,6 +128,8 @@ export default function PetView({ initial }: { initial: PetState }) {
   // 서버 렌더 값과 클라이언트 첫 렌더 값이 9시간 어긋나 hydration 경고가 난다.
   // null인 동안은 시간대 인사 없이 기존 문구가 나온다
   const [hour, setHour] = useState<number | null>(null)
+  // 다음 방치형 씨앗이 쌓이는 목표 시각(epoch ms). 0은 "아직 안 심었다"는 뜻이다
+  const nextSeedAt = useRef(0)
 
   const need = expToNextLevel(pet.level)
   const progress = expProgress(pet.level, pet.exp)
@@ -130,8 +138,10 @@ export default function PetView({ initial }: { initial: PetState }) {
   const stage = pet.stageCount > 1 ? Math.min(pet.evolutionStage, MAX_STAGE) : 2
   // 다음 진화까지 남은 씨앗. 최종 단계면 null (lib/pet.ts seedsToNextStage)
   const nextStage = seedsToNextStage(pet.level, pet.exp)
-  // 펫이 스스로 상태를 말한다. 반응 대사가 있으면 그동안은 그쪽이 이긴다
-  const mood = petMood(pet)
+  // 펫이 스스로 상태를 말한다. 반응 대사가 있으면 그동안은 그쪽이 이긴다.
+  // hour는 마운트 후에만 값이 있고(서버 UTC / 브라우저 KST), 급한 상태가 없을 때만
+  // 쓰인다 — 어느 문장이 나오는지는 petMood()가 정한다(lib/pet.ts)
+  const mood = petMood(pet, hour)
   // evolutionStageFor가 MAX_STAGE에서 멈추므로 카드도 그 수를 넘기지 않는다
   const stages = Array.from({ length: Math.min(pet.stageCount, MAX_STAGE) }, (_, i) => i + 1)
   const feedable = Math.min(amount, pet.seeds)
@@ -159,19 +169,42 @@ export default function PetView({ initial }: { initial: PetState }) {
 
   // 다음 씨앗까지 남은 시간. 표시 전용이다 — 실제 지급량은 받기를 누를 때 서버가 다시 센다.
   // 상한에 닿아 있으면 더 쌓이지 않으므로 돌리지 않는다.
+  //
+  // **절대 시각으로 센다.** 전에는 매 tick마다 `left - 1000`으로 깎았다. 브라우저는
+  // 배경 탭의 1초 타이머를 분당 1회까지 줄이므로, 탭을 5분 이상 뒤에 두면 30분이
+  // 지나도 화면은 30초만 흐른 것으로 셌다 — 돌아와 보면 "다음 씨앗까지 29분"이
+  // 그대로 있고 방에 떨어진 씨앗도 늘지 않는다. 새로고침해야 진짜 값이 나왔다.
+  // 목표 시각을 ref에 두고 매번 now와 비교하면 탭이 깨어날 때 스스로 따라잡는다.
+  //
+  // 값을 렌더가 아니라 effect에서 심는 이유: 서버(SSR)에서 Date.now()를 읽으면
+  // 하이드레이션 값과 어긋난다. 첫 페인트는 서버가 준 msToNextSeed 그대로 쓴다.
   useEffect(() => {
     if (pet.idleCapped || pet.idleSeeds >= IDLE_MAX_SEEDS) return
+    // 0이면 아직 안 심은 것이다. 심기 전에 while을 돌면 무한 루프가 된다
+    if (!nextSeedAt.current) nextSeedAt.current = Date.now() + initial.msToNextSeed
+
     const tick = setInterval(() => {
-      setMsLeft((left) => {
-        if (left > 1000) return left - 1000
-        setPet((prev) =>
-          prev.idleSeeds >= IDLE_MAX_SEEDS ? prev : { ...prev, idleSeeds: prev.idleSeeds + 1 },
-        )
-        return MS_PER_IDLE_SEED
-      })
+      const now = Date.now()
+      let due = 0
+      while (nextSeedAt.current <= now) {
+        due += 1
+        nextSeedAt.current += MS_PER_IDLE_SEED
+      }
+      if (due > 0) {
+        setPet((prev) => ({
+          ...prev,
+          idleSeeds: Math.min(IDLE_MAX_SEEDS, prev.idleSeeds + due),
+        }))
+      }
+      // 화면은 분 단위로만 쓴다. 분이 그대로면 같은 값을 돌려줘 리렌더를 건너뛴다 —
+      // 1초마다 이 컴포넌트 전체를 다시 그릴 이유가 없다(React가 동일 값이면 멈춘다)
+      const left = Math.max(0, nextSeedAt.current - now)
+      setMsLeft((prev) =>
+        Math.ceil(left / 60_000) === Math.ceil(prev / 60_000) ? prev : left,
+      )
     }, 1000)
     return () => clearInterval(tick)
-  }, [pet.idleCapped, pet.idleSeeds])
+  }, [pet.idleCapped, pet.idleSeeds, initial.msToNextSeed])
 
   // 반응 대사 정리. burst에 걸어야 3초 안에 다시 누른 경우 타이머가 새로 시작한다
   useEffect(() => {
@@ -250,8 +283,10 @@ export default function PetView({ initial }: { initial: PetState }) {
       }))
       setAmount(1)
       setToast({ text: `씨앗 ${ko(seeds)}개를 먹였어요. 경험치 +${ko(seeds * SEED_TO_EXP)}` })
-      // 진화하지 않는 대부분의 먹이기에도 반응을 남긴다. 지금까지는 숫자만 바뀌었다
-      react(FEED_REPLY, true)
+      // 진화하지 않는 대부분의 먹이기에도 반응을 남긴다. 지금까지는 숫자만 바뀌었다.
+      //
+      // 레벨이 올랐으면 그걸 말하고, 아니면 기본 대사다 (lib/pet.ts levelUpReply)
+      react(levelUpReply(next.gainedLevels ?? 0, next.level) ?? FEED_REPLY, true)
 
       // 진화 풀스크린 연출 2초 (SPEC.md 5절)
       if (next.evolvedTo) {
@@ -446,12 +481,8 @@ export default function PetView({ initial }: { initial: PetState }) {
                   overflow: hidden에 잘렸다(실측). 그래서 방 위쪽 고정으로 바꿨다.
                 - z-index가 같으면 DOM 순서가 위아래를 정한다. 앞에 두면 좁은 화면에서
                   펫 머리가 글자를 덮는다 — 읽히는 쪽이 위여야 한다 */}
-            {/* 급한 상태(배고픔·수확·진화 임박)가 없을 때만 시간대 인사로 바꾼다.
-                CALM_LINES는 레벨로 골라 같은 레벨에서 항상 같은 문장이 나왔다 —
-                하루에 한 번 여는 사용자에게는 고정 문구와 다를 게 없었다 */}
             <p className="pet-bubble" data-tone={reaction ? (reaction.eat ? "eat" : "touch") : mood.tone}>
-              {reaction?.text ??
-                (mood.tone === "calm" && hour !== null ? timeGreeting(hour) : mood.text)}
+              {reaction?.text ?? mood.text}
             </p>
           </div>
 
@@ -553,60 +584,125 @@ export default function PetView({ initial }: { initial: PetState }) {
               <span className="pet-card__meta">보유 {ko(pet.seeds)}개</span>
             </div>
 
-            <div className="pet-step">
-              <button
-                type="button"
-                className="pet-step__btn"
-                onClick={() => setAmount((a) => Math.max(1, a - 1))}
-                disabled={amount <= 1}
-                aria-label="한 개 줄이기"
-              >
-                −
-              </button>
-              <p>
-                <span className="pet-step__value">{ko(amount)}</span>
-                <span className="pet-step__unit">개</span>
-              </p>
-              <button
-                type="button"
-                className="pet-step__btn"
-                onClick={() => setAmount((a) => Math.min(Math.max(1, pet.seeds), a + 1))}
-                disabled={amount >= pet.seeds}
-                aria-label="한 개 늘리기"
-              >
-                +
-              </button>
-            </div>
+            {/* 씨앗이 0개면 조작부를 전부 비활성으로 두지 않는다. 전에는 스테퍼·프리셋
+                5개·먹이기 버튼이 모두 회색으로 남아 **어디서 씨앗을 얻는지는 아무데도
+                적혀 있지 않았다** — 처음 온 사람이 가장 자주 만나는 상태다.
+                고장난 화면 대신 다음 행동(미션) 하나만 보여 준다 */}
+            {pet.seeds < 1 ? (
+              <div className="pet-empty">
+                <p className="pet-empty__text">
+                  씨앗이 없어요. 미션을 하나 해내면 씨앗이 생겨요
+                </p>
+                <Link className="pet-btn pet-btn--block" href="/missions">
+                  오늘의 미션 보기
+                </Link>
+                <p className="pet-empty__hint">
+                  방치형으로도 시간당 {IDLE_SEEDS_PER_HOUR}개씩 모여요
+                </p>
+              </div>
+            ) : (
+              <>
+                <div className="pet-step">
+                  <button
+                    type="button"
+                    className="pet-step__btn"
+                    onClick={() => setAmount((a) => Math.max(1, a - 1))}
+                    disabled={amount <= 1}
+                    aria-label="한 개 줄이기"
+                  >
+                    −
+                  </button>
+                  <p>
+                    <span className="pet-step__value">{ko(amount)}</span>
+                    <span className="pet-step__unit">개</span>
+                  </p>
+                  <button
+                    type="button"
+                    className="pet-step__btn"
+                    onClick={() => setAmount((a) => Math.min(Math.max(1, pet.seeds), a + 1))}
+                    disabled={amount >= pet.seeds}
+                    aria-label="한 개 늘리기"
+                  >
+                    +
+                  </button>
+                </div>
 
-            {/* export는 1·5·10·20이었다. 씨앗 1 = 경험치 10이고 Lv.1→2가 100이라
-                실제 경제(일일 미션 60/일)에 맞춰 1·10·50·100으로 잡았다 */}
-            <div className="pet-presets">
-              {FEED_PRESETS.map((p) => (
+                {/* export는 1·5·10·20이었다. 씨앗 1 = 경험치 10이고 Lv.1→2가 100이라
+                    실제 경제(일일 미션 60/일)에 맞춰 1·10·50·100으로 잡았다.
+                    "전부"를 뒤에 붙였다 — 3,000개를 모은 사람이 100개 프리셋을 서른 번
+                    누르는 것 말고는 방법이 없었다. 벤치마크 5종 모두 MAX 버튼이 있다 */}
+                <div className="pet-presets">
+                  {FEED_PRESETS.map((p) => (
+                    <button
+                      key={p}
+                      type="button"
+                      className="pet-preset"
+                      aria-pressed={amount === p}
+                      onClick={() => setAmount(p)}
+                      disabled={p > pet.seeds}
+                    >
+                      {ko(p)}개
+                    </button>
+                  ))}
+                  <button
+                    type="button"
+                    className="pet-preset"
+                    aria-pressed={amount === pet.seeds}
+                    onClick={() => setAmount(pet.seeds)}
+                    aria-label={`보유한 씨앗 ${ko(pet.seeds)}개 전부`}
+                  >
+                    전부
+                  </button>
+                </div>
+
                 <button
-                  key={p}
                   type="button"
-                  className="pet-preset"
-                  aria-pressed={amount === p}
-                  onClick={() => setAmount(p)}
-                  disabled={p > pet.seeds}
+                  className="pet-btn pet-btn--block"
+                  onClick={() => feed(feedable)}
+                  disabled={pending || amount > pet.seeds}
+                  aria-disabled={pending || amount > pet.seeds}
                 >
-                  {ko(p)}개
+                  씨앗 {ko(amount)}개 먹이기 🌱
                 </button>
-              ))}
+
+                {/* 투입할 개수가 정해지면 그것이 무엇이 되는지 바로 옆에서 말한다.
+                    "씨앗 1개는 경험치 10"만으로는 100개를 넣기 전에 곱셈을 시켜야 했다 */}
+                <p className="pet-card__foot">
+                  <span>씨앗 1개는 경험치 {SEED_TO_EXP}이 돼요</span>
+                  <em>경험치 +{ko(feedable * SEED_TO_EXP)}</em>
+                </p>
+              </>
+            )}
+          </div>
+
+          {/* 함께한 기록. 벤치마크 5종은 전부 누적된 것을 보여 준다(다마고치 나이,
+              Finch 여정, ねこあつめ 수집, 포켓캠프 앨범). 우리 화면에는 "지금 상태"만
+              있어서 6주째 매일 온 사람과 오늘 처음 온 사람의 화면이 레벨 말고는 같았다.
+              남과 비교하는 랭킹은 여전히 넣지 않는다(SPEC.md 5절) — 비교 대상은 과거의 자신뿐이다 */}
+          <div className="pet-card">
+            <div className="pet-card__head">
+              <p className="pet-card__title">📖 함께한 기록</p>
             </div>
-
-            <button
-              type="button"
-              className="pet-btn pet-btn--block"
-              onClick={() => feed(feedable)}
-              disabled={pending || pet.seeds < 1 || amount > pet.seeds}
-              aria-disabled={pending || pet.seeds < 1 || amount > pet.seeds}
-            >
-              씨앗 {ko(amount)}개 먹이기 🌱
-            </button>
-
+            <dl className="pet-log">
+              <div className="pet-log__item">
+                <dt className="pet-log__label">함께한 날</dt>
+                <dd className="pet-log__value">{ko(pet.daysTogether)}일</dd>
+              </div>
+              <div className="pet-log__item">
+                <dt className="pet-log__label">해낸 미션</dt>
+                <dd className="pet-log__value">{ko(pet.missionsDone)}개</dd>
+              </div>
+              <div className="pet-log__item">
+                <dt className="pet-log__label">출석</dt>
+                <dd className="pet-log__value">{ko(pet.attendanceTotal)}일</dd>
+              </div>
+            </dl>
             <p className="pet-card__foot">
-              <span>씨앗 1개는 경험치 {SEED_TO_EXP}이 돼요</span>
+              <span>
+                {pet.missionsDone > 0
+                  ? `여기까지 오는 데 ${ko(pet.daysTogether)}일이 걸렸어요`
+                  : "첫 미션을 해내면 여기에 남아요"}
+              </span>
             </p>
           </div>
         </div>
