@@ -107,32 +107,28 @@ export function Sidebar({ profile }: { profile: SidebarProfile | null }) {
 
         {/* Profile card */}
         {compact ? (
+          // 접힌 상태 카드. 둥근 모서리·종족색 배경은 유지하고 레일 폭(64px)을
+          // 거의 채우도록 좌우 마진을 4px로 줄였다 — 56×48로 가로가 조금 길다.
+          // 안쪽 흰 원은 뺐고 펫 이미지 대신 종족 아이콘(🦊·🐱·🐻)을 쓴다.
+          // 아이콘은 내비와 같은 방식으로 둔다 — flex 중앙 + fontSize만.
+          // lineHeight를 건드리면 이모지 글리프가 줄 상자 안에서 위로 밀린다.
           <div
             style={{
-              margin: "8px",
+              margin: "8px 4px",
+              height: 48,
               background: bg,
               borderRadius: 12,
-              padding: "12px 8px",
               display: "flex",
+              alignItems: "center",
               justifyContent: "center",
             }}
           >
-            <div
-              style={{
-                width: 40,
-                height: 40,
-                borderRadius: "50%",
-                background: "white",
-                display: "flex",
-                alignItems: "center",
-                justifyContent: "center",
-                fontSize: 22,
-                overflow: "hidden",
-              }}
-            >
-              {/* 접힌 상태에서는 펫 이미지가 아니라 종족 아이콘(🦊·🐱·🐻)을 쓴다 */}
-              <span>{getStageEmoji(profile.typeCode)}</span>
-            </div>
+            {/* translateY(-2px): Segoe UI Emoji의 winAscent(2210/2048)가 글리프 잉크보다
+                크다. flex는 줄 상자를 중앙에 놓으므로 남는 ascent만큼 아이콘이 아래로
+                밀린다 — 실측 편차는 🐱 2.75px · 🦊 1.60px · 🐻 2.82px이고 평균만큼 당긴다 */}
+            <span style={{ fontSize: 26, transform: "translateY(-2px)" }}>
+              {getStageEmoji(profile.typeCode)}
+            </span>
           </div>
         ) : (
           <div style={{ margin: "16px 16px 8px", background: bg, borderRadius: 16, padding: "16px" }}>
