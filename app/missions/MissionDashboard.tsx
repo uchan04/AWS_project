@@ -4,6 +4,7 @@ import { useState, useRef, useEffect, useCallback } from "react"
 import styles from "./mission-ui.module.css"
 import { useModalA11y } from "@/app/components/useModalA11y"
 import type { DashboardDTO, MissionDTO } from "@/lib/missions/dashboard"
+import { applyCompletion } from "@/lib/missions/optimistic"
 
 // ─── 미션 화면 전용 색상 (Figma 원본) ──────────────────────────────────────
 
@@ -124,10 +125,24 @@ interface MissionModalProps {
   bg: string
   mascotEmoji: string
   onClose: () => void
+  /** 사진 미션 완료 후 재조회. 사진 판정은 결과를 미리 알 수 없어 낙관적으로 처리할 수 없다 */
   onComplete: () => void
+  /**
+   * 버튼 미션 완료. 여기서 fetch하지 않고 부모에 넘긴다 —
+   * 낙관적 갱신은 모달을 즉시 닫으므로, 요청이 이 컴포넌트보다 오래 살아야 한다
+   */
+  onButtonComplete: (mission: MissionDTO) => void
 }
 
-function MissionModal({ mission, color, bg, mascotEmoji, onClose, onComplete }: MissionModalProps) {
+function MissionModal({
+  mission,
+  color,
+  bg,
+  mascotEmoji,
+  onClose,
+  onComplete,
+  onButtonComplete,
+}: MissionModalProps) {
   // Escape로 닫기 · 초점 가두기 · 닫을 때 초점 되돌리기 (app/components/useModalA11y.ts)
   const boxRef = useModalA11y(onClose)
   const [proofMode, setProofMode] = useState(false)
@@ -248,26 +263,9 @@ function MissionModal({ mission, color, bg, mascotEmoji, onClose, onComplete }: 
       return
     }
 
-    setCompleting(true)
-    setCompleteError(null)
-
-    try {
-      const res = await fetch(`/api/missions/${mission.id}/complete`, { method: "POST" })
-      const json = await res.json()
-
-      if (!res.ok) {
-        setCompleteError(json.error?.message || "완료 중 오류가 발생했습니다")
-        return
-      }
-
-      onComplete()
-      onClose()
-      window.dispatchEvent(new CustomEvent("user-stats-changed"))
-    } catch {
-      setCompleteError("네트워크 오류가 발생했습니다")
-    } finally {
-      setCompleting(false)
-    }
+    // 버튼 미션은 여기서 기다리지 않는다. 부모가 체크를 먼저 그리고 요청을 뒤로 보낸다
+    // (요청 자체는 왕복 7회 1253ms — scripts/perf-write-path.ts)
+    onButtonComplete(mission)
   }
 
   return (
@@ -534,7 +532,8 @@ function MissionModal({ mission, color, bg, mascotEmoji, onClose, onComplete }: 
                   opacity: completing || (mission.requiresPhoto && !uploadedFile) ? 0.4 : 1,
                 }}
               >
-                {completing ? (mission.requiresPhoto ? "검증 중..." : "완료 중...") : "완료했어요 ✓"}
+                {/* completing은 사진 미션에서만 켜진다. 버튼 미션은 기다리지 않으므로 표시가 없다 */}
+                {completing ? "검증 중..." : "완료했어요 ✓"}
               </button>
             </>
           )}
@@ -895,6 +894,9 @@ export default function MissionDashboard({
   // 절대 인덱스를 state에 박아두면 미션을 완료해 창이 옮겨간 뒤 엉뚱한 단계를 가리킨다 —
   // 그래서 새로 불러올 때마다 null로 되돌린다
   const [stageIndexOverride, setStageIndexOverride] = useState<number | null>(null)
+  // 낙관적 완료가 실패해 되돌렸을 때 띄운다. 모달의 에러 칸을 쓸 수 없다 —
+  // 체크를 즉시 보여주려고 모달을 먼저 닫으므로 그 state가 함께 사라진다
+  const [actionError, setActionError] = useState<string | null>(null)
 
   const loadDashboard = useCallback(async () => {
     // 성공해도 error를 비우지 않으면 "다시 시도" 버튼이 아무 일도 하지 않는다.
@@ -1005,6 +1007,41 @@ export default function MissionDashboard({
     loadDashboard()
   }
 
+  /**
+   * 버튼 미션 완료 — 기다리지 않는다.
+   *
+   * 체크와 카운터를 먼저 그리고(applyCompletion) 요청을 보낸다. 실패하면 되돌리고 알린다.
+   * 왜: POST가 왕복 7회(1253ms) + 재조회 2회(370ms)라 그대로 기다리면 탭 한 번에 1.6초를
+   * 로딩 표시로 보낸다. RDS가 us-east-1이라 이 왕복은 코드로 더 줄일 몫이 거의 없다 —
+   * 트랜잭션의 BEGIN·COMMIT이 보상 지급의 원자성 그 자체다.
+   *
+   * 재화는 낙관적으로 올리지 않는다. calculateReward()가 스킨 배율을 서버에서 걸어서
+   * 클라이언트 추측이 틀릴 수 있다. 사이드바는 user-stats-changed로 응답 후에 맞춘다.
+   */
+  const handleButtonComplete = (mission: MissionDTO) => {
+    setActionError(null)
+    setSelected(null)
+    setDashboard((prev) => (prev ? applyCompletion(prev, mission.id, true) : prev))
+
+    void (async () => {
+      try {
+        const res = await fetch(`/api/missions/${mission.id}/complete`, { method: "POST" })
+        const json = await res.json()
+        if (!res.ok) {
+          setDashboard((prev) => (prev ? applyCompletion(prev, mission.id, false) : prev))
+          setActionError(json.error?.message || "완료 중 오류가 발생했습니다")
+          return
+        }
+        window.dispatchEvent(new CustomEvent("user-stats-changed"))
+        // 단계 해금·연속 달성처럼 서버만 아는 값을 맞춘다(applyCompletion은 일부러 건드리지 않는다)
+        void loadDashboard()
+      } catch {
+        setDashboard((prev) => (prev ? applyCompletion(prev, mission.id, false) : prev))
+        setActionError("네트워크 오류가 발생했습니다. 완료 표시를 되돌렸어요")
+      }
+    })()
+  }
+
   return (
     <div style={{ padding: "32px 20px", maxWidth: 840, margin: "0 auto" }}>
       <header style={{ textAlign: "center", marginBottom: 32 }}>
@@ -1021,6 +1058,41 @@ export default function MissionDashboard({
         </h1>
         <p style={{ fontSize: 14, color: "#7A6B58", margin: 0 }}>작은 한 걸음씩, 함께 걸어가요</p>
       </header>
+
+      {/* 낙관적 완료를 되돌렸을 때만 뜬다. 화면이 이미 바뀐 뒤라 즉시 알려야 하므로 alert */}
+      {actionError && (
+        <div
+          role="alert"
+          style={{
+            background: "#FBEEE6",
+            border: "1px solid #E8C4AE",
+            borderRadius: 14,
+            padding: "12px 16px",
+            marginBottom: 20,
+            display: "flex",
+            alignItems: "center",
+            gap: 12,
+          }}
+        >
+          <span style={{ fontSize: 14, color: "#A9542A", flex: 1 }}>{actionError}</span>
+          <button
+            type="button"
+            onClick={() => setActionError(null)}
+            aria-label="알림 닫기"
+            style={{
+              background: "none",
+              border: "none",
+              fontSize: 18,
+              color: "#A9542A",
+              cursor: "pointer",
+              lineHeight: 1,
+              padding: 4,
+            }}
+          >
+            ✕
+          </button>
+        </div>
+      )}
 
       <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(140px, 1fr))", gap: 12, marginBottom: 24 }}>
         <ProgressCard
@@ -1214,6 +1286,7 @@ export default function MissionDashboard({
           mascotEmoji={mascotEmoji}
           onClose={() => setSelected(null)}
           onComplete={handleComplete}
+          onButtonComplete={handleButtonComplete}
         />
       )}
     </div>
