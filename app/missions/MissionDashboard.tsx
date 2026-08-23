@@ -41,19 +41,6 @@ const ANIM_CLASS: Record<string, string> = {
   default: styles.mascotFloat,
 }
 
-const ANIM_CAPTION: Record<string, string> = {
-  walk: "함께 걷고 있어요 🚶",
-  stretch: "기지개를 켜고 있어요 🤸",
-  drink: "홀짝홀짝 마시고 있어요 ☕",
-  eat: "맛있게 먹고 있어요 😋",
-  rest: "포근하게 쉬고 있어요 😴",
-  look: "두리번두리번 둘러보고 있어요 🌤️",
-  write: "열심히 적고 있어요 ✏️",
-  music: "신나게 음악을 즐기고 있어요 🎵",
-  photo: "찰칵! 찍고 있어요 📸",
-  default: "응원하고 있어요 💚",
-}
-
 function getMissionAnimType(mission: { title: string }): string {
   const t = mission.title
   if (/산책|걷|나가/.test(t)) return "walk"
@@ -128,7 +115,6 @@ function MissionModal({ mission, color, bg, mascotEmoji, onClose, onComplete }: 
   const fileRef = useRef<HTMLInputElement>(null)
 
   const animType = getMissionAnimType(mission)
-  const caption = ANIM_CAPTION[animType] ?? ANIM_CAPTION.default
   const emoji = getEmojiForMission(mission.title)
 
   function handleFile(e: React.ChangeEvent<HTMLInputElement>) {
@@ -285,30 +271,31 @@ function MissionModal({ mission, color, bg, mascotEmoji, onClose, onComplete }: 
           >
             ×
           </button>
+          {/* 미션 아이콘 → 캐릭터 → 제목 → 설명. 애니메이션 칸과 아이콘 칸을 한 칸으로 합쳤다 */}
+          <div style={{ fontSize: 34, lineHeight: 1 }}>{emoji}</div>
+          {/* 더미 캐릭터. 미션을 수행하는 캐릭터 자산이 아직 없어 마스코트 이모지에 동작 애니메이션만 건다 */}
           <div
+            className={ANIM_CLASS[animType] ?? ANIM_CLASS.default}
             style={{
-              fontSize: 120,
+              fontSize: 96,
               lineHeight: 1,
               display: "inline-block",
+              margin: "8px 0 12px",
             }}
           >
             {mascotEmoji}
           </div>
-          <p style={{ margin: "12px 0 0", fontSize: 12, color: "#7A6B58", fontWeight: 500 }}>{caption}</p>
-          <div style={{ marginTop: 20, paddingTop: 20, borderTop: `1px solid ${color}33` }}>
-            <div style={{ fontSize: 28, marginBottom: 6 }}>{emoji}</div>
-            <h2
-              style={{
-                fontFamily: "'Gowun Dodum', sans-serif",
-                fontSize: 20,
-                color: "#2A1F14",
-                margin: "0 0 10px",
-              }}
-            >
-              {mission.title}
-            </h2>
-            <p style={{ color: "#7A6B58", fontSize: 13, lineHeight: 1.8, margin: 0 }}>{mission.description}</p>
-          </div>
+          <h2
+            style={{
+              fontFamily: "'Gowun Dodum', sans-serif",
+              fontSize: 20,
+              color: "#2A1F14",
+              margin: "0 0 10px",
+            }}
+          >
+            {mission.title}
+          </h2>
+          <p style={{ color: "#7A6B58", fontSize: 13, lineHeight: 1.8, margin: 0 }}>{mission.description}</p>
         </div>
 
         <div style={{ padding: "24px 32px 32px", overflowY: "auto", flex: 1 }}>
@@ -480,6 +467,51 @@ function MissionModal({ mission, color, bg, mascotEmoji, onClose, onComplete }: 
           )}
         </div>
       </div>
+    </div>
+  )
+}
+
+// ─── Carousel arrows ────────────────────────────────────────────────────────
+// 일일 미션과 추가 미션이 같은 화살표를 쓴다. 넘기는 단위만 각자 다르다.
+
+function CarouselArrows({
+  color,
+  hasPrev,
+  hasNext,
+  onPrev,
+  onNext,
+  children,
+}: {
+  color: string
+  hasPrev: boolean
+  hasNext: boolean
+  onPrev: () => void
+  onNext: () => void
+  children: React.ReactNode
+}) {
+  const arrowStyle = (enabled: boolean): React.CSSProperties => ({
+    position: "absolute",
+    top: "50%",
+    transform: "translateY(0%) scaleX(0.7)",
+    background: "transparent",
+    color: enabled ? color : "#DDD0BC",
+    border: "none",
+    cursor: enabled ? "pointer" : "not-allowed",
+    fontSize: 32,
+    zIndex: 10,
+    padding: 0,
+    lineHeight: 1,
+  })
+
+  return (
+    <div style={{ position: "relative" }}>
+      <button onClick={onPrev} disabled={!hasPrev} style={{ ...arrowStyle(hasPrev), left: -32 }}>
+        ◀
+      </button>
+      <button onClick={onNext} disabled={!hasNext} style={{ ...arrowStyle(hasNext), right: -32 }}>
+        ▶
+      </button>
+      {children}
     </div>
   )
 }
@@ -732,6 +764,7 @@ export default function MissionDashboard() {
   const [error, setError] = useState<string | null>(null)
   const [selected, setSelected] = useState<MissionDTO | null>(null)
   const [currentStageIndex, setCurrentStageIndex] = useState(0)
+  const [dailyIndex, setDailyIndex] = useState(0)
 
   const loadDashboard = useCallback(async () => {
     try {
@@ -870,16 +903,38 @@ export default function MissionDashboard() {
         />
       </div>
 
-      <StepSection
-        title="일일 미션"
-        subtitle="매일 새롭게 시작해요"
-        missions={dashboard.dailyMissions}
-        color={color}
-        bg={bg}
-        mascotEmoji={mascotEmoji}
-        progress={`${dashboard.progress.dailyCompleted} / ${dashboard.progress.dailyTotal}`}
-        onSelect={setSelected}
-      />
+      {(() => {
+        // 일일 미션도 화살표로 넘긴다. 한 번에 PAGE개를 보이고 1칸씩 밀어
+        // 카드 크기를 추가 미션과 같게 유지한다(마지막 페이지가 1장만 남는 것을 막는다).
+        const PAGE = 4
+        const all = dashboard.dailyMissions
+        const maxStart = Math.max(0, all.length - PAGE)
+        const start = Math.min(dailyIndex, maxStart)
+        const shown = all.slice(start, start + PAGE)
+
+        return (
+          <div style={{ marginBottom: 36 }}>
+            <CarouselArrows
+              color={color}
+              hasPrev={start > 0}
+              hasNext={start < maxStart}
+              onPrev={() => setDailyIndex((i) => Math.max(0, i - 1))}
+              onNext={() => setDailyIndex((i) => Math.min(maxStart, i + 1))}
+            >
+              <StepSection
+                title="일일 미션"
+                subtitle="매일 새롭게 시작해요"
+                missions={shown}
+                color={color}
+                bg={bg}
+                mascotEmoji={mascotEmoji}
+                progress={`${dashboard.progress.dailyCompleted} / ${dashboard.progress.dailyTotal}`}
+                onSelect={setSelected}
+              />
+            </CarouselArrows>
+          </div>
+        )
+      })()}
 
       {(() => {
         // 모든 단계 표시 (잠김 포함)
@@ -907,55 +962,13 @@ export default function MissionDashboard() {
                 단계를 완료하면 새로운 미션이 열려요
               </p>
             </div>
-            <div style={{ position: "relative" }}>
-              {/* 왼쪽 화살표 */}
-              <button
-                onClick={() => setCurrentStageIndex((i) => Math.max(0, i - 1))}
-                disabled={!hasPrev}
-                style={{
-                  position: "absolute",
-                  left: -32,
-                  top: "50%",
-                  transform: "translateY(0%) scaleX(0.7)",
-                  background: "transparent",
-                  color: hasPrev ? color : "#DDD0BC",
-                  border: "none",
-                  cursor: hasPrev ? "pointer" : "not-allowed",
-                  fontSize: 32,
-                  zIndex: 10,
-                  padding: 0,
-                  lineHeight: 1,
-                }}
-              >
-                ◀
-              </button>
-
-              {/* 오른쪽 화살표 */}
-              <button
-                onClick={() => {
-                  if (hasNext) {
-                    setCurrentStageIndex((i) => Math.min(allMissions.length - 1, i + 1))
-                  }
-                }}
-                disabled={!hasNext}
-                style={{
-                  position: "absolute",
-                  right: -32,
-                  top: "50%",
-                  transform: "translateY(0%) scaleX(0.7)",
-                  background: "transparent",
-                  color: hasNext ? color : "#DDD0BC",
-                  border: "none",
-                  cursor: hasNext ? "pointer" : "not-allowed",
-                  fontSize: 32,
-                  zIndex: 10,
-                  padding: 0,
-                  lineHeight: 1,
-                }}
-              >
-                ▶
-              </button>
-
+            <CarouselArrows
+              color={color}
+              hasPrev={hasPrev}
+              hasNext={hasNext}
+              onPrev={() => setCurrentStageIndex((i) => Math.max(0, i - 1))}
+              onNext={() => setCurrentStageIndex((i) => Math.min(allMissions.length - 1, i + 1))}
+            >
               <StepSection
                 title={`단계 ${currentMission.stage}`}
                 missions={currentMission.missions}
@@ -966,7 +979,7 @@ export default function MissionDashboard() {
                 progress={currentMission.unlocked ? `${currentMission.completedCount} / 4 완료` : "🔒 이전 단계를 먼저 완료해 주세요"}
                 onSelect={setSelected}
               />
-            </div>
+            </CarouselArrows>
           </div>
         )
       })()}
