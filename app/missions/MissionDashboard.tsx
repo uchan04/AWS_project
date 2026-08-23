@@ -650,6 +650,79 @@ function StepSection({ title, subtitle, missions, color, bg, unlocked = true, pr
   )
 }
 
+// ─── Daily focus card ──────────────────────────────────────────────────────
+//
+// 오늘 남은 일일 미션 중 **하나만** 크게 띄운다. 원안(develop의 DailyFocusSection)에서
+// 바꾼 것:
+// - 아래 목록에서 이 미션을 **뺀다.** 원안은 focus를 크게 띄우면서 목록에도 그대로
+//   남겨 같은 미션이 화면에 두 번 나왔다
+// - 이모지를 `title.includes("휴식")`으로 고르지 않는다. 이 파일에 이미
+//   getEmojiForMission()이 있고, 제목 문자열에 기능을 걸면 문구를 다듬는 순간 깨진다
+// - `mission.code === "DAILY_REST"` 특수 분기를 넣지 않는다. 특정 미션 코드를 화면이
+//   알아야 하면 미션을 추가할 때마다 화면을 고쳐야 한다
+//
+// 왜 하나인가: 대상 이용자에게 할 일 5개를 한 번에 보여 주는 것은 목록이 아니라 압박이다.
+// 5개가 다 보이는 그리드는 아래에 그대로 두되(선택권을 없애지 않는다), 시선의 기본값을
+// 하나로 만든다. Finch·Streaks 같은 습관 앱이 같은 구조다.
+
+interface DailyFocusCardProps {
+  mission: MissionDTO
+  color: string
+  bg: string
+  remaining: number
+  onSelect: (m: MissionDTO) => void
+}
+
+function DailyFocusCard({ mission, color, bg, remaining, onSelect }: DailyFocusCardProps) {
+  return (
+    <button
+      onClick={() => onSelect(mission)}
+      className={styles.missionCard}
+      style={{
+        display: "block",
+        width: "100%",
+        textAlign: "left",
+        background: bg,
+        border: `2px solid ${color}`,
+        borderRadius: 20,
+        padding: "20px 22px",
+        marginBottom: 14,
+        cursor: "pointer",
+      }}
+    >
+      <span style={{ fontSize: 12, fontWeight: 700, color }}>오늘 이거 하나만</span>
+      <div style={{ display: "flex", alignItems: "center", gap: 14, marginTop: 10 }}>
+        <span style={{ fontSize: 40, lineHeight: 1 }} aria-hidden="true">
+          {getEmojiForMission(mission.title)}
+        </span>
+        <span style={{ minWidth: 0 }}>
+          <p
+            style={{
+              fontFamily: "var(--font-display)",
+              fontSize: 17,
+              color: "#2A1F14",
+              margin: 0,
+              lineHeight: 1.4,
+            }}
+          >
+            {mission.title}
+          </p>
+          <p style={{ fontSize: 12, color: "#7A6B58", margin: "6px 0 0", display: "flex", gap: 8 }}>
+            {mission.reward.seeds > 0 && <span>🌱 {mission.reward.seeds}</span>}
+            {mission.reward.affinity > 0 && <span>💖 {mission.reward.affinity}</span>}
+            {mission.reward.starShards > 0 && <span>⭐ {mission.reward.starShards}</span>}
+          </p>
+        </span>
+      </div>
+      {/* 남은 개수를 숨기지 않는다. 하나만 보여 주는 것과 나머지를 감추는 것은 다르다 —
+          감추면 "다 했나?" 확인하러 새로고침하게 된다 */}
+      <p style={{ fontSize: 11, color: "#7A6B58", margin: "12px 0 0" }}>
+        {remaining > 0 ? `나머지 ${remaining}개는 아래에 있어요` : "오늘 남은 건 이거 하나예요"}
+      </p>
+    </button>
+  )
+}
+
 // ─── Progress card ─────────────────────────────────────────────────────────
 
 interface ProgressCardProps {
@@ -976,16 +1049,39 @@ export default function MissionDashboard({
         />
       </div>
 
-      <StepSection
-        title="일일 미션"
-        subtitle="매일 새롭게 시작해요"
-        missions={dashboard.dailyMissions}
-        color={color}
-        bg={bg}
-        mascotEmoji={mascotEmoji}
-        progress={`${dashboard.progress.dailyCompleted} / ${dashboard.progress.dailyTotal}`}
-        onSelect={setSelected}
-      />
+      {(() => {
+        // 아직 안 한 일일 미션 중 첫 번째를 오늘의 하나로 잡는다. 서버가 이미
+        // order로 정렬해 내려준다(lib/missions/dashboard.ts) — 여기서 다시 정렬하지 않는다.
+        const undone = dashboard.dailyMissions.filter((m) => !m.completed)
+        const focus = undone[0]
+        // focus는 아래 목록에서 뺀다. 같은 미션이 두 번 나오면 두 번째 것을 눌러도
+        // 같은 모달이 열려 사용자는 카드가 두 개인 이유를 찾게 된다
+        const rest = focus ? dashboard.dailyMissions.filter((m) => m.id !== focus.id) : dashboard.dailyMissions
+
+        return (
+          <>
+            {focus ? (
+              <DailyFocusCard
+                mission={focus}
+                color={color}
+                bg={bg}
+                remaining={undone.length - 1}
+                onSelect={setSelected}
+              />
+            ) : null}
+            <StepSection
+              title="일일 미션"
+              subtitle={focus ? "나머지는 여기 있어요" : "오늘 다 했어요. 내일 또 만나요"}
+              missions={rest}
+              color={color}
+              bg={bg}
+              mascotEmoji={mascotEmoji}
+              progress={`${dashboard.progress.dailyCompleted} / ${dashboard.progress.dailyTotal}`}
+              onSelect={setSelected}
+            />
+          </>
+        )
+      })()}
 
       {(() => {
         // 모든 단계 표시 (잠김 포함)
