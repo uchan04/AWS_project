@@ -1,5 +1,5 @@
 import type { Metadata, Viewport } from "next";
-import { Gowun_Dodum, Noto_Sans_KR } from "next/font/google";
+import { Gowun_Dodum } from "next/font/google";
 import "./globals.css";
 import { getSidebarProfile } from "@/lib/profile";
 import { Sidebar } from "./components/Sidebar";
@@ -17,15 +17,17 @@ import { ChatLauncher } from "./chat/_components/ChatLauncher";
 // 외부 도메인 왕복이 사라지고, size-adjust가 들어간 폴백을 같이 만들어 레이아웃 이동도 없다.
 // 방문자 IP가 Google로 가지 않는 것도 이 서비스에는 의미가 있다.
 //
-// 실제 family 이름은 빌드마다 바뀐다(__Noto_Sans_KR_xxxx). 그래서 화면 코드는
+// 실제 family 이름은 빌드마다 바뀐다(__Gowun_Dodum_xxxx). 그래서 화면 코드는
 // 서체 이름을 직접 쓰지 않고 --font-body / --font-display만 쓴다(styles/tokens.css).
-const notoSansKr = Noto_Sans_KR({
-  subsets: ["latin"],
-  // 가변 폰트다. weight를 지정하면 정적 인스턴스로 떨어져 300·600이 합성된다
-  variable: "--font-noto-sans-kr",
-  display: "swap",
-});
-
+//
+// 2026-08-23: 본문용 Noto Sans KR 웹폰트를 **뺐다.** 실측하면 `/missions` 콜드
+// 로드의 폰트가 380.9KB였고 그중 220.8KB가 이것이었는데, Android의 시스템 한국어
+// 서체가 바로 Noto Sans CJK KR이라 기기에 이미 있는 글꼴을 다시 받고 있었다.
+// `subsets: ["latin"]`도 한국어 폰트에는 효과가 없었다(한글은 이름 없는
+// unicode-range 조각으로 쪼개져 온다). 이유 전체는 app/globals.css의
+// --font-korean-system 주석에 있다. **여기에 한국어 웹폰트를 다시 추가하지 말 것.**
+//
+// 제목용 Gowun Dodum은 남긴다. 시스템에 대체품이 없다.
 const gowunDodum = Gowun_Dodum({
   subsets: ["latin"],
   // 굵기가 400 하나뿐인 정적 폰트다(styles/tokens.css:185 참고)
@@ -85,7 +87,7 @@ export default async function RootLayout({ children }: LayoutProps<"/">) {
   return (
     <html
       lang="ko"
-      className={`h-full antialiased ${notoSansKr.variable} ${gowunDodum.variable}`}
+      className={`h-full antialiased ${gowunDodum.variable}`}
     >
       <body className="h-full flex">
         {/* 사이드바·하단 탭을 Tab으로 다 지나지 않고 본문으로 건너뛴다 (globals.css) */}

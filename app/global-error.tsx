@@ -9,9 +9,10 @@
 // tokens.css를 import하지 않는다. 스타일시트 로딩이 실패해서 여기 온 경우까지
 // 받아야 하므로 색과 서체를 인라인으로 적는다.
 //
-// 서체도 next/font를 쓰지 않는다. --font-noto-sans-kr은 app/layout.tsx가 <html>에
+// 서체도 next/font를 쓰지 않는다. --font-gowun-dodum은 app/layout.tsx가 <html>에
 // 심는 변수인데 이 파일은 그 레이아웃을 아예 대체한다 — 변수가 없어 무시된다.
-// 시스템 서체가 이 화면의 올바른 답이다.
+// 시스템 서체가 이 화면의 올바른 답이다. (2026-08-23부터 본문은 모든 화면이
+// 시스템 서체다 — app/globals.css의 --font-korean-system)
 
 export default function GlobalError({
   error,

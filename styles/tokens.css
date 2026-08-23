@@ -36,9 +36,12 @@
   --tribe: var(--color-accent);
   --tribe-ink: var(--color-ink);
 
-  /* next/font가 심는 변수를 받는다. 폰트 로드가 실패해도 뒤 폴백으로 떨어진다 */
-  --font-display: var(--font-gowun-dodum), ui-sans-serif, sans-serif;
-  --font-body: var(--font-noto-sans-kr), ui-sans-serif, sans-serif;
+  /* 제목만 웹폰트다(next/font가 --font-gowun-dodum을 심는다). 본문은 기기의
+     시스템 한국어 서체를 그대로 쓴다 — 이유와 실측치는 app/globals.css의
+     --font-korean-system 주석. 그 변수는 app/layout.tsx가 항상 싣는
+     globals.css에 있으므로 이 파일을 import하는 화면에서 늘 정의돼 있다 */
+  --font-display: var(--font-gowun-dodum), var(--font-korean-system, sans-serif);
+  --font-body: var(--font-korean-system, sans-serif);
 
   /* 4pt 9단 */
   --space-3xs: 0.25rem;
