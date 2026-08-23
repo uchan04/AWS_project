@@ -93,18 +93,43 @@ export function PostDetailModal({
     }
   }, [postId])
 
+  /**
+   * 좋아요 — 서버를 기다리지 않는다.
+   *
+   * POST가 왕복 7회(1281ms 실측). RDS가 us-east-1이라 그만큼은 구조적으로 든다.
+   * 커뮤니티에서 가장 많이 눌리는 버튼을 1.3초 회색으로 두면 두 번 세 번 누르게 된다.
+   * 그래서 하트를 즉시 뒤집고, 응답이 오면 서버가 준 수치로 맞추고, 실패하면 되돌린다.
+   *
+   * 요청이 하나 떠 있는 동안 들어온 탭은 무시한다(likePending). 서버 토글은 현재 DB
+   * 상태를 보고 뒤집으므로 두 요청이 겹치면 어느 쪽이 이겼는지 알 수 없다.
+   * 버튼을 disabled로 두지는 않는다 — 이미 뒤집혀 보이는 버튼이 회색이면 고장으로 읽힌다.
+   */
   async function handleLike() {
     if (!post || likePending) return
+    const before = { likedByMe: post.likedByMe, likeCount: post.likeCount }
+    const next = !before.likedByMe
+
     setLikePending(true)
     setActionError(null)
+    setPost((prev) =>
+      prev
+        ? { ...prev, likedByMe: next, likeCount: Math.max(0, prev.likeCount + (next ? 1 : -1)) }
+        : prev,
+    )
+
     try {
       const res = await fetch(`/api/community/posts/${postId}/like`, { method: "POST" })
       const json = await res.json()
       if (json.error) {
+        setPost((prev) => (prev ? { ...prev, ...before } : prev))
         setActionError(json.error.message)
         return
       }
+      // 서버 수치로 맞춘다. 다른 사람이 그 사이에 누른 것도 여기서 반영된다
       setPost((prev) => (prev ? { ...prev, likedByMe: json.data.liked, likeCount: json.data.likeCount } : prev))
+    } catch {
+      setPost((prev) => (prev ? { ...prev, ...before } : prev))
+      setActionError("네트워크 오류가 발생했어요. 좋아요를 되돌렸어요")
     } finally {
       setLikePending(false)
     }
@@ -235,9 +260,9 @@ export function PostDetailModal({
               <button
                 type="button"
                 onClick={handleLike}
-                disabled={likePending}
+                aria-pressed={post.likedByMe}
                 className={
-                  "mb-7 rounded-full border px-5 py-2 text-sm font-semibold transition disabled:opacity-60 " +
+                  "mb-7 rounded-full border px-5 py-2 text-sm font-semibold transition " +
                   (post.likedByMe
                     ? "border-neutral-900 bg-neutral-900 text-white"
                     : "border-neutral-300 bg-white text-neutral-500 hover:bg-neutral-50")
