@@ -1,4 +1,4 @@
-import type { User } from "@prisma/client"
+import type { TypeCode, User } from "@prisma/client"
 import { prisma } from "@/lib/prisma"
 import { getTodayKey, getToday } from "./reset"
 import { computeStageProgress, currentStageOf, isGraduated } from "./stages"
@@ -56,7 +56,10 @@ export type DashboardDTO = {
     total: number
     graduated: boolean
   }
-  userTypeCode: string | null
+  // `string`이 아니라 `TypeCode`다. 넓게 두면 화면이 TRIBE를 색인하지 못해
+  // typeCode.includes("...")로 종족을 세게 되고, 시드·픽스처에 존재하지 않는
+  // 값("INDEPENDENT_LOW_INCOME_A" 같은 것)이 들어가도 컴파일이 통과한다
+  userTypeCode: TypeCode | null
 }
 
 /**

@@ -3,30 +3,29 @@
 import { useState, useRef, useEffect, useCallback } from "react"
 import styles from "./mission-ui.module.css"
 import { useModalA11y } from "@/app/components/useModalA11y"
+import type { TypeCode } from "@prisma/client"
 import type { DashboardDTO, MissionDTO } from "@/lib/missions/dashboard"
 import { applyCompletion } from "@/lib/missions/optimistic"
+import { TRIBE } from "@/lib/types"
 
-// ─── 미션 화면 전용 색상 (Figma 원본) ──────────────────────────────────────
-
-const CHARACTER_COLOR = {
-  fox: "#E8956A",
-  cat: "#6A95C8",
-  bear: "#7AAE82",
+// ─── 미션 화면 전용 색상 ────────────────────────────────────────────────────
+//
+// 2026-08-23: 종족색·이모지를 여기서 다시 선언하지 않는다. 정본은 lib/types.ts의
+// TRIBE 하나다 — 그 파일이 "색은 여기 한 곳에만 있다. 톤을 바꾸기로 하면 colorHex
+// 3개만 교체한다"고 적어 두었는데, 이 파일이 그 3개를 복사해 갖고 있어서 톤을
+// 바꾸면 미션 화면만 옛 색으로 남았다. `app/pet/rest/page.tsx`에서 develop 판의
+// 같은 패턴(CHARACTER_COLOR/BG/EMOJI 맵 3개 + typeCode.includes 분기)을 이미
+// 같은 이유로 거절해 두고 이쪽만 남아 있었다.
+//
+// 연한 배경색만 여기 남는다. TRIBE에 대응 값이 없고 미션 화면만 쓴다.
+const TRIBE_BG: Record<TypeCode, string> = {
+  HEALTH_EMOTION: "#FAE8D8",
+  INDEPENDENT_LOW_INCOME: "#D8E8FA",
+  FAMILY_LIVING: "#D8F0DC",
 }
 
-const CHARACTER_BG = {
-  fox: "#FAE8D8",
-  cat: "#D8E8FA",
-  bear: "#D8F0DC",
-}
-
-const CHARACTER_EMOJI = {
-  fox: "🦊",
-  cat: "🐱",
-  bear: "🐻",
-}
-
-type CharacterKey = keyof typeof CHARACTER_COLOR
+// 진단 전(typeCode = null)에 쓸 기본 종족. 고양이가 기존 동작이었다
+const DEFAULT_TRIBE: TypeCode = "INDEPENDENT_LOW_INCOME"
 
 // 서버 기준과 같아야 한다 (lib/missions/upload.ts ALLOWED_TYPES·MAX_SIZE).
 // 여기서 먼저 걸러야 3MB를 다 올린 뒤에 거절당하는 일이 없다
@@ -999,18 +998,13 @@ export default function MissionDashboard({
 
   if (!dashboard) return null
 
-  // TODO: 사용자 캐릭터를 User.typeCode 기반으로 결정
-  // typeCode에서 종족 매핑
-  const typeCode = dashboard.userTypeCode
-  let character: CharacterKey = "cat"
-  if (typeCode) {
-    if (typeCode.includes("HEALTH_EMOTION")) character = "fox"
-    else if (typeCode.includes("INDEPENDENT_LOW_INCOME")) character = "cat"
-    else if (typeCode.includes("FAMILY_LIVING")) character = "bear"
-  }
-  const color = CHARACTER_COLOR[character]
-  const bg = CHARACTER_BG[character]
-  const mascotEmoji = CHARACTER_EMOJI[character]
+  // 종족은 TRIBE에서 바로 꺼낸다. 전에는 typeCode.includes()로 세 갈래를 세었는데
+  // TypeCode는 값이 정확히 3개인 enum이라(prisma/schema.prisma:14) 부분 일치가
+  // 필요 없었고, 유형이 늘면 그 분기는 조용히 기본값으로 떨어졌다
+  const typeCode = dashboard.userTypeCode ?? DEFAULT_TRIBE
+  const color = TRIBE[typeCode].colorHex
+  const bg = TRIBE_BG[typeCode]
+  const mascotEmoji = TRIBE[typeCode].emoji
 
   const handleComplete = () => {
     // 완료 후 dashboard 재조회
