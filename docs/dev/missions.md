@@ -235,3 +235,38 @@ optional `mission` 파라미터로 넘겨받되 **`mission.id !== missionId`면 
 `danluu.com/perf-opt` HN 스레드 최상위 댓글: *"많은 UI 조작에 대기 창이나 로딩 표시가 필요하다면 처음부터 블로킹을 기본 전제로 설계한 셈"*. 이 기준으로 보면 "완료 중..." 표시는 성능 문제의 **증상 표기**였다.
 
 남은 블로킹 조작: 출석 수령(`disabled={claiming}`), 사진 미션(Bedrock), 챗봇.
+
+## 종족색 중복 선언 제거 (2026-08-23)
+
+`MissionDashboard.tsx`가 `CHARACTER_COLOR` · `CHARACTER_BG` · `CHARACTER_EMOJI`
+맵 3개를 자체 선언하고 `typeCode.includes("HEALTH_EMOTION")`으로 세 갈래를 갈랐다.
+
+두 가지가 문제였다.
+
+- **`lib/types.ts:5`가 "색은 여기 한 곳에만 있다. 톤을 바꾸기로 하면 colorHex 3개만
+  교체한다"고 적어 둔 약속을 깬다.** 이 파일이 그 3개(`#E8956A` `#6A95C8` `#7AAE82`)와
+  이모지 3개를 복사해 갖고 있어서, 톤을 바꾸면 미션 화면만 옛 색으로 남는다
+- **`includes()`가 필요 없었다.** `TypeCode`는 값이 정확히 3개인 enum이다
+  (`prisma/schema.prisma:14`). 부분 일치가 필요한 접미사 붙은 코드는 존재하지 않는다.
+  그리고 유형이 늘면 `else if` 사슬은 조용히 기본값(`cat`)으로 떨어진다
+
+`app/pet/rest/page.tsx:14`에 **같은 패턴을 같은 이유로 이미 거절해 둔 기록**이 있었다
+(`develop`의 원안이 그것이었다). 그때 `/pet/rest`만 고치고 `/missions`는 남겨 뒀다.
+
+바꾼 것:
+
+| 파일 | 변경 |
+|---|---|
+| `app/missions/MissionDashboard.tsx` | 맵 3개 → `TRIBE[typeCode]` 직접 색인. `TRIBE`에 대응 값이 없는 연한 배경색만 `TRIBE_BG`로 남았고 키가 `TypeCode`다 |
+| `lib/missions/dashboard.ts` | `userTypeCode: string \| null` → `TypeCode \| null` |
+| `scripts/check-optimistic.ts` | 픽스처 `"INDEPENDENT_LOW_INCOME_A"` → `"INDEPENDENT_LOW_INCOME"` |
+
+**DTO를 좁힌 것이 실제로 값을 했다.** `TypeCode`로 바꾸자 컴파일러가 즉시
+`check-optimistic.ts`의 `"INDEPENDENT_LOW_INCOME_A"`를 잡았다 — `_A` 접미사가 붙은
+코드는 `TypeCode` 3개에도 `SubTypeCode` 8개에도 없다. DTO가 `string`이라 통과하고
+있었던 것이다.
+
+검증: `tsc`·`lint`·`build`·`check:optimistic` 9건·`npm run e2e` 75건 통과.
+브라우저 실측(테스트 계정 = `INDEPENDENT_LOW_INCOME`) — 종족색 `#6A95C8`,
+배경 `#D8E8FA`, 마스코트 🐱, 단계 `4 / 100 단계`, 가로 스크롤 0, 콘솔 에러 0.
+변경 전과 같은 값이다.

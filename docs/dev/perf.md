@@ -10,7 +10,9 @@
 - 완료: 측정 도구 확립, 병목 3건 식별, 3건 전부 수정 + 전후 실측
 - 완료: **4번째 병목 — prepare 왕복 × 연결 수. `/missions` 743ms → 376ms** (아래 "고친 것 4번째" 절). 재측정 스크립트 12개를 `scripts/perf-*`로 남겼다
 - 완료: **5번째 — 쓰기 경로. 미션 완료 왕복 8→7회, 체감 1.6초 → 6ms. 좋아요도 같은 패턴**
+- 완료: **6번째 — 전송 바이트. `/missions` 콜드 603.6KB → 361.4KB (−40%)** (아래 "고친 것 6번째" 절)
 - 미착수: `/community` 첫 페이지 쿼리(현재 549ms, 이미 서버 렌더라 왕복 구조가 최선), API 응답 캐시
+- 미착수: 남은 361.4KB 중 **JS 171.7KB**가 최대 항목. Gowun Dodum 160.1KB + `@font-face` 96개(29.5KB)는 자체 서브셋이 답인데 `fonttools`가 없어 의존성 승인이 필요하다
 
 ## 측정한 물리량 — 이게 전부의 근거다
 
@@ -455,3 +457,104 @@ danluu.com/perf-opt 스레드의 최상위 댓글: *"많은 UI 조작에 대기 
   다른 창에서 한 번 눌러보면 끝난다
 - RDS 리전이 us-east-1인 것 자체가 최대 병목이다. ap-northeast-2로 옮기면 왕복이
   180ms → 10ms대가 된다. **공유 DB라 손대지 않는다** — 팀 결정 사항이다
+
+---
+
+## 고친 것 6번째 — 전송 바이트. 폰트가 페이지의 70%였다 (2026-08-23)
+
+1~5번째는 전부 **왕복 횟수**를 줄인 것이다. 그러다 보니 **바이트**를 한 번도 재지
+않았다. 재보니 `/missions` 콜드 로드가 **603.6KB**였고 그중 **380.9KB가 폰트**였다.
+
+측정은 `curl`로 콜드 전송량을 직접 잰다. 브라우저 `performance.getEntriesByType("resource")`의
+`transferSize`는 **캐시된 재방문에서 0으로 나온다** — 이걸 믿으면 "0KB"라는 결론이 난다.
+압축 후 실제 선로 바이트는 이렇게 잰다.
+
+```bash
+curl -s --compressed -o /dev/null -w '%{size_download}\n' http://localhost:3101/_next/static/...
+```
+
+| 항목 | 개수 | 전송량 |
+|---|---|---|
+| 폰트 woff2 | 24 | **380.9 KB** |
+| CSS | 4 | 51.0 KB (이 중 `@font-face` 선언만 41.5 KB · 221개) |
+| JS | 11 | 171.7 KB |
+| **합계** | | **603.6 KB** |
+
+### 원인 — `subsets: ["latin"]`은 한국어 폰트에 아무 효과가 없다
+
+`next/font/google`의 `subsets` 필터는 **이름 있는 서브셋**(`latin`, `cyrillic` …)에만
+걸린다. Google은 한글을 **이름 없는 번호 `unicode-range` 조각 120여 개**로 쪼개
+내려주므로 그 필터를 통과해 전부 실린다.
+
+```
+빌드 산출물: woff2 219개 / 5.1MB
+@font-face:  221개 (Noto Sans KR 124 / Gowun Dodum 95)
+폰트 CSS 청크 125,063 bytes 중 99.6%가 폰트 선언 (gzip 41,743 bytes)
+실제 내려온 것: Noto Sans KR 13개 220.8KB · Gowun Dodum 11개 160.1KB
+```
+
+### 판단 — 본문 웹폰트만 뺐다
+
+Noto Sans KR 220.8KB가 사는 것이 거의 없다.
+
+- **Android의 시스템 한국어 서체가 Noto Sans CJK KR이다.** 기기에 이미 있는 같은
+  디자인의 글꼴을 매번 다시 받고 있었다
+- iOS·macOS는 Apple SD Gothic Neo(굵기 100~900 전부), Windows는 Malgun Gothic
+- 시스템 서체는 `swap`이 없어 **본문 레이아웃 이동이 0**이 된다
+
+`app/globals.css`의 `--font-korean-system`으로 바꿨다. **순서에 의미가 있다** — CSS
+폰트 폴백은 글자 단위라 숫자·영문은 앞쪽(SF/Segoe UI/Roboto)이, 한글은 뒤쪽이 잡는다.
+
+```css
+--font-korean-system: -apple-system, BlinkMacSystemFont, "Apple SD Gothic Neo",
+  "Segoe UI", "Malgun Gothic", Roboto, "Helvetica Neue", system-ui, sans-serif;
+```
+
+**제목의 Gowun Dodum(160.1KB)은 남겼다.** 시스템에 대체품이 없고 이 서비스의 인상
+자체다. 굵기가 400 하나뿐인 정적 폰트라(`styles/tokens.css:185`) 본문 700 사용처
+38곳은 전부 본문 폰트였고, 700은 모든 한국어 시스템 폰트에 있다.
+
+### 전후
+
+| 항목 | 전 | 후 | 차이 |
+|---|---|---|---|
+| 폰트 woff2 | 380.9 KB (24개) | **160.1 KB (11개)** | −220.8 KB |
+| CSS | 51.0 KB | **29.5 KB** | −21.5 KB (`@font-face` 221→96) |
+| JS | 171.7 KB | 171.7 KB | 0 |
+| **합계** | **603.6 KB** | **361.4 KB** | **−242.2 KB (−40%)** |
+| 빌드 산출물 | 219개 / 5.1MB | 95개 / 1.5MB | |
+
+### 알려진 손실 — 재봤고, 안정성 문제가 아니다
+
+`font-weight` 500·600이 Windows에서 스냅된다. Malgun Gothic에 400·700만 있다.
+**추측하지 않고 canvas 잉크량으로 실측했다** (Windows 11 / Chrome, 16px):
+
+| 지정 굵기 | 한글 잉크량 (400 대비) | 라틴 잉크량 (400 대비) |
+|---|---|---|
+| 400 | 1.000 | 1.000 |
+| 500 | **1.000** ← 강조가 사라진다 | 1.374 |
+| 600 | 1.252 | 1.374 |
+| 700 | 1.252 | 1.853 |
+
+읽는 법:
+
+- **레이아웃은 안 움직인다.** 한글 글자폭 157.16px(400) vs 157.20px(500) = **0.03% 차**.
+  리플로우·CLS·잘림 없음. 이게 "안정성 문제가 아니다"의 근거다
+- `600` 사용처 2곳(`Lv.26`·본문 건너뛰기 링크)은 700으로 올라가 **강조가 유지**된다
+- `500` 사용처 10곳은 Windows에서 400으로 렌더된다. **전부 muted 보조 텍스트다**
+  (`--color-muted` · `#5A4A3A` · `#9A8A76`) — 보조 텍스트의 통상 굵기가 400이다.
+  `.pet-card__meta` `.pet-idle__label` `.pet-idle__unit` `.pet-step__unit`
+  `.navLabel` · 사이드바 `내 계정`과 모달 버튼 3개 · 미션 ProgressCard caption
+- 모바일(iOS·Android)은 굵기가 다 있어 **영향 0**이다. 모바일 우선 서비스다
+
+되돌리려면 `app/layout.tsx`에 `Noto_Sans_KR`을 다시 넣고 `--font-korean-system`을
+그 변수로 바꾸면 된다. 242.2KB를 되사는 값이다.
+
+### 검증
+
+- `tsc` · `lint` · `build` 통과
+- `check:*` 8종 통과 · `npm run e2e http://localhost:3101` **75건 통과 · 0건 실패**
+- 브라우저 실측: `body` 계산 서체 = 시스템 스택, `h1`/`h2`/`h3` = `"Gowun Dodum"` 우선,
+  Gowun 청크 11개 로드, `/missions`(378px)·`/pet` 가로 스크롤 0, 콘솔 에러 0
+- 끊긴 CSS 변수 참조 0건 — `--font-body`는 `app/pet/pet.css:16`만 쓰고 pet 화면은
+  `tokens.css`를 import한다. `app/global-error.tsx`는 의도적으로 인라인 시스템 서체다
