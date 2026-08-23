@@ -35,7 +35,11 @@ export function Sidebar({ profile }: { profile: SidebarProfile | null }) {
   const pathname = usePathname()
   const router = useRouter()
   const [showAccount, setShowAccount] = useState(false)
-  const [compact, setCompact] = useState(false)
+  // narrow: 창이 좁아 자동으로 접힌 상태. collapsed: 사용자가 버튼으로 접은 상태.
+  // 둘을 나눠 둔 것은 넓은 화면에서도 직접 접을 수 있어야 하기 때문이다.
+  const [narrow, setNarrow] = useState(false)
+  const [collapsed, setCollapsed] = useState(false)
+  const compact = narrow || collapsed
 
   // 재화·상태 변경 시 갱신(2026-08-21 A 수정).
   // 프로필은 layout.tsx가 서버에서 읽어 props로 주므로 여기서 fetch하지 않는다.
@@ -52,7 +56,7 @@ export function Sidebar({ profile }: { profile: SidebarProfile | null }) {
   // 화면 크기 감지
   useEffect(() => {
     function checkWidth() {
-      setCompact(window.innerWidth <= 768)
+      setNarrow(window.innerWidth <= 768)
     }
     checkWidth()
     window.addEventListener("resize", checkWidth)
@@ -83,11 +87,22 @@ export function Sidebar({ profile }: { profile: SidebarProfile | null }) {
 
   return (
     <>
-      <aside className={styles.sidebar}>
+      <aside className={compact ? `${styles.sidebar} ${styles.rail}` : styles.sidebar}>
         {/* Logo */}
         <div className={styles.logo}>
-          <h1 className={styles.logoTitle}>함께 걷는 하루</h1>
+          <h1 className={styles.logoTitle}>모꼬지</h1>
           <p className={styles.logoSubtitle}>작은 한 걸음, 매일</p>
+          {/* 접기 토글. 창이 좁아 자동으로 접힌 상태에서는 폭을 CSS가 고정하므로 숨긴다 */}
+          {!narrow && (
+            <button
+              onClick={() => setCollapsed((v) => !v)}
+              aria-label={collapsed ? "사이드바 펼치기" : "사이드바 접기"}
+              title={collapsed ? "사이드바 펼치기" : "사이드바 접기"}
+              className={styles.railToggle}
+            >
+              {collapsed ? "»" : "«"}
+            </button>
+          )}
         </div>
 
         {/* Profile card */}
@@ -115,21 +130,8 @@ export function Sidebar({ profile }: { profile: SidebarProfile | null }) {
                 overflow: "hidden",
               }}
             >
-              {profile.imageUrl ? (
-                // eslint-disable-next-line @next/next/no-img-element
-                <img
-                  src={profile.imageUrl}
-                  alt="펫"
-                  style={{ width: "100%", height: "100%", objectFit: "cover" }}
-                  onError={(e) => {
-                    e.currentTarget.style.display = "none"
-                    if (e.currentTarget.nextSibling) {
-                      ;(e.currentTarget.nextSibling as HTMLElement).style.display = "block"
-                    }
-                  }}
-                />
-              ) : null}
-              <span style={{ display: profile.imageUrl ? "none" : "block" }}>{getStageEmoji(profile.typeCode)}</span>
+              {/* 접힌 상태에서는 펫 이미지가 아니라 종족 아이콘(🦊·🐱·🐻)을 쓴다 */}
+              <span>{getStageEmoji(profile.typeCode)}</span>
             </div>
           </div>
         ) : (
