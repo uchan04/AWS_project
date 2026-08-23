@@ -20,7 +20,7 @@ function getBgColor(hex: string): string {
   return map[hex] || "#F5F0E8"
 }
 
-function getStageEmoji(typeCode: TypeCode | null): string {
+function getTribeEmoji(typeCode: TypeCode | null): string {
   if (!typeCode) return "🌱"
   const tribe = TRIBE[typeCode]
   return tribe.emoji
@@ -131,7 +131,7 @@ export function Sidebar({ profile }: { profile: SidebarProfile | null }) {
                   fallbackDisplay="block"
                 />
               ) : null}
-              <span style={{ display: profile.imageUrl ? "none" : "block" }}>{getStageEmoji(profile.typeCode)}</span>
+              <span style={{ display: profile.imageUrl ? "none" : "block" }}>{getTribeEmoji(profile.typeCode)}</span>
             </div>
           </div>
         ) : (
@@ -160,7 +160,7 @@ export function Sidebar({ profile }: { profile: SidebarProfile | null }) {
                     fallbackDisplay="block"
                   />
                 ) : null}
-                <span style={{ display: profile.imageUrl ? "none" : "block" }}>{getStageEmoji(profile.typeCode)}</span>
+                <span style={{ display: profile.imageUrl ? "none" : "block" }}>{getTribeEmoji(profile.typeCode)}</span>
               </div>
               <div style={{ flex: 1, minWidth: 0 }}>
                 <div style={{ display: "flex", alignItems: "center", gap: 6, marginBottom: 2 }}>

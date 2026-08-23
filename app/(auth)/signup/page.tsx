@@ -94,6 +94,22 @@ export default function SignupPage() {
               </p>
             </div>
 
+            {/* 비밀번호 복구가 불가능하다는 사실을 가입 **전에** 알린다.
+                이 서비스는 낙인 위험 때문에 복구용 이메일을 수집·발송하지 않는다
+                (CLAUDE.md 8절 "이메일 인증 코드" 제외). 그 설계의 대가가 이것이고,
+                잊은 다음에 알리면 복구할 방법이 없다.
+
+                빨강을 쓰지 않는다 — 사용자가 뭘 잘못한 게 아니다. 색·명암비는
+                app/components/CrisisNotice.tsx와 같은 호박색 계열을 쓴다
+                (amber-800은 흰 글자와 4.5:1을 넘긴다. 더 밝게 낮추지 말 것) */}
+            <div role="note" className="rounded-xl border border-amber-200 bg-amber-50 p-3">
+              <p className="text-xs leading-relaxed text-amber-900">
+                이 서비스는 개인정보를 최소로만 받기 위해 <strong>비밀번호 재설정용 이메일을
+                보내지 않아요.</strong> 비밀번호를 잊으면 계정을 되돌릴 수 없으니 꼭 안전한 곳에
+                적어 두세요.
+              </p>
+            </div>
+
             {/* 가입 실패 사유(이미 있는 이메일 등)를 스크린리더가 읽게 한다 */}
             {error && (
               <p role="alert" className="hm-field__help hm-field__help--error">
