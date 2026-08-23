@@ -2,6 +2,7 @@ import type { User } from "@prisma/client"
 import { prisma } from "@/lib/prisma"
 import { getTodayKey, getToday } from "./reset"
 import { computeStageProgress, currentStageOf, isGraduated } from "./stages"
+import { getDailyMissionCatalog, getStageMissionCatalog } from "./catalog"
 import { MISSIONS_PER_STAGE, TOTAL_STAGES, bandLabel } from "./bands"
 
 export type CompletionMode = "BUTTON" | "PHOTO" | "EVENT"
@@ -86,24 +87,19 @@ export async function buildDashboard(user: User): Promise<DashboardDTO> {
   const mondayKey = mondayOfThisWeek.toLocaleDateString("sv-SE")
   const todayDate = getToday()
 
-  // 6개 쿼리를 한 번에 낸다(2026-08-21 A).
-  // 서로 의존하지 않으므로 순차로 기다릴 이유가 없다. RDS가 us-east-1이라 왕복 1회가
-  // 176ms다 — 순차로 6번 기다리면 그것만 1초가 넘는다.
+  // 한 번에 낸다(2026-08-21 A). 서로 의존하지 않으므로 순차로 기다릴 이유가 없다.
+  // RDS가 us-east-1이라 왕복 1회가 177ms다 — 순차로 기다리면 그것만 1초가 넘는다.
   // 완료 기록은 앞 쿼리의 missionId 목록 대신 관계 필터로 같은 집합을 고른다.
-  const [dailyMissionsRaw, dailyCompletions, allStageMissions, allStageCompletions, weeklyCount, claimedToday] =
+  //
+  // 2026-08-23: 미션 카탈로그 2개를 여기서 뺐다. 시드로만 바뀌는 불변 데이터인데
+  // 그 둘이 이 묶음 페이로드 76.7KB 중 75.3KB였다. 이유와 계측은 ./catalog.ts 주석에.
+  const [dailyMissionsRaw, allStageMissions, dailyCompletions, allStageCompletions, weeklyCount, claimedToday] =
     await Promise.all([
-      prisma.mission.findMany({
-        where: { scope: "DAILY" },
-        orderBy: { order: "asc" },
-      }),
+      getDailyMissionCatalog(),
+      getStageMissionCatalog(typeCode),
       prisma.userMission.findMany({
         where: { userId: user.id, resetKey: today, mission: { scope: "DAILY" } },
         select: { missionId: true },
-      }),
-      prisma.mission.findMany({
-        // order 상한 이유는 lib/missions/stages.ts getStageProgress 주석에 있다
-        where: { scope: "STAGE", typeCode, order: { lte: MISSIONS_PER_STAGE } },
-        orderBy: [{ stage: "asc" }, { order: "asc" }],
       }),
       prisma.userMission.findMany({
         where: {

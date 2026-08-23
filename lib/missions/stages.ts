@@ -1,5 +1,6 @@
 import type { TypeCode } from "@prisma/client"
 import { prisma } from "@/lib/prisma"
+import { getStageMissionCatalog } from "./catalog"
 import { MISSIONS_PER_STAGE, REQUIRED_PER_STAGE, TOTAL_STAGES } from "./bands"
 
 export type StageProgress = {
@@ -77,21 +78,19 @@ export function isGraduated(progress: StageProgress[]): boolean {
 /**
  * 단계별 해금 상태와 완료 수 계산.
  *
- * 두 쿼리를 병렬로 낸다. 완료 기록은 missionId 목록에 의존하지 않고
+ * 두 쪽을 병렬로 낸다. 완료 기록은 missionId 목록에 의존하지 않고
  * 관계 필터(mission: {...})로 같은 집합을 고르므로 순차로 기다릴 이유가 없다.
  *
- * 미션은 id·stage만 select한다 — 잠금 판정에 title·description이 필요 없고,
- * 300행의 본문을 매번 끌어오면 완료 API 한 번이 수십 KB를 왕복한다.
+ * 2026-08-23: 미션 쪽은 프로세스 내 캐시(./catalog.ts)에서 가져온다. 시드로만 바뀌는
+ * 불변 데이터를 요청마다 다시 읽을 이유가 없다 — 계측 근거는 그 파일 주석에 있다.
+ * 그래서 DB 왕복은 완료 기록 1회로 줄었다.
+ *
+ * order 상한(옛 시드가 남긴 단계당 4번째 미션 9개 배제)은 카탈로그 쪽에서 처리한다.
+ * 정리하려면 scripts/prune-orphan-stage-missions.ts --apply
  */
 export async function getStageProgress(userId: string, typeCode: TypeCode): Promise<StageProgress[]> {
   const [allMissions, completions] = await Promise.all([
-    prisma.mission.findMany({
-      // order 상한: 옛 시드가 만든 단계당 4번째 미션 9개가 아직 DB에 남아 있다.
-      // 지우려면 완료기록을 함께 지워야 해서(FK) 남겨두고 여기서 배제한다.
-      // 정리하려면 scripts/prune-orphan-stage-missions.ts --apply
-      where: { scope: "STAGE", typeCode, order: { lte: MISSIONS_PER_STAGE } },
-      select: { id: true, stage: true },
-    }),
+    getStageMissionCatalog(typeCode),
     prisma.userMission.findMany({
       where: {
         userId,
