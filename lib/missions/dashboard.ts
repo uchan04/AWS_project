@@ -1,5 +1,6 @@
 import type { User } from "@prisma/client"
 import { prisma } from "@/lib/prisma"
+import { cappedStage } from "@/lib/pet"
 import { listClaimedDates } from "./attendance"
 import { getTodayKey, getToday } from "./reset"
 import { computeStageProgress } from "./stages"
@@ -51,6 +52,8 @@ export type DashboardDTO = {
     claimedDates: string[]
   }
   userTypeCode: string | null
+  /** 미션 모달의 캐릭터 칸에 쓰는 펫 이미지. 스킨이 없거나 CDN 미설정이면 null(이모지로 떨어진다) */
+  petImageUrl: string | null
 }
 
 function getCompletionMode(mission: { code: string; requiresPhoto: boolean }): CompletionMode {
@@ -84,6 +87,7 @@ export async function buildDashboard(user: User): Promise<DashboardDTO> {
     weeklyCount,
     claimedToday,
     claimedDatesThisMonth,
+    activeSkin,
   ] = await Promise.all([
       prisma.mission.findMany({
         where: { scope: "DAILY" },
@@ -113,6 +117,14 @@ export async function buildDashboard(user: User): Promise<DashboardDTO> {
       }),
       // 이번 달 출석 날짜. 첫 화면이 추가 요청 없이 캘린더를 그리도록 여기서 같이 읽는다
       listClaimedDates(user.id, today.slice(0, 7)),
+      // 펫 이미지 키. getCurrentUser()는 스킨 관계를 붙이지 않으므로 여기서 따로 읽는다 —
+      // 라우트를 getCurrentUserWithSkin()으로 바꾸면 사이드바 프로필과 같은 조회가 두 번 난다.
+      user.activePetSkinId
+        ? prisma.petSkin.findUnique({
+            where: { id: user.activePetSkinId },
+            select: { imageKeyBase: true, stageCount: true },
+          })
+        : Promise.resolve(null),
     ])
 
   const dailyCompletedIds = new Set(dailyCompletions.map((c) => c.missionId))
@@ -174,6 +186,13 @@ export async function buildDashboard(user: User): Promise<DashboardDTO> {
 
   const cycleDay = user.attendanceTotal > 0 ? ((user.attendanceTotal - 1) % 7) + 1 : 1
 
+  // 사이드바(lib/profile.ts:44)와 같은 규칙으로 만든다. 규칙이 갈라지면 두 화면의 펫이 달라진다
+  const cloudfront = process.env.CLOUDFRONT_DOMAIN
+  const petImageUrl =
+    cloudfront && activeSkin
+      ? `${cloudfront}/${activeSkin.imageKeyBase}-${cappedStage(user.level, activeSkin.stageCount)}.png`
+      : null
+
   return {
     dailyMissions,
     stageMissions,
@@ -193,6 +212,7 @@ export async function buildDashboard(user: User): Promise<DashboardDTO> {
       claimedDates: claimedDatesThisMonth,
     },
     userTypeCode: user.typeCode,
+    petImageUrl,
   }
 }
 

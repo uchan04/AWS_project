@@ -105,14 +105,17 @@ interface MissionModalProps {
   color: string
   bg: string
   mascotEmoji: string
+  /** 내 펫 이미지. null이면 이모지로 떨어진다 */
+  petImageUrl: string | null
   onClose: () => void
   onComplete: () => void
 }
 
-function MissionModal({ mission, color, bg, mascotEmoji, onClose, onComplete }: MissionModalProps) {
+function MissionModal({ mission, color, bg, mascotEmoji, petImageUrl, onClose, onComplete }: MissionModalProps) {
   const [proofMode, setProofMode] = useState(false)
   const [proofImage, setProofImage] = useState<string | null>(null)
   const [uploadedFile, setUploadedFile] = useState<File | null>(null)
+  const [petImageFailed, setPetImageFailed] = useState(false)
   const fileRef = useRef<HTMLInputElement>(null)
 
   const animType = getMissionAnimType(mission)
@@ -274,17 +277,30 @@ function MissionModal({ mission, color, bg, mascotEmoji, onClose, onComplete }: 
           </button>
           {/* 미션 아이콘 → 캐릭터 → 제목 → 설명. 애니메이션 칸과 아이콘 칸을 한 칸으로 합쳤다 */}
           <div style={{ fontSize: 34, lineHeight: 1 }}>{emoji}</div>
-          {/* 더미 캐릭터. 미션을 수행하는 캐릭터 자산이 아직 없어 마스코트 이모지에 동작 애니메이션만 건다 */}
+          {/* 캐릭터 칸. 미션별 자산을 그리는 대신 (내 펫 이미지) × (동작 CSS 애니메이션)으로
+              조합한다 — 미션이 늘어도 자산은 늘지 않는다. 이미지를 못 읽으면 이모지로 떨어진다 */}
           <div
             className={ANIM_CLASS[animType] ?? ANIM_CLASS.default}
             style={{
-              fontSize: 96,
+              fontSize: 176,
               lineHeight: 1,
               display: "inline-block",
-              margin: "8px 0 12px",
+              margin: "12px 0 16px",
             }}
           >
-            {mascotEmoji}
+            {petImageUrl && !petImageFailed ? (
+              // eslint-disable-next-line @next/next/no-img-element
+              <img
+                src={petImageUrl}
+                alt="내 펫"
+                // 펫 PNG는 가로가 긴 비율이다. 높이를 이모지 칸과 같은 176px로 잡고
+                // contain으로 맞춰야 사이드바처럼 잘리지 않는다
+                style={{ height: 176, maxWidth: "100%", objectFit: "contain", display: "block" }}
+                onError={() => setPetImageFailed(true)}
+              />
+            ) : (
+              mascotEmoji
+            )}
           </div>
           <h2
             style={{
@@ -897,6 +913,7 @@ export default function MissionDashboard() {
           color={color}
           bg={bg}
           mascotEmoji={mascotEmoji}
+          petImageUrl={dashboard.petImageUrl}
           onClose={() => setSelected(null)}
           onComplete={handleComplete}
         />
