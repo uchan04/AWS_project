@@ -497,18 +497,29 @@ export default function PetView({ initial }: { initial: PetState }) {
             </ul>
 
             {/* 잔액 목록과 상점 입구 사이에 오늘 들어온 재화의 출처 두 줄
-                (.pet-wallet__source)이 있었다. 2026-08-24 사용자 요청으로 걷었고, 그 높이는
-                아래 상점 입구 두 개가 그대로 받았다(pet.css .pet-wallet__shop의 5rem 계산).
-                삭제 이유는 위 sourceLines 자리의 주석에 있다 */}
+                (.pet-wallet__source)이 있었다. 2026-08-24 사용자 요청으로 걷었고, 그 높이(36px)를
+                아래 상점 입구 두 개가 5rem으로 두꺼워지며 받았다. 같은 날 마지막 요청으로 그
+                두께가 먹이기 버튼과 같은 44px로 돌아갔으므로 **지금 이 카드는 그만큼 짧다** —
+                남는 높이는 위 방(.pet__col--room의 1fr)이 가진다. 자세한 사정은 pet.css의
+                .pet-wallet__shop 주석, 삭제 이유는 위 sourceLines 자리의 주석에 있다 */}
 
             {/* 상단 바에서 내려온 상점 입구 2개 (2026-08-21 사용자 결정).
                 나무판(.pet-plank)이었다. 같은 날 결정으로 미션 화면의 "오늘 달성률" 카드처럼
-                테두리 없는 종족색 면에 가운데 정렬이고, 아이콘 없이 라벨만 둔다 */}
+                테두리 없는 종족색 면에 가운데 정렬이고, 아이콘 없이 라벨만 둔다.
+
+                2026-08-24 사용자 요청("그냥 외형 상점이랑 배경 상점 버튼을 씨앗 먹이기 버튼
+                객체랑 똑같은 걸로 바꿔줘. 크기도 비슷했으면 좋겠어"): 먹이기 버튼이 쓰는
+                **그 클래스를 그대로 붙인다**(.pet-btn.pet-btn--block). 값을 베껴 쓰지 않는
+                이유는 그러면 다음에 먹이기 버튼만 바뀌었을 때 둘이 갈리는 것이다.
+                단, 먹이기 버튼의 실제 크기·글자·그림자는 .pet-btn 본체가 아니라
+                `.pet-card--feed .pet-btn`에 있어서 이것만으로는 겉보기가 달랐다(같은 날
+                사용자 지적 "…동일한 폰트, 동일한 굵기"). 그래서 pet.css에서 그 규칙의
+                선택자에 .pet-wallet__shop을 함께 넣었다 — 자세한 사정은 그 두 주석 */}
             <div className="pet-wallet__shops">
-              <Link className="pet-wallet__shop" href="/pet/skins">
+              <Link className="pet-btn pet-btn--block pet-wallet__shop" href="/pet/skins">
                 외형 상점
               </Link>
-              <Link className="pet-wallet__shop" href="/pet/cosmetics">
+              <Link className="pet-btn pet-btn--block pet-wallet__shop" href="/pet/cosmetics">
                 배경 상점
               </Link>
             </div>

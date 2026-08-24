@@ -26,6 +26,10 @@
  * 8/21에 걷어낸 것 중 재화 줄·상점 두 화면의 잔액 알약은 그대로 종족색이다 — 나무는
  * "입구(.pet-wallet__shop)와 그 입구가 여는 화면의 머리(.pet-banner)"에만 있다.
  * 자세한 내력은 --pet-wood-* 정의 주석과 "상점 배너" 절 주석.
+ *
+ * 2026-08-24 같은 날 마지막 요청으로 **입구가 다시 나무가 아니게 됐다** — 상점 입구 2개가
+ * 먹이기 버튼과 같은 종족색 버튼이 됐다(.pet-wallet__shop 주석). 그래서 나무색이 남은 곳은
+ * **상점 두 화면의 머리띠(.pet-banner) 하나뿐**이다. 홈에는 나무가 없다.
  */
 
 /* 2026-08-21: 옛 .hm-pet / .hm-pet__cos* 를 걷어냈다. 치장·외형 상점이 그 클래스를
@@ -887,8 +891,20 @@
    2026-08-21 사용자 시안 반영: 12px 라운드 → 알약, 아래 단계 그림자(0 4px 0 --tribe-cta)
    → 같은 종족색의 부드러운 번짐이다. 색을 바꾼 것이 아니라 같은 색을 퍼뜨린 것이다.
    .pet-btn 본체를 고치지 않고 이 카드에만 거는 이유: 상점 2화면의 --ghost 버튼과 옆 칸의
-   씨앗 줍기 버튼이 같은 .pet-btn을 쓴다. 본체를 알약으로 바꾸면 세 화면이 같이 바뀐다 */
-.pet-card--feed .pet-btn {
+   씨앗 줍기 버튼이 같은 .pet-btn을 쓴다. 본체를 알약으로 바꾸면 세 화면이 같이 바뀐다
+
+   2026-08-24 사용자 요청("…씨앗 먹이기 버튼 객체랑 똑같은 걸로 바꿔줘. 크기도 비슷했으면
+   좋겠어" → "상점 버튼들의 글씨를 씨앗 먹이기랑 동일한 폰트, 동일한 굵기의 글씨로 바꿔줘")로
+   **지갑 카드의 상점 입구 2개를 이 선택자에 함께 넣었다.** .pet-btn만 붙였을 때는 겉보기가
+   달랐다 — 먹이기 버튼의 실제 값은 .pet-btn 본체가 아니라 이 규칙(48px · 0.9rem · 400 ·
+   부드러운 번짐)이고, 본체만 물려받으면 44px · --text-body(16px) · 600 · 단계 그림자가 된다.
+   값을 상점 규칙에 베껴 쓰지 않고 선택자를 늘린 이유: 이 규칙이 바뀔 때 둘이 같이 움직인다.
+   상점 쪽이 .pet-card--wallet을 앞에 다는 것은 특이도 때문이다 — 클래스 하나(0,1,0)로 두면
+   파일 뒤쪽의 .pet-btn 본체가 순서로 이겨 min-height·font-size·font-weight가 되돌아간다.
+   **서체는 이 규칙에 넣을 수 없다.** 먹이기 버튼은 카드(.pet-card--feed)에서 물려받는데
+   지갑 카드는 본문 서체이므로, 상점 입구에는 아래 .pet-wallet__shop 규칙이 직접 준다 */
+.pet-card--feed .pet-btn,
+.pet-card--wallet .pet-wallet__shop {
   min-height: 3rem;
   border-radius: var(--radius-pill);
   box-shadow: 0 6px 16px color-mix(in oklch, var(--tribe) 42%, transparent);
@@ -899,7 +915,11 @@
 /* 아래 두 규칙은 .pet-btn 본체의 :active·:disabled가 하드 단계 그림자를 되살리기 때문에
    필요하다. 본체 규칙(.pet-btn:disabled)은 이 파일 뒤쪽에 있고 특이도가 위 규칙과 같아서
    순서로 이긴다 — 클래스 하나를 더 얹어 특이도로 눌러 둔다 */
-.pet-card--feed .pet-btn:active:not(:disabled) {
+/* 상점 입구가 :not(:disabled)를 같이 다는 것은 특이도 때문이다(<a>는 :disabled가 될 수 없어
+   항상 참이다) — 이게 없으면 파일 뒤쪽 .pet-btn:active:not(:disabled)와 특이도가 같아져
+   순서로 지고, 2px 눌림 + box-shadow: none이 걸린다 */
+.pet-card--feed .pet-btn:active:not(:disabled),
+.pet-card--wallet .pet-wallet__shop:active:not(:disabled) {
   transform: translateY(1px);
   box-shadow: 0 3px 8px color-mix(in oklch, var(--tribe) 34%, transparent);
 }
@@ -1107,7 +1127,8 @@
    잔액 목록 아래에 붙어 있었다.
    규칙은 .pet-card__meta와 같은 값(라벨 크기 + --color-muted)이었고, 면도 테두리도 없이
    padding-inline만 재화 줄과 맞춰 왼쪽 끝을 정렬했다 — 되살리면 그 값이 다시 맞다.
-   빈 자리는 아래 상점 입구 두 개가 받았다(.pet-wallet__shop의 5rem 계산) */
+   빈 자리는 아래 상점 입구 두 개가 5rem으로 두꺼워지며 받았지만, 같은 날 마지막 요청으로
+   그 두께가 44px로 돌아갔다 — 지금 그 36px은 방(.pet__col--room의 1fr)에 있다 */
 
 /* 상점 입구 2개. auto-fit이라 좁아지면 두 줄로 갈린다 — 라벨이 nowrap이어서 억지로 한 줄에
    두면 320px에서 글자가 칸을 넘어간다 */
@@ -1229,26 +1250,64 @@
    모양이 아니라 **네모 상자**를 따라 그려진다. 그림자가 필요하면 알파를 따르는
    filter: drop-shadow를 써야 하지만, 그림 자체에 이미 아래쪽 어두운 마감이 들어 있어서
    지금은 아무것도 얹지 않았다. --pet-wood-light 토큰은 쓰는 곳이 없어졌지만 파일 앞
-   정의 주석과 함께 남겨 둔다 — 그림을 되돌릴 때 다시 필요한 값이다 */
-.pet-wallet__shop {
+   정의 주석과 함께 남겨 둔다 — 그림을 되돌릴 때 다시 필요한 값이다
+
+   ──────────────────────────────────────────────────────────────────────────
+   **2026-08-24 다섯 번째 요청: 이 버튼만의 모양을 그만둔다. 먹이기 버튼과 같은 것이 됐다**
+   ("그냥 외형 상점이랑 배경 상점 버튼을 씨앗 먹이기 버튼 객체랑 똑같은 걸로 바꿔줘.
+   크기도 비슷했으면 좋겠어").
+
+   그래서 위 다섯 문단이 이 자리에 쌓아 온 면은 **전부 없다**: 종족색 연한 면 → 나무
+   그라데이션 → 단색 --pet-wood-light + 결 + 광택 → 나무 간판 그림. 이제 이 버튼의 면·
+   모서리·그림자·글자 크기·높이는 하나도 여기서 정하지 않고 **먹이기 버튼이 쓰는 규칙들을
+   그대로 물려받는다.** 값을 이 규칙에 베껴 오지 않은 이유는 그렇게 하면 다음에 먹이기
+   버튼만 손댔을 때 둘이 조용히 갈리는 것이다 — "똑같은 것"이라는 요청은 지금 같아 보이는
+   것이 아니라 앞으로도 같이 움직이는 것으로 지킨다. 물려받는 길이 두 갈래다:
+   - JSX에서 .pet-btn + .pet-btn--block을 함께 붙인다 → 좌우 padding --space-sm, 광택 두 겹
+     + 종족색 135deg 면, 잉크 글자, 폭 100%
+   - 위쪽 `.pet-card--feed .pet-btn` 규칙의 선택자에 이 클래스를 넣었다 → 높이 3rem(48px),
+     알약 모서리, 부드러운 번짐(0 6px 16px), 0.9rem, 굵기 400, 누름 translateY(1px)
+   두 번째가 필요한 이유는 **먹이기 버튼의 실제 값이 .pet-btn 본체에 없다**는 것이다. 본체만
+   붙였을 때 44px · 16px · 600 · 단계 그림자가 나와 사용자가 곧바로 다르다고 지적했다
+   ("상점 버튼들의 글씨를 씨앗 먹이기랑 동일한 폰트, 동일한 굵기의 글씨로 바꿔줘").
+
+   **서체 한 줄만 이 규칙이 직접 준다.** 먹이기 버튼은 자기 카드(.pet-card--feed)에서
+   Gowun Dodum을 물려받고 .pet-btn은 font-family: inherit이라 따라오는데, 이 버튼이 앉은
+   지갑 카드는 본문 서체(Noto Sans KR)다. 그래서 카드를 통한 상속으로는 같아질 수 없다 —
+   지갑 카드에 --font-display를 걸면 잔액 줄까지 서체가 바뀐다. 선택자에 .pet-card--wallet을
+   앞세운 것은 특이도 때문이다: 클래스 하나(0,1,0)면 파일 뒤쪽 .pet-btn의
+   font-family: inherit이 순서로 이겨 본문 서체로 되돌아간다.
+   굵기를 400으로 두는 것도 이 서체의 조건이다 — Gowun Dodum은 굵기가 400 하나뿐이라
+   600을 주면 브라우저가 합성해 획이 흐려진다(.pet-card--feed 주석).
+
+   **높이가 5rem → 3rem(48px)으로 돌아가는 것이 요청의 값이다**("크기도 비슷"). 세 번째 요청에서
+   5rem으로 올린 근거(지운 출처 문구 36.48px를 이 버튼이 받아 카드 높이를 지킨다)는 이
+   요청으로 뒤집힌다 — 지갑 카드가 32px 짧아지고 그 높이는 왼쪽 열이
+   grid-template-rows: 1fr auto라서(.pet__col--room) **방이 가진다.** 방이 그만큼 커지는
+   것이지 카드 안에 빈 여백이 생기는 것은 아니다(카드가 내용 높이를 따르므로) — 세 번째
+   요청의 "꽉차게"가 카드 안쪽에서는 유지된다.
+
+   `background`를 여기서 지운다(그림 · 그라데이션 · 색 전부). 이 규칙이 파일에서
+   .pet-btn보다 **앞**에 있어 특이도가 같으면 뒤가 이기지만, 그림을 지우지 않고 두면
+   .pet-btn의 background와 이 규칙의 background 중 하나만 남는 것이 아니라 읽는 사람이
+   어느 쪽이 보이는지 매번 세어야 한다. 남길 이유가 없으므로 지운다.
+   그림 파일(public/images/pet/wood-sign.png)은 지우지 않고 둔다 — 되돌릴 때 필요하고,
+   지우면 그 커밋을 되돌려야 다시 생긴다.
+
+   남은 세 줄은 전부 **<a>가 <button>이 아니라서** 필요한 것이다:
+   - display: grid + place-items: center — <button>은 안쪽 글자를 저절로 가운데에 두지만
+     <a>는 min-height만 받으면 글자가 위쪽에 붙는다
+   - text-decoration: none — 링크 밑줄
+   - white-space: nowrap — 라벨 두 줄 금지(design.md). 좁아지면 위 .pet-wallet__shops의
+     auto-fit이 1열로 접으므로 넘칠 자리가 없다
+   :active는 위 `.pet-card--feed .pet-btn:active` 규칙에 함께 넣었다(먹이기와 같은 1px) */
+.pet-card--wallet .pet-wallet__shop {
   display: grid;
   place-items: center;
-  min-height: 5rem;
-  /* 위 0.45rem 큰 값이 널판 몸통 가운데(54.4%)로 글자를 내리는 보정이다 */
-  padding: 0.95rem var(--space-xs) 0.5rem;
-  background: url("/images/pet/wood-sign.png") center / 100% 100% no-repeat;
-  color: var(--color-ink);
+  /* 위 문단의 서체 한 줄. 나머지 글자 값(0.9rem·400)은 먹이기 버튼 규칙에서 온다 */
   font-family: var(--font-display);
-  font-size: var(--text-md);
-  text-align: center;
   text-decoration: none;
   white-space: nowrap;
-  transition: transform var(--dur-micro) var(--ease-out);
-}
-
-/* 누름은 1px 그대로 남긴다. 줄일 번짐이 이제 없다(위 주석의 box-shadow 문단) */
-.pet-wallet__shop:active {
-  transform: translateY(1px);
 }
 
 /* ── 오늘의 활동 (2026-08-24) ────────────────────────────────────────────── */
