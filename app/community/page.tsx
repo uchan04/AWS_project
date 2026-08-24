@@ -7,6 +7,8 @@ import { HopeBanner } from "./_components/HopeBanner"
 import { PostList } from "./_components/PostList"
 import { WriteModal } from "./_components/WriteModal"
 import { resolveGallery, listGalleryPosts, type GalleryTab, type GalleryPost } from "./_lib/gallery"
+import { MeetupNotice } from "./meetups/_components/MeetupNotice"
+import { pendingMeetupNotices, type MeetupNoticeItem } from "./meetups/_lib/notice"
 
 // 유저별 데이터를 읽으므로 정적 프리렌더 대상이 아니다. 이걸 빼면 빌드 시점에
 // 아래 catch의 안내 화면이 정적으로 굳어 로그인한 뒤에도 그대로 나온다(pet/page.tsx와 같은 이유).
@@ -19,6 +21,7 @@ export default async function CommunityPage(props: PageProps<"/community">) {
   let myTypeCode: TypeCode | null
   let gallery: GalleryTab
   let posts: GalleryPost[]
+  let notices: MeetupNoticeItem[]
 
   // 인증이나 DB가 실패해도 화면을 죽이지 않고 안내를 띄운다(C의 pet/page.tsx와 같은 패턴).
   try {
@@ -26,6 +29,8 @@ export default async function CommunityPage(props: PageProps<"/community">) {
     myTypeCode = user.typeCode
     gallery = resolveGallery(tab, user.typeCode)
     posts = await listGalleryPosts(gallery)
+    // 모임 화면에 들르지 않아도 무산 사실은 알아야 한다. 커뮤니티 첫 화면에도 같은 배너를 띄운다.
+    notices = await pendingMeetupNotices(user.id)
   } catch (error) {
     // 미인증이면 로그인으로 보낸다. 여기 남는 카드는 DB 장애용이다 —
     // 장애에 "로그인이 필요해요"를 띄우면 이미 로그인한 사람이 로그아웃하고
@@ -45,6 +50,8 @@ export default async function CommunityPage(props: PageProps<"/community">) {
 
   return (
     <main className="mx-auto flex max-w-3xl flex-col gap-6 p-4 sm:p-6">
+      <MeetupNotice notices={notices} />
+
       <div className="flex flex-wrap items-end justify-between gap-3">
         <div>
           <h1 className="text-xl font-bold text-neutral-900">커뮤니티</h1>

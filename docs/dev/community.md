@@ -7,6 +7,18 @@
 
 D 쪽 기능 구현은 끝났고, 외부 대기 항목도 없다. AWS 계정·`BEDROCK_MODEL_ID`는 확보되어 챗봇 스트리밍은 완료했다(2026-08-19). origin/main을 머지해 인프라 완료분(Cognito 실검증, `BottomNav`, RDS 마이그레이션 등)도 받았다(2026-08-19). 2026-08-20에 `origin/develop`을 두 차례 머지해 A·B·C·E 작업분을 받았고, 챗봇을 전역 오버레이로 이전했다(차단 2 해소). 2026-08-21에 미션 완료 연동(6번)을 처리했고, 같은 날 `origin/develop`을 다시 머지해 흐름 변경분(소개 → 가입/로그인 → 문항 → 결과 → 홈, 자체 DB 계정)을 받았다. 챗봇 버튼 노출 판정은 이 머지에서 **허용 목록 방식으로 대체**됐다 — D의 `HIDDEN_PATHS`는 남아 있지 않다(`docs/STATUS.md` 차단 20번 + 21번의 D 몫 해소). **아래 표에서 남은 항목은 3번(`app/chat/` 폴더 소유 확정, 팀 합의 대기) 하나뿐이다.** 재개할 때 이 표부터 본다.
 
+**2026-08-24: 오프라인 모임을 구현하고 `feat/community` → `develop`에 머지했다(`0ccc6be`).** API 6종 + 화면 + 결성·무산 알림 + "내가 신청한 모임" 구역까지 끝났고 외부 대기 항목은 없다. 재개할 때 알아야 할 것은 셋이다.
+
+- **`develop`을 받으면 마이그레이션을 적용해야 한다** — `npx prisma migrate deploy && npx prisma generate`. `20260824120000_meetup`과 `20260824150000_meetup_participant_notice_reason` 두 개다(`CLAUDE.md` 5절대로 손으로 썼다)
+- **관리자 계정은 DB에서 직접 켠다.** 가입·설정 화면에 스위치가 없다. 모임 개설·결성확인·무산은 전부 `user.isAdmin`이 켜져 있어야 보이고 동작한다
+
+  ```sql
+  UPDATE "User" SET "isAdmin" = true WHERE id = '<user id>';
+  ```
+
+  켠 뒤에는 그 계정으로 모임에 **신청할 수 없다**(관리자의 역할은 개설·결성확인·무산뿐이다). 신청 흐름을 확인하려면 일반 계정이 따로 필요하다
+- **모임은 전체 갤러리 하나로만 운영한다.** `Meetup.galleryType` 컬럼과 API의 검증은 그대로 살아 있고 개설 화면에서만 `ALL`로 고정한다. 종족 모임을 열기로 하면 `MeetupCreateModal`의 선택지를 되살리고 **소속 검사(`canAccessGallery`)를 신청 라우트와 목록 조회에 다시 넣어야 한다** — 한 번 넣었다가 "전체 모임 하나로 통합" 결정으로 되돌렸다
+
 ### 1. Bedrock 스트리밍 응답 — 완료 (2026-08-19)
 `POST /api/chat/stream`을 새로 만들어 `ConverseStreamCommand`로 응답을 스트리밍하고, 스트림이 `messageStop`까지 정상 종료된 경우에만 `ChatRole.ASSISTANT`로 저장한다. 기존 `app/api/chat/messages/route.ts`(사용자 발화 저장 + 친밀도 지급)는 건드리지 않았다. 자세한 내용은 아래 "구현한 파일"·"결정한 것과 이유" 참고.
 
@@ -49,7 +61,7 @@ D 쪽 기능 구현은 끝났고, 외부 대기 항목도 없다. AWS 계정·`B
 ---
 
 ## 현재 상태
-- 완료: 갤러리 목록 화면, 상세 오버레이, 좋아요 토글, 댓글 작성, 글쓰기 모달, **전체 탭 글쓰기**, 본인 글 삭제, 본인 댓글 삭제, 친밀도 지급 헬퍼, 챗봇 시스템 프롬프트, 챗봇 메시지 저장 API(GET/POST, 친밀도 지급까지), 챗봇 패널 UI, Bedrock 스트리밍 응답 연결(`POST /api/chat/stream`), 타이핑 인디케이터, 유형별 챗봇 추천 문구 6개씩·3개 랜덤 노출(LLM 아님, 정적 상수), **챗봇 전역 오버레이 이전(`ChatLauncher` + `layout.tsx`, 임시 `/chat` 라우트 폐기)**, **희망 문구 배너(SPEC.md 9절)**, **좋아요 낙관적 갱신(1281ms 대기 제거)**
+- 완료: 갤러리 목록 화면, 상세 오버레이, 좋아요 토글, 댓글 작성, 글쓰기 모달, **전체 탭 글쓰기**, 본인 글 삭제, 본인 댓글 삭제, 친밀도 지급 헬퍼, 챗봇 시스템 프롬프트, 챗봇 메시지 저장 API(GET/POST, 친밀도 지급까지), 챗봇 패널 UI, Bedrock 스트리밍 응답 연결(`POST /api/chat/stream`), 타이핑 인디케이터, 유형별 챗봇 추천 문구 6개씩·3개 랜덤 노출(LLM 아님, 정적 상수), **챗봇 전역 오버레이 이전(`ChatLauncher` + `layout.tsx`, 임시 `/chat` 라우트 폐기)**, **희망 문구 배너(SPEC.md 9절)**, **좋아요 낙관적 갱신(1281ms 대기 제거)**, **오프라인 모임(2026-08-24 — API 6종, 목록·개설·신청·취소 화면, 결성·무산 알림, "내가 신청한 모임" 구역, 같은 날 중복 신청 제한)**
 - 진행 중: 없음
 - 미착수: 이미지 업로드, LLM 주제 추천(고정 문구로 대체됨 — 아래 "결정한 것과 이유" 참고)
 - 보류(다음 세션 이전 필요 조건): 글쓰기 시 일일 미션(`DAILY_COMMUNITY_POST`) 완료 처리(B와 협의 필요), `ChatPanel`의 `layout.tsx` 이전(E 소유 파일이라 D가 직접 못 건드림) — 전부 아래 "결정한 것과 이유"에 근거 남김
@@ -73,6 +85,24 @@ D 쪽 기능 구현은 끝났고, 외부 대기 항목도 없다. AWS 계정·`B
 - `app/api/community/posts/[id]/comments/[commentId]/route.ts` — DELETE. 본인 댓글 소프트 삭제. `Comment.deletedAt` 설정 + `Post.commentCount` 감소를 `$transaction`으로 묶음(댓글 작성의 create + increment와 대칭). 소유자 검사 앞에 `comment.postId !== id`를 먼저 확인한다
 
 - `app/community/_components/WriteModal.tsx` — 글쓰기 버튼 + 모달을 한 컴포넌트로 통합(트리거가 이번 세션에 새로 생기는 것이라 지시된 파일 목록에도 이 컴포넌트만 있고 별도 트리거 컴포넌트는 없었음). `gallery` prop이 `"ALL"`이면 버튼을 비활성화하고 "전체 커뮤니티 글쓰기는 준비 중이에요" 안내만 노출, 종족 갤러리일 때만 모달이 동작. `_lib/gallery.ts`의 `canWriteToGallery()`로 판단(클라이언트 쪽은 UX용 차단이고, 실제 차단은 서버가 함)
+
+### 오프라인 모임 (2026-08-24 추가, SPEC.md 8절)
+
+- `app/api/community/meetups/route.ts` — **2026-08-24 추가.** GET(목록) + POST(개설). GET은 `gallery`(없으면 전체)·`status`(기본 `OPEN`) 쿼리로 거르고 `startsAt` 오름차순. `OPEN`을 볼 때만 `startsAt >= now`를 더한다 — 이미 시작한 모임은 상태가 `OPEN`으로 남아 있어도 신청받을 수 없다. 각 항목의 `joined`는 `participants`를 본인 행(`userId` + `canceledAt: null`)만 골라 와 접은 값이라 **응답에 남의 신청 정보가 실리지 않는다.** POST는 `user.isAdmin`이 false면 401, title 1~80·place 1~120·body 1~2000·`capacity >= 1`·`1 <= minCount <= capacity`·`startsAt` 파싱 가능 + 미래를 검증한다
+- `app/api/community/meetups/[id]/route.ts` — **2026-08-24 추가.** DELETE(무산). 관리자 전용. 없거나 이미 `deletedAt`이 있으면 404. `status: CANCELED`와 `deletedAt: now()`를 한 번에 세팅한다 — 목록은 `deletedAt`으로 거르고, 이미 신청한 사람의 화면은 `status`로 "무산됨"을 표시한다
+- `app/api/community/meetups/[id]/confirm/route.ts` — **2026-08-24 추가.** POST(결성확인). 관리자 전용. `status !== OPEN`이면 400 `"이미 처리된 모임입니다"`, `joinCount < minCount`면 400 `"최소 인원이 모이지 않았습니다"`. 참가자 친밀도는 지급하지 않는다 — 관리자 행동이라 참가자가 그 시점에 접속해 있지 않고, 일괄 지급은 배치가 필요하다
+- `app/api/community/meetups/[id]/join/route.ts` — **2026-08-24 추가.** POST(신청) + DELETE(취소). POST는 404 → `status !== OPEN` → 지난 모임 → 관리자 → 같은 날 중복 순으로 거른 뒤 인터랙티브 트랜잭션에 들어간다. 재신청은 행을 새로 만들지 않고 `canceledAt`만 되돌리며 **친밀도는 신규 신청일 때만** 트랜잭션 밖에서 별도 `try/catch`로 지급한다(`MEETUP_JOIN_AFFINITY`). DELETE는 `{ reason?: string }`을 받고 body 없이 와도 정상 동작한다 — 1~200자면 `cancelReason`에 저장하고 200자를 넘으면 400
+- `app/api/community/meetups/[id]/participants/route.ts` — **2026-08-24 추가.** GET(참가자 명단). 관리자 전용. `participants`(미취소, `joinedAt` 오름차순)와 `canceled`(취소, `canceledAt` 내림차순 + `cancelReason`) 두 배열. `nickname`·시각만 내보내고 `userId`·`email`·`MeetupParticipant.id`는 `select` 단계에서 아예 가져오지 않는다 — 나가는 순간 오프라인 모임 참가자를 특정할 수 있는 식별자가 된다. `deletedAt`으로 거르지 않는다(무산된 모임도 관리자는 누가 신청했었는지 봐야 한다)
+- `app/api/community/meetups/notices/route.ts` — **2026-08-24 추가.** POST(알림 읽음 처리). `{ meetupIds: string[] }`를 받아 `updateMany`로 `notifiedCancelAt`을 채운다. `where`에 `userId: user.id`가 박혀 있어 남의 `meetupId`를 섞어 보내도 그 사람 알림은 갱신되지 않는다. 무산·결성을 구분하지 않는다 — `meetupIds`로만 동작하므로 종류를 알 필요가 없다
+- `app/community/meetups/page.tsx` — **2026-08-24 추가.** 서버 컴포넌트. `export const dynamic = "force-dynamic"`, 목록은 API를 다시 부르지 않고 여기서 직접 조회한다(`page.tsx`가 posts에서 쓰는 방식과 같다). 위에서부터 알림 배너 → "내가 신청한 모임" 구역 → 전체 목록 순이고, 아래 목록에서는 이미 신청한 모임을 `id: { notIn }`으로 뺀다. 인증·DB 실패 시 `try/catch`로 "로그인이 필요해요" 안내를 렌더하는 것도 `app/community/page.tsx`와 같은 패턴
+- `app/community/meetups/_components/MeetupList.tsx` — **2026-08-24 추가.** 클라이언트 경계(`PostList`와 같은 자리). `router.refresh()`가 필요해 분리했다. `isAdmin`일 때만 개설 모달을 렌더 트리에 넣는다. `showCreateButton`(기본 `true`)은 "내가 신청한 모임" 구역이 같은 컴포넌트를 재사용하면서 개설 버튼만 빼기 위한 것
+- `app/community/meetups/_components/MeetupCard.tsx` — **2026-08-24 추가.** 카드 + 인라인 펼침 3종(신청 확인 / 취소 사유 / 무산 확인). `window.confirm`을 쓰지 않는다. `pending`을 `"join" | "leave" | "confirm" | "cancel"`로 들고 있어 스피너는 누른 버튼에만, 잠금은 전부에 건다. `isPast`면 모든 액션을, `isConfirmed`면 취소만 숨기고 각각 "지난 모임"·"결성됨" 배지를 띄운다(배지 어휘는 `PostCard`의 종족 배지와 같다)
+- `app/community/meetups/_components/MeetupCreateModal.tsx` — **2026-08-24 추가.** 관리자 전용 개설 모달. 모달 껍데기·입력 클래스는 `WriteModal`을 그대로 따랐고, 열림·닫힘 전환은 `WriteModal`에 없어서 여기서 정했다(150ms, 닫힐 때는 그만큼 언마운트를 미룬다). 갤러리 선택은 걷어내고 `FIXED_GALLERY = ALL`로 보낸다
+- `app/community/meetups/_components/MeetupNotice.tsx` — **2026-08-24 추가.** 결성(🤝)·무산(🗓️) 알림 배너. 껍데기 어휘는 `HopeBanner`의 중립 배너와 같다. 결성이 위, 무산이 아래이고 "확인" 버튼 하나가 양쪽 `meetupIds`를 함께 읽음 처리한다. 실패하면 배너를 닫지 않는다 — 닫으면 읽음 처리가 안 된 채 알림만 사라진다
+- `app/community/meetups/_components/transitions.tsx` — **2026-08-24 추가.** `FadeIn`(마운트 시 opacity 상승, `key`를 바꿔 교체 연출)과 `Spinner`. 카드와 모달이 함께 쓴다
+- `app/community/meetups/_lib/notice.ts` — **2026-08-24 추가.** `pendingMeetupNotices(userId)`. `canceledAt: null` + `notifiedCancelAt: null` + `status in (CANCELED, CONFIRMED)`. 본인이 스스로 취소한 건은 구조적으로 걸리지 않는다 — 알릴 이유가 없고 "내가 취소한 건가, 무산된 건가"가 헷갈린다
+- `app/community/meetups/_lib/joined.ts` — **2026-08-24 추가.** `myJoinedMeetups(userId)`. `OPEN`·`CONFIRMED`만(무산은 배너 몫), 지난 모임도 포함하고 뒤로 민다. 반환 형태를 `MeetupListItem`에 맞춰 `MeetupCard`가 그대로 받는다
+- `app/community/meetups/_lib/kst.ts` — **2026-08-24 추가.** `kstDayRange(at)`. 같은 날 중복 신청 판정용 KST 달력 경계. 아래 "결정한 것과 이유" 참고
 
 ## 수정한 파일
 - `app/community/_lib/gallery.ts` — `canWriteToGallery()` 추가. 전체 탭 글쓰기 차단 로직을 여기 한 곳에 모았고, **2026-08-20**에 스키마가 열리면서 예고대로 이 함수만 고쳐 해소했다. 같은 날 `GalleryTab`을 `GalleryType` 별칭으로 단순화
@@ -104,6 +134,11 @@ D 쪽 기능 구현은 끝났고, 외부 대기 항목도 없다. AWS 계정·`B
 - `app/chat/_components/ChatLauncher.tsx` — **2026-08-21 수정 → 머지에서 대체됨.** D가 `pathname === "/diagnosis"` 단일 비교를 `HIDDEN_PATHS` 배열 + `includes()`로 바꾸고 `/login`·`/signup`을 추가했으나(`c8b4d08`), 같은 날 `origin/develop` 머지에서 A/E의 허용 목록 방식(`ALLOWED_PREFIXES` + `/api/diagnosis/me` 확인)으로 대체됐다. **현재 이 파일에 D의 변경분은 남아 있지 않다.** 경위는 아래 "결정한 것과 이유"의 `### 로그인 화면 챗봇 버튼 숨김 (2026-08-21)` 참고
 
 **`app/chat/` 폴더 소유 — 팀 확인 대기.** `CLAUDE.md` 2절의 폴더 소유 표(`app/diagnosis/` A, `app/missions/` B, `app/pet/` C, `app/community/` D, `app/(auth)/` E)에는 `app/chat/`이 없다. `업무분담.md`의 D 항목에 "AI 상담 챗봇"과 `/api/chat/*`가 D 담당으로 명시돼 있어 D 소유로 보고 진행했지만, `CLAUDE.md` 갱신은 전원 합의가 필요하므로 다음 통합 때 팀에 확인해 `CLAUDE.md` 2절에 정식으로 추가해야 한다.
+
+- `app/community/_lib/affinity.ts` — **2026-08-24 수정.** `MEETUP_JOIN_AFFINITY = 10` 상수 추가(2줄). `grantAffinity()` 본문은 손대지 않았다. 금액을 라우트에 매직넘버로 두지 않고 친밀도 금액의 단일 출처인 이 파일에 모은다 — `POST_AFFINITY`·`COMMENT_AFFINITY`·`CHAT_TURN_AFFINITY`와 같은 자리
+- `app/community/_lib/format.ts` — **2026-08-24 수정.** `meetupDateTime()` 추가. `timeAgo()`는 상대 시각이라 미래 일정에 못 쓴다. `Intl.DateTimeFormat("ko-KR", { timeZone: "Asia/Seoul", ... })`로 KST를 고정한다 — 이유는 아래 "결정한 것과 이유"
+- `app/community/page.tsx` — **2026-08-24 수정.** `<MeetupNotice notices={notices} />`를 `<main>` 최상단에 추가하고 `pendingMeetupNotices(user.id)`를 호출한다. 모임 화면에 들르지 않아도 결성·무산은 알아야 하므로 커뮤니티 첫 화면에도 같은 배너를 띄운다. 같은 날 넣었던 "오프라인 모임" 진입 링크는 사이드바에 메뉴가 생기면서 다시 걷었다
+- `app/components/Sidebar.tsx` — **2026-08-24 수정(B 소유 공유 파일, 사전 협의함).** `TABS` 배열만 건드렸고 diff는 **+2 / −1줄**이다. `{ href: "/community/meetups", label: "모임", emoji: "🤝", desc: "오프라인에서 만나기" }` 한 줄 추가 + 커뮤니티 항목의 `desc`를 `"같은 종족 모임"` → `"같은 종족 이야기"`로 교체(모임이 별도 메뉴가 되면서 문구가 겹쳤다). 활성 표시는 `pathname === href` 정확 일치라 두 항목이 함께 켜지지 않는 것을 먼저 확인했다. 스타일·구조·다른 항목은 손대지 않았다
 
 ## 삭제한 파일
 - `app/chat/page.tsx` — **2026-08-20 삭제.** `layout.tsx`를 못 고쳐서 만들었던 임시 확인용 라우트. 전역 오버레이(`ChatLauncher`)로 대체돼 `/chat`은 이제 404다. `app/chat/_components/`·`app/chat/_lib/`·`app/api/chat/`은 그대로 둔다
@@ -225,6 +260,25 @@ D 쪽 기능 구현은 끝났고, 외부 대기 항목도 없다. AWS 계정·`B
 - `aria-pressed={post.likedByMe}`를 붙였다. 색만으로 눌린 상태를 표현하고 있어서 스크린 리더에는 "좋아요 12" 버튼이 토글인지 전달되지 않았다
 - **브라우저 실측은 못 했다.** preview 창에서 `/community`의 Suspense 경계가 하이드레이션되지 않아(`loading.tsx` fallback에서 멈춘다) 클릭을 넣을 수 없었다. 서버 렌더 자체는 정상임을 curl로 확인했다(200 · 0.553s · 39241B, 본문에 글 제목과 "좋아요" 5개 포함). 타입 체크·빌드·`check:community`·e2e 75/75는 통과. 화면에서 한 번 눌러보는 확인은 남아 있다
 - 미션 완료 쪽과 같은 판단이고 근거는 `docs/dev/perf.md` "고친 것 5번째"에 함께 정리했다. 다만 이쪽은 순수 함수로 빼지 않았다 — 되돌릴 상태가 `{ likedByMe, likeCount }` 두 값뿐이라 `before` 스냅샷 한 줄로 끝난다(미션 쪽은 카운터 4개와 단계 배열이 얽혀 `lib/missions/optimistic.ts` + `check:optimistic`이 필요했다)
+
+### 오프라인 모임 (2026-08-24)
+
+- **정원 검사는 `joinCount`를 증가시킨 뒤에 한다.** 먼저 읽고 비교하면 동시 신청 두 건이 같은 값을 읽어 둘 다 통과하고 정원을 넘긴다. 증가 후 `joinCount > capacity`면 throw해서 신청 행과 카운터를 함께 롤백한다
+- **인터랙티브 트랜잭션 안에서는 `return fail()`이 롤백을 못 시킨다.** `code`·`message`를 실은 `MeetupJoinError`를 throw하고 바깥 `catch`에서 `fail()`로 바꾼다. 트랜잭션 안에서 판정한 실패를 밖으로 내보내는 유일한 통로다
+- **취소 판정은 `updateMany`의 `count`로 한다.** 먼저 읽고 검사하면 동시 취소 두 건이 모두 통과해 `joinCount`가 두 번 깎인다. `canceledAt: null`인 행만 갱신하므로 두 번째는 `count`가 0이고, 감소는 `where`에 `joinCount: { gt: 0 }`을 둬서 음수로 내려가지 않게 막는다
+- **일시는 KST로 고정한다.** 고정하지 않으면 서버(Amplify=UTC)와 브라우저(KST)가 서로 다른 문자열을 만들어 하이드레이션이 어긋난다. 표기할 일시는 항상 한국 기준이라 고정해도 문제가 없다. 반대로 개설 모달의 `datetime-local` 값은 시간대가 없는 `"2026-08-30T19:00"` 형태라 **그대로 보내면 서버가 UTC로 읽어 9시간 밀린다** — `new Date(값).toISOString()`으로 바꿔 보낸다
+- **같은 날 판정은 UTC 자정으로 자르면 안 된다.** KST는 UTC+9라 한국 시간 8월 30일 오전 3시가 UTC로는 8월 29일 18시다. UTC 날짜로 자르면 한국 시간 오전 0~9시 모임이 전부 전날로 밀려 같은 날 판정이 어긋난다. `_lib/kst.ts`가 +9시간을 더해 KST 벽시계를 UTC 필드에 담은 뒤 날짜를 취하고 다시 -9시간 해서 실제 UTC 경계를 만든다
+- **`isPast` 판정용 `nowMs`는 페이지에서 한 번 찍어 내려보낸다.** 렌더 중에 `Date.now()`를 부르면 하이드레이션이 어긋나고, `react-hooks`의 `Cannot call impure function during render`가 **lint 에러**로 잡힌다. 서버가 한 번 찍은 값을 `MeetupList` → `MeetupCard`로 내려 조회와 화면이 같은 기준을 쓰게 한다
+- **취소 사유는 어떤 경우에도 필수가 아니다.** 취소를 어렵게 만들면 취소 자체를 회피하고 말없이 안 나타나는 쪽으로 흐른다. 그래서 "취소하기"는 아무것도 고르지 않아도 눌리고(`disabled`로 막지 않는다), 사유를 남기지 않는 "말하지 않고 취소"가 따로 있다. `MeetupCard`의 `CANCEL_REASONS` 위에 같은 내용을 적어 뒀다
+- **`NEUTRAL_COLOR`는 "종족색 없음"을 뜻하는 부재 표시라 주 CTA 배경으로 쓰지 않는다.** 모든 모임이 `ALL`이 되면서 `galleryColor`가 항상 `#9CA3AF`로 풀려 신청 버튼이 비활성처럼 보였다. 신청 계열 버튼은 `MEETUP_ACCENT`(`#0F766E`)를 쓴다. 값은 `lib/types.ts`·`app/globals.css`가 아니라 `MeetupCard.tsx`에 둔다 — 둘 다 공유 파일이고(`CLAUDE.md` 1절) 화면 하나 때문에 공유 색 토큰을 늘릴 이유가 없다. `WriteModal`이 `NEUTRAL_COLOR`를 자기 파일에 둔 것과 같은 방식
+- **`notifiedCancelAt`은 이름을 바꾸지 않고 의미만 넓혔다.** 결성 알림을 붙이면서 "이 신청 건의 상태 변경 알림을 보여준 시각"이 됐다. 이름을 고치면 마이그레이션이 또 나가 5인이 전부 받아야 하므로 `_lib/notice.ts` 주석과 `SPEC.md` 11절에 의미만 적었다
+
+## 알려진 한계 (2026-08-24)
+
+- **같은 날 중복 신청 검사가 트랜잭션 밖 `findFirst`다.** 같은 날 두 모임에 거의 동시에 신청하면 둘 다 통과할 수 있다. 날짜 기반 유니크 제약을 걸 수 없어 DB로는 막지 못한다. 사람이 실수로 낼 수 있는 상황이 아니라 그대로 둔다
+- **모임 상세 페이지가 없다.** 결성된 모임은 "내가 신청한 모임" 구역에서만 볼 수 있다. 알림 배너의 링크도 그 구역으로 보낸다
+- **정기 모임 자동 갱신, 사용자 건의함, 참석 시 친밀도 지급은 구현하지 않았다.** 앞의 둘은 `SPEC.md` 12절에 제외로 남아 있고, 참석 지급은 참석을 확인할 수단이 없다
+- **`prisma/schema.prisma` 변경 7줄(`notifiedCancelAt`·`cancelReason`)이 `c96cc72`(UI 커밋)에 섞여 들어갔고 마이그레이션은 `73f7cf3`에 따로 있다.** 되돌릴 일이 생기면 두 커밋을 함께 되돌린다. 첫 마이그레이션 쪽은 `35d8f51`에 스키마와 함께 들어가 있어 문제없다
 
 ## 막힌 것
 - 없음 (로컬 DB가 `prisma migrate`로 관리되지 않고 있던 것을 발견해 베이스라인 마이그레이션(`prisma/migrations/00000000000000_init`)을 만들어 해결. 기존 시드 데이터(미션 41개, 펫스킨 6개)는 유지됨. 스키마 담당과 공유 필요)
