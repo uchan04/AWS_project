@@ -1,4 +1,5 @@
 import { randomUUID } from "node:crypto"
+import { cache } from "react"
 import type { PetSkin, User } from "@prisma/client"
 import { cookies } from "next/headers"
 import { CognitoJwtVerifier } from "aws-jwt-verify"
@@ -50,8 +51,28 @@ function getVerifier() {
   return verifier
 }
 
+// 아래 두 함수를 React cache()로 감싼다(A, 2026-08-22). 요청 1건 안에서 몇 번을 불러도
+// DB 쿼리는 한 번이다.
+//
+// 왜 필요한가: 루트 레이아웃이 사이드바를 그리려고 getSidebarProfile()을 부르고
+// (→ getCurrentUserWithSkin), 같은 요청에서 페이지가 또 한 번 사용자를 읽는다.
+// Amplify와 RDS가 us-east-1이고 한국에서 왕복 1회가 178ms라(docs/dev/diagnosis.md 실측)
+// 중복 쿼리가 그대로 체감 지연이 된다.
+//
+// 실측(2026-08-22, 두 함수에 임시 console.log를 넣고 로컬에서 문서 요청 1건씩):
+//   /pet  쿼리 8회 → 2회
+//   /     쿼리 4회 → 2회
+// 남는 2회는 세션 쿠키로 사용자를 읽는 것과 활성 스킨을 붙여 다시 읽는 것이다.
+//
+// 안전한 이유: 요청 1건 안에서 사용자를 고친 뒤 다시 읽는 핸들러가 없다 —
+// 전부 처음에 한 번 읽어 그 객체를 넘긴다(2026-08-22 전수 확인).
+// 새 핸들러를 쓸 때 "고친 뒤 다시 읽어 응답을 만드는" 코드를 넣으면 낡은 값을 보게 된다.
+// 그때는 다시 읽지 말고 update의 반환값을 쓴다.
+// cache()는 throw도 기억한다. 그래서 로그인 라우트는 getCurrentUser()를 부르지 않는다 —
+// 쿠키를 심기 전에 한 번 부르면 그 요청 내내 미인증으로 남는다.
+
 /** 미인증이면 UnauthorizedError를 throw한다. 호출부는 401로 변환한다. */
-export async function getCurrentUser(): Promise<User> {
+export const getCurrentUser = cache(async function getCurrentUser(): Promise<User> {
   if (process.env.DEV_AUTH_BYPASS === "true") {
     return prisma.user.upsert({
       where: { cognitoSub: DEV_COGNITO_SUB },
@@ -74,18 +95,32 @@ export async function getCurrentUser(): Promise<User> {
     return user
   }
 
+  // 2026-08-22 이전에 발급된 Cognito 쿠키를 위한 경로. 새 로그인은 위의 세션 쿠키만 심는다.
+  // 이 쿠키는 1시간이면 만료되므로 남아 있는 것도 곧 사라진다.
   const token = jar.get("access_token")?.value ?? null
   if (!token) throw new UnauthorizedError()
 
-  // try 밖에서 만든다. 설정 오류는 401이 아니라 500으로 터져야 원인이 보인다
+  const user = await userFromCognitoToken(token)
+  if (!user) throw new UnauthorizedError()
+  return user
+})
+
+/**
+ * Cognito 액세스 토큰 → 우리 계정. 없으면 만든다. 토큰이 유효하지 않으면 null.
+ *
+ * getVerifier()를 try 밖에서 부른다(E, 2026-08-24). 안에 두면 환경변수 누락으로 인한
+ * throw가 토큰 만료와 똑같이 null → 401로 뭉개져, "로그인은 되는데 모든 API가 401"만
+ * 보이고 원인을 못 찾는다. 설정 오류는 500으로 터져야 CloudWatch에 원인이 남는다.
+ */
+async function userFromCognitoToken(accessToken: string): Promise<User | null> {
   const jwt = getVerifier()
 
   let sub: string
   try {
-    sub = (await jwt.verify(token)).sub
+    // 여기서 throw하는 건 토큰이 만료·위조·다른 풀 발급인 경우뿐이다
+    sub = (await jwt.verify(accessToken)).sub
   } catch {
-    // 여기 도달하는 건 토큰이 만료·위조·다른 풀 발급인 경우뿐이다
-    throw new UnauthorizedError()
+    return null
   }
 
   return prisma.user.upsert({
@@ -96,28 +131,47 @@ export async function getCurrentUser(): Promise<User> {
 }
 
 /**
- * 재화를 지급하는 API는 이 버전을 쓴다.
- * calculateReward()에 넘길 활성 스킨을 같이 가져오기 위한 것이다.
+ * Cognito로 인증한 직후(이메일 로그인 폴백·Google 콜백) 세션을 심는다. 실패하면 null.
+ *
+ * Cognito 액세스 토큰을 쿠키에 그대로 담지 않는다(A, 2026-08-22). 그 토큰은 1시간이면
+ * 만료되고 refresh 흐름이 없어서 Google로 들어온 사용자만 한 시간 뒤 조용히 로그아웃됐다.
+ * 여기서 자체 세션 쿠키(7일)로 바꿔 자체 계정과 수명을 맞춘다.
  */
-export async function getCurrentUserWithSkin(): Promise<User & { activePetSkin: PetSkin | null }> {
-  const user = await getCurrentUser()
-  const full = await prisma.user.findUniqueOrThrow({
-    where: { id: user.id },
-    include: { activePetSkin: true },
-  })
-  return full
+export async function signInWithCognitoToken(accessToken: string): Promise<User | null> {
+  const user = await userFromCognitoToken(accessToken)
+  if (!user) return null
+  await setLocalSessionCookie(user.id)
+  return user
 }
 
-/** app/api/auth/* 가 로그인 성공 후 이 쿠키를 심는다. 이메일·Google 로그인 모두 동일하게 쓴다. */
-export async function setSessionCookie(accessToken: string, expiresInSeconds: number) {
-  ;(await cookies()).set("access_token", accessToken, {
-    httpOnly: true,
-    secure: process.env.NODE_ENV === "production",
-    sameSite: "lax",
-    path: "/",
-    maxAge: expiresInSeconds,
-  })
-}
+/**
+ * 재화를 지급하는 API는 이 버전을 쓴다.
+ * calculateReward()에 넘길 활성 스킨을 같이 가져오기 위한 것이다.
+ *
+ * 유저 행을 다시 읽지 않는다(2026-08-23, 실측 근거 아래). 전에는 getCurrentUser()가 읽어 온
+ * 같은 행을 include와 함께 한 번 더 읽었다. Prisma는 to-one 관계도 기본적으로 쿼리를 따로
+ * 내므로 그 한 줄이 왕복 2회였고, 합쳐서 3회가 됐다.
+ *
+ * activePetSkinId는 User의 컬럼이라(prisma/schema.prisma:113) 이미 손에 있다. 스킨만
+ * 따로 읽으면 왕복 1회로 끝나고, 진단 전 유저(스킨 없음)는 0회다.
+ *
+ * 실측(prod 빌드, RDS us-east-1, 왕복 1회 = 180ms):
+ *   이전  findUnique → findUnique(include)   536ms (3왕복)
+ *   이후  findUnique → petSkin.findUnique    357ms (2왕복)
+ * 루트 레이아웃이 사이드바를 그리려고 매 페이지에서 이걸 부르므로(lib/profile.ts)
+ * 모든 화면의 TTFB에서 180ms가 빠진다.
+ *
+ * 반환 형태는 include 버전과 같다. 스킨 id가 지워진 행을 가리키면 include도 null을 줬다.
+ */
+export const getCurrentUserWithSkin = cache(async function getCurrentUserWithSkin(): Promise<
+  User & { activePetSkin: PetSkin | null }
+> {
+  const user = await getCurrentUser()
+  if (!user.activePetSkinId) return { ...user, activePetSkin: null }
+
+  const activePetSkin = await prisma.petSkin.findUnique({ where: { id: user.activePetSkinId } })
+  return { ...user, activePetSkin }
+})
 
 /**
  * 자체 계정 로그인이 심는 쿠키. Cognito 토큰이 아니라 서명된 userId라 검증에 네트워크가 없다.

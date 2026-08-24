@@ -8,7 +8,9 @@
 
 /** 지표 14개. 전부 boolean. 판정 함수는 이것만 본다. */
 export type Indicator =
-  | "ALONE" //             ① 1인 가구
+  // 원 지표는 "1인 가구"지만 Q1은 가족과 살지 않는 선택지 세 개(혼자·룸메이트·그 외)를
+  // 모두 켠다. 가족 동거만 아니면 고립 위험을 같게 본다는 판단이다(docs/dev/diagnosis.md 5장)
+  | "ALONE" //             ① 가족과 살지 않음
   | "HOUSING_UNSTABLE" //  ② 주거 불안정
   | "MENTAL_UNMET" //      ③ 정신건강 진료 미충족
   | "PHYSICAL_UNMET" //    ④ 신체건강 진료 미충족

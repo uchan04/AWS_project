@@ -288,7 +288,9 @@ DATABASE_URL="postgresql://postgres:본인이정한비밀번호@localhost:5432/w
 
 `DEV_AUTH_BYPASS`는 `.env.example`에 이미 `"true"`로 들어 있다. **그대로 둔다.** 이 값이 `true`여야 `lib/auth.ts`가 Cognito 검증을 건너뛰고 고정 개발 계정을 반환해서, AWS 자격증명 없이 모든 API를 호출할 수 있다.
 
-`COGNITO_*` `BEDROCK_*` `S3_BUCKET` `CLOUDFRONT_DOMAIN`은 **빈 값으로 둔다.** 실제 값이 필요해지면(사진 업로드·챗봇 작업 시) E에게 개별로 받는다. 절차는 `docs/dev/infra.md`.
+`COGNITO_*` `BEDROCK_*` `S3_BUCKET`은 **빈 값으로 둔다.** 실제 값이 필요해지면(사진 업로드·챗봇 작업 시) E에게 개별로 받는다. 절차는 `docs/dev/infra.md`.
+
+`CLOUDFRONT_DOMAIN`은 **아무 코드도 읽지 않는다**(2026-08-22). 펫·치장 그림 30장은 `public/art/` 아래에 구워져 있고 `lib/assets.ts`가 거기서 읽는다. 키를 지우지는 않았다 — `amplify.yml`이 아직 목록에 갖고 있다.
 
 > **주의 — `.env`를 커밋하지 않는다**
 >

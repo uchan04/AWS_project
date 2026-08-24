@@ -2,30 +2,36 @@
 
 import { useState, useRef, useEffect, useCallback } from "react"
 import styles from "./mission-ui.module.css"
-import type { DashboardDTO, MissionDTO } from "@/lib/missions/dashboard"
 import { AttendanceCalendar } from "./AttendanceCalendar"
+import { useModalA11y } from "@/app/components/useModalA11y"
+import type { TypeCode } from "@prisma/client"
+import type { DashboardDTO, MissionDTO } from "@/lib/missions/dashboard"
+import { applyCompletion } from "@/lib/missions/optimistic"
+import { TRIBE } from "@/lib/types"
 
-// ─── 미션 화면 전용 색상 (Figma 원본) ──────────────────────────────────────
-
-const CHARACTER_COLOR = {
-  fox: "#E8956A",
-  cat: "#6A95C8",
-  bear: "#7AAE82",
+// ─── 미션 화면 전용 색상 ────────────────────────────────────────────────────
+//
+// 2026-08-23: 종족색·이모지를 여기서 다시 선언하지 않는다. 정본은 lib/types.ts의
+// TRIBE 하나다 — 그 파일이 "색은 여기 한 곳에만 있다. 톤을 바꾸기로 하면 colorHex
+// 3개만 교체한다"고 적어 두었는데, 이 파일이 그 3개를 복사해 갖고 있어서 톤을
+// 바꾸면 미션 화면만 옛 색으로 남았다. `app/pet/rest/page.tsx`에서 develop 판의
+// 같은 패턴(CHARACTER_COLOR/BG/EMOJI 맵 3개 + typeCode.includes 분기)을 이미
+// 같은 이유로 거절해 두고 이쪽만 남아 있었다.
+//
+// 연한 배경색만 여기 남는다. TRIBE에 대응 값이 없고 미션 화면만 쓴다.
+const TRIBE_BG: Record<TypeCode, string> = {
+  HEALTH_EMOTION: "#FAE8D8",
+  INDEPENDENT_LOW_INCOME: "#D8E8FA",
+  FAMILY_LIVING: "#D8F0DC",
 }
 
-const CHARACTER_BG = {
-  fox: "#FAE8D8",
-  cat: "#D8E8FA",
-  bear: "#D8F0DC",
-}
+// 진단 전(typeCode = null)에 쓸 기본 종족. 고양이가 기존 동작이었다
+const DEFAULT_TRIBE: TypeCode = "INDEPENDENT_LOW_INCOME"
 
-const CHARACTER_EMOJI = {
-  fox: "🦊",
-  cat: "🐱",
-  bear: "🐻",
-}
-
-type CharacterKey = keyof typeof CHARACTER_COLOR
+// 서버 기준과 같아야 한다 (lib/missions/upload.ts ALLOWED_TYPES·MAX_SIZE).
+// 여기서 먼저 걸러야 3MB를 다 올린 뒤에 거절당하는 일이 없다
+const PHOTO_TYPES = ["image/jpeg", "image/png"]
+const PHOTO_MAX_BYTES = 3 * 1024 * 1024
 
 // ─── 애니메이션 매핑 (CSS Module class) ───────────────────────────────────
 
@@ -40,6 +46,19 @@ const ANIM_CLASS: Record<string, string> = {
   music: styles.mascotMusic,
   photo: styles.mascotPhoto,
   default: styles.mascotFloat,
+}
+
+const ANIM_CAPTION: Record<string, string> = {
+  walk: "함께 걷고 있어요 🚶",
+  stretch: "기지개를 켜고 있어요 🤸",
+  drink: "홀짝홀짝 마시고 있어요 ☕",
+  eat: "맛있게 먹고 있어요 😋",
+  rest: "포근하게 쉬고 있어요 😴",
+  look: "두리번두리번 둘러보고 있어요 🌤️",
+  write: "열심히 적고 있어요 ✏️",
+  music: "신나게 음악을 즐기고 있어요 🎵",
+  photo: "찰칵! 찍고 있어요 📸",
+  default: "응원하고 있어요 💚",
 }
 
 function getMissionAnimType(mission: { title: string }): string {
@@ -105,20 +124,38 @@ interface MissionModalProps {
   color: string
   bg: string
   mascotEmoji: string
-  /** 내 펫 이미지. null이면 이모지로 떨어진다 */
+  /** 종족 이모지 대신 띄울 내 펫 그림. 없거나 안 뜨면 이모지로 떨어진다 */
   petImageUrl: string | null
   onClose: () => void
+  /** 사진 미션 완료 후 재조회. 사진 판정은 결과를 미리 알 수 없어 낙관적으로 처리할 수 없다 */
   onComplete: () => void
+  /**
+   * 버튼 미션 완료. 여기서 fetch하지 않고 부모에 넘긴다 —
+   * 낙관적 갱신은 모달을 즉시 닫으므로, 요청이 이 컴포넌트보다 오래 살아야 한다
+   */
+  onButtonComplete: (mission: MissionDTO) => void
 }
 
-function MissionModal({ mission, color, bg, mascotEmoji, petImageUrl, onClose, onComplete }: MissionModalProps) {
+function MissionModal({
+  mission,
+  color,
+  bg,
+  mascotEmoji,
+  petImageUrl,
+  onClose,
+  onComplete,
+  onButtonComplete,
+}: MissionModalProps) {
+  // Escape로 닫기 · 초점 가두기 · 닫을 때 초점 되돌리기 (app/components/useModalA11y.ts)
+  const boxRef = useModalA11y(onClose)
+  const [petImageFailed, setPetImageFailed] = useState(false)
   const [proofMode, setProofMode] = useState(false)
   const [proofImage, setProofImage] = useState<string | null>(null)
   const [uploadedFile, setUploadedFile] = useState<File | null>(null)
-  const [petImageFailed, setPetImageFailed] = useState(false)
   const fileRef = useRef<HTMLInputElement>(null)
 
   const animType = getMissionAnimType(mission)
+  const caption = ANIM_CAPTION[animType] ?? ANIM_CAPTION.default
   const emoji = getEmojiForMission(mission.title)
 
   function handleFile(e: React.ChangeEvent<HTMLInputElement>) {
@@ -142,15 +179,37 @@ function MissionModal({ mission, color, bg, mascotEmoji, petImageUrl, onClose, o
         return
       }
 
+      // 서버(lib/missions/upload.ts)와 같은 기준으로 먼저 걸러 왕복을 아낀다
+      if (!PHOTO_TYPES.includes(uploadedFile.type)) {
+        setCompleteError("JPG 또는 PNG 사진만 올릴 수 있어요")
+        return
+      }
+      if (uploadedFile.size > PHOTO_MAX_BYTES) {
+        setCompleteError("사진 크기는 3MB 이하여야 해요")
+        return
+      }
+
       setCompleting(true)
       setCompleteError(null)
 
       try {
-        // 1. presigned URL 받기
-        const presignRes = await fetch("/api/missions/upload/presigned", {
+        // 1. presigned URL 받기.
+        //
+        // 2026-08-22: /api/missions/upload/* 대신 /api/upload/* 를 쓴다. 같은 일을 하는
+        //   라우트가 두 벌 있었고 쓰던 쪽이 방어가 없었다 —
+        //   fileKey 소유권 검사 없음(남의 사진 key로 내 미션을 통과시킬 수 있었다),
+        //   용량·형식 검사 없음, 시스템 프롬프트 없음, passed 타입 검증 없음
+        //   (모델이 문자열을 주면 truthy로 통과), 친밀도 일일 상한 우회.
+        //   /api/upload/* 는 lib/missions/upload.ts + vision.ts + completion.ts 를 거쳐
+        //   그 다섯 가지를 다 막는다. 단계 잠금 확인도 여기에만 있다
+        const presignRes = await fetch("/api/upload/presign", {
           method: "POST",
           headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({ contentType: uploadedFile.type }),
+          body: JSON.stringify({
+            missionId: mission.id,
+            contentType: uploadedFile.type,
+            fileSize: uploadedFile.size,
+          }),
         })
         const presignJson = await presignRes.json()
 
@@ -159,7 +218,7 @@ function MissionModal({ mission, color, bg, mascotEmoji, petImageUrl, onClose, o
           return
         }
 
-        const { uploadUrl, fileKey } = presignJson.data
+        const { uploadUrl, s3Key } = presignJson.data
 
         // 2. S3에 직접 업로드
         const uploadRes = await fetch(uploadUrl, {
@@ -174,10 +233,10 @@ function MissionModal({ mission, color, bg, mascotEmoji, petImageUrl, onClose, o
         }
 
         // 3. Bedrock Vision 검증
-        const verifyRes = await fetch("/api/missions/upload/verify", {
+        const verifyRes = await fetch("/api/upload/verify", {
           method: "POST",
           headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({ missionId: mission.id, fileKey }),
+          body: JSON.stringify({ missionId: mission.id, s3Key }),
         })
         const verifyJson = await verifyRes.json()
 
@@ -191,7 +250,8 @@ function MissionModal({ mission, color, bg, mascotEmoji, petImageUrl, onClose, o
           return
         }
 
-        if (verifyJson.data.alreadyCompleted) {
+        // 통과했는데 새로 완료되지 않았으면 이미 받은 미션이다
+        if (!verifyJson.data.completed) {
           setCompleteError("이미 완료한 미션입니다")
           return
         }
@@ -207,26 +267,9 @@ function MissionModal({ mission, color, bg, mascotEmoji, petImageUrl, onClose, o
       return
     }
 
-    setCompleting(true)
-    setCompleteError(null)
-
-    try {
-      const res = await fetch(`/api/missions/${mission.id}/complete`, { method: "POST" })
-      const json = await res.json()
-
-      if (!res.ok) {
-        setCompleteError(json.error?.message || "완료 중 오류가 발생했습니다")
-        return
-      }
-
-      onComplete()
-      onClose()
-      window.dispatchEvent(new CustomEvent("user-stats-changed"))
-    } catch {
-      setCompleteError("네트워크 오류가 발생했습니다")
-    } finally {
-      setCompleting(false)
-    }
+    // 버튼 미션은 여기서 기다리지 않는다. 부모가 체크를 먼저 그리고 요청을 뒤로 보낸다
+    // (요청 자체는 왕복 7회 1253ms — scripts/perf-write-path.ts)
+    onButtonComplete(mission)
   }
 
   return (
@@ -243,6 +286,12 @@ function MissionModal({ mission, color, bg, mascotEmoji, petImageUrl, onClose, o
       onClick={onClose}
     >
       <div
+        ref={boxRef}
+        role="dialog"
+        aria-modal="true"
+        aria-labelledby="mission-modal-title"
+        aria-describedby="mission-modal-desc"
+        tabIndex={-1}
         onClick={(e) => e.stopPropagation()}
         className="screen-enter"
         style={{
@@ -259,7 +308,9 @@ function MissionModal({ mission, color, bg, mascotEmoji, petImageUrl, onClose, o
       >
         <div style={{ background: bg, padding: "36px 32px 32px", textAlign: "center", position: "relative" }}>
           <button
+            type="button"
             onClick={onClose}
+            aria-label="미션 창 닫기"
             style={{
               position: "absolute",
               top: 14,
@@ -275,44 +326,49 @@ function MissionModal({ mission, color, bg, mascotEmoji, petImageUrl, onClose, o
           >
             ×
           </button>
-          {/* 미션 아이콘 → 캐릭터 → 제목 → 설명. 애니메이션 칸과 아이콘 칸을 한 칸으로 합쳤다 */}
-          <div style={{ fontSize: 34, lineHeight: 1 }}>{emoji}</div>
-          {/* 캐릭터 칸. 미션별 자산을 그리는 대신 (내 펫 이미지) × (동작 CSS 애니메이션)으로
-              조합한다 — 미션이 늘어도 자산은 늘지 않는다. 이미지를 못 읽으면 이모지로 떨어진다 */}
+          {/* 2026-08-22: ANIM_CLASS가 정의만 돼 있고 어디에도 안 붙어 있었다.
+              mission-ui.module.css의 미션별 동작 애니메이션 10종이 전부 죽어 있었고
+              캡션("함께 걷고 있어요")만 떠서 문구와 화면이 어긋났다 */}
           <div
             className={ANIM_CLASS[animType] ?? ANIM_CLASS.default}
             style={{
-              fontSize: 176,
+              fontSize: 120,
               lineHeight: 1,
               display: "inline-block",
-              margin: "12px 0 16px",
             }}
           >
             {petImageUrl && !petImageFailed ? (
+              // CloudFront 원본을 그대로 쓴다. ArtImage(next/image)를 쓰지 않는 이유는
+              // 그 파일 주석 참고 — 설정에 없는 hostname이면 렌더 중에 throw한다
               // eslint-disable-next-line @next/next/no-img-element
               <img
                 src={petImageUrl}
                 alt="내 펫"
-                // 펫 PNG는 가로가 긴 비율이다. 높이를 이모지 칸과 같은 176px로 잡고
-                // contain으로 맞춰야 사이드바처럼 잘리지 않는다
-                style={{ height: 176, maxWidth: "100%", objectFit: "contain", display: "block" }}
+                style={{ height: 120, maxWidth: "100%", objectFit: "contain", display: "block" }}
                 onError={() => setPetImageFailed(true)}
               />
             ) : (
               mascotEmoji
             )}
           </div>
-          <h2
-            style={{
-              fontFamily: "'Gowun Dodum', sans-serif",
-              fontSize: 20,
-              color: "#2A1F14",
-              margin: "0 0 10px",
-            }}
-          >
-            {mission.title}
-          </h2>
-          <p style={{ color: "#7A6B58", fontSize: 13, lineHeight: 1.8, margin: 0 }}>{mission.description}</p>
+          <p style={{ margin: "12px 0 0", fontSize: 12, color: "#7A6B58", fontWeight: 500 }}>{caption}</p>
+          <div style={{ marginTop: 20, paddingTop: 20, borderTop: `1px solid ${color}33` }}>
+            <div style={{ fontSize: 28, marginBottom: 6 }}>{emoji}</div>
+            <h2
+              id="mission-modal-title"
+              style={{
+                fontFamily: "var(--font-display)",
+                fontSize: 20,
+                color: "#2A1F14",
+                margin: "0 0 10px",
+              }}
+            >
+              {mission.title}
+            </h2>
+            <p id="mission-modal-desc" style={{ color: "#7A6B58", fontSize: 13, lineHeight: 1.8, margin: 0 }}>
+              {mission.description}
+            </p>
+          </div>
         </div>
 
         <div style={{ padding: "24px 32px 32px", overflowY: "auto", flex: 1 }}>
@@ -409,10 +465,17 @@ function MissionModal({ mission, color, bg, mascotEmoji, petImageUrl, onClose, o
 
                   {proofMode && (
                     <div style={{ marginBottom: 12 }}>
-                      <input ref={fileRef} type="file" accept="image/jpeg,image/jpg,image/png,image/webp" style={{ display: "none" }} onChange={handleFile} />
+                      <input ref={fileRef} type="file" accept="image/jpeg,image/png" style={{ display: "none" }} onChange={handleFile} />
                       {proofImage ? (
                         <div style={{ position: "relative", borderRadius: 14, overflow: "hidden", aspectRatio: "16/9" }}>
-                          <img src={proofImage} alt="proof" style={{ width: "100%", height: "100%", objectFit: "cover" }} />
+                          {/* FileReader가 만든 data: URL이다. next/image는 data URL을 최적화하지
+                              못하고 unoptimized로 감싸면 <img>와 같아진다 */}
+                          {/* eslint-disable-next-line @next/next/no-img-element */}
+                          <img
+                            src={proofImage}
+                            alt="올린 인증 사진 미리보기"
+                            style={{ width: "100%", height: "100%", objectFit: "cover" }}
+                          />
                           <button
                             onClick={() => {
                               setProofImage(null)
@@ -458,8 +521,15 @@ function MissionModal({ mission, color, bg, mascotEmoji, petImageUrl, onClose, o
                 </>
               )}
 
+              {/* role="alert"이 있어야 스크린리더가 실패 이유를 읽는다.
+                  없으면 버튼만 다시 눌리고 왜 안 되는지 알 수 없다 */}
               {completeError && (
-                <p style={{ fontSize: 13, color: "#A9542A", marginBottom: 12, textAlign: "center" }}>{completeError}</p>
+                <p
+                  role="alert"
+                  style={{ fontSize: 13, color: "#A9542A", marginBottom: 12, textAlign: "center" }}
+                >
+                  {completeError}
+                </p>
               )}
 
               <button
@@ -478,60 +548,13 @@ function MissionModal({ mission, color, bg, mascotEmoji, petImageUrl, onClose, o
                   opacity: completing || (mission.requiresPhoto && !uploadedFile) ? 0.4 : 1,
                 }}
               >
-                {completing ? (mission.requiresPhoto ? "검증 중..." : "완료 중...") : "완료했어요 ✓"}
+                {/* completing은 사진 미션에서만 켜진다. 버튼 미션은 기다리지 않으므로 표시가 없다 */}
+                {completing ? "검증 중..." : "완료했어요 ✓"}
               </button>
             </>
           )}
         </div>
       </div>
-    </div>
-  )
-}
-
-// ─── Carousel arrows ────────────────────────────────────────────────────────
-// 일일 미션과 추가 미션이 같은 화살표를 쓴다. 넘기는 단위만 각자 다르다.
-
-function CarouselArrows({
-  color,
-  hasPrev,
-  hasNext,
-  onPrev,
-  onNext,
-  topOffset = 0,
-  children,
-}: {
-  color: string
-  hasPrev: boolean
-  hasNext: boolean
-  onPrev: () => void
-  onNext: () => void
-  /** 감싼 영역의 헤더가 더 높을 때 화살표를 카드 중심으로 되돌리는 보정값(px). */
-  topOffset?: number
-  children: React.ReactNode
-}) {
-  const arrowStyle = (enabled: boolean): React.CSSProperties => ({
-    position: "absolute",
-    top: topOffset === 0 ? "50%" : `calc(50% + ${topOffset}px)`,
-    transform: "translateY(0%) scaleX(0.7)",
-    background: "transparent",
-    color: enabled ? color : "#DDD0BC",
-    border: "none",
-    cursor: enabled ? "pointer" : "not-allowed",
-    fontSize: 32,
-    zIndex: 10,
-    padding: 0,
-    lineHeight: 1,
-  })
-
-  return (
-    <div style={{ position: "relative" }}>
-      <button onClick={onPrev} disabled={!hasPrev} style={{ ...arrowStyle(hasPrev), left: -32 }}>
-        ◀
-      </button>
-      <button onClick={onNext} disabled={!hasNext} style={{ ...arrowStyle(hasNext), right: -32 }}>
-        ▶
-      </button>
-      {children}
     </div>
   )
 }
@@ -546,6 +569,16 @@ interface StepSectionProps {
   bg: string
   mascotEmoji: string
   unlocked?: boolean
+  /**
+   * 제목 오른쪽 알약. **단계 섹션만 쓴다** — `2 / 3 완료`이거나 잠금 안내이고,
+   * 그 값은 화면 어디에도 다시 나오지 않는다.
+   *
+   * 일일 미션 섹션은 2026-08-23에 이 값을 넘기지 않게 바꿨다. 거기서 넘긴 것은
+   * `${dailyCompleted} / ${dailyTotal}`이었고 200px 위 `오늘 달성률` ProgressCard가
+   * **같은 문자열**을 이미 쓴다. 집중 카드의 `나머지 N개는 아래에 있어요`까지 합치면
+   * 한 화면에서 같은 사실이 세 번이었다. ProgressCard 쪽을 남긴 이유는 그것이
+   * `이번 주`·`연속 달성`과 3칸 한 세트라 하나만 빼면 격자가 어긋나기 때문이다.
+   */
   progress?: string
   onSelect: (m: MissionDTO) => void
 }
@@ -557,7 +590,7 @@ function StepSection({ title, subtitle, missions, color, bg, unlocked = true, pr
         <div>
           <h2
             style={{
-              fontFamily: "'Gowun Dodum', sans-serif",
+              fontFamily: "var(--font-display)",
               fontSize: 19,
               color: "#2A1F14",
               margin: 0,
@@ -614,7 +647,7 @@ function StepSection({ title, subtitle, missions, color, bg, unlocked = true, pr
               <div style={{ fontSize: 32, marginBottom: 8 }}>{locked ? "🔒" : emoji}</div>
               <p
                 style={{
-                  fontFamily: "'Gowun Dodum', sans-serif",
+                  fontFamily: "var(--font-display)",
                   fontSize: 13,
                   color: "#2A1F14",
                   margin: 0,
@@ -642,6 +675,79 @@ function StepSection({ title, subtitle, missions, color, bg, unlocked = true, pr
   )
 }
 
+// ─── Daily focus card ──────────────────────────────────────────────────────
+//
+// 오늘 남은 일일 미션 중 **하나만** 크게 띄운다. 원안(develop의 DailyFocusSection)에서
+// 바꾼 것:
+// - 아래 목록에서 이 미션을 **뺀다.** 원안은 focus를 크게 띄우면서 목록에도 그대로
+//   남겨 같은 미션이 화면에 두 번 나왔다
+// - 이모지를 `title.includes("휴식")`으로 고르지 않는다. 이 파일에 이미
+//   getEmojiForMission()이 있고, 제목 문자열에 기능을 걸면 문구를 다듬는 순간 깨진다
+// - `mission.code === "DAILY_REST"` 특수 분기를 넣지 않는다. 특정 미션 코드를 화면이
+//   알아야 하면 미션을 추가할 때마다 화면을 고쳐야 한다
+//
+// 왜 하나인가: 대상 이용자에게 할 일 5개를 한 번에 보여 주는 것은 목록이 아니라 압박이다.
+// 5개가 다 보이는 그리드는 아래에 그대로 두되(선택권을 없애지 않는다), 시선의 기본값을
+// 하나로 만든다. Finch·Streaks 같은 습관 앱이 같은 구조다.
+
+interface DailyFocusCardProps {
+  mission: MissionDTO
+  color: string
+  bg: string
+  remaining: number
+  onSelect: (m: MissionDTO) => void
+}
+
+function DailyFocusCard({ mission, color, bg, remaining, onSelect }: DailyFocusCardProps) {
+  return (
+    <button
+      onClick={() => onSelect(mission)}
+      className={styles.missionCard}
+      style={{
+        display: "block",
+        width: "100%",
+        textAlign: "left",
+        background: bg,
+        border: `2px solid ${color}`,
+        borderRadius: 20,
+        padding: "20px 22px",
+        marginBottom: 14,
+        cursor: "pointer",
+      }}
+    >
+      <span style={{ fontSize: 12, fontWeight: 700, color }}>오늘 이거 하나만</span>
+      <div style={{ display: "flex", alignItems: "center", gap: 14, marginTop: 10 }}>
+        <span style={{ fontSize: 40, lineHeight: 1 }} aria-hidden="true">
+          {getEmojiForMission(mission.title)}
+        </span>
+        <span style={{ minWidth: 0 }}>
+          <p
+            style={{
+              fontFamily: "var(--font-display)",
+              fontSize: 17,
+              color: "#2A1F14",
+              margin: 0,
+              lineHeight: 1.4,
+            }}
+          >
+            {mission.title}
+          </p>
+          <p style={{ fontSize: 12, color: "#7A6B58", margin: "6px 0 0", display: "flex", gap: 8 }}>
+            {mission.reward.seeds > 0 && <span>🌱 {mission.reward.seeds}</span>}
+            {mission.reward.affinity > 0 && <span>💖 {mission.reward.affinity}</span>}
+            {mission.reward.starShards > 0 && <span>⭐ {mission.reward.starShards}</span>}
+          </p>
+        </span>
+      </div>
+      {/* 남은 개수를 숨기지 않는다. 하나만 보여 주는 것과 나머지를 감추는 것은 다르다 —
+          감추면 "다 했나?" 확인하러 새로고침하게 된다 */}
+      <p style={{ fontSize: 11, color: "#7A6B58", margin: "12px 0 0" }}>
+        {remaining > 0 ? `나머지 ${remaining}개는 아래에 있어요` : "오늘 남은 건 이거 하나예요"}
+      </p>
+    </button>
+  )
+}
+
 // ─── Progress card ─────────────────────────────────────────────────────────
 
 interface ProgressCardProps {
@@ -665,7 +771,7 @@ function ProgressCard({ title, value, color, bg }: ProgressCardProps) {
       <p style={{ fontSize: 12, color: "#7A6B58", margin: "0 0 6px" }}>{title}</p>
       <p
         style={{
-          fontFamily: "'Gowun Dodum', sans-serif",
+          fontFamily: "var(--font-display)",
           fontSize: 22,
           color,
           fontWeight: 700,
@@ -680,69 +786,90 @@ function ProgressCard({ title, value, color, bg }: ProgressCardProps) {
 
 // ─── Main dashboard ────────────────────────────────────────────────────────
 
-// initial: page.tsx가 서버에서 읽어 넘긴 첫 화면 데이터.
-// 이게 있으면 마운트 시 fetch를 내지 않는다 — 서버가 이미 같은 값을 담아 보냈다.
-// 서버 조회가 실패했으면(진단 미완료 등) null로 오고, 그때만 클라이언트에서 읽어
-// 에러 문구를 화면에 띄운다.
-export default function MissionDashboard({ initial }: { initial: DashboardDTO | null }) {
+/**
+ * initial / initialError는 서버가 조립해 넘긴다(app/missions/page.tsx).
+ * 둘 중 하나가 있으면 마운트 시 fetch를 하지 않는다 — 첫 화면이 이미 HTML에 들어 있다.
+ * 둘 다 null인 경우는 남겨 둔다: 이 컴포넌트를 서버 데이터 없이 쓰는 곳이 생기면
+ * 예전처럼 스스로 불러온다.
+ */
+export default function MissionDashboard({
+  initial = null,
+  initialError = null,
+}: {
+  initial?: DashboardDTO | null
+  initialError?: string | null
+} = {}) {
   const [dashboard, setDashboard] = useState<DashboardDTO | null>(initial)
-  const [loading, setLoading] = useState(initial === null)
-  const [error, setError] = useState<string | null>(null)
+  const [loading, setLoading] = useState(!initial && !initialError)
+  const [error, setError] = useState<string | null>(initialError)
   const [selected, setSelected] = useState<MissionDTO | null>(null)
-  const [currentStageIndex, setCurrentStageIndex] = useState(0)
-  const [dailyIndex, setDailyIndex] = useState(0)
-
-  // 화면이 살아있는지. 언마운트 후 setState를 막는다
-  const aliveRef = useRef(true)
-  // 진행 중인 GET /api/missions. 같은 요청이 겹치면 새로 내지 않고 이걸 기다린다.
-  // GET /api/missions는 서버에서 DB 8쿼리를 병렬로 내는데, RDS가 us-east-1이라
-  // 한 번에 약 800ms다. 커넥션 풀이 9개뿐이라 같은 요청 2건이 겹치면 16쿼리가 서로를
-  // 기다려 응답이 배가 된다. 마운트 effect와 완료 후 재조회가 겹치는 실제 경로가 있고,
-  // dev의 React Strict Mode는 마운트 effect를 두 번 호출한다.
-  const inFlightRef = useRef<Promise<void> | null>(null)
+  // 캐러셀 위치. null이면 "지금 서 있는 단계"를 보여준다(아래 defaultIndex).
+  // 절대 인덱스를 state에 박아두면 미션을 완료해 창이 옮겨간 뒤 엉뚱한 단계를 가리킨다 —
+  // 그래서 새로 불러올 때마다 null로 되돌린다
+  const [stageIndexOverride, setStageIndexOverride] = useState<number | null>(null)
+  // 낙관적 완료가 실패해 되돌렸을 때 띄운다. 모달의 에러 칸을 쓸 수 없다 —
+  // 체크를 즉시 보여주려고 모달을 먼저 닫으므로 그 state가 함께 사라진다
+  const [actionError, setActionError] = useState<string | null>(null)
 
   const loadDashboard = useCallback(async () => {
-    if (inFlightRef.current) return inFlightRef.current
+    // 성공해도 error를 비우지 않으면 "다시 시도" 버튼이 아무 일도 하지 않는다.
+    // 에러 화면 분기가 dashboard 분기보다 위에 있어서, 새로 받아온 데이터가 가려진다
+    setError(null)
+    try {
+      const res = await fetch("/api/missions")
+      const json = await res.json()
+      if (!res.ok) {
+        setError(json.error?.message || "미션을 불러올 수 없습니다")
+        setLoading(false)
+        return
+      }
+      setDashboard(json.data)
+      setStageIndexOverride(null)
+      setLoading(false)
+    } catch {
+      setError("네트워크 오류가 발생했습니다")
+      setLoading(false)
+    }
+  }, [])
 
-    const run = (async () => {
+  useEffect(() => {
+    // 서버가 이미 넘겼으면 같은 것을 다시 부르지 않는다. 이 조건이 없으면 서버 렌더를
+    // 해 두고도 마운트 직후 왕복 1회를 그대로 낸다 — 임계 경로에서 빠지지 않는다
+    if (initial || initialError) return
+
+    let mounted = true
+    async function load() {
       try {
         const res = await fetch("/api/missions")
         const json = await res.json()
-        if (!aliveRef.current) return
+        if (!mounted) return
         if (!res.ok) {
           setError(json.error?.message || "미션을 불러올 수 없습니다")
           setLoading(false)
           return
         }
         setDashboard(json.data)
-        setError(null)
         setLoading(false)
       } catch {
-        if (!aliveRef.current) return
+        if (!mounted) return
         setError("네트워크 오류가 발생했습니다")
         setLoading(false)
-      } finally {
-        inFlightRef.current = null
       }
-    })()
-
-    inFlightRef.current = run
-    return run
-  }, [])
-
-  useEffect(() => {
-    aliveRef.current = true
-    // 서버가 이미 넘겨준 데이터가 있으면 같은 것을 다시 읽지 않는다
-    if (initial === null) void loadDashboard()
-    return () => {
-      aliveRef.current = false
     }
-  }, [loadDashboard, initial])
+    void load()
+    return () => {
+      mounted = false
+    }
+  }, [initial, initialError])
 
   if (loading) {
     return (
       <div style={{ textAlign: "center", padding: "80px 20px" }}>
-        <p style={{ fontSize: 15, color: "#7A6B58" }}>미션을 불러오는 중...</p>
+        {/* role="status"가 없으면 스크린리더에는 빈 화면이 뜬 것과 같다.
+            aria-live="polite"라서 읽던 문장을 끊지 않고 뒤에 붙여 읽는다 */}
+        <p role="status" aria-live="polite" style={{ fontSize: 15, color: "#7A6B58" }}>
+          미션을 불러오는 중...
+        </p>
       </div>
     )
   }
@@ -750,8 +877,12 @@ export default function MissionDashboard({ initial }: { initial: DashboardDTO | 
   if (error) {
     return (
       <div style={{ textAlign: "center", padding: "80px 20px" }}>
-        <p style={{ fontSize: 15, color: "#A9542A", marginBottom: 20 }}>{error}</p>
+        {/* 실패는 즉시 알려야 하므로 status가 아니라 alert다 */}
+        <p role="alert" style={{ fontSize: 15, color: "#A9542A", marginBottom: 20 }}>
+          {error}
+        </p>
         <button
+          type="button"
           onClick={loadDashboard}
           style={{
             background: "#4B7A5B",
@@ -771,22 +902,52 @@ export default function MissionDashboard({ initial }: { initial: DashboardDTO | 
 
   if (!dashboard) return null
 
-  // TODO: 사용자 캐릭터를 User.typeCode 기반으로 결정
-  // typeCode에서 종족 매핑
-  const typeCode = dashboard.userTypeCode
-  let character: CharacterKey = "cat"
-  if (typeCode) {
-    if (typeCode.includes("HEALTH_EMOTION")) character = "fox"
-    else if (typeCode.includes("INDEPENDENT_LOW_INCOME")) character = "cat"
-    else if (typeCode.includes("FAMILY_LIVING")) character = "bear"
-  }
-  const color = CHARACTER_COLOR[character]
-  const bg = CHARACTER_BG[character]
-  const mascotEmoji = CHARACTER_EMOJI[character]
+  // 종족은 TRIBE에서 바로 꺼낸다. 전에는 typeCode.includes()로 세 갈래를 세었는데
+  // TypeCode는 값이 정확히 3개인 enum이라(prisma/schema.prisma:14) 부분 일치가
+  // 필요 없었고, 유형이 늘면 그 분기는 조용히 기본값으로 떨어졌다
+  const typeCode = dashboard.userTypeCode ?? DEFAULT_TRIBE
+  const color = TRIBE[typeCode].colorHex
+  const bg = TRIBE_BG[typeCode]
+  const mascotEmoji = TRIBE[typeCode].emoji
 
   const handleComplete = () => {
     // 완료 후 dashboard 재조회
     loadDashboard()
+  }
+
+  /**
+   * 버튼 미션 완료 — 기다리지 않는다.
+   *
+   * 체크와 카운터를 먼저 그리고(applyCompletion) 요청을 보낸다. 실패하면 되돌리고 알린다.
+   * 왜: POST가 왕복 7회(1253ms) + 재조회 2회(370ms)라 그대로 기다리면 탭 한 번에 1.6초를
+   * 로딩 표시로 보낸다. RDS가 us-east-1이라 이 왕복은 코드로 더 줄일 몫이 거의 없다 —
+   * 트랜잭션의 BEGIN·COMMIT이 보상 지급의 원자성 그 자체다.
+   *
+   * 재화는 낙관적으로 올리지 않는다. calculateReward()가 스킨 배율을 서버에서 걸어서
+   * 클라이언트 추측이 틀릴 수 있다. 사이드바는 user-stats-changed로 응답 후에 맞춘다.
+   */
+  const handleButtonComplete = (mission: MissionDTO) => {
+    setActionError(null)
+    setSelected(null)
+    setDashboard((prev) => (prev ? applyCompletion(prev, mission.id, true) : prev))
+
+    void (async () => {
+      try {
+        const res = await fetch(`/api/missions/${mission.id}/complete`, { method: "POST" })
+        const json = await res.json()
+        if (!res.ok) {
+          setDashboard((prev) => (prev ? applyCompletion(prev, mission.id, false) : prev))
+          setActionError(json.error?.message || "완료 중 오류가 발생했습니다")
+          return
+        }
+        window.dispatchEvent(new CustomEvent("user-stats-changed"))
+        // 단계 해금·연속 달성처럼 서버만 아는 값을 맞춘다(applyCompletion은 일부러 건드리지 않는다)
+        void loadDashboard()
+      } catch {
+        setDashboard((prev) => (prev ? applyCompletion(prev, mission.id, false) : prev))
+        setActionError("네트워크 오류가 발생했습니다. 완료 표시를 되돌렸어요")
+      }
+    })()
   }
 
   return (
@@ -795,7 +956,7 @@ export default function MissionDashboard({ initial }: { initial: DashboardDTO | 
         <div style={{ fontSize: 64, marginBottom: 12 }}>{mascotEmoji}</div>
         <h1
           style={{
-            fontFamily: "'Gowun Dodum', sans-serif",
+            fontFamily: "var(--font-display)",
             fontSize: 26,
             color: "#2A1F14",
             margin: "0 0 8px",
@@ -805,6 +966,41 @@ export default function MissionDashboard({ initial }: { initial: DashboardDTO | 
         </h1>
         <p style={{ fontSize: 14, color: "#7A6B58", margin: 0 }}>작은 한 걸음씩, 함께 걸어가요</p>
       </header>
+
+      {/* 낙관적 완료를 되돌렸을 때만 뜬다. 화면이 이미 바뀐 뒤라 즉시 알려야 하므로 alert */}
+      {actionError && (
+        <div
+          role="alert"
+          style={{
+            background: "#FBEEE6",
+            border: "1px solid #E8C4AE",
+            borderRadius: 14,
+            padding: "12px 16px",
+            marginBottom: 20,
+            display: "flex",
+            alignItems: "center",
+            gap: 12,
+          }}
+        >
+          <span style={{ fontSize: 14, color: "#A9542A", flex: 1 }}>{actionError}</span>
+          <button
+            type="button"
+            onClick={() => setActionError(null)}
+            aria-label="알림 닫기"
+            style={{
+              background: "none",
+              border: "none",
+              fontSize: 18,
+              color: "#A9542A",
+              cursor: "pointer",
+              lineHeight: 1,
+              padding: 4,
+            }}
+          >
+            ✕
+          </button>
+        </div>
+      )}
 
       <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(140px, 1fr))", gap: 12, marginBottom: 24 }}>
         <ProgressCard
@@ -838,39 +1034,35 @@ export default function MissionDashboard({ initial }: { initial: DashboardDTO | 
       </div>
 
       {(() => {
-        // 일일 미션도 화살표로 넘긴다. 한 번에 PAGE개를 보이고 1칸씩 밀어
-        // 카드 크기를 추가 미션과 같게 유지한다(마지막 페이지가 1장만 남는 것을 막는다).
-        const PAGE = 4
-        const all = dashboard.dailyMissions
-        const maxStart = Math.max(0, all.length - PAGE)
-        const start = Math.min(dailyIndex, maxStart)
-        const shown = all.slice(start, start + PAGE)
+        // 아직 안 한 일일 미션 중 첫 번째를 오늘의 하나로 잡는다. 서버가 이미
+        // order로 정렬해 내려준다(lib/missions/dashboard.ts) — 여기서 다시 정렬하지 않는다.
+        const undone = dashboard.dailyMissions.filter((m) => !m.completed)
+        const focus = undone[0]
+        // focus는 아래 목록에서 뺀다. 같은 미션이 두 번 나오면 두 번째 것을 눌러도
+        // 같은 모달이 열려 사용자는 카드가 두 개인 이유를 찾게 된다
+        const rest = focus ? dashboard.dailyMissions.filter((m) => m.id !== focus.id) : dashboard.dailyMissions
 
         return (
-          <div style={{ marginBottom: 36 }}>
-            <CarouselArrows
-              color={color}
-              hasPrev={start > 0}
-              hasNext={start < maxStart}
-              onPrev={() => setDailyIndex((i) => Math.max(0, i - 1))}
-              onNext={() => setDailyIndex((i) => Math.min(maxStart, i + 1))}
-              // 추가 미션은 "추가 미션" 제목·설명이 CarouselArrows 밖에 있지만
-              // 일일 미션은 subtitle까지 안에 들어와 헤더가 그만큼 높다.
-              // 그 절반을 내려 화살표를 추가 미션과 같은 카드 중심에 맞춘다.
-              topOffset={9}
-            >
-              <StepSection
-                title="일일 미션"
-                subtitle="매일 새롭게 시작해요"
-                missions={shown}
+          <>
+            {focus ? (
+              <DailyFocusCard
+                mission={focus}
                 color={color}
                 bg={bg}
-                mascotEmoji={mascotEmoji}
-                progress={`${dashboard.progress.dailyCompleted} / ${dashboard.progress.dailyTotal}`}
+                remaining={undone.length - 1}
                 onSelect={setSelected}
               />
-            </CarouselArrows>
-          </div>
+            ) : null}
+            <StepSection
+              title="일일 미션"
+              subtitle={focus ? "나머지는 여기 있어요" : "오늘 다 했어요. 내일 또 만나요"}
+              missions={rest}
+              color={color}
+              bg={bg}
+              mascotEmoji={mascotEmoji}
+              onSelect={setSelected}
+            />
+          </>
         )
       })()}
 
@@ -879,6 +1071,17 @@ export default function MissionDashboard({ initial }: { initial: DashboardDTO | 
         const allMissions = dashboard.stageMissions
         if (allMissions.length === 0) return null
 
+        // 서버는 지금 단계 앞뒤 2칸만 보내준다(lib/missions/dashboard.ts STAGE_WINDOW).
+        // 기본으로 보여줄 칸은 "지금 서 있는 단계"다 — 100단계 캐러셀을 1단계부터 열면
+        // 37단계 사용자가 화살표를 36번 눌러야 한다
+        const defaultIndex = Math.max(
+          0,
+          allMissions.findIndex((sm) => sm.stage === dashboard.stages.current),
+        )
+        const currentStageIndex = Math.min(
+          allMissions.length - 1,
+          stageIndexOverride ?? defaultIndex,
+        )
         const currentMission = allMissions[currentStageIndex]
         const hasPrev = currentStageIndex > 0
         const hasNext = currentStageIndex < allMissions.length - 1
@@ -886,38 +1089,102 @@ export default function MissionDashboard({ initial }: { initial: DashboardDTO | 
         return (
           <div style={{ marginBottom: 36 }}>
             <div>
-              <h2
+              <div
                 style={{
-                  fontFamily: "'Gowun Dodum', sans-serif",
-                  fontSize: 19,
-                  color: "#2A1F14",
-                  margin: "0 0 4px",
+                  display: "flex",
+                  alignItems: "baseline",
+                  justifyContent: "space-between",
+                  gap: 8,
                 }}
               >
-                추가 미션
-              </h2>
+                <h2
+                  style={{
+                    fontFamily: "var(--font-display)",
+                    fontSize: 19,
+                    color: "#2A1F14",
+                    margin: "0 0 4px",
+                  }}
+                >
+                  단계 미션
+                </h2>
+                <span style={{ fontSize: 12, color: "#7A6B58" }}>
+                  {dashboard.stages.current} / {dashboard.stages.total} 단계
+                </span>
+              </div>
               <p style={{ fontSize: 12, color: "#7A6B58", margin: "0 0 14px" }}>
-                단계를 완료하면 새로운 미션이 열려요
+                {dashboard.stages.graduated
+                  ? "100단계를 모두 지났어요. 여기까지 온 것 자체가 결과예요."
+                  : "3개 중 2개를 하면 다음 단계가 열려요"}
               </p>
             </div>
-            <CarouselArrows
-              color={color}
-              hasPrev={hasPrev}
-              hasNext={hasNext}
-              onPrev={() => setCurrentStageIndex((i) => Math.max(0, i - 1))}
-              onNext={() => setCurrentStageIndex((i) => Math.min(allMissions.length - 1, i + 1))}
-            >
+            <div style={{ position: "relative" }}>
+              {/* 왼쪽 화살표. ◀만 두면 스크린리더가 문자 이름을 읽거나 아무것도 읽지 않는다 */}
+              <button
+                type="button"
+                aria-label="이전 단계 보기"
+                onClick={() => setStageIndexOverride(Math.max(0, currentStageIndex - 1))}
+                disabled={!hasPrev}
+                style={{
+                  position: "absolute",
+                  left: -32,
+                  top: "50%",
+                  transform: "translateY(0%) scaleX(0.7)",
+                  background: "transparent",
+                  color: hasPrev ? color : "#DDD0BC",
+                  border: "none",
+                  cursor: hasPrev ? "pointer" : "not-allowed",
+                  fontSize: 32,
+                  zIndex: 10,
+                  padding: 0,
+                  lineHeight: 1,
+                }}
+              >
+                ◀
+              </button>
+
+              {/* 오른쪽 화살표 */}
+              <button
+                type="button"
+                aria-label="다음 단계 보기"
+                onClick={() => {
+                  if (hasNext) {
+                    setStageIndexOverride(Math.min(allMissions.length - 1, currentStageIndex + 1))
+                  }
+                }}
+                disabled={!hasNext}
+                style={{
+                  position: "absolute",
+                  right: -32,
+                  top: "50%",
+                  transform: "translateY(0%) scaleX(0.7)",
+                  background: "transparent",
+                  color: hasNext ? color : "#DDD0BC",
+                  border: "none",
+                  cursor: hasNext ? "pointer" : "not-allowed",
+                  fontSize: 32,
+                  zIndex: 10,
+                  padding: 0,
+                  lineHeight: 1,
+                }}
+              >
+                ▶
+              </button>
+
               <StepSection
-                title={`단계 ${currentMission.stage}`}
+                title={`${currentMission.stage}단계 · ${currentMission.bandLabel}`}
                 missions={currentMission.missions}
                 color={color}
                 bg={bg}
                 mascotEmoji={mascotEmoji}
                 unlocked={currentMission.unlocked}
-                progress={currentMission.unlocked ? `${currentMission.completedCount} / 4 완료` : "🔒 이전 단계를 먼저 완료해 주세요"}
+                progress={
+                  currentMission.unlocked
+                    ? `${currentMission.completedCount} / ${currentMission.missions.length} 완료`
+                    : `🔒 앞 단계에서 ${currentMission.requiredForNextStage}개를 먼저 해주세요`
+                }
                 onSelect={setSelected}
               />
-            </CarouselArrows>
+            </div>
           </div>
         )
       })()}
@@ -931,6 +1198,7 @@ export default function MissionDashboard({ initial }: { initial: DashboardDTO | 
           petImageUrl={dashboard.petImageUrl}
           onClose={() => setSelected(null)}
           onComplete={handleComplete}
+          onButtonComplete={handleButtonComplete}
         />
       )}
     </div>

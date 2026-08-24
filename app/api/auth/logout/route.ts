@@ -1,7 +1,7 @@
 // 소유자: E. 로그아웃 — 세션 쿠키만 지운다.
 
 import { clearSessionCookie } from "@/lib/auth"
-import { appRedirect } from "@/lib/cognito"
+import { appRedirect } from "@/lib/oauth"
 
 export async function POST() {
   await clearSessionCookie()

@@ -9,6 +9,8 @@
 
 ## 현재 상태
 - 완료: 미션 41개, 지표 14개 정의, 12문항 + 형용사 문항, `classify()`·`classifySub()`, 무손실 조기 종료, 스냅샷 체크, 화면 3장(진단·결과·홈), 화면 3장 디자인 시스템 적용 + Figma 팔레트·폰트 반영(12장), 진단 API 3종 + 화면 연결, `draft.ts` 제거, 2차 마이그레이션 적용 후 실 DB로 전체 흐름 확인(14장), **스킨·치장 구조 변경을 스키마·실 DB·시드까지 적용(15장)**, 홈 미션 미리보기를 `GET /api/missions`로 교체(`bdcef94`), 결과 화면 판정 근거 3줄(`298ab56`)
+- 완료(2026-08-22): **전수 점검에서 찾은 오류·기능 6건 반영(21장)** — 재진단 잠금, 재진단 시 활성 펫 스킨 초기화 차단, 홈 미션 로딩·실패 구분, 홈 진행 카드, 결과 화면 문구 분기, Google 로그인 CSRF `state` + 세션 7일 통일
+- 완료(2026-08-22): **계정 관리와 시도 제한(22장)** — `lib/ratelimit.ts` 로그인·가입 레이트 리밋, `POST /api/auth/password` 비밀번호 변경, `POST /api/auth/withdraw` 회원 탈퇴, `/settings` 화면, `scripts/e2e-scenario.ts` E2E 시나리오 75건
 - 진행 중: 없음
 - 미착수: 없음. 근거 3줄의 **Bedrock 실호출 검증만 E의 IAM 키·`BEDROCK_MODEL_ID` 공유 대기**다
 - 컷: 관리자 교차표(`SPEC.md`에 없다), Bedrock 호출 2종(질문 문장 다듬기·자유 입력 enum 변환). 근거는 16장. 펫 이미지는 E가 S3에 올리는 중이다(17장)
@@ -16,11 +18,17 @@
 
 ## 구현한 파일
 - `lib/types.ts` — 종족·동물·색, 형용사 매핑, 기본 닉네임, 성장 곡선 상수
-- `prisma/seed/missions.ts` — 미션 41개. 일일 5 + 단계 36(유형 3 × 단계 3 × 4). 보상·사진 배치는 `stageMission()`이 강제한다
+- `prisma/seed/missions.ts` — 일일 미션 5개. 단계 미션은 2026-08-22에 `prisma/seed/curriculum.ts`(100단계 × 3슬롯)로 옮겼다. 이 문서 11장의 "단계 3개" 서술은 그때까지의 기록이다
+- `lib/ratelimit.ts` — IP당 고정 윈도 카운터. 인메모리다(새 의존성 금지). Lambda 인스턴스마다 따로 세므로 한도가 인스턴스 수만큼 늘어난다 — 파일 머리에 그렇게 적어 뒀다
+- `app/api/auth/password/route.ts` — 비밀번호 변경. 세션 쿠키만으로는 못 바꾸고 현재 비밀번호를 다시 받는다
+- `app/api/auth/withdraw/route.ts` — 회원 탈퇴. 하드 삭제 + 자식 9표 FK 순서 삭제
+- `app/settings/page.tsx`, `app/settings/SettingsForm.tsx` — 계정 설정 화면. 탈퇴는 2단 확인
+- `scripts/e2e-scenario.ts` — `npm run e2e`. 가입→진단→미션→펫→커뮤니티→챗봇→설정→탈퇴 75건
 - `lib/diagnosis/questions.ts` — 12문항 + 형용사 문항의 서버 원본. 선택지가 어떤 지표를 켜는지도 여기 있다
 - `lib/diagnosis/indicators.ts` — 답변 → 지표 14개. 대분류·세부유형이 전부 이 결과만 본다
 - `lib/diagnosis/classify.ts` — `classify()`(3대분류) + `classifySub()`(8세부유형). 순수 함수, LLM·DB 없음
 - `lib/diagnosis/adaptive.ts` — `possibleTypes()` / `canDecide()` / `nextQuestion()`. 무손실 조기 종료
+- `lib/diagnosis/flags.ts` — `REDIAGNOSIS_ENABLED`. 재진단 스위치 하나뿐이다. 클라이언트도 import하므로 서버 전용 모듈을 넣지 않는다(21장)
 - `scripts/check-diagnosis.ts` — `npm run check:diagnosis`
 - `app/diagnosis/page.tsx` — 진단 화면 한 장. 클라이언트 컴포넌트. 답변은 state에만 있고 문항마다 서버를 부르지 않는다. 진행 문구는 `canDecide()`로 갈린다(확정 전 "n번째 질문이에요", 확정 후 "거의 다 왔어요")
 - `app/api/diagnosis/complete/route.ts` — 답변을 받아 서버에서 판정하고 `User`·`DiagnosisSession`을 한 트랜잭션에 저장한다. 응답에 세부유형·지표를 넣지 않는다
@@ -68,7 +76,7 @@ DB가 아직 없다(`DATABASE_URL` 미공유). **DB가 필요 없는 것부터 �
 
 ## 2. 결정한 것과 이유
 
-- 판정은 100% 코드. LLM은 문장 다듬기와 자유 입력 enum 변환만 담당한다
+- 판정은 100% 코드. **LLM이 하는 일은 결과 화면의 근거 3줄 하나뿐이다** — 문장 다듬기·자유 입력 enum 변환은 컷됐다(16장)
 - **답변 → 지표 14개 → 판정** 순서로 한 단계를 끼웠다. 대분류와 세부유형이 같은 지표를 보므로 규칙을 고칠 때 한 곳만 고친다
 - **대분류(3)와 세부유형(8)은 각각 독립으로 판정하고 둘 다 저장한다.** 세부유형에서 대분류를 고정 매핑으로 뽑으면, 미취업빈곤형처럼 주거 상황에 따라 갈려야 하는 유형이 한 집단에 몰려 미션 배정이 틀린다. 관리자 화면은 "대분류 × 세부유형" 교차표로 보므로 8개가 3집단으로 쪼개진 모습은 그대로 보인다
 - **경계선지능청년은 8유형에서 제외했다.** IQ 71~84는 자기보고로 측정할 수 없고, 묻는 것 자체가 낙인이다
@@ -79,7 +87,7 @@ DB가 아직 없다(`DATABASE_URL` 미공유). **DB가 필요 없는 것부터 �
 - 화면은 선택지 버튼만으로 먼저 완성한다. Bedrock이 늦어져도 진단 플로우 전체가 동작해야 한다
 - **`GET /api/diagnosis/me`를 계약에 추가했다.** 원래 계약에는 완료 API와 닉네임 PATCH만 있었다. 결과 화면과 홈이 새로고침·직접 진입을 견뎌야 하는데, 판정 결과를 클라이언트에 다시 저장하면 `draft.ts`를 없앤 이유가 사라진다. 서버에 한 번 더 물어보는 쪽이 싸다
 - **재진단은 닉네임을 덮어쓰지 않는다.** 저장된 닉네임이 이전 판정의 기본 닉네임과 똑같을 때만 새 기본 닉네임으로 바꾼다. 유저가 직접 고친 이름은 유지되고, 종족이 바뀌었는데 "조용한 여우"가 남는 경우는 고쳐진다
-- **재진단은 레벨·경험치·재화·아이템·연속 기록을 건드리지 않는다.** 유형이 바뀌어도 키운 것은 남는다. 활성 펫 스킨만 새 유형의 기본 스킨으로 바꾼다
+- **재진단은 레벨·경험치·재화·아이템·연속 기록을 건드리지 않는다.** 유형이 바뀌어도 키운 것은 남는다. 활성 펫 스킨은 **종족이 바뀔 때만** 새 유형의 기본 스킨으로 옮긴다(2026-08-22 수정, 21-2절). 그전에는 무조건 덮어써서 별조각 2500 스킨의 착용이 풀렸다. **재진단 자체는 현재 잠금 상태다**(21-1절)
 - **완료 API는 기본 펫 스킨이 없어도 실패하지 않는다.** `npm run db:seed`가 C의 `items.ts` 때문에 아직 막혀 있어서, 시드 전에도 진단은 끝까지 되어야 한다
 - **하단 탭을 없애고 사이드바 하나만 쓴다** (2026-08-19, 사용자 결정). E가 "데스크톱은 사이드바 / 모바일은 하단 탭" 이원화를 제안했지만, 내비게이션이 두 벌이면 화면마다 어느 쪽이 뜨는지 확인해야 하고 활성 표시·경로도 두 곳에서 갈린다. 마감이 3일 남은 상태에서 감당할 비용이 아니다. 모바일에서는 같은 사이드바를 아이콘만 남긴 좁은 레일로 줄인다. 진단 문항 화면에서는 내비를 숨긴다(이탈 방지). 적용은 E, 적용되면 A가 `styles/tokens.css`의 `--nav-h`를 지우고 `min-height: 100dvh`로 되돌린다
 - **미션 데이터는 DB가 원본, `prisma/seed/missions.ts`는 그 DB를 채우는 시드다** (B와 합의, 2026-08-19). 화면에 41개 문구를 다시 복사하지 않는다. B는 `시드 → DB Mission → GET /api/missions → 화면`으로 가고, A의 홈 미션 미리보기도 그 API가 생기면 그쪽으로 바꾼다. 그때까지 홈이 `DAILY`를 직접 읽는 것은 임시다 — `prisma/seed/missions.ts:1`이 `import type`뿐이라 Prisma가 클라이언트 번들에 들어가지 않는 것은 빌드 산출물에서 확인했다(`.next/static/chunks`에 `PrismaClient` 없음, 미션 문구는 있음)
@@ -108,7 +116,7 @@ DB가 아직 없다(`DATABASE_URL` 미공유). **DB가 필요 없는 것부터 �
 
 | # | 코드 | 뜻 | 출처 문항 |
 |---|---|---|---|
-| ① | `ALONE` | 1인 가구 (가족과 동거하지 않음) | Q1 |
+| ① | `ALONE` | 가족과 동거하지 않음 (혼자·룸메이트·그 외 세 선택지가 모두 켠다) | Q1 |
 | ② | `HOUSING_UNSTABLE` | 주거 불안정 (월세·공과금 부담, 퇴거 위험) | Q2 |
 | ③ | `MENTAL_UNMET` | 정신건강 진료 미충족 | Q6 |
 | ④ | `PHYSICAL_UNMET` | 신체건강 진료 미충족 | Q6 |
@@ -1035,7 +1043,7 @@ B가 `feat/missions`를 `develop`에 머지해(`3adbea5`) 5인 중 4인이 통�
 
 **관리자 세부유형 교차표 — 만들지 않는다.** `SPEC.md`에 "세부유형"도 "교차표"도 없다(grep으로 확인). 결정 변경 2번의 팀 결정으로만 존재하고, `CLAUDE.md`는 SPEC에 없는 기능을 만들지 말라고 한다. `User.subTypeCode`와 `DiagnosisSession.indicators`에 데이터는 쌓이고 있으니 발표에서는 "8개 세부유형을 수집 중이며 화면은 범위 외"로 말할 수 있다.
 
-**펫 이미지 교체 — E가 올리는 중이다(2026-08-20).** `prisma/seed/items.ts`가 이름을 고정해 둔 18개 파일(`pets/fox-1` ~ `pets/bear-polar-3`)을 E가 성장 단계별로 분할·누끼 후 S3에 올리고 있다. `CLOUDFRONT_DOMAIN`이 채워지면 `app/api/pet/route.ts`가 URL을 만들어 내려준다. 홈과 결과 화면의 이모지 마스코트는 그때까지 자리를 잡는 용도다 — 17장 참고.
+~~**펫 이미지 교체 — E가 올리는 중이다(2026-08-20).**~~ **해소(2026-08-22, A).** CloudFront가 모든 경로에 403을 줘서 환경변수를 기다리는 길을 버렸다. 시트에서 잘라낸 30장(펫 6종 × 4단 = 24 + 배경 6)을 `public/art/` 아래에 굽고(`scripts/slice-art.ts`) `lib/assets.ts` 한 곳에서만 URL을 만든다. Amplify Hosting이 `public/`을 자기 CDN으로 내보내므로 CDN을 잃은 것도 아니다. **홈 마스코트도 이모지에서 실제 펫 그림으로 바꿨다**(`app/page.tsx` → `HomeDashboard`의 `petImage`). 이모지로 떨어지는 것은 스킨 미착용이거나 파일이 실제로 없을 때뿐이다.
 
 ---
 
@@ -1227,3 +1235,237 @@ git pull && npx prisma migrate deploy && npx prisma generate
 | `/login` `/signup` `/diagnosis` `/diagnosis/result` | 0개 | 0개 |
 
 `/diagnosis/result`의 **사이드바는 아직 뜬다**(`aside` 1개). `Sidebar.tsx:106`의 경로 조건은 B 몫으로 남겼다(차단 21).
+
+---
+
+## 20. 간헐 500의 원인 — RDS 커넥션 고갈 (2026-08-21, A)
+
+"로그인을 비롯한 기능이 랜덤하게 동작하거나 하지 않는다"를 실측으로 좁혔다. **원인은 하나가 아니라 시간대가 다른 네 개였고, 시각을 붙이지 않으면 서로 섞여 원인을 못 찾는다.**
+
+### 재현 시도 — 내 쪽에서는 전부 통과한다
+
+프로덕션(`https://main.d2ynoyp44lt46h.amplifyapp.com`, job 10 = `e3ca7d7`)에 실계정으로:
+
+| 테스트 | 결과 |
+|---|---|
+| `POST /api/auth/login` 순차 20회 | 20/20 200, 0.32~0.35s |
+| `POST /api/auth/login` 동시 25회 | 25/25 200 (최대 3.3s = 콜드 스타트) |
+| GET API 7종(`missions` `pet` `pet/cosmetics` `pet/skins` `diagnosis/me` `community/posts` `chat/messages`) × 10회 | 70/70 200 |
+| `GET /` 12회 헤더·본문 비교 | `cache-control: private, no-cache, no-store` + 전부 `X-Cache: Miss` + 본문 해시 동일 |
+
+**CloudFront가 개인화 SSR을 캐시한다는 가설은 여기서 죽었다.** 클라이언트 1대에서 나오는 부하로는 재현되지 않는다 — 재현 조건이 동시 접속자 수이기 때문이다.
+
+### 확정된 원인 — CloudWatch 로그 스트림 53개 전수 조사
+
+`logs:FilterLogEvents` 권한이 없어 `describe-log-streams` → 스트림별 `get-log-events` → 로컬 grep으로 훑었다(`welli-diagnose` 프로필).
+
+```
+Too many database connections opened:
+FATAL: remaining connection slots are reserved for roles with the SUPERUSER attribute
+```
+
+| 에러 | 건수 | 최초 | 최종 | 판정 |
+|---|---|---|---|---|
+| `Too many database connections` | **120** | 16:40:50 | 16:50:22 | **살아 있다** |
+| `Environment variable not found: DATABASE_URL` | 55 | 15:28:36 | 16:09:31 | 죽었다 — job 7(16:09:13)이 `.env.production`을 구웠다 |
+| `CredentialsProviderError` (Bedrock·S3) | 12 | 16:19:00 | 16:25:50 | 죽었다 — IAM 컴퓨트 역할 부착(job 9, 16:31) |
+| `temperature is deprecated` | 4 | 16:33:17 | 16:44:01 | 살아 있다 — `bd04830` 미배포 |
+| 비로그인 페이지 `로그인이 필요합니다` throw | 9 | 16:19:30 | 16:35:32 | 살아 있다 — C·D 담당 |
+
+`Too many`의 시작 16:40:**50**은 job 10 배포 완료 16:40:**52**와 사실상 같은 순간이다.
+
+### 왜 랜덤인가
+
+- DB는 `db.t4g.micro`(1 GiB) + `default.postgres16` → `max_connections ≈ 112`. `superuser_reserved_connections` 3을 빼면 앱 몫 **약 107개**
+- 오늘 Lambda 인스턴스 **53개**가 떴다(로그 스트림 1개 = 인스턴스 1개). 동시요청 25개 실측에서 4초 안에 6개가 동시 생존
+- Prisma 기본 `connection_limit`은 `물리 CPU × 2 + 1`이라 인스턴스당 5개 안팎. 인스턴스 20개면 100개 → 천장
+- **배포 직후가 최악이다.** 낡은 컨테이너의 커넥션이 회수되기 전에 새 컨테이너가 전부 콜드 스타트로 새 풀을 잡는다. 그래서 에러가 배포 시각에 몰리고 10분 뒤 저절로 멎는다(컨테이너 만료로 회수)
+
+동시 접속자·콜드 스타트 수에 따라 갈리므로 **같은 요청이 될 때도 있고 안 될 때도 있다.**
+
+### `lib/prisma.ts`는 고치지 않는다
+
+"프로덕션에서 `globalThis`에 캐시하지 않아 콜드 스타트마다 새 클라이언트가 생긴다"는 진단이 팀에서 나왔는데, **결론은 맞고 근거는 틀렸다.**
+
+- `export const prisma = new PrismaClient()`는 모듈 스코프라 컨테이너가 사는 동안 이미 재사용된다. warm 호출에서 새로 만들어지지 않는다
+- 콜드 스타트는 새 컨테이너라 `globalThis`도 같이 비어 있다 — 캐시해도 못 막는다
+- 그 조건은 파일 주석대로 **로컬 hot reload 전용**이다
+
+진짜 원인은 "동시 컨테이너 수 × 컨테이너당 `connection_limit` > 107"이다. `lib/prisma.ts`(E 소유)를 고쳐도 숫자가 안 바뀐다.
+
+### 고치는 방법
+
+`DATABASE_URL` 끝에 `?connection_limit=1`(이미 `?`가 있으면 `&connection_limit=1`)을 붙인다. 코드 변경 없음, Amplify 콘솔 환경변수만.
+
+**교착 위험을 먼저 확인했다.** 인터랙티브 `$transaction(async (tx) => ...)` 8곳(`diagnosis/complete` `pet/cosmetics` `pet/cosmetics/buy` `pet/feed` `pet/idle` `pet/skins/buy` `missions/attendance` `missions/completion`) 전부 콜백 안에서 `tx`만 쓰고 전역 `prisma`를 부르지 않는다. 배열형 `$transaction([...])`은 커넥션 1개다. Lambda는 컨테이너당 요청 1개이므로 1로 줄여도 교착하지 않는다. `Promise.all` 안의 병렬 쿼리 12곳은 직렬화되지만 쿼리당 20ms대라 무해하고, `pool_timeout` 기본 10s에 한참 못 미친다.
+
+인스턴스 53개 × 1 = 53개로 천장 107의 절반이다.
+
+**콘솔 값만 바꾸면 반영되지 않는다.** `amplify.yml`이 빌드 시점에 `env | grep`으로 `.env.production`을 굽기 때문에 **재배포가 필수다.** 이걸 빠뜨리면 "고쳤는데 그대로"가 된다.
+
+### 부하 재현은 하지 않았다
+
+동시 60~80 요청으로 재현할 수 있지만 마감 전날 팀 4인이 같은 공유 DB를 쓰고 있어 1분간 전원 500이 된다. Postgres FATAL 원문 120건으로 증거가 충분해 생략했다.
+
+---
+
+## 21. 전수 점검 후 수정 6건 (2026-08-22, A)
+
+`develop`을 받아 A 담당 코드를 전부 읽고 "기획 의도와 다른 곳"·"오류가 나는 곳"을 뽑은 뒤 그 목록을 그대로 고쳤다. 복귀점은 로컬 태그 `restore/pre-fix-20260822`(= `fdd3afa`)다. `develop`·`main`에는 올리지 않았다(지시 대기).
+
+검증: `npm run lint` 0 에러(경고 6건은 전부 기존 것), `npm run build` 통과, `npm run check:diagnosis` 통과(시나리오 20 / 경계쌍 3 / 이상 입력 4 / 근거 5, 평균 9.7문항), `npx tsx scripts/check-auth.ts` 통과.
+
+### 21-1. 재진단 잠금 (`4b53b3e`)
+
+"없앤다"가 아니라 **코드는 남기고 입구만 막는다**가 결정이다. 스위치는 `lib/diagnosis/flags.ts`의 `REDIAGNOSIS_ENABLED = false` 하나다.
+
+잠금 지점 3곳:
+
+| 곳 | 하는 일 |
+|---|---|
+| `POST /api/diagnosis/complete` | `user.typeCode`가 있으면 `ALREADY_DIAGNOSED` 400. **실제 차단은 이것뿐이다** |
+| `/diagnosis` (서버 컴포넌트) | 이미 진단했으면 `/diagnosis/result`로 `redirect()` |
+| 홈·결과 화면의 "다시 진단하기" 링크 | `REDIAGNOSIS_ENABLED &&`로 감싸 렌더하지 않는다 |
+
+링크를 지우는 것만으로는 주소창 직접 입력을 못 막는다. 그래서 서버 가드를 먼저 두고 링크는 그다음이다. 문항을 다 풀고 나서 400을 맞는 것보다 `/diagnosis` 진입 시점에 돌려보내는 쪽이 낫다.
+
+**잠근 이유**: 재진단으로 종족이 바뀌면 별조각 2500으로 산 옛 종족 펫 스킨이 상점·목록 어디에도 안 보이는 채 `UserPetSkin`에만 남는다. 환불이냐 유지냐 정책이 없는 상태에서 열어 두면 사용자가 조용히 손해를 본다(13장 "C — 재진단 시 옛 종족 스킨 정책"). 잠금으로 **신규 발생은 0**이 되고 기존 1건만 남는다.
+
+### 21-2. 재진단이 활성 펫 스킨을 초기화하던 버그 (`4b53b3e`)
+
+`POST /api/diagnosis/complete`가 종족 기본 스킨을 `activePetSkinId`에 **무조건** 덮어썼다. 재진단할 때마다 별조각 2500으로 산 스킨의 착용이 풀리고 `calculateReward()`의 캐릭터 배율도 같이 사라졌다. 소유 기록(`UserPetSkin`)은 남으니 데이터 손실은 아니고 착용만 풀렸다.
+
+```ts
+// 종족이 바뀌었거나, 아직 활성 스킨이 없을 때(시드보다 먼저 진단한 계정)만 심는다
+const nextSkinId =
+  defaultSkin && (user.typeCode !== typeCode || !user.activePetSkinId) ? defaultSkin.id : null
+```
+
+잠금과 별개로 고쳤다. 플래그를 다시 켜도 안전해야 한다.
+
+### 21-3. 홈 미션 카드가 로딩 중에 실패 문구를 띄웠다 (`6e1bb88`)
+
+상태가 `MissionsView | null` 하나여서 초깃값 `null`(= 아직 안 읽음)이 실패와 구분되지 않았다. fetch가 끝나기 전에 "미션을 불러오지 못했어요"가 먼저 떴다.
+
+`undefined`(읽는 중) / `null`(실패) / 값(성공) 3분기로 갈랐다.
+
+### 21-4. 홈 "오늘까지의 나" 카드 (`6e1bb88`)
+
+`GET /api/missions`가 이미 `progress.{dailyCompleted,dailyTotal,weeklyCompleted,weeklyTotal,streak}`를 내려주고 있었다(`lib/missions/dashboard.ts`). B 쪽 변경은 없다.
+
+- 오늘·이번 주 달성률 막대 2줄. `styles/tokens.css`의 기존 `.hm-bar`·`.hm-status`를 쓴다(새 CSS 없음. `app/globals.css`는 E 소유)
+- 연속 출석 배지 — `🔥 연속 N일` / 0이면 `오늘부터`
+- `role="progressbar"` + `aria-valuenow`. 분모 0이면 0%로 둔다(`ratioOf()`) — `NaN`이면 `width`가 통째로 무효가 되고 `aria-valuenow`도 깨진다
+- **순위·비교는 넣지 않는다**(`SPEC.md` 5절, 경쟁 지표 의도적 배제). 레벨·경험치도 넣지 않는다 — `/pet`에 이미 있어서 같은 숫자를 두 번 두지 않는다
+
+### 21-5. 결과 화면 재방문 문구 (`0039f46`)
+
+결과 화면은 진단 직후에도 오고, 이름을 바꾸러 다시 들어오는 경로이기도 한데(하단 탭·사이드바) 버튼이 늘 "이 이름으로 시작하기"였다. `AskFlow`가 완료 직후에만 `?new=1`을 붙이고 그때만 시작 문구를 쓴다.
+
+쿼리는 `fetchMe().then()` 콜백 안에서 읽는다. 렌더 중에 `window.location.search`를 읽으면 서버·클라이언트 문구가 달라 하이드레이션이 깨지고, `useEffect` 본문에서 `setState`하면 `react-hooks/set-state-in-effect` lint 에러다.
+
+사이드바의 "다시 진단하기" 버튼은 같은 자리에서 **"이름 바꾸기"**(→ `/diagnosis/result`)로 바꿨다. B 소유 파일이라 사용자 승인을 받았고 B에게 통보한다.
+
+### 21-6. Google 로그인 CSRF `state` + 세션 7일 통일 (`40ab886`)
+
+**(1) `state`가 없었다.** `/api/auth/google`이 `state` 없이 authorize로 보내고 콜백도 검사하지 않았다. 공격자가 자기 `code`로 만든 콜백 링크를 피해자에게 열게 하면 피해자가 공격자 계정에 로그인된다. `/api/auth/google`이 `randomUUID()`를 `oauth_state` 쿠키(httpOnly, `sameSite: "lax"`, 10분)에 심고 authorize 파라미터에도 넣는다. 콜백이 한 번 대조한 뒤 쿠키를 지운다.
+
+`sameSite`는 **`lax`여야 한다.** `strict`면 Cognito에서 돌아오는 최상위 이동에 쿠키가 실리지 않아 정상 로그인이 전부 `state` 불일치로 막힌다.
+
+**(2) Cognito 경로 세션이 1시간이었다.** 처음 본 증상은 "Google로 들어오면 한 시간 뒤 조용히 로그아웃"이었는데, `setSessionCookie()`의 호출부를 grep해 보니 콜백만이 아니라 `POST /api/auth/login`의 Cognito 폴백도 같은 함수를 쓰고 있었다. 액세스 토큰을 그대로 쿠키에 담았고 refresh 흐름이 없어서 두 경로가 다 1시간이었다.
+
+호출부마다 고치지 않고 두 경로가 지나는 `lib/auth.ts` 한 곳으로 모았다.
+
+- `signInWithCognitoToken(accessToken)` 추가 — 토큰을 검증해 계정을 찾거나 만들고, **자체 세션 쿠키(7일)** 를 심는다
+- `setSessionCookie()` 삭제 — `access_token` 쿠키의 유일한 기록자였다
+- `getCurrentUser()`는 그 쿠키를 **읽기만** 남긴다(2026-08-22 이전 발급분. 1시간이면 알아서 사라진다)
+
+`lib/auth.ts`와 `app/api/auth/*`는 E 소유다. E에게 통보한다.
+
+### 배포에 반영되지 않은 것
+
+`feat/diagnosis`가 `develop` 미반영 9커밋이다. 그중 `bd04830`(근거 3줄 `temperature` 제거)이 안 올라가 있어 **프로덕션 결과 화면의 근거 3줄은 여전히 비어 있다.** 이번 6건도 같이 묶여 있다. 머지는 지시를 받고 한다.
+
+---
+
+## 22. 계정 관리와 시도 제한 (2026-08-22, A)
+
+가입 이후 계정을 손댈 수 있는 화면이 하나도 없었다. 비밀번호를 바꿀 수도, 계정을 지울 수도 없었다. 탈퇴 경로가 없는 것은 "내 정보를 지워 달라"는 요청을 받을 방법이 없다는 뜻이라 누락 중 가장 무거운 쪽이다. 여기에 로그인 시도 제한이 없어 비밀번호 대입을 무한히 시도할 수 있었다.
+
+`lib/auth.ts`·`app/api/auth/*`는 E 소유다. E에게 통보한다.
+
+### 22-1. 로그인·가입 시도 제한 (`6c7a38c`)
+
+`lib/ratelimit.ts` — IP당 고정 윈도 카운터. `Map<string, {count, resetAt}>`이다.
+
+- **로그인: 5분 10회, 실패만 센다.** 성공하면 `clearAttempts()`로 지운다. 공용 IP(학교·카페 NAT)를 쓰는 정상 사용자가 남의 실패 기록에 막히지 않게 한다
+- **가입: 1시간 5회, 성공도 센다.** 막으려는 것이 "한 IP에서 계정을 대량 생성하는 것"이라 성공을 빼면 세는 의미가 없다
+- 가입 카운트는 **형식 검증을 통과한 뒤에** 올린다. 게이트 직후에 올리면 8자 미만 오타를 다섯 번 낸 정상 사용자가 한 시간 잠긴다
+- 게이트는 body 파싱보다 먼저 본다. 막을 요청에 JSON 파싱과 DB 조회를 들이지 않는다
+
+**상태 코드는 400이다.** 맞는 코드는 429지만 `CLAUDE.md` 7절이 200/400/401/404/500 다섯 개로 고정했다. 코드는 `TOO_MANY_ATTEMPTS`이고, 화면은 `message`만 읽으므로 사용자에게 보이는 차이는 없다. 라우트에 그 이유를 주석으로 붙여 뒀다 — 누가 "고치려고" 429로 바꾸면 규칙 위반이 된다.
+
+**한계를 정직하게 적어 둔다(파일 머리 주석).** 인메모리라 Lambda 인스턴스마다 따로 센다 — 인스턴스가 5개면 실질 한도가 5배다. 전역 한도를 원하면 Redis나 DB 카운터가 필요하지만, 새 인프라를 늘리고 로그인 경로에 DB 쓰기를 추가하는 쪽이 지금 더 위험하다(간헐 500의 원인이 커넥션 고갈이었다. 20장). 무한 대입을 막는다는 목적은 5배 한도로도 달성한다.
+
+검증: `npm run check:auth`에 10건 추가(한도 경계, 성공 시 초기화, 키 격리, 윈도 만료, `x-forwarded-for` 첫 홉만 읽기, 헤더 없으면 `unknown`). 실제 서버로도 확인했다 — 1~10회 401, 11회째 400 `TOO_MANY_ATTEMPTS`, 다른 `x-forwarded-for`는 영향 없음, 3회 실패 → 성공 → 다시 9회 실패에도 통과.
+
+### 22-2. 비밀번호 변경 (`51c1f67`)
+
+`POST /api/auth/password` — `{ currentPassword, newPassword }`.
+
+- **현재 비밀번호를 다시 받는다.** 세션 쿠키만으로 바꾸게 하면 남의 기기에 열려 있는 화면으로 비밀번호를 갈아치울 수 있다
+- Google 계정(`passwordHash`가 없다)은 `NO_PASSWORD_ACCOUNT`로 거절한다. 이 서비스에 비밀번호가 없으니 바꿀 것도 없다
+- 같은 비밀번호는 `SAME_PASSWORD`로 거절한다
+- **다른 기기 세션은 살아 있다.** DB 세션 표가 없어 즉시 무효화가 불가능하다 — 만료(7일)까지 유효하다. 화면에 그렇게 안내한다
+
+**비밀번호 재설정(찾기)은 넣지 않았다.** 메일 발송 경로가 없다(SES 미검증, 새 의존성 금지). 자체 DB 계정은 비밀번호를 잊으면 복구 수단이 없다는 뜻이고, 이 사실을 라우트 머리 주석에 적었다.
+
+### 22-3. 회원 탈퇴 (`51c1f67`)
+
+`POST /api/auth/withdraw` — 비밀번호가 있으면 `{ password }`, Google 계정이면 `{ confirm: "탈퇴" }`.
+
+**하드 삭제다.** 소프트 삭제로 두면 이메일과 비밀번호 해시가 남는다 — 그건 "지웠다"가 아니다.
+
+**`prisma/schema.prisma`에 `onDelete: Cascade`가 한 곳도 없다.** 스키마는 전원 합의 파일이라 A가 고칠 수 없어서, 자식 9표를 트랜잭션 안에서 FK 순서대로 직접 지운다.
+
+```
+comment → postLike → post → chatMessage → attendanceClaim
+       → userMission → userPetSkin → userCosmetic → diagnosisSession → user
+```
+
+**`comment`·`postLike`는 `where: { OR: [{ userId }, { post: { userId } }] }`다.** 내 글에 달린 **남의** 댓글·좋아요까지 먼저 지워야 한다. 내 것만 지우면 `Post` 삭제가 FK로 막혀 500이 난다. 실제로 이 경로를 재현해 확인했다 — 관찰자 계정이 댓글 1 + 좋아요 1을 남긴 글이 있는 상태에서 탈퇴했고, 행 수가 `{user:1, post:1, comment:1, like:1, mission:1}`에서 전부 0으로 갔다.
+
+Cognito 사용자 풀은 건드리지 않는다. IAM 권한이 없고, 로그인 판정은 DB 행이 하므로 행이 사라지면 들어올 수 없다.
+
+### 22-4. `/settings` 화면 (`51c1f67`)
+
+`app/settings/page.tsx`(서버) + `SettingsForm.tsx`(클라이언트).
+
+- `passwordHash`는 클라이언트로 내리지 않는다. `hasPassword: Boolean(...)`만 넘긴다
+- **탈퇴는 2단이다.** 먼저 무엇이 지워지는지 보여주고, 그다음에 비밀번호(또는 `"탈퇴"`)를 받는다
+- `.hm-btn--danger`는 **테두리만** 붉게 둔다. 면을 채우면 시선이 비밀번호 변경보다 탈퇴로 먼저 간다
+- 탈퇴 성공 시 `window.location.href = "/login"`. 로그아웃과 같은 이유다 — `router.push`는 RSC 캐시를 남겨 계정이 사라진 뒤에도 사이드바가 방금 지운 사람의 닉네임·재화를 그린다
+- 닉네임 변경은 여기 두지 않는다. `/diagnosis/result`에 이미 있다(21-5)
+- 입구는 사이드바 "내 계정" 모달의 **"계정 설정"** 버튼
+
+### 22-5. E2E 시나리오 (`0166bdc`)
+
+`npm run e2e` → `scripts/e2e-scenario.ts`. 기본 대상은 `http://localhost:3000`이고 **로컬에만 쓴다.**
+
+단위 체크(`check:diagnosis` 등)는 순수 함수만 본다. 실제로 깨지는 곳은 라우트 사이 연결이다 — 인증이 안 붙어 401, 재화가 안 붙어 400, 삭제 순서가 어긋나 500. 가입 → 진단 → 미션 → 펫 → 커뮤니티 → 챗봇 저장 → 계정 설정 → 탈퇴를 HTTP로 그대로 따라가며 **75건**을 검사한다.
+
+- `fetch`에는 쿠키 저장소가 없어 `Set-Cookie`를 직접 모은다. 값이 빈 `Set-Cookie`는 삭제 신호다(로그아웃·탈퇴)
+- **계정을 두 개 만든다.** 두 번째("관찰자")가 첫 번째의 글에 댓글·좋아요를 남긴다 — 22-3의 FK 순서는 그 상황에서만 검증된다. 탈퇴 후 글이 사라졌는지도 살아 있는 관찰자 세션으로 본다(미인증으로 부르면 401이라 지워졌는지 알 수 없다)
+- 실행마다 `x-forwarded-for`를 다르게 위장한다. 22-1의 리밋에 걸리면 스크립트가 실패하는데 그건 정상 동작이다. 한 번 돌 때 형식이 맞는 가입 요청을 4건 보낸다(한도 5) — 가입 검증을 더 넣으려면 IP를 쪼개야 한다
+- 끝나면 두 계정을 탈퇴로 지운다
+
+**첫 실행에서 45/51이었고 실패 6건은 전부 스크립트 쪽이었다.** 프로덕션 버그는 나오지 않았다.
+
+| 실패했던 단정 | 실제 |
+|---|---|
+| `data.daily` / `data.stages`가 비어 있다 (3건) | DTO 필드 이름이 `dailyMissions` / `stageMissions`다(`lib/missions/dashboard.ts`) |
+| 주제 추천 3개 이상 → `[]` | 로컬에 AWS 자격증명이 없어 Bedrock이 `CredentialsProviderError`. 라우트가 **설계대로** `ok({ topics: [] })`를 주고 화면이 정적 문구로 넘어간다. 단정을 "배열이면 통과"로 고쳤다 |
+| 없는 `role`은 400 | 라우트가 클라이언트의 `role`을 아예 무시하고 항상 `USER`로 저장한다. 그래야 남이 챗봇 답변을 위조해 넣지 못한다. 단정을 "`ASSISTANT`를 보내도 `USER`로 저장된다"로 고쳤다 |
+| 탈퇴한 사람의 글도 사라졌다 → 401 | 쿠키가 방금 지워져서 401이었다. 관찰자 세션으로 보게 고쳤다 |
+
+지금은 64/64 통과한다.

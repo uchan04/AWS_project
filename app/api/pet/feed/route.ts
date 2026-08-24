@@ -1,4 +1,5 @@
 import { fail, ok } from "@/lib/api"
+import { petImageUrl } from "@/lib/assets"
 import { UnauthorizedError, getCurrentUserWithSkin } from "@/lib/auth"
 import { applySeeds } from "@/lib/pet"
 import { prisma } from "@/lib/prisma"
@@ -60,12 +61,10 @@ export async function POST(request: Request) {
 
     if (!result) return fail("NOT_ENOUGH_SEEDS", "씨앗이 부족합니다")
 
-    // S3 이미지 URL 생성
-    const cloudfront = process.env.CLOUDFRONT_DOMAIN
-    const imageUrl =
-      cloudfront && user.activePetSkin
-        ? `${cloudfront}/${user.activePetSkin.imageKeyBase}-${result.evolutionStage}.png`
-        : null
+    // 그림 URL은 lib/assets.ts만 만든다 (public/art에 구운 정적 자산)
+    const imageUrl = user.activePetSkin
+      ? petImageUrl(user.activePetSkin.imageKeyBase, result.evolutionStage)
+      : null
 
     return ok({ ...result, imageUrl })
   } catch (error) {

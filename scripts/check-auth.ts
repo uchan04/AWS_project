@@ -1,5 +1,12 @@
 import assert from "node:assert/strict"
 import { hashPassword, verifyPassword } from "../lib/password"
+import {
+  clearAttempts,
+  clientKey,
+  recordAttempt,
+  resetAllAttempts,
+  retryAfter,
+} from "../lib/ratelimit"
 import { createSessionToken, readSessionToken } from "../lib/session"
 
 // npx tsx scripts/check-auth.ts
@@ -64,5 +71,39 @@ process.env.SESSION_SECRET = "check-auth-secret"
 assert.equal(readSessionToken("", now), null)
 assert.equal(readSessionToken("a.b.c.d", now), null)
 assert.equal(readSessionToken("a.notanumber.c", now), null)
+
+// --- 레이트 리밋 ---
+
+// 한도까지는 통과하고 한도를 넘기면 막힌다
+resetAllAttempts()
+for (let i = 0; i < 3; i += 1) {
+  assert.equal(retryAfter("k", 3), 0)
+  recordAttempt("k", 60_000)
+}
+assert.ok(retryAfter("k", 3) > 0)
+
+// 성공 시 지우면 다시 열린다 — 공용 IP 사용자가 남의 실패에 막히지 않는 근거
+clearAttempts("k")
+assert.equal(retryAfter("k", 3), 0)
+
+// 키가 다르면 서로 영향이 없다
+resetAllAttempts()
+for (let i = 0; i < 5; i += 1) recordAttempt("a", 60_000)
+assert.ok(retryAfter("a", 3) > 0)
+assert.equal(retryAfter("b", 3), 0)
+
+// 윈도가 지나면 풀린다. 시계를 못 돌리므로 윈도를 0으로 줘서 즉시 만료시킨다
+resetAllAttempts()
+for (let i = 0; i < 5; i += 1) recordAttempt("c", 0)
+assert.equal(retryAfter("c", 3), 0)
+
+// x-forwarded-for의 첫 홉만 쓴다(프록시가 뒤에 자기 IP를 붙인다)
+assert.equal(
+  clientKey(new Request("http://x/", { headers: { "x-forwarded-for": "1.2.3.4, 10.0.0.1" } })),
+  "1.2.3.4"
+)
+assert.equal(clientKey(new Request("http://x/")), "unknown")
+
+resetAllAttempts()
 
 console.log("auth 체크 통과")

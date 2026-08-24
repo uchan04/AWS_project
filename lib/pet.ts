@@ -1,5 +1,5 @@
 import type { Rarity, Slot } from "@prisma/client"
-import { SEED_TO_EXP, TRIBE, evolutionStageFor, expToNextLevel } from "@/lib/types"
+import { EVOLUTION_LEVEL, SEED_TO_EXP, TRIBE, evolutionStageFor, expToNextLevel } from "@/lib/types"
 
 // 소유자: C. 펫 성장 계산. 순수 함수만 둔다 (DB·요청 객체를 모르게 유지해야 체크 스크립트로 검증된다).
 // 수치 근거는 SPEC.md 5절. 곡선 상수는 lib/types.ts(A 소유)에 있으므로 여기서 다시 정의하지 않는다.
@@ -78,9 +78,9 @@ export function expProgress(level: number, exp: number): number {
 // ── 마스코트 이모지 ───────────────────────────────────────────────────────────
 //
 // 이미지가 안 뜰 때 원판·배지 자리에 쓰는 폴백이다 (design.md).
-// 2026-08-21: 이미지는 S3에 6종 × 4단 = 24장이 다 올라와 있다. 옛 주석의 "9장이 아직
-// 없다"는 사실이 아니었다. 북극곰 키 불일치(차단 19번)도 pets/bear-arctic으로 해소했다.
-// 지금 이모지로 떨어지는 것은 CLOUDFRONT_DOMAIN이 빈 값일 때뿐이다.
+// 2026-08-22: 6종 × 4단 = 24장을 public/art/pets 아래에 구웠다(scripts/slice-art.ts).
+// URL은 lib/assets.ts가 만들고 환경변수를 읽지 않는다 — 이제 이모지로 떨어지는 조건은
+// 스킨이 아직 없을 때(진단 전)와 <img>가 404를 낼 때 둘뿐이다.
 // 기본 3종은 lib/types.ts의 TRIBE가 정본이라 여기 다시 적지 않는다.
 // 화면 두 곳(PetView·SkinList)이 같이 쓰므로 컴포넌트가 아니라 여기에 둔다.
 
@@ -168,6 +168,12 @@ export function compareCosmetics(
     a.name.localeCompare(b.name, "ko")
   )
 }
+
+// SHIPPED_COSMETIC이 있던 자리다(2026-08-24 삭제). `imageKey`가 `cosmetics/`로 시작하는
+// 행만 고르는 where 조각이었는데, C가 배경 6종을 `backgrounds/…` 키로 다시 심어서
+// 공유 DB 6행 중 **0행**이 걸렸다 — 배경 상점이 빈 화면이었다. 지금 DB의 6행이 곧 판매
+// 목록 전체라 필터가 필요 없다. 다시 넣지 말 것: 판매 목록은 시드가 정하고, 코드가
+// imageKey 접두사로 다시 걸러 봤자 시드와 규칙이 갈라지는 지점만 하나 늘어난다.
 
 // ── 방치형 자동 획득 (SPEC.md 5절) ────────────────────────────────────────────
 //
@@ -345,4 +351,250 @@ export function lineIndex(seed: string, count: number): number {
  */
 export function greetingFor(seed: string): string {
   return PET_GREETINGS[lineIndex(seed, PET_GREETINGS.length)]
+}
+
+// ── 다음 목표를 개수로 말한다 (2026-08-23 추가) ────────────────────────────────
+//
+// 화면이 지금까지 `Lv.25 마지막 진화`만 보여 줬다. 실제로 서비스되는 육성 게임
+// (다마고치·포켓캠프·My Talking Tom)은 전부 다음 목표를 **남은 개수**로 알려 준다 —
+// "Lv.25"는 지금 내가 무엇을 얼마나 해야 하는지 알려 주지 않는다.
+//
+// 경험치 곡선(lib/types.ts)이 expToNextLevel(L) = L × 100이므로 레벨 N까지의 누적은
+// 100 × (1+2+…+(N-1)) = 50 × N × (N-1)이다. 씨앗은 그 값을 SEED_TO_EXP로 나눈 것.
+// 곡선을 고치면 이 식도 같이 틀리므로 check:pet이 applySeeds를 실제로 돌려 교차 검증한다.
+
+function expAtLevel(level: number): number {
+  const n = Math.max(1, Math.floor(level))
+  return 50 * n * (n - 1)
+}
+
+/**
+ * 다음 진화까지 남은 씨앗 개수. 마지막 단계(4)에 이미 닿았으면 null.
+ * stage는 도달할 단계 번호라 화면이 "성체까지"처럼 이름을 붙일 수 있다.
+ */
+export function seedsToNextStage(level: number, exp: number): { stage: number; seeds: number } | null {
+  const gates = [EVOLUTION_LEVEL.STAGE2, EVOLUTION_LEVEL.STAGE3, EVOLUTION_LEVEL.STAGE4]
+  const target = gates.find((gate) => Math.floor(level) < gate)
+  if (target === undefined) return null
+
+  const need = expAtLevel(target) - (expAtLevel(level) + Math.max(0, Math.floor(exp)))
+  // 경계에서 0이 나오면 "0개만 더"가 되어 이상하다. 최소 1로 올린다
+  return { stage: evolutionStageFor(target), seeds: Math.max(1, Math.ceil(need / SEED_TO_EXP)) }
+}
+
+// ── 펫의 한 줄 (2026-08-23 추가) ──────────────────────────────────────────────
+//
+// 벤치마크한 5종(Finch, 다마고치, ねこあつめ, My Talking Tom, 포켓캠프) 중 4종은
+// 펫이 사용자에게 **먼저 말을 건다.** 우리 화면은 이름과 고정 단계 설명만 있어서
+// 상태를 알려면 게이지를 읽어야 했다. 같은 숫자를 두 번 보여 주는 대신 펫이 말한다.
+//
+// 문구를 지시문("씨앗을 먹여 주세요")이 아니라 1인칭 상태("배가 조금 고파요")로 쓴다.
+// 고립은둔 청년에게 앱이 할 일을 지시하면 그 자체가 압박이 된다 — SPEC.md 5절이
+// 랭킹·경쟁 지표를 뺀 것과 같은 이유다. hungerLabel의 지시형 문구는 게이지 옆에
+// 그대로 남겨 둔다(그쪽은 접근성 라벨이라 상태를 명확히 말해야 한다).
+//
+// 순수 함수다. DB도 시각도 읽지 않고 저장하는 값도 없다 — check:pet이 검증한다.
+
+// "hungry"가 있던 자리다(2026-08-24 삭제). 배고픔 게이지를 걷으면서 HUNGER_LOW도 사라졌는데
+// 이 분기만 남아 빌드가 깨져 있었다 — 병합에서 한쪽은 상수를 지우고 다른 쪽은 petMood를
+// 지키면 이렇게 된다. 되살리려면 위 "배고픔 — 삭제" 주석의 계산식부터 되돌려야 한다
+export type PetMoodTone = "harvest" | "soon" | "calm"
+export type PetMood = {
+  tone: PetMoodTone
+  /** 말풍선에 그대로 넣는 한 줄 */
+  text: string
+}
+
+// level로 골라 리렌더마다 바뀌지 않는다. Math.random()을 쓰면 1초 타이머가 돌 때마다
+// 대사가 바뀌어 읽을 수 없다(PetView의 idle 카운터가 매초 리렌더를 낸다).
+const CALM_LINES = [
+  "여기 같이 있어 줘서 좋아요",
+  "오늘도 와 줬네요",
+  "창밖이 조용해요. 우리도 조용히 있어요",
+  "천천히 해도 괜찮아요",
+  "아무것도 안 해도 돼요. 그냥 있어 줄래요",
+]
+
+/**
+ * 우선순위는 "지금 행동할 수 있는 것"이 위다.
+ * 씨앗 상한(더 안 쌓이니 손해가 진행 중) → 진화 임박 → 쌓인 씨앗 → 평온.
+ *
+ * `hour`는 급한 상태가 없을 때(tone `calm`)만 쓴다 — 그때만 시간대 인사로 바꾼다.
+ * null/미지정이면 CALM_LINES를 레벨로 골라 쓴다. 이게 **서버 렌더와 첫 페인트의 값**이다:
+ * 서버(UTC)와 브라우저(KST)의 `getHours()`가 9시간 달라 서버에서 시각을 읽으면
+ * hydration이 어긋난다. 그래서 호출부가 마운트 후에 시각을 넣어 준다.
+ *
+ * 2026-08-23: 이 분기가 화면 쪽에 `mood.tone === "calm" ? timeGreeting(hour) : mood.text`로
+ * 있었다. 그러면 CALM_LINES 5줄이 **첫 페인트에만** 스치고 사실상 죽은 문구가 된다 —
+ * 어느 문장이 실제로 나오는지 화면 코드를 읽어야 알 수 있었다. 여기로 합쳐
+ * check:pet이 "hour를 주면 시간대 인사, 안 주면 CALM_LINES"를 못 박는다.
+ */
+export function petMood(
+  state: {
+    level: number
+    exp: number
+    idleSeeds: number
+    idleCapped: boolean
+  },
+  hour?: number | null,
+): PetMood {
+  if (state.idleCapped || state.idleSeeds >= IDLE_MAX_SEEDS) {
+    return { tone: "harvest", text: "씨앗이 가득 쌓였어요. 더는 안 늘어나요" }
+  }
+
+  const next = seedsToNextStage(state.level, state.exp)
+  if (next && next.seeds <= 10) {
+    return { tone: "soon", text: `씨앗 ${next.seeds}개만 더 먹으면 뭔가 달라질 것 같아요` }
+  }
+
+  if (state.idleSeeds > 0) {
+    return { tone: "harvest", text: `방에 씨앗 ${state.idleSeeds}개가 떨어져 있어요` }
+  }
+
+  if (hour !== undefined && hour !== null) return { tone: "calm", text: timeGreeting(hour) }
+  return { tone: "calm", text: CALM_LINES[Math.max(1, Math.floor(state.level)) % CALM_LINES.length] }
+}
+
+/**
+ * 레벨이 올랐을 때의 반응. 오르지 않았으면 null이고 호출부가 먹이기 기본 대사로 떨어진다.
+ *
+ * API(app/api/pet/feed)가 gainedLevels를 돌려주는데도 화면이 그걸 **버리고** 있었다.
+ * 진화(4번)에만 연출이 있어서 그 사이 스물네 번의 레벨업은 게이지가 0으로 돌아가는
+ * 것으로만 보였다 — 벤치마크한 육성 게임 5종은 전부 레벨업을 따로 알린다.
+ *
+ * 숫자 뒤에 조사를 붙이지 않는다. "Lv.5이/가"는 숫자를 읽는 법(오/다섯)에 따라 받침이
+ * 갈려 어느 쪽을 써도 틀린 문장이 된다(withSubject는 한글 종성만 본다). 레벨 값으로 문장을 끝낸다.
+ */
+export function levelUpReply(gainedLevels: number, level: number): string | null {
+  if (gainedLevels < 1) return null
+  if (gainedLevels === 1) return `레벨이 올랐어요! 이제 Lv.${level}`
+  return `레벨이 ${gainedLevels} 올랐어요! 이제 Lv.${level}`
+}
+
+/**
+ * 쓰다듬었을 때의 반응. 누른 횟수를 넘기면 같은 말이 연속으로 나오지 않는다.
+ * 재화도 저장값도 움직이지 않는다 — 누르는 것 자체가 보상인 상호작용이다
+ * (My Talking Tom·다마고치가 같은 구조다).
+ */
+export const PET_TOUCH_REPLIES = [
+  "헤헤, 간지러워요",
+  "좋아요. 조금 더요",
+  "손이 따뜻하네요",
+  "여기 있어 줘서 고마워요",
+  "오늘 하루는 어땠어요?",
+]
+
+export function petTouchReply(count: number): string {
+  return PET_TOUCH_REPLIES[Math.abs(Math.floor(count)) % PET_TOUCH_REPLIES.length]
+}
+
+// ── 시간대 인사 (2026-08-23 추가) ─────────────────────────────────────────────
+//
+// 벤치마크한 육성 게임 5종 중 4종이 접속 시각에 따라 다른 인사를 한다. 하루에 한 번
+// 열어도 같은 문장만 나오면 "저장된 그림"으로 읽히고, 바뀌면 살아 있는 것으로 읽힌다.
+//
+// **시각을 읽는 것은 이 함수가 아니라 호출부다.** 서버(Lambda·UTC)와 브라우저(KST)의
+// getHours()가 9시간 다르므로, 서버에서 렌더한 인사와 클라이언트 첫 렌더의 인사가
+// 어긋나 hydration 경고가 난다. 호출부는 마운트 후에만 시각을 읽는다.
+// 인자를 받는 순수 함수라 check:pet이 경계값을 검증할 수 있다.
+
+export type TimeOfDay = "dawn" | "morning" | "afternoon" | "evening" | "night"
+
+/** 0~23시를 5구간으로 나눈다. 범위를 벗어난 값은 0~23으로 감아 넣는다 */
+export function timeOfDay(hour: number): TimeOfDay {
+  const h = ((Math.floor(hour) % 24) + 24) % 24
+  if (h < 6) return "dawn"
+  if (h < 11) return "morning"
+  if (h < 17) return "afternoon"
+  if (h < 22) return "evening"
+  return "night"
+}
+
+// 지시문이 아니라 1인칭 상태로 쓴다(CALM_LINES와 같은 이유).
+// 새벽·밤은 특히 조심한다 — 이 시간에 앱을 여는 사람에게 "일찍 자라"는 말은 훈계다.
+const TIME_GREETING: Record<TimeOfDay, string> = {
+  dawn: "이 시간에 깨어 있었네요. 저도 같이 있을게요",
+  morning: "좋은 아침이에요. 창문 한 번 열어 볼래요?",
+  afternoon: "오늘 하루 어떻게 가고 있어요?",
+  evening: "저녁이네요. 오늘 여기까지 온 것으로 충분해요",
+  night: "하루가 끝났어요. 조용히 있어도 괜찮아요",
+}
+
+export function timeGreeting(hour: number): string {
+  return TIME_GREETING[timeOfDay(hour)]
+}
+
+// ── 함께한 기록 (2026-08-23 추가) ─────────────────────────────────────────────
+//
+// 벤치마크 5종 전부가 **누적된 것**을 보여 준다 — 다마고치는 나이(일수), Finch는 여정
+// 기록, ねこあつめ는 온 고양이 수, 포켓캠프는 앨범이다. 우리 화면에는 "지금 상태"
+// (레벨·게이지·단계)만 있고 **지나온 것**이 없었다. 하루 접속을 여러 주 이어 온 사용자와
+// 오늘 처음 온 사용자의 화면이 레벨 말고는 같다.
+//
+// 이 서비스에서는 그게 특히 아쉬운 자리다. 랭킹·경쟁 지표를 배제한 것은(SPEC.md 5절)
+// **남과 비교**하지 않겠다는 뜻이고, 자기 누적을 보여 주는 것은 그 반대가 아니다.
+// 비교 대상이 과거의 자신이면 "얼마나 부족한지"가 아니라 "얼마나 왔는지"가 나온다.
+//
+// 캘린더 날짜 차이가 아니라 **경과 시간**으로 센다. 서버는 UTC고 브라우저는 KST라
+// 달력으로 세면 자정 근처에서 두 값이 하루 어긋난다(timeGreeting과 같은 문제).
+// 가입 당일이 1일째다 — 0일째라고 말하는 화면은 "아직 아무것도 아니다"로 읽힌다.
+
+const MS_PER_DAY = 24 * MS_PER_HOUR
+
+/** 가입일부터 오늘까지 며칠째인가. 가입 당일이 1이고 그 아래로 내려가지 않는다 */
+export function daysTogether(createdAt: Date | null, now: Date): number {
+  if (!createdAt) return 1
+  const elapsed = now.getTime() - createdAt.getTime()
+  if (elapsed <= 0) return 1
+  return Math.floor(elapsed / MS_PER_DAY) + 1
+}
+
+// ── 호흡 안내 (2026-08-23 추가. /pet/rest) ────────────────────────────────────
+//
+// 4-4-6 주기. 4-7-8(Weil)은 7초 참기가 처음 하는 사람에게 길어 중간에 포기하고,
+// Calm·Headspace의 기본 안내도 들이쉬기보다 내쉬기를 길게 잡는다(부교감 우세).
+// 합이 14초라 3분(180초)이 12.86주기 — 딱 맞지 않아도 된다. 카운트다운을 보여 주는
+// 화면이 아니라 "아무것도 안 하는" 화면이라 주기가 끊기는 자리가 없다.
+//
+// 순수 함수다. 경계(0, 4, 8, 14)를 check:pet이 못 박는다.
+export const BREATH_CYCLE = [
+  { phase: "in", seconds: 4, label: "천천히 들이쉬어요" },
+  { phase: "hold", seconds: 4, label: "잠깐 멈춰요" },
+  { phase: "out", seconds: 6, label: "길게 내쉬어요" },
+] as const
+
+export type BreathPhase = (typeof BREATH_CYCLE)[number]["phase"]
+
+/** 한 주기 길이(초). 14 */
+export const BREATH_CYCLE_SECONDS = BREATH_CYCLE.reduce((sum, s) => sum + s.seconds, 0)
+
+/**
+ * 시작 후 경과 초 → 지금 어느 단계이고 그 단계가 몇 초 남았는지.
+ * 원(circle) 크기와 안내 문구가 같은 값에서 나와야 어긋나지 않는다.
+ */
+export function breathAt(elapsedSeconds: number): {
+  phase: BreathPhase
+  label: string
+  /** 이 단계 안에서의 진행도 0~1. 원의 지름에 쓴다 */
+  progress: number
+  /** 이 단계가 끝나기까지 남은 초(올림). 1 이상이다 */
+  remaining: number
+} {
+  const t = Math.max(0, elapsedSeconds) % BREATH_CYCLE_SECONDS
+  let start = 0
+  for (const step of BREATH_CYCLE) {
+    if (t < start + step.seconds) {
+      const into = t - start
+      return {
+        phase: step.phase,
+        label: step.label,
+        progress: into / step.seconds,
+        remaining: Math.max(1, Math.ceil(step.seconds - into)),
+      }
+    }
+    start += step.seconds
+  }
+  // BREATH_CYCLE_SECONDS로 나눈 나머지는 항상 마지막 구간 안에 들어오므로 닿지 않는다
+  const last = BREATH_CYCLE[BREATH_CYCLE.length - 1]
+  return { phase: last.phase, label: last.label, progress: 1, remaining: 1 }
 }

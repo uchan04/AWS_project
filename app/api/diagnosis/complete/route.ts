@@ -8,6 +8,7 @@
 import { type Prisma } from "@prisma/client"
 import { UnauthorizedError, getCurrentUser } from "@/lib/auth"
 import { classify } from "@/lib/diagnosis/classify"
+import { REDIAGNOSIS_ENABLED } from "@/lib/diagnosis/flags"
 import type { Answer } from "@/lib/diagnosis/indicators"
 import { fail, ok } from "@/lib/api"
 import { prisma } from "@/lib/prisma"
@@ -33,6 +34,12 @@ export async function POST(request: Request) {
   } catch (error) {
     if (error instanceof UnauthorizedError) return fail("UNAUTHORIZED", error.message, 401)
     throw error
+  }
+
+  // 재진단 잠금(lib/diagnosis/flags.ts). 링크를 지우는 것만으로는 URL 직접 입력을 막지 못하므로
+  // 실제 차단은 여기 한 곳이다.
+  if (!REDIAGNOSIS_ENABLED && user.typeCode) {
+    return fail("ALREADY_DIAGNOSED", "이미 진단을 마쳤어요", 400)
   }
 
   let body: unknown
@@ -68,6 +75,13 @@ export async function POST(request: Request) {
     select: { id: true },
   })
 
+  // 활성 펫 스킨은 종족이 바뀔 때만 옮긴다. 무조건 덮어쓰면 재진단할 때마다
+  // 별조각 2500으로 산 스킨의 착용이 풀리고 calculateReward()의 배율도 함께 사라진다.
+  // (소유 기록 UserPetSkin은 남으므로 데이터 손실은 아니고 착용만 풀렸다)
+  // 종족이 바뀌었거나, 아직 활성 스킨이 없을 때(시드보다 먼저 진단한 계정)만 심는다.
+  const nextSkinId =
+    defaultSkin && (user.typeCode !== typeCode || !user.activePetSkinId) ? defaultSkin.id : null
+
   // 레벨·경험치·재화·아이템·streak은 건드리지 않는다. 재진단에서 이 코드가 다시 돌기 때문이다.
   await prisma.$transaction(async (tx) => {
     await tx.user.update({
@@ -77,7 +91,7 @@ export async function POST(request: Request) {
         subTypeCode,
         adjective,
         nickname,
-        ...(defaultSkin ? { activePetSkinId: defaultSkin.id } : {}),
+        ...(nextSkinId ? { activePetSkinId: nextSkinId } : {}),
       },
     })
 

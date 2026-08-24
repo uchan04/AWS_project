@@ -563,6 +563,17 @@
   color: var(--color-ink);
 }
 
+/* 반응 대사 3초 동안만 선 색을 바꾼다 (PetView react()). 평상시 대사와 구분되는 신호가
+   글자뿐이면 무엇이 바뀐 것인지 읽어야 알 수 있다 — 색이 먼저 도착한다.
+   면색은 건드리지 않는다: 배경 그림 6종 위에서 명암비를 지키는 것이 카드색이다
+   (위 .pet-welcome 주석). 새 색 값도 만들지 않는다 — 씨앗 초록과 종족 강조색이다 */
+.pet-welcome[data-tone="eat"] .pet-welcome__shape path {
+  stroke: var(--pet-seed);
+}
+.pet-welcome[data-tone="touch"] .pet-welcome__shape path {
+  stroke: var(--tribe-cta);
+}
+
 /* ── 펫 캐릭터 ───────────────────────────────────────────────────────────── */
 
 /* 펫은 방 **중앙 하단**에 고정한다 (2026-08-21 사용자 확정).
@@ -619,11 +630,57 @@
   animation: petSparkle 3s var(--ease-in-out) 1s infinite;
 }
 
+/* 쓰다듬기. 그림 자체가 버튼이라 자체 상자를 만들지 않는다 */
+.pet-char__touch {
+  display: grid;
+  padding: 0;
+  border: 0;
+  border-radius: var(--radius-pill);
+  background: none;
+  cursor: pointer;
+}
+
+.pet-char__touch:focus-visible {
+  outline: 2px solid var(--tribe-cta);
+  outline-offset: 4px;
+}
+
+/* 눌린 느낌. transition을 걸지 않아 즉시 반응한다 — 직접 조작의 피드백은
+   prefers-reduced-motion에서도 남겨 두는 편이 맞다(장식이 아니다) */
+.pet-char__touch:active .pet-char__body {
+  transform: scale(0.94);
+}
+
 .pet-char__body {
   display: grid;
   place-items: center;
   filter: drop-shadow(0 8px 16px rgb(42 31 20 / 0.25));
   animation: petBounce 2.5s var(--ease-in-out) infinite;
+}
+
+/* 쓰다듬기·먹이기 파티클. React가 key로 remount하므로 여기서 재생을 다시 걸 필요가 없다 */
+.pet-char__burst {
+  position: absolute;
+  inset: 0;
+  pointer-events: none;
+}
+
+.pet-char__burst span {
+  position: absolute;
+  bottom: 35%;
+  font-size: var(--text-md);
+  animation: petBurst 900ms var(--ease-out) both;
+}
+.pet-char__burst span[data-i="1"] {
+  left: 4%;
+}
+.pet-char__burst span[data-i="2"] {
+  left: 44%;
+  animation-delay: 120ms;
+}
+.pet-char__burst span[data-i="3"] {
+  left: 82%;
+  animation-delay: 240ms;
 }
 
 /* 진화 단계별 크기. SPEC.md 5절은 "CSS transform 수준"까지만 요구한다.
@@ -1166,6 +1223,8 @@
 
 /* ── 버튼 ────────────────────────────────────────────────────────────────── */
 
+/* display/text-decoration은 <a>도 이 클래스를 쓰기 때문에 있다 (씨앗 0개 빈 상태의
+   "오늘의 미션 보기"). 인라인 요소에는 min-height와 width가 먹지 않는다 */
 /* 먹이기 버튼. 면은 종족색 원색, 글자는 잉크색이다(.pet 스코프의 --tribe-face 주석 참고)
  *
  * 2026-08-22 사용자 요청("게임 UI 디자인처럼"): 광택 두 겹을 얹었다. 시안으로 받은 것이
@@ -1174,9 +1233,12 @@
  * 종족색 그라데이션은 135deg로 남긴다. 광택이 180deg 세로라서 두 겹의 결이 갈려야
  * 면이 사선으로 흐르고 그 위에 빛이 얹힌 것으로 읽힌다 */
 .pet-btn {
+  display: grid;
+  place-items: center;
   min-height: var(--control-h);
   padding: 0 var(--space-sm);
   border: none;
+  text-decoration: none;
   border-radius: var(--radius-input);
   background: var(--pet-gloss), linear-gradient(135deg, var(--tribe-face), var(--tribe));
   box-shadow: var(--pet-gloss-edge), 0 4px 0 var(--tribe-cta);
@@ -1349,6 +1411,10 @@
   color: var(--color-muted);
 }
 
+/* 프리셋 4개(1·5·10·50). 한때 "전부"를 더해 5개였고 그 시절 규칙이 auto-fit이었다.
+   4개로 돌아온 뒤로는 시안대로 4열 고정이다 — auto-fit은 폭에 따라 3+1로 갈라져
+   알약 줄이 들쭉날쭉해진다. 320px에서 한 칸이 50px까지 좁아지는 것만 문제라
+   그 폭은 아래 max-width: 360px 규칙이 2열로 받는다 */
 .pet-presets {
   display: grid;
   grid-template-columns: repeat(4, 1fr);
@@ -1399,6 +1465,60 @@
 .pet-preset:disabled {
   color: var(--color-muted);
   cursor: not-allowed;
+}
+
+/* ── 씨앗 0개 빈 상태 (2026-08-23) ───────────────────────────────────────────
+   조작부를 회색으로 늘어놓는 대신 다음 행동 하나만 남긴다. 카드 안쪽이라
+   테두리를 다시 두르지 않는다 — 카드 안의 카드는 깊이만 늘린다 */
+
+.pet-empty {
+  display: grid;
+  gap: var(--space-2xs);
+  padding: var(--space-2xs) 0;
+  text-align: center;
+}
+
+.pet-empty__text {
+  font-size: var(--text-body);
+  color: var(--color-ink-2);
+}
+
+.pet-empty__hint {
+  font-size: var(--text-label);
+  color: var(--color-muted);
+}
+
+/* ── 함께한 기록 (2026-08-23) ────────────────────────────────────────────────
+   숫자 3개를 나란히 둔다. auto-fit이라 320px에서는 한 줄에 2개가 들어가고
+   남은 하나가 아래로 내려간다 — 세 칸을 고정하면 "1,234일"이 잘린다.
+   dl/dt/dd다. 라벨과 값의 관계가 마크업에 남아야 스크린리더가 짝으로 읽는다 */
+
+.pet-log {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(min(5.5rem, 100%), 1fr));
+  gap: var(--space-3xs);
+}
+
+.pet-log__item {
+  display: grid;
+  gap: 0.1rem;
+  padding: var(--space-2xs);
+  border: 2px solid var(--tribe-line);
+  border-radius: var(--radius-input);
+  background: var(--tribe-wash);
+  text-align: center;
+}
+
+.pet-log__label {
+  font-size: var(--text-label);
+  color: var(--color-muted);
+}
+
+.pet-log__value {
+  margin: 0;
+  font-size: var(--text-md);
+  font-weight: 700;
+  color: var(--color-ink);
 }
 
 /* ── 진화 단계 ───────────────────────────────────────────────────────────── */
@@ -1569,6 +1689,17 @@
   line-height: 1;
 }
 
+/* 스킨 목록의 그림. 이모지 얼굴 칸과 같은 크기를 써서 격자가 흔들리지 않는다.
+   그림은 배경이 투명한 누끼라 contain으로 넣는다.
+   배경 치장 목록은 이 값을 쓰지 않는다 — 아래 .pet-item__thumb 안에서 덮어쓴다
+   (2026-08-24 머지: 배경 쪽은 액자(__thumb) 방식으로 갈렸고 스킨 쪽은 그대로다.
+    __img 하나로 두 화면을 맞추려다 스킨 56px 칸이 깨지는 것을 막는 분리다) */
+.pet-item__img {
+  width: 3.5rem;
+  height: 3.5rem;
+  object-fit: contain;
+}
+
 /* 배경 미리보기 (2026-08-22). 비율은 실제 그림 6장의 크기(810×324)를 그대로 쓴다 —
    여기서 자르지 않고 장면 전체를 보여 준다. 방은 세로로 길어서(.pet-room 27rem) 같은
    그림의 가운데만 잘라 쓰지만, 상점에서까지 가운데만 보이면 6칸이 다 비슷한
@@ -1583,7 +1714,8 @@
   background: var(--color-paper-2);
 }
 
-.pet-item__img {
+/* 액자 안에서는 위 56px 정사각을 버리고 액자를 꽉 채운다 */
+.pet-item__thumb .pet-item__img {
   display: block;
   width: 100%;
   height: 100%;
@@ -1685,6 +1817,25 @@
 
 /* ── 토스트 ──────────────────────────────────────────────────────────────── */
 
+/* 쉬는 화면(/pet/rest) 입구. 상단 나무판을 걷으면서 유일한 입구가 사라져 여기로 내렸다.
+   각주 크기다 — 눈에 띄는 자리에서 쉬기를 권하면 "쉬어라"는 지시가 된다.
+   밑줄은 남긴다. 이 크기·이 색에서 밑줄까지 빼면 링크로 안 읽힌다 */
+.pet__rest {
+  margin: var(--space-xs) 0 0;
+  text-align: center;
+  font-size: var(--text-label);
+}
+
+.pet__rest a {
+  color: var(--color-muted);
+  text-decoration: underline;
+  text-underline-offset: 0.2em;
+}
+
+.pet__rest a:hover {
+  color: var(--tribe-cta);
+}
+
 .pet-toast {
   position: fixed;
   bottom: var(--space-lg);
@@ -1777,10 +1928,29 @@
   }
 }
 
-/* design.md는 "필수적이지 않은 움직임은 끈다"를 요구한다 */
+/* 말풍선이 나타날 때. translateX(-50%)를 유지해야 가운데 정렬이 풀리지 않는다 */
+@keyframes petBurst {
+  from {
+    opacity: 0;
+    transform: translateY(0) scale(0.6);
+  }
+  35% {
+    opacity: 1;
+  }
+  to {
+    opacity: 0;
+    transform: translateY(-3.5rem) scale(1.1);
+  }
+}
+
+/* design.md는 "필수적이지 않은 움직임은 끈다"를 요구한다.
+   새 애니메이션을 추가하면 여기에도 넣는다 — 빠뜨리면 조용히 규칙이 깨진다.
+   .pet-char__burst는 animation: none으로 두면 파티클이 그 자리에 3초간 그대로 보인다.
+   움직임 없이 "반응했다"는 신호는 남으므로 의도한 결과다. */
 @media (prefers-reduced-motion: reduce) {
   .pet-char__body,
   .pet-char__sparkle,
+  .pet-char__burst span,
   .pet-room__seed,
   .pet-toast,
   .pet-welcome {
@@ -1788,6 +1958,222 @@
   }
   .pet-gauge__fill {
     transition: none;
+  }
+}
+
+/* ── 쉼 화면 (/pet/rest) ─────────────────────────────────────────────────── */
+/*
+ * 펫 홈보다 어둡고 차분하게 간다. 색은 종족 토큰(--tribe-*)에서 파생한다 —
+ * 원안(develop)은 #1E1A17·#2A241F 같은 값을 컴포넌트 안에 하드코딩해서
+ * 종족색과 무관한 화면이 되어 있었다.
+ */
+
+.pet-rest {
+  min-height: 100vh;
+  gap: var(--space-md);
+  background: var(--color-paper-2);
+  /* 1280px 실측(2026-08-23): 폭을 안 잡으면 "고민 태우기" 입력칸이 942px이 된다.
+     모니터를 가로지르며 한 줄을 쓰는 칸이다. 42rem(672px)은 한 줄이 한글 40자 안쪽에
+     들어오는 폭이다 — 읽기 좋은 한 줄 길이(45~75자)의 아래쪽에 맞췄다.
+     이 화면은 "아무것도 안 하기"라 좁은 단이 넓은 단보다 낫다. */
+  max-width: 42rem;
+  margin-inline: auto;
+}
+
+.pet-rest__bar {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--space-2xs);
+}
+
+.pet-rest__stage {
+  display: grid;
+  justify-items: center;
+  gap: var(--space-sm);
+  padding: var(--space-lg) var(--space-md);
+  border: 3px solid var(--tribe-line);
+  border-radius: var(--radius-card);
+  background: radial-gradient(circle at 50% 30%, var(--tribe-wash), var(--color-card) 70%);
+}
+
+.pet-rest__title {
+  margin: 0;
+  font-family: var(--font-display);
+  font-size: var(--text-lg);
+  color: var(--color-ink);
+}
+
+.pet-rest__lede {
+  margin: 0;
+  max-width: 32ch;
+  text-align: center;
+  font-size: var(--text-label);
+  line-height: 1.7;
+  color: var(--color-ink-2);
+}
+
+/* 호흡 원. 지름은 JS가 --breath(0.7~1.15)로 넣는다.
+   transition을 1s로 두면 1초 타이머 사이가 메워져 계단이 보이지 않는다 */
+.pet-rest__breath {
+  position: relative;
+  display: grid;
+  place-items: center;
+  width: 11rem;
+  height: 11rem;
+}
+
+.pet-rest__breath-ring {
+  position: absolute;
+  width: 100%;
+  height: 100%;
+  border: 4px solid var(--tribe-cta);
+  border-radius: 50%;
+  background: color-mix(in oklch, var(--tribe) 16%, var(--color-card));
+  transform: scale(var(--breath, 1));
+  transition: transform 1s linear;
+}
+
+.pet-rest__breath-count {
+  position: relative;
+  font-family: var(--font-display);
+  font-size: var(--text-lg);
+  color: var(--tribe-cta);
+}
+
+.pet-rest__breath-label {
+  margin: 0;
+  font-size: var(--text-body);
+  font-weight: 700;
+  color: var(--color-ink);
+}
+
+.pet-rest__pet {
+  display: grid;
+  justify-items: center;
+  gap: var(--space-3xs);
+}
+
+.pet-rest__pet-img {
+  width: 7rem;
+  height: auto;
+  filter: drop-shadow(0 6px 10px rgb(0 0 0 / 0.12));
+}
+
+.pet-rest__pet-emoji {
+  font-size: 4rem;
+  line-height: 1;
+}
+
+.pet-rest__pet-line,
+.pet-rest__meta {
+  margin: 0;
+  text-align: center;
+  font-size: var(--text-label);
+  color: var(--color-muted);
+}
+
+/* ── 고민 태우기 ─────────────────────────────────────────────────────────── */
+
+.pet-burn {
+  display: grid;
+  gap: var(--space-2xs);
+}
+
+.pet-burn__lede {
+  line-height: 1.7;
+}
+
+.pet-burn__label {
+  font-size: var(--text-label);
+  font-weight: 700;
+  color: var(--color-ink);
+}
+
+.pet-burn__input {
+  width: 100%;
+  box-sizing: border-box;
+  padding: var(--space-2xs);
+  border: 2px solid var(--tribe-line);
+  border-radius: var(--radius-input);
+  background: var(--color-paper);
+  font: inherit;
+  font-size: var(--text-body);
+  line-height: 1.7;
+  color: var(--color-ink);
+  resize: vertical;
+}
+
+.pet-burn__input:focus-visible {
+  outline: 2px solid var(--tribe-cta);
+  outline-offset: 2px;
+}
+
+.pet-burn__done {
+  display: grid;
+  justify-items: center;
+  gap: var(--space-2xs);
+  padding: var(--space-sm) 0;
+}
+
+/* 불꽃 3개는 한 줄, 안내 문구는 그 아래 줄로 내린다(flex-basis: 100%) */
+.pet-burn__fire {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: flex-end;
+  justify-content: center;
+  gap: var(--space-2xs);
+  padding: var(--space-sm) 0;
+}
+
+.pet-burn__flame {
+  font-size: 2.25rem;
+  line-height: 1;
+  animation: pet-burn-flicker 0.7s var(--ease-in-out) infinite alternate;
+}
+
+.pet-burn__flame[data-i="2"] {
+  animation-delay: 0.2s;
+  font-size: 2.75rem;
+}
+
+.pet-burn__flame[data-i="3"] {
+  animation-delay: 0.4s;
+}
+
+.pet-burn__status {
+  margin: 0;
+  flex-basis: 100%;
+  text-align: center;
+  font-size: var(--text-label);
+  line-height: 1.7;
+  color: var(--color-ink-2);
+}
+
+.pet-burn__again {
+  justify-self: center;
+}
+
+/* 태우는 것은 연출이지 정보가 아니다. 흔들림을 끄고 크기만 남긴다 */
+@media (prefers-reduced-motion: reduce) {
+  .pet-burn__flame {
+    animation: none;
+  }
+
+  .pet-rest__breath-ring {
+    transition: none;
+  }
+}
+
+@keyframes pet-burn-flicker {
+  from {
+    transform: translateY(0) scale(1);
+    opacity: 0.85;
+  }
+  to {
+    transform: translateY(-6px) scale(1.12);
+    opacity: 1;
   }
 }
 
@@ -1814,6 +2200,11 @@
     flex-wrap: wrap;
   }
 
+  /* 모바일에서 방을 15rem(240px)으로 줄이던 규칙을 지웠다 (2026-08-23).
+     그 값은 3단 진화 시절 것이다. 4단 그림이 10rem이 되면서 .pet-char 전체 높이가
+     252px가 되어 240px 방을 12px 넘어갔고, overflow: hidden이라 펫 머리와 Lv 배지가
+     320px에서 잘렸다(실측). 대신 19.5rem(312px)로만 줄인다 — 아래 말풍선 주석의
+     여백 계산이 이 값을 쓴다 */
   .pet-room {
     min-height: 19.5rem;
   }
@@ -1838,7 +2229,24 @@
     width: 12.5rem;
     --pet-bubble-min-h: 6.25rem;
   }
+}
 
+/* 320px 실측(2026-08-23): 사이드바 레일 64px + .pet 패딩 16×2 + .pet-card 패딩 16×2 =
+   껍데기가 96px이라 "고민 태우기" 입력칸이 194px밖에 안 남았다. 한글 9자쯤에서 줄이 바뀐다.
+   레일은 전역 레이아웃(E 소유)이라 손대지 않고, 내 카드 패딩만 줄여 32px을 되돌린다.
+   360px을 기준으로 잡은 것은 이 값이 실제로 팔리는 가장 좁은 기기(iPhone SE 375,
+   Galaxy S 계열 360)의 하한이기 때문이다. */
+@media (max-width: 360px) {
+  .pet {
+    padding: var(--space-2xs);
+  }
+
+  .pet-card {
+    padding: var(--space-2xs);
+  }
+
+  /* 프리셋 4개를 2열로 내린다. 껍데기 96px을 뺀 224px에서 4열이면 한 칸이 50px이고
+     "50개"가 잘린다(--text-label 12.8px × 3자 + 패딩). 두 줄이 되는 대신 안 잘린다 */
   .pet-presets {
     grid-template-columns: repeat(2, 1fr);
   }

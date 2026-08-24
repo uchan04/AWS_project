@@ -10,7 +10,8 @@
 - 2026-08-24 완료: **모꼬지 Figma 시안 에셋 41장을 `public/images/`에 추가**(`feat/infra` `cea04c9`). 아래 "정적 UI 에셋은 DB도 S3도 아니다" 절 참고
 - 2026-08-24 완료: **`develop` → `main` 배포**(fast-forward 31커밋 `79741d0..d1c1cda`, Amplify job 14 SUCCEED). 배포본 실측 통과 — 이미지 41/41, 페이지 9장 200, 미인증 API 401, 로그아웃 303 `location: /login`, 로그인 401(500 아님 → `SESSION_SECRET` 정상). 아래 "로컬 `.env`에서만 깨지는 것 2건" 절도 함께 참고
 - 진행 중: Amplify GitHub 연동은 완료(아래 앱 ID 참고). Google 로그인 전 구간 실사용 검증(브라우저로 실제 계정 로그인)은 아직 안 했다 — OAuth 동의 화면이 "테스트" 상태면 등록된 테스트 사용자만 된다(아래 "막힌 것" 참고)
-- 미착수: 희망 문구 배너, 발표 자료
+- 미착수: 발표 자료
+- 2026-08-22 A가 넘긴 것: 희망 문구 배너 구현(`app/community/_lib/banner.ts`), `middleware.ts` 미인증 리다이렉트, `lib/ratelimit.ts` 로그인·가입 시도 제한, `/settings`(비밀번호 변경·회원 탈퇴). 아래 "다음 할 일" 3·4번이 이걸로 해소됐다
 
 ## 구현한 파일
 - `lib/auth.ts` — `getCurrentUser()`. `DEV_AUTH_BYPASS=true`면 고정 유저 upsert 스텁, 아니면 `access_token` httpOnly 쿠키를 `aws-jwt-verify`로 검증 후 `sub`으로 upsert. `Authorization` 헤더는 안 읽는다 — 문서 내비게이션(링크 클릭·주소창 이동)에는 커스텀 헤더가 안 붙어서 서버 컴포넌트 페이지를 인증할 수 없었다(`docs/STATUS.md` "외부 피드백 검증" 참고)
@@ -44,8 +45,8 @@
 ## 다음 할 일
 1. **(사용자 직접) Amplify GitHub 연동** — 아래 절차 참고. 끝나면 `main` push 시 자동 배포된다
 2. **(사용자 직접) Google Cloud OAuth 클라이언트 발급** — 위 "막힌 것" 참고
-3. 서버 컴포넌트 페이지의 미인증 리다이렉트 규칙 확정: API는 401 + `{ error: { code: "UNAUTHORIZED" } }`를 이미 쓰고 있다. 페이지 쪽(`getCurrentUser()` 직접 호출)의 미인증 처리는 각 화면 담당자가 정한다
-4. 희망 문구 배너 (상수 3~5개)
+3. ~~서버 컴포넌트 페이지의 미인증 리다이렉트 규칙 확정~~ → 2026-08-22 A가 `middleware.ts`로 정했다. 쿠키가 없으면 `/login?next=<원래 경로>`로 보낸다. 쿠키 존재만 보는 UX 게이트이고 보안 경계가 아니다(Edge 런타임에서 `lib/session.ts`의 Node crypto 검증을 못 돈다) — 실제 인증은 라우트·페이지 첫 줄의 `getCurrentUser()`가 그대로 한다
+4. ~~희망 문구 배너~~ → 해소 (`app/community/_lib/banner.ts`)
 5. 8/20부터 발표 자료 착수
 
 ## Amplify 배포 (연동 완료)
