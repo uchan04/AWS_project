@@ -52,6 +52,7 @@
 - 완료: **벤치마크 2회차 (2026-08-23)** — `함께한 기록` 카드(누적 일수·미션·출석), 레벨업 축하, 씨앗 0개 빈 상태 + `/missions` 링크, `전부` 프리셋. **방치형 카운트다운이 배경 탭에서 조용히 멈춰 있던 버그**를 절대 시각 기준으로 고쳤다(덤으로 매초 리렌더 → 분당 1회). `CALM_LINES` 5줄이 첫 페인트에만 스치는 죽은 코드였던 것도 `petMood(state, hour)`로 합쳤다. **펫 이름은 컬럼이 없어 막혔다.** 아래 절
 - 완료: **중복 요소 정리 (2026-08-23)** — 한 화면에서 같은 사실을 두 번 말하던 요소 3개를 `/pet`에서 지웠다(경험치 겹쳐쓰기·상단 씨앗 HUD·진화 헤더 효과명). 배고픔 `%`+게이지+문장, 방 씨앗 줍기+카드 받기, 상점 HUD는 **각각 다른 일을 하므로 남겼다.** 아래 절
 - 완료: **antigravity `develop` 분 선별 반영 + 쉼 화면 (2026-08-23)** — `develop`이 만든 것 중 살릴 것만 가져오고 깨진 것은 버렸다. `/pet/rest`(호흡·빗소리·고민 태우기)를 미션·DB와 완전히 분리해 새로 짰다. **곰족만 "곰가"를 보던 조사 버그**를 `withSubject()`로 고쳤다. 아래 "쉼 화면과 develop 선별 반영" 절
+- 완료: **`develop` 3차 머지 — 충돌 11곳을 하나씩 사용자 결정 (2026-08-24)** — `283033c`. 8/21·8/24 두 번의 머지와 달리 이번에는 펫 파일 4개가 정면으로 겹쳤다(`pet.css` 5 · `PetView.tsx` 3 · `SkinList.tsx` 1 · `skins/page.tsx` 1). **11곳을 사용자에게 하나씩 물어 8개 결정으로 정리했다.** 방 안의 펫은 develop 전부(반짝임 3개 · 쓰다듬기 · 반응 파티클), "그동안 쌓인 씨앗"은 develop의 별도 카드로 되돌림(`revert b0f5b78`), develop의 "함께한 기록" 카드는 안 가져옴, "오늘의 활동"은 이 브랜치 쪽(4칸), 타일 그림은 develop의 `<ArtImage>`+`petImageUrl`+`.pet-item__img`이되 **단계는 성체 고정이 아니라 유저의 현재 단계**, 좁은 화면 방 22rem·말풍선 14×7rem은 이 브랜치 쪽. **`npm run build`가 지금 `/login`에서 죽는데 이 머지 탓이 아니다** — develop `73ffe95`가 전역 `Sidebar.tsx`에 넣은 `useSearchParams`가 원인이고 E 소유 파일이라 손대지 않았다. 아래 "`develop` 3차 머지 — 충돌 11곳" 절
 
 ## 중복 요소 정리 — 같은 값을 두 번 말하지 않는다 (2026-08-23)
 
@@ -337,6 +338,113 @@ petName String? @db.VarChar(20)
 - **로컬 실행 실측 (`npm run dev` + 실 DB)** — `/pet` `/pet/skins` `/pet/cosmetics` 셋 다 200. 외형 상점은 여우 계정(별조각 130)에서 착용 중 카드(`fox-4.png` + 기본 외형 · 진단으로 받았어요)와 타일 2칸이 의도대로 갈렸다(여우 = `pet-item--on` + 일반 배지 + 착용 중 / 북극여우 = `pet-item--rare` + 희귀 배지 + 보유). 배경 상점은 `5 / 6 수집` 게이지가 배너 바로 아래, 제목 `모든 아이템 / 6개`, 메타 `🏞️ 배경 · 친밀도 600`. **착용 중인 배경이 없는 계정이라 `pet-hero`가 0개** — 폴백이 의도대로 빠졌다. CloudFront 이미지 3장 200
 - **`app/pet/loading.tsx`가 상점에도 걸린다** — 스트리밍 대기 동안 "나의 펫 / 불러오고 있어요"가 한순간 지나간다. 이번 작업 전부터 그랬고 고치지 않았다(요청 범위 밖)
 - 브라우저 확인은 남았다: 320px에서 배너 음수 마진과 장식 숨김, 탭 전환 뒤 격자 재배치
+
+## `develop` 3차 머지 — 충돌 11곳 (2026-08-24, 사용자가 하나씩 결정)
+
+`283033c`. 8/21(`develop 머지`)·8/24 오전(`develop 재머지`) 두 번은 펫 파일이 한 줄도 안 겹쳤지만, 이번에는 **같은 화면을 양쪽이 각자 고쳐 놓아 정면으로 충돌했다.** 사용자 요청이 "충돌되는 부분은 일일이 물어봐줘"였으므로 **결정은 전부 사용자가 했고 나는 선택지와 화면에 보일 결과만 만들었다.**
+
+전체 241파일 +14458/−1572. 펫 몫은 14파일 +1675/−237이고, 새로 들어온 것은 `app/components/ArtImage.tsx`, `app/pet/rest/**`(쉼 화면 3파일), `lib/assets.ts`, `lib/pet.ts` 증분이다.
+
+### 충돌한 파일과 개수
+
+| 파일 | 충돌 |
+|---|---|
+| `app/pet/pet.css` | 5 |
+| `app/pet/_components/PetView.tsx` | 3 (혼자 4였는데 아래 revert로 1개가 자동 해소됐다) |
+| `app/pet/_components/SkinList.tsx` | 1 |
+| `app/pet/skins/page.tsx` | 1 |
+
+### 작업 순서 — 물어보기 전에 작업 트리를 더럽히지 않았다
+
+`git merge`를 먼저 걸면 충돌 마커가 박힌 상태로 사용자 답을 기다려야 하고, 그 사이에 개발 서버가 깨진 파일을 읽는다. 그래서 **`git merge-tree --write-tree HEAD origin/develop`으로 머지 결과 트리만 만들어**(`12687f66…`) 11개 훵크를 전부 읽고 질문을 만든 뒤, 결정이 다 모인 다음에 실제 머지를 걸었다.
+
+### 결정 8개
+
+| # | 항목 | 결정 |
+|---|---|---|
+| ① | 방 안의 펫 (반짝임 3개 ✨⭐✨ · 쓰다듬기 버튼 · 반응 파티클) | **develop 전부** |
+| ② | "그동안 쌓인 씨앗" | **develop의 별도 카드** — 같은 날 오전의 통합을 되돌린다 |
+| ③ | develop의 "📖 함께한 기록" 카드 | **안 가져옴** |
+| ④ | "오늘의 활동" 카드 | **이 브랜치 쪽** (4칸 · 항상 표시) |
+| ⑤ | 타일 그림 구현 방식 | **develop** (`<ArtImage>` + `petImageUrl()` + `.pet-item__img`) |
+| ⑥ | 타일이 보여 줄 진화 단계 | **유저의 현재 단계** (`cappedStage(user.level, skin.stageCount)`) |
+| ⑦ | 좁은 화면 방 높이 | **22rem** (이 브랜치 쪽. develop은 19.5rem) |
+| ⑧ | 좁은 화면 말풍선 | **14 × 7rem 통일** (이 브랜치 쪽. develop은 12.5 × 6.25rem) |
+
+⑤는 **화면에 보이는 차이가 없어서 내가 정하고 결과만 알렸다.** 사용자가 "무슨 말인지 잘 모르겠어"라고 한 뒤의 조치다 — 눈에 안 보이는 내부 선택을 질문으로 내보낸 것이 잘못이었다. 다시 물을 때는 화면에 무엇이 달라지는지만 쓰고, 서로 묶인 ⑦⑧을 한 질문으로 붙였다.
+
+### ②는 손으로 고치지 않고 `revert`로 했다
+
+내 쪽이 develop보다 커밋 하나 앞서 있는 형태(`b0f5b78` "방치형 카드를 씨앗 투입 카드에 통합")였으므로, "develop 쪽을 쓴다"는 곧 그 커밋을 되돌리는 것이다. `git revert --no-edit b0f5b78`(→ `3b0d728`, +56/−112). 손으로 되돌리면 놓쳤을 것이 두 개 딸려 왔다.
+
+- `.pet-card--feed .pet-btn` 선택자가 `.pet-btn--block`으로 좁혀져 있던 것이 원래대로 돌아왔다. 그 좁힘은 줍기 버튼이 이 카드로 들어왔을 때만 필요한 것이었다
+- **PetView의 방치형 충돌 1개가 자동 해소됐다.** 충돌 4개가 3개로 줄었다
+
+### 함정 1: 마커가 엉뚱한 블록에 앉는다
+
+git이 훵크를 붙이는 자리는 의미가 아니라 줄 근접도다. 두 곳에서 어긋났다.
+
+- develop의 **타일 그림** 훵크가 SkinList의 **hero 배지**(`함께하는 중 🐾`) 블록 안으로 들어왔다
+- 내 **먹이기 버튼**이 develop의 **함께한 기록 카드** 안으로 들어왔다
+
+두 번째는 위험했다. 자동 머지된 영역에 develop의 먹이기 버튼이 이미 남아 있어서, 충돌 블록에서 내 쪽을 버리면 **같은 날 한 🌱 삭제(`60d3999`)가 조용히 사라진다.** 마커만 보고 고르면 알 수 없다. develop 버튼에 그 삭제를 다시 적용하고 중복 버튼을 지웠다.
+
+### 함정 2: 그림만 되살리면 스타일 없는 이모지가 뜬다
+
+①로 반짝임 `<span>` 3개가 PetView에 돌아왔는데, **그 CSS는 충돌이 아니라 자동 머지로 조용히 삭제된 상태였다** — 이 브랜치가 같은 날 오전에 지웠고 develop은 그 줄을 안 건드려서 "내 삭제"가 그냥 이겼다. 그대로 두면 방 왼쪽 위에 정렬 없는 이모지 세 개가 겹쳐 뜬다. `origin/develop:app/pet/pet.css`에서 되살린 것:
+
+- `.pet-char__sparkle` + `[data-i="1|2|3"]` 세 자리·세 주기
+- `@keyframes petSparkle`, `@keyframes petBurst`
+- `@media (prefers-reduced-motion: reduce)`의 항목 목록
+
+같은 목록에 있던 **`.pet-room__seed`는 일부러 빼놓았다** — 방에 떠다니던 씨앗은 요소 자체가 지워진 채이므로 그 규칙은 죽은 코드가 된다. `petFloatSeed` 히스토리 주석만 그 사실에 맞게 고쳤다.
+
+**충돌 해결의 일반 규칙으로 남긴다: 되살린 마크업의 CSS가 반대편에서 조용히 지워졌는지 반드시 확인한다.** 충돌이 안 난 자리가 더 위험하다.
+
+### 함정 3: 미디어 쿼리의 닫는 `}`가 한쪽에만 있다
+
+⑦⑧ 충돌 블록의 경계가 `@media` 안쪽을 가르고 있어서, 한쪽을 그대로 고르면 중괄호 수가 어긋난다. 해결 후 `{`/`}`를 세어 259/259를 확인했다. 그리고 내 편집 앵커가 마커 **다음** 줄에서 시작해서 `<<<<<<< HEAD` 줄 2개가 파일에 남아 있었다 — 마커 0개까지 따로 확인해야 한다.
+
+### 함정 4: 두 브랜치가 같은 필드를 각자 추가하면 자동 머지가 중복 키를 만든다
+
+`SkinRow.imageUrl`과 `skins/page.tsx`의 `imageUrl:` 둘 다 양쪽이 추가해서, **충돌 표시 없이** 중복 선언·중복 객체 키가 됐다(TS2300/TS2687/TS2717). `imageUrl: string | null`(optional 아닌 쪽) 하나로 합치고, 값은 `petImageUrl(...)` 하나만 남겼다. 주소를 `${CLOUDFRONT_DOMAIN}/${key}`로 직접 조립하던 내 판을 버린 이유는 `lib/assets.ts`의 `cdnOrigin()`이 스킴 없는 도메인 값에 `https://`를 붙여 주는데 손으로 조립하면 상대 경로가 되어 404이기 때문이다.
+
+⑤로 클래스도 develop의 `.pet-item__img`로 통일했으므로 내 `.pet-item--locked .pet-item__pet` 규칙은 지웠다 — develop의 `.pet-item--locked .pet-item__img` 하나가 외형·배경 두 화면을 다 덮는다.
+
+### 스키마 — 마이그레이션 2건이 들어왔다
+
+`20260824120000_meetup`, `20260824150000_meetup_participant_notice_reason`(D의 모임). 이 브랜치에서는 **`npx prisma generate`만 실행했다** — 안 하면 `MeetupStatus`·`prisma.meetup`·`isAdmin`이 없다고 `tsc`가 수십 개를 쏟는다. `migrate dev`는 스키마 담당 1인만, `migrate reset`은 절대 실행하지 않는다(`CLAUDE.md` 5절).
+
+### 검증 결과
+
+| 검사 | 결과 |
+|---|---|
+| 충돌 마커 잔여 | 0 (`app/pet/` 전체) |
+| `npx prisma generate` | 통과 |
+| `npm run check:pet` | "pet 체크 통과" |
+| `npx eslint app/pet` | 0 |
+| `npm run build` TypeScript 단계 | 통과 |
+| `npm run build` 전체 | **실패 — `/login`. 아래** |
+| 개발 서버 `/pet` `/pet/skins` `/pet/cosmetics` `/pet/rest` | 전부 200 |
+
+SSR HTML 실측으로 결정이 그대로 그려지는 것까지 봤다 — `pet-char__sparkle` **3개**, `pet-char__touch` 1개, `pet-card--today` 1개, `pet-card--feed` 1개, `쌓인 씨앗` 1개, **안 가져온 `pet-log` 0개**, 외형 상점의 `pet-item__img` 2개·`pet-hero__badge` 1개·**걷어낸 `pet-item__pet` 0개**. `pet-char__burst`가 0인 것은 정상이다(먹이기·쓰다듬기 반응 중에만 렌더된다).
+
+`tsc --noEmit`이 `app/api/community/meetups/**`에서 `RouteContext`·`AppRouteHandlerRoutes` 오류 10개를 냈는데 **`.next/types`의 낡은 산출물이다** — `next build`가 그 타입을 다시 만들고 TypeScript 단계를 통과시켰다. D의 파일이라 손대지 않았다.
+
+### 남은 차단: `npm run build`가 `/login`에서 죽는다 (E)
+
+```
+⨯ useSearchParams() should be wrapped in a suspense boundary at page "/login"
+Export encountered an error on /(auth)/login/page: /login, exiting the build.
+```
+
+**이 머지가 만든 것이 아니다.** 근거:
+
+- `app/(auth)/login/page.tsx`와 `app/components/Sidebar.tsx`가 `origin/develop`과 **바이트 단위로 같다.** 이 브랜치는 `app/(auth)/`를 한 번도 건드리지 않았다
+- `Sidebar.tsx`의 `useSearchParams` 개수: 머지 기준점 `01bd5d1`에서 **0**, 머지 직전 `3b0d728`에서 **0**, `origin/develop`에서 **3**
+- 넣은 커밋은 develop의 `73ffe95` "fix: 이름 바꾸기로 들어온 결과 화면에 사이드바가 없던 문제"
+
+Sidebar가 전역 레이아웃에 있으므로 `/login` 프리렌더가 Suspense 경계를 요구한다. `app/layout.tsx`·`app/(auth)/`·`app/components/Sidebar.tsx`는 **E 소유**라 이 브랜치에서 고치지 않는다(`CLAUDE.md` 1·2절). E가 Suspense로 감싸야 한다.
 
 ## `develop` 재머지와 검증 (2026-08-24)
 
