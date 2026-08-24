@@ -697,9 +697,12 @@ export default function PetView({ initial }: { initial: PetState }) {
               disabled={pending || pet.seeds < 1 || amount > pet.seeds}
               aria-disabled={pending || pet.seeds < 1 || amount > pet.seeds}
             >
-              {/* 시안대로 아이콘이 글자 앞이다. aria-hidden으로 빼 두면 버튼 이름이
-                  "씨앗 1개 먹이기"로 읽힌다 — 뒤에 있을 때는 이름 끝에 "새싹"이 붙었다 */}
-              <span aria-hidden="true">🌱</span> 씨앗 {ko(amount)}개 먹이기
+              {/* 글자 앞에 🌱이 있었다(시안대로). 2026-08-24 사용자 요청("씨앗 먹이기 버튼
+                  속 문구에서 새싹 이모티콘 삭제해줘")으로 걷었다. 스크린리더가 읽는 이름은
+                  전부터 aria-hidden 덕에 "씨앗 1개 먹이기"였으므로 이 삭제로 바뀌지 않는다.
+                  같은 카드의 제목(🌱 씨앗 투입)과 위 지갑 줄의 🌱은 그대로다 — 요청이
+                  버튼 문구 하나였다 */}
+              씨앗 {ko(amount)}개 먹이기
             </button>
 
             <p className="pet-card__foot">
