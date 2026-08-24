@@ -71,7 +71,7 @@ export type PetState = {
   attendanceDays: number
   /** 방치형으로 모여 있는(아직 안 받은) 씨앗. 배율까지 적용된 값이다 */
   idleSeeds: number
-  /** 상한(12시간분)에 닿아 누적이 멈춘 상태인지 */
+  /** 상한(IDLE_MAX_SEEDS)에 닿아 누적이 멈춘 상태인지 */
   idleCapped: boolean
   /** 다음 1개가 쌓이기까지 남은 밀리초. 상단 카운트다운에 쓴다 */
   msToNextSeed: number
@@ -206,6 +206,9 @@ export default function PetView({ initial }: { initial: PetState }) {
 
   const need = expToNextLevel(pet.level)
   const progress = expProgress(pet.level, pet.exp)
+  // 방치형 게이지 채움률 (2026-08-24 사용자 요청). 0~1로 자른다 — 서버가 상한을 넘긴 값을
+  // 보내는 경우(상한을 나중에 내리면 이미 쌓인 행이 그렇다) 막대가 카드 밖으로 자란다
+  const idleProgress = Math.min(1, Math.max(0, pet.idleSeeds / IDLE_MAX_SEEDS))
   const emoji = animalEmoji(pet.animal)
   // 단일 형태(친밀도 캐릭터)는 단계 크기를 쓰지 않는다. 중간 크기로 고정한다
   const stage = pet.stageCount > 1 ? Math.min(pet.evolutionStage, MAX_STAGE) : 2
@@ -767,14 +770,40 @@ export default function PetView({ initial }: { initial: PetState }) {
               2026-08-24 사용자 결정으로 걷었다. 수확 입구는 이 버튼 하나다.
 
               각주("가득 찼어요")는 .pet-idle 밖에 남긴다. 안에 넣으면 버튼과 같은 줄을
-              다투게 되고, 각주는 카드 전체에 붙는 말이라 자리가 카드 맨 아래가 맞다 */}
+              다투게 되고, 각주는 카드 전체에 붙는 말이라 자리가 카드 맨 아래가 맞다
+
+              2026-08-24 사용자 요청("그동안 쌓인 씨앗도 게이지 요소를 씨앗줍기버튼 왼쪽에
+              놔줘. 게이지의 최대치인 맥시멈을 200으로 둘 거야" → 같은 대화에서 **100으로
+              확정**)으로 왼쪽 상자에 게이지가 붙었다. 최대치는 화면에 적는 숫자가 아니라
+              **실제 상한**(IDLE_MAX_SEEDS)이다 — 게이지가 100에서 끝나는데 씨앗이 24에서
+              멈추면 막대가 12%를 넘지 못한다. 그래서 상한을 100개(50시간분)로 함께 올렸다
+              (lib/pet.ts IDLE_CAP_HOURS 주석에 그 결정과 수급 영향이 있다) */}
           <div className="pet-card">
             <div className="pet-idle">
               <div className="pet-idle__body">
                 <p className="pet-card__title">
                   <span aria-hidden="true">🌱</span> 그동안 쌓인 씨앗
                 </p>
-                <span className="pet-card__meta">{ko(pet.idleSeeds)}개</span>
+                {/* "N개"에서 "N / 100개"로 늘렸다. 경험치 카드가 게이지 위에 같은 형태로
+                    현재/최대를 적는다 — 분모가 없으면 막대가 어디서 끝나는지 알 수 없다 */}
+                <span className="pet-card__meta">
+                  {ko(pet.idleSeeds)} / {ko(IDLE_MAX_SEEDS)}개
+                </span>
+                {/* 경험치 게이지와 **같은 클래스**를 쓴다. 방치형용 변형을 만들지 않는 이유는
+                    두 게이지가 같은 열에 나란히 서 있어서다 — 굵기나 색이 갈리면 같은 카드
+                    묶음이 아닌 것처럼 읽힌다. 채움률만 다른 값으로 계산한다.
+                    게이지 안에 숫자를 겹쳐 쓰지 않는다(.pet-gauge__value) — 바로 위
+                    __meta가 같은 문자열을 이미 갖고 있다(경험치 카드와 같은 사정) */}
+                <div
+                  className="pet-gauge"
+                  role="progressbar"
+                  aria-label="그동안 쌓인 씨앗"
+                  aria-valuemin={0}
+                  aria-valuemax={IDLE_MAX_SEEDS}
+                  aria-valuenow={pet.idleSeeds}
+                >
+                  <div className="pet-gauge__fill" style={{ width: `${idleProgress * 100}%` }} />
+                </div>
               </div>
 
               <button
