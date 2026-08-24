@@ -361,6 +361,13 @@ model MeetupParticipant {
   joinedAt   DateTime  @default(now())
   canceledAt DateTime?
 
+  // 모임이 무산됐다는 알림을 이 유저에게 보여준 시각. null이면 아직 안 보여줬다.
+  notifiedCancelAt DateTime?
+
+  // 본인이 신청을 취소할 때 고른 사유. 건너뛸 수 있으므로 null이 정상이다.
+  // 필수로 만들지 않는다 — 취소를 어렵게 하면 말없이 안 나타나는 쪽으로 흐른다.
+  cancelReason String?
+
   meetup Meetup @relation(fields: [meetupId], references: [id])
   user   User   @relation(fields: [userId], references: [id])
 
