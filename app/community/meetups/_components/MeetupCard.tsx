@@ -15,7 +15,8 @@ const NEUTRAL_COLOR = "#9CA3AF"
 // 값을 lib/types.ts나 app/globals.css에 두지 않는다 — 둘 다 5인이 공유하는 파일이고(CLAUDE.md 1절)
 // 화면 하나 때문에 공유 색 토큰을 늘릴 이유가 없다. WriteModal.tsx가 NEUTRAL_COLOR를
 // 자기 파일에 둔 것과 같은 방식이다.
-const MEETUP_ACCENT = "#0F766E"
+// MeetupList의 결성 완료 표시가 같은 색을 쓴다. 값을 두 곳에 적어두면 한쪽만 바뀐다.
+export const MEETUP_ACCENT = "#0F766E"
 
 // 카드 진입의 순차 지연. 상한을 두지 않으면 20번째 카드가 800ms 뒤에 떠서 화면이 느려 보인다.
 const ENTER_STEP_MS = 40
@@ -57,7 +58,9 @@ export type MeetupListItem = {
 }
 
 // 어떤 요청이 진행 중인지까지 들고 있는다. 스피너는 누른 버튼에만 띄우고, 잠그는 것은 전부다.
-type PendingAction = "join" | "leave" | "confirm" | "cancel"
+// 성공한 뒤 onChanged로 그대로 올려보낸다 — MeetupList가 결성·무산일 때만 완료 표시를 띄운다.
+export type MeetupAction = "join" | "leave" | "confirm" | "cancel"
+type PendingAction = MeetupAction
 
 // 목록·카드 어디에도 참가자 명단은 없다. 명단은 관리자 전용 API로만 볼 수 있다(SPEC 8절 취지).
 export function MeetupCard({
@@ -73,7 +76,8 @@ export function MeetupCard({
   isAdmin: boolean
   index: number
   nowMs: number
-  onChanged: () => void
+  // 성공한 동작을 함께 넘긴다. 목록을 다시 읽는 것 외에 결성·무산에는 완료 표시가 따라붙는다.
+  onChanged: (action: MeetupAction) => void
 }) {
   const [pending, setPending] = useState<PendingAction | null>(null)
   const [error, setError] = useState<string | null>(null)
@@ -138,7 +142,7 @@ export function MeetupCard({
         return
       }
       closePanels()
-      onChanged()
+      onChanged(action)
       // 신규 신청에만 친밀도가 붙는다. 헤더의 재화 표시를 갱신하라고 알린다(WriteModal과 같은 이벤트).
       if (options.grantsAffinity) window.dispatchEvent(new CustomEvent("user-stats-changed"))
     } finally {
