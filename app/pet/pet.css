@@ -431,38 +431,13 @@
   opacity: 0.4;
 }
 
-/* 떠다니는 씨앗 장식. 클릭을 막지 않는다 */
-.pet-room__seeds {
-  position: absolute;
-  inset: 0;
-  overflow: hidden;
-  pointer-events: none;
-}
-
-.pet-room__seed {
-  position: absolute;
-}
-.pet-room__seed:nth-child(1) {
-  top: 15%;
-  left: 10%;
-  font-size: var(--text-md);
-  opacity: 0.6;
-  animation: petFloatSeed 3s var(--ease-in-out) infinite;
-}
-.pet-room__seed:nth-child(2) {
-  top: 25%;
-  right: 12%;
-  font-size: var(--text-body);
-  opacity: 0.5;
-  animation: petFloatSeed 3.5s var(--ease-in-out) 0.8s infinite;
-}
-.pet-room__seed:nth-child(3) {
-  bottom: 30%;
-  left: 15%;
-  font-size: var(--text-body);
-  opacity: 0.4;
-  animation: petFloatSeed 2.8s var(--ease-in-out) 1.5s infinite;
-}
+/* 떠다니는 씨앗 장식(.pet-room__seeds / .pet-room__seed 🌱🌿🍃) — 2026-08-24 사용자 요청
+   ("주위에 둥둥 떠다니는 이모티콘들 지워줘")으로 **삭제했다.**
+   방 안 세 자리(15%/10%, 25%/우12%, 하30%/15%)에서 petFloatSeed로 12px씩 오르내렸다.
+   같은 요청으로 펫 주위 반짝임(.pet-char__sparkle)도 함께 걷었으므로 이 화면에 남은
+   움직임은 펫의 petBounce와 말풍선 등장뿐이다.
+   petFloatSeed 키프레임과 prefers-reduced-motion 목록의 항목도 함께 지웠다.
+   위치·주기가 필요해지면 docs/dev/pet.md의 이 날짜 절에 값이 남아 있다 */
 
 /* ── 환영 문구 말풍선 (2026-08-23) ───────────────────────────────────────── */
 
@@ -762,26 +737,13 @@
    그때 말풍선 자리(.pet-welcome의 bottom 식 "그림 폭의 0.78배")를 배지 높이만큼 다시
    올려야 한다 — 2026-08-24부터 네 값이 아니라 식 하나다 */
 
-.pet-char__sparkle {
-  position: absolute;
-  pointer-events: none;
-}
-/* nth-of-type을 쓰지 않는다 — .pet-char 안의 형제가 전부 span이라 배지·그림자까지 세어진다 */
-.pet-char__sparkle[data-i="1"] {
-  top: -1rem;
-  left: -1.5rem;
-  animation: petSparkle 2s var(--ease-in-out) infinite;
-}
-.pet-char__sparkle[data-i="2"] {
-  top: -0.5rem;
-  right: 0;
-  animation: petSparkle 2.5s var(--ease-in-out) 0.5s infinite;
-}
-.pet-char__sparkle[data-i="3"] {
-  top: 1rem;
-  right: -1.5rem;
-  animation: petSparkle 3s var(--ease-in-out) 1s infinite;
-}
+/* 펫 주위 반짝임 3개(.pet-char__sparkle, ✨⭐✨) — 2026-08-24 사용자 요청
+   ("주위에 둥둥 떠다니는 이모티콘들 지워줘")으로 **삭제했다.** 방의 떠다니는 씨앗
+   (.pet-room__seeds 주석)과 같은 요청이다.
+   상자 밖 세 자리(위-왼 -1/-1.5rem, 위-오 -0.5rem/0, 오른-아래 1/-1.5rem)에서 petSparkle로
+   깜빡였다. data-i로 구분했던 이유는 .pet-char 안의 형제가 전부 span이라 nth-of-type이
+   그림자까지 세었기 때문이다 — 되살릴 때도 그 규칙이 그대로 필요하다.
+   petSparkle 키프레임과 prefers-reduced-motion 목록의 항목도 함께 지웠다 */
 
 .pet-char__body {
   display: grid;
@@ -2442,29 +2404,11 @@
    위 petBounce의 -50% 붙은 사본이었다(가운데 정렬과 움직임이 같은 transform을 쓰므로
    사본이 필요했다). 배지를 되살리면 이 키프레임도 같이 되살려야 한다 */
 
-@keyframes petFloatSeed {
-  0%,
-  100% {
-    transform: translateY(0) rotate(0deg);
-    opacity: 0.7;
-  }
-  50% {
-    transform: translateY(-12px) rotate(15deg);
-    opacity: 1;
-  }
-}
-
-@keyframes petSparkle {
-  0%,
-  100% {
-    opacity: 0;
-    transform: scale(0.5) rotate(0deg);
-  }
-  50% {
-    opacity: 1;
-    transform: scale(1) rotate(180deg);
-  }
-}
+/* petFloatSeed(씨앗 장식) · petSparkle(펫 주위 반짝임) — 2026-08-24 삭제.
+   두 키프레임을 쓰던 요소가 같은 날 사용자 요청으로 전부 걷혔다
+   (.pet-room__seeds·.pet-char__sparkle 자리의 주석). 값은
+   petFloatSeed = translateY(0 → -12px) + rotate(15deg) + opacity(0.7 → 1),
+   petSparkle = opacity(0 → 1) + scale(0.5 → 1) + rotate(180deg)였다 */
 
 @keyframes petSlideIn {
   from {
@@ -2477,11 +2421,10 @@
   }
 }
 
-/* design.md는 "필수적이지 않은 움직임은 끈다"를 요구한다 */
+/* design.md는 "필수적이지 않은 움직임은 끈다"를 요구한다.
+   .pet-char__sparkle·.pet-room__seed도 여기 있었다 — 2026-08-24에 두 요소가 삭제됐다 */
 @media (prefers-reduced-motion: reduce) {
   .pet-char__body,
-  .pet-char__sparkle,
-  .pet-room__seed,
   .pet-toast,
   .pet-welcome {
     animation: none;

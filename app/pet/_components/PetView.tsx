@@ -379,11 +379,12 @@ export default function PetView({ initial }: { initial: PetState }) {
         <div className="pet__col pet__col--room">
           <div className="pet-room">
             <PetRoom imageUrl={pet.roomImageUrl} />
-            <div className="pet-room__seeds" aria-hidden="true">
-              <span className="pet-room__seed">🌱</span>
-              <span className="pet-room__seed">🌿</span>
-              <span className="pet-room__seed">🍃</span>
-            </div>
+
+            {/* 여기 떠다니는 씨앗 장식 3개(🌱🌿🍃)가 있었다 — 2026-08-24 사용자 요청
+                ("주위에 둥둥 떠다니는 이모티콘들 지워줘")으로 걷었다. 펫 주위의 반짝임
+                3개(✨⭐✨)도 같은 요청으로 함께 걷었다(아래 .pet-char 주석).
+                CSS(.pet-room__seeds·.pet-room__seed)와 petFloatSeed 키프레임도 함께 지웠다.
+                방을 채우는 것은 배경 그림과 펫뿐이다 */}
 
             {/* 펫 대사 (2026-08-23 사용자 요청). 20문장 전부 사용자가 직접 쓴 것이다.
                 들어오면 접속 인사(서버가 고른다), 5분마다 평상시 대사로 넘어간다.
@@ -440,18 +441,13 @@ export default function PetView({ initial }: { initial: PetState }) {
                 좁은 화면에서는 말풍선과 배지가 겹쳤다(위 .pet-welcome 주석의 계산).
                 레벨은 아래 진화 카드의 "현재 Lv.N"에 그대로 있으므로 정보가 사라지지 않는다.
                 배지 CSS(.pet-char__badge)와 petBounceBadge 키프레임도 함께 걷었다 */}
+            {/* 펫 주위를 돌던 반짝임 3개(✨⭐✨, data-i로 위치·타이밍이 달랐다)를
+                2026-08-24 사용자 요청("주위에 둥둥 떠다니는 이모티콘들 지워줘")으로 걷었다.
+                CSS(.pet-char__sparkle[data-i])와 petSparkle 키프레임, prefers-reduced-motion
+                목록의 항목도 함께 지웠다. 이 상자에 남는 것은 그림과 그림자 두 줄이다 —
+                그림자 자리(pet.css의 bottom·margin-top 한 쌍)는 반짝임과 무관하므로
+                걷어도 펫 위치가 움직이지 않는다 */}
             <div className="pet-char" data-stage={stage}>
-              {/* 반짝임 3개. 위치·타이밍이 각각 달라 pet.css가 data-i로 구분한다 */}
-              <span className="pet-char__sparkle" data-i="1" aria-hidden="true">
-                ✨
-              </span>
-              <span className="pet-char__sparkle" data-i="2" aria-hidden="true">
-                ⭐
-              </span>
-              <span className="pet-char__sparkle" data-i="3" aria-hidden="true">
-                ✨
-              </span>
-
               <span className="pet-char__body" aria-hidden="true">
                 {petFace}
               </span>
