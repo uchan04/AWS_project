@@ -12,7 +12,8 @@
     "db:seed": "tsx prisma/seed.ts",
     "check:reward": "tsx scripts/check-reward.ts",
     "check:pet": "tsx scripts/check-pet.ts",
-    "check:diagnosis": "tsx scripts/check-diagnosis.ts"
+    "check:diagnosis": "tsx scripts/check-diagnosis.ts",
+    "check:attendance": "tsx scripts/check-attendance.ts"
   },
   "prisma": {
     "seed": "tsx prisma/seed.ts"

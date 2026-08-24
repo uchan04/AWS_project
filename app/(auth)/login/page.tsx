@@ -42,7 +42,7 @@ export default function LoginPage() {
           <div className="hm-card__head">
             <h1 className="hm-card__title">로그인</h1>
           </div>
-          <p className="hm__note">함께 걷는 하루에 다시 오신 걸 환영해요</p>
+          <p className="hm__note">모꼬지에 다시 오신 걸 환영해요</p>
 
           <form className="hm-auth__form" onSubmit={onSubmit}>
             <div className="hm-field">
