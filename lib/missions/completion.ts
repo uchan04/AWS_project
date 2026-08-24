@@ -1,4 +1,4 @@
-import type { User, PetSkin } from "@prisma/client"
+import type { User, PetSkin, Mission } from "@prisma/client"
 import { prisma } from "@/lib/prisma"
 import { calculateReward, capAffinity } from "@/lib/reward"
 import { getTodayKey, getToday } from "./reset"
@@ -15,6 +15,24 @@ export type MissionCompletionResult = {
 
 type ActorWithSkin = User & { activePetSkin: PetSkin | null }
 
+// Mission은 prisma/seed로만 채워지는 정적 표(17행)다. 유저 요청마다 다시 읽을 이유가 없어
+// 프로세스 메모리에 한 번만 담는다. RDS 왕복이 약 200~390ms라 이 한 번이 체감에 그대로 남는다.
+// 시드가 갱신되면 서버를 다시 띄워야 반영된다 — 미션 문구·보상 변경은 배포 단위 작업이라
+// 그 제약을 받아들이는 쪽이 매 요청 왕복을 내는 것보다 낫다.
+let missionCache: { byId: Map<string, Mission>; byCode: Map<string, Mission>; dailyCount: number } | null = null
+
+async function getMissionCache() {
+  if (!missionCache) {
+    const missions = await prisma.mission.findMany()
+    missionCache = {
+      byId: new Map(missions.map((m) => [m.id, m])),
+      byCode: new Map(missions.map((m) => [m.code, m])),
+      dailyCount: missions.filter((m) => m.scope === "DAILY").length,
+    }
+  }
+  return missionCache
+}
+
 /**
  * 일반 미션 완료 공통 함수.
  * P2002는 중복으로 보고 idempotent 결과 반환.
@@ -24,13 +42,18 @@ export async function completeMission(params: {
   missionId: string
   resetKey: string
   photoKey?: string
+  /** 이미 조회해 둔 Mission. 있으면 재조회하지 않는다 */
+  mission?: Mission
 }): Promise<MissionCompletionResult> {
   const { actor, missionId, resetKey, photoKey } = params
 
-  const mission = await prisma.mission.findUnique({ where: { id: missionId } })
+  const mission = params.mission ?? (await getMissionCache()).byId.get(missionId)
   if (!mission) {
     throw new Error("미션을 찾을 수 없습니다")
   }
+
+  // 트랜잭션 안에서 캐시를 채우면 첫 요청의 트랜잭션이 그만큼 길어진다. 미리 읽어 둔다
+  const dailyMissionTotal = mission.scope === "DAILY" ? (await getMissionCache()).dailyCount : 0
 
   try {
     await prisma.$transaction(async (tx) => {
@@ -93,7 +116,8 @@ export async function completeMission(params: {
           },
         })
 
-        const dailyTotal = await tx.mission.count({ where: { scope: "DAILY" } })
+        // 일일 미션 개수는 시드 고정값이라 트랜잭션 안에서 세지 않는다(위 캐시에서 읽는다)
+        const dailyTotal = dailyMissionTotal
 
         if (dailyCount >= dailyTotal) {
           // 오늘 전부 완료
@@ -162,16 +186,29 @@ export async function completeMissionByCode(params: {
 }): Promise<MissionCompletionResult> {
   const { actor, code } = params
 
-  const mission = await prisma.mission.findUnique({ where: { code } })
+  const mission = (await getMissionCache()).byCode.get(code)
   if (!mission) {
     throw new Error(`미션을 찾을 수 없습니다: ${code}`)
   }
 
   const today = getTodayKey()
 
+  // 이미 완료한 미션이면 트랜잭션을 열지 않는다. 챗봇·글쓰기는 하루에 여러 번 호출되고
+  // 두 번째부터는 전부 P2002로 롤백됐다 — 실패하는 트랜잭션이 왕복 약 830ms를 먹었다.
+  // 유니크 조회 1회(약 200ms)로 갈아탄다. 경합 시에도 아래 completeMission이 P2002를
+  // 잡으므로 이 선판정이 틀려도 결과는 같다.
+  const already = await prisma.userMission.findUnique({
+    where: { userId_missionId_resetKey: { userId: actor.id, missionId: mission.id, resetKey: today } },
+    select: { id: true },
+  })
+  if (already) {
+    return { newlyCompleted: false, missionId: mission.id, reward: { seeds: 0, starShards: 0, affinity: 0 } }
+  }
+
   return completeMission({
     actor,
     missionId: mission.id,
     resetKey: today,
+    mission,
   })
 }

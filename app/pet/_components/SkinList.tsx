@@ -113,7 +113,8 @@ export default function SkinList({
         <div className="pet__top-acts">
           {/* 잔액이 이 화면에만 있으므로 홈의 씨앗 HUD처럼 aria-hidden으로 묻지 않는다 */}
           <p className="pet-hud" aria-label={`별조각 ${ko(starShards)}`}>
-            <span className="pet-hud__icon pet-hud__icon--wood" aria-hidden="true">
+            {/* --wood 변형은 2026-08-21에 지웠다. 아이콘 칸이 종족색 하나로 통일됐다 */}
+            <span className="pet-hud__icon" aria-hidden="true">
               ⭐
             </span>
             <span className="pet-hud__value" aria-hidden="true">

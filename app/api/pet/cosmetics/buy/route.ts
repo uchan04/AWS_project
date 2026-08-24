@@ -1,5 +1,6 @@
 import { fail, ok } from "@/lib/api"
 import { UnauthorizedError, getCurrentUser } from "@/lib/auth"
+import { cosmeticLabel } from "@/lib/pet"
 import { prisma } from "@/lib/prisma"
 
 // 소유자: C. 친밀도 전용 치장 구매. (SPEC.md 5절)
@@ -84,8 +85,15 @@ export async function POST(request: Request) {
       return fail("NOT_ENOUGH_AFFINITY", `친밀도가 부족합니다 (${price} 필요)`)
     }
 
-    // 수집 진행률의 분자가 늘었으므로 같이 돌려준다. 화면이 진행률 바를 다시 그린다
-    return ok({ itemId: item.id, name: item.name, affinity: result.affinity, owned: result.owned })
+    // 수집 진행률의 분자가 늘었으므로 같이 돌려준다. 화면이 진행률 바를 다시 그린다.
+    // name은 DB에 코드로 들어 있어(2026-08-22) 표시명으로 바꿔 내린다 —
+    // 구매 완료 문구에 그대로 쓰이는 값이라 코드가 새면 "autumn_path 구매 완료"가 된다
+    return ok({
+      itemId: item.id,
+      name: cosmeticLabel(item.name),
+      affinity: result.affinity,
+      owned: result.owned,
+    })
   } catch (error) {
     if (error instanceof UnauthorizedError) return fail("UNAUTHORIZED", error.message, 401)
     console.error("[POST /api/pet/cosmetics/buy]", error)

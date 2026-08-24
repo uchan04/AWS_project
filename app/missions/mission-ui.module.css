@@ -121,3 +121,234 @@
 .missionSlideOut {
   animation: missionSlideOut 0.28s ease-in forwards;
 }
+
+/* ─── 출석 캘린더 ─────────────────────────────────────────────────────────── */
+/* 색은 미션 페이지가 이미 쓰는 값만 재사용한다 — 베이지 #F5F0E8, 갈색 글자 #9A8A76·
+   #7A6B58, 제목 #2A1F14, 테두리 #DDD0BC, 밝은 카드 #FDFBF5, 오류 #A9542A.
+   파랑은 종족 강조색(color)과 연한 배경(bg)이 인라인 style로 들어온다.
+   구성은 세 영역뿐이다: 제목·연월 / 날짜 7칸(또는 월간) / 오늘 상태 문구.
+   출석은 오늘 날짜 칸을 눌러서 한다 — 별도 출석 버튼을 두지 않는다 */
+
+.attCard {
+  border-radius: 16px;
+  padding: 18px 18px 16px;
+}
+
+.attHead {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 10px;
+  margin-bottom: 12px;
+}
+
+.attTitle {
+  font-family: 'Gowun Dodum', sans-serif;
+  font-size: 16px;
+  color: #2A1F14;
+  margin: 0;
+}
+
+/* 연월 글자 자체가 월간 보기 토글이다. 테두리 없는 텍스트 버튼 */
+.attMonthLabel {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  border: none;
+  background: none;
+  padding: 4px 2px;
+  font-family: inherit;
+  font-size: 13px;
+  font-weight: 700;
+  color: #7A6B58;
+  white-space: nowrap;
+  cursor: pointer;
+}
+
+.attMonthLabel:hover {
+  color: #2A1F14;
+}
+
+.attMonthCaret {
+  font-size: 10px;
+  line-height: 1;
+}
+
+/* 날짜 7칸 */
+.attDays,
+.attWeekdays,
+.attMonthWeek {
+  display: grid;
+  grid-template-columns: repeat(7, minmax(0, 1fr));
+  gap: 8px;
+}
+
+.attCell {
+  width: 100%;
+  min-width: 0;
+  min-height: 48px;
+  border: 1.5px solid transparent;
+  border-radius: 11px;
+  padding: 7px 2px;
+  font-family: inherit;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 2px;
+  overflow: hidden;
+  cursor: default;
+}
+
+/* 오늘이고 아직 안 받은 칸만 누를 수 있다 */
+.attCell:not(:disabled),
+.attMonthCell:not(:disabled) {
+  cursor: pointer;
+}
+
+.attCellWeekday {
+  font-size: 11px;
+  font-weight: 600;
+  line-height: 1;
+  opacity: 0.8;
+}
+
+.attCellDay {
+  font-size: 14px;
+  font-weight: 700;
+  line-height: 1.1;
+  display: flex;
+  align-items: center;
+  gap: 2px;
+  white-space: nowrap;
+}
+
+.attCellCheck {
+  font-size: 9px;
+  line-height: 1;
+}
+
+.attStatus {
+  margin-top: 12px;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 6px;
+}
+
+.attStatusPrompt {
+  font-size: 13px;
+  color: #7A6B58;
+  margin: 0;
+}
+
+.attStatusDone {
+  font-size: 13px;
+  margin: 0;
+}
+
+.attError {
+  font-size: 12px;
+  color: #A9542A;
+  text-align: center;
+  margin: 0;
+}
+
+.attErrorRow {
+  margin-top: 10px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+}
+
+.attRetry {
+  border: 1px solid #DDD0BC;
+  border-radius: 8px;
+  background: #FDFBF5;
+  color: #7A6B58;
+  font-size: 10px;
+  font-weight: 700;
+  padding: 3px 8px;
+  cursor: pointer;
+}
+
+.attWeekdays {
+  margin-bottom: 6px;
+}
+
+.attWeekday {
+  font-size: 10px;
+  font-weight: 600;
+  color: #9A8A76;
+  line-height: 1;
+  text-align: center;
+}
+
+.attMonthWeek {
+  margin-top: 6px;
+}
+
+/* 월간도 주간과 같은 둥근 사각형. 원형은 쓰지 않는다 */
+.attMonthCell {
+  min-width: 0;
+  min-height: 34px;
+  border: 1.5px solid transparent;
+  border-radius: 10px;
+  padding: 4px 0;
+  font-family: inherit;
+  font-size: 12px;
+  font-weight: 700;
+  line-height: 1.1;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 2px;
+  cursor: default;
+}
+
+/* 월 시작 전·종료 후 빈 칸. 열만 차지한다 */
+.attPad {
+  min-height: 1px;
+}
+
+/* 달이 바뀌는 순간 기록을 다시 읽는 동안 높이가 튀지 않게 자리를 잡아둔다 */
+.attSkeleton {
+  min-height: 226px;
+  border-radius: 11px;
+  background: #F5F0E8;
+  opacity: 0.6;
+}
+
+@media (max-width: 520px) {
+  .attCard {
+    padding: 16px 14px 14px;
+  }
+
+  .attDays,
+  .attWeekdays,
+  .attMonthWeek {
+    gap: 4px;
+  }
+
+  .attCell {
+    min-height: 44px;
+  }
+
+  /* 좁은 폭에서는 "일"을 떼고 숫자만 남긴다. 잘리는 것보다 낫다 */
+  .attCellSuffix {
+    display: none;
+  }
+
+  .attCellWeekday {
+    font-size: 9px;
+  }
+
+  .attCellDay {
+    font-size: 12px;
+  }
+
+  .attMonthLabel {
+    font-size: 12px;
+  }
+}

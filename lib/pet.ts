@@ -99,6 +99,49 @@ export function animalEmoji(animal: string): string {
   return base ? ANIMAL_EMOJI[base] : "🐾"
 }
 
+// ── 배경 6종 — 코드·표시명·이미지 (2026-08-22 사용자 지정) ────────────────────
+//
+// DB(CosmeticItem.name)에는 **코드**를 저장하고("autumn_path") 화면에는 표시명을
+// 보여 준다("노을빛 단풍길").
+//
+// 스키마에 code 컬럼을 새로 만들지 않았다. prisma/schema.prisma는 5인 합의 파일이고
+// 컬럼 추가는 공유 DB 마이그레이션이다(CLAUDE.md 1·5절) — 마감 하루 전에 혼자 낼 변경이
+// 아니다. name이 이미 유니크 upsert 키라 코드가 들어갈 자리로 맞고, 표시명이 바뀌어도
+// 키가 흔들리지 않는다는 이점이 오히려 있다(옛 "배경1"~"배경6"은 이름을 고칠 때마다
+// 시드가 새 행을 만들 위험이 있었다. prisma/seed/items.ts의 pruneCosmetics 주석 참고).
+//
+// 이 배열의 순서가 곧 상점 진열 순서다(아래 compareCosmetics가 인덱스로 정렬한다).
+// 사용자가 준 순서를 그대로 둔다 — 코드 가나다순으로 정렬하면 aurora_field가 맨 앞으로
+// 와서 계절 흐름(가을 → 숲 → 봄 → 오로라 → 빙해 → 겨울)이 깨진다.
+//
+// imageKey는 S3 실제 파일명이다. 파일명(forest-autumn-*)과 장면이 어긋나 보이는 것은
+// 생성 배치 이름이 그대로 붙었기 때문이고, 어느 키가 어느 장면인지는 그림을 열어 확인했다.
+// prisma/seed/items.ts와 화면이 이 한 배열을 함께 쓴다 — 두 곳에 적으면 조용히 갈라진다.
+export const BACKGROUNDS = [
+  { code: "autumn_path", label: "노을빛 단풍길", imageKey: "backgrounds/forest-autumn-0-0.png" },
+  { code: "forest_camp", label: "숲 속 캠프", imageKey: "backgrounds/forest-autumn-0-1.png" },
+  { code: "spring_garden", label: "봄날의 정원", imageKey: "backgrounds/forest-autumn-1-0.png" },
+  { code: "aurora_field", label: "오로라 들판", imageKey: "backgrounds/forest-autumn-1-1.png" },
+  { code: "frozen_ocean", label: "푸른 빙해", imageKey: "backgrounds/forest-autumn-2-0.png" },
+  { code: "winter_village", label: "눈꽃 마을", imageKey: "backgrounds/forest-autumn-2-1.png" },
+] as const
+
+const LABEL_BY_CODE = new Map(BACKGROUNDS.map((bg) => [bg.code as string, bg.label as string]))
+const ORDER_BY_CODE = new Map(BACKGROUNDS.map((bg, i) => [bg.code as string, i]))
+
+/**
+ * 코드 → 화면에 띄울 이름. 모르는 코드는 그대로 돌려준다 —
+ * 옛 이름("배경1")이 남은 DB나 나중에 추가된 아이템이 빈 칸으로 보이지 않게 한다.
+ */
+export function cosmeticLabel(code: string): string {
+  return LABEL_BY_CODE.get(code) ?? code
+}
+
+/** 진열 순서. 목록에 없는 코드는 뒤로 보낸다 */
+function cosmeticOrder(code: string): number {
+  return ORDER_BY_CODE.get(code) ?? Number.MAX_SAFE_INTEGER
+}
+
 // ── 치장 목록 정렬 (SPEC.md 5절) ──────────────────────────────────────────────
 //
 // 화면(app/pet/cosmetics/page.tsx)과 API(app/api/pet/cosmetics)가 같은 목록을 만든다.
@@ -107,7 +150,13 @@ export function animalEmoji(animal: string): string {
 export const COSMETIC_SLOT_ORDER: readonly Slot[] = ["HAT", "SCARF", "BACKGROUND"]
 export const COSMETIC_RARITY_ORDER: readonly Rarity[] = ["COMMON", "RARE", "EPIC", "LEGENDARY"]
 
-/** 슬롯 → 등급 → 이름 순. 화면이 매번 같은 순서로 보이게 고정한다 */
+/**
+ * 슬롯 → 등급 → 진열 순서 → 이름 순. 화면이 매번 같은 순서로 보이게 고정한다.
+ *
+ * 2026-08-22: 이름이 코드가 되면서 진열 순서 단계가 들어왔다. 코드 가나다순으로는
+ * 사용자가 정한 순서(가을 → … → 겨울)가 나오지 않는다. BACKGROUNDS에 없는 이름끼리는
+ * 인덱스가 같아 그대로 가나다순으로 떨어진다.
+ */
 export function compareCosmetics(
   a: { slot: Slot; rarity: Rarity; name: string },
   b: { slot: Slot; rarity: Rarity; name: string },
@@ -115,6 +164,7 @@ export function compareCosmetics(
   return (
     COSMETIC_SLOT_ORDER.indexOf(a.slot) - COSMETIC_SLOT_ORDER.indexOf(b.slot) ||
     COSMETIC_RARITY_ORDER.indexOf(a.rarity) - COSMETIC_RARITY_ORDER.indexOf(b.rarity) ||
+    cosmeticOrder(a.name) - cosmeticOrder(b.name) ||
     a.name.localeCompare(b.name, "ko")
   )
 }
@@ -188,45 +238,111 @@ export function idleAccrual(lastClaimAt: Date | null, now: Date): IdleAccrual {
   }
 }
 
-// ── 배고픔 (2026-08-21 추가. SPEC.md 5절) ─────────────────────────────────────
+// ── 배고픔 — 삭제 (2026-08-21 사용자 결정) ────────────────────────────────────
 //
-// 마지막으로 씨앗을 먹인 시각(User.lastFedAt)에서 경과한 시간만으로 정해진다.
-// 100 = 배부름, 0 = 비었음. 컬럼 하나(lastFedAt)로 끝나게 이렇게 잡았다 —
-// hunger 값을 따로 저장하면 화면을 열 때마다 감쇠분을 써야 해서 읽기가 쓰기가 된다
-// (방치형 씨앗을 페이지 로드 때 지급하지 않는 것과 같은 이유다).
+// 하루 만에 넣고 뺐다. 있던 것: `lastFedAt`에서 경과 시간만으로 100 → 0을 24시간에
+// 선형 감쇠시켜 게이지로 보여 주는 표시 전용 값(`hungerFor`·`hungerLabel`·`HUNGER_*`).
+// 게이지가 있던 자리는 재화 3종(씨앗·별조각·친밀도) + 상점 입구 2개가 대신 쓴다.
 //
-// 투입한 씨앗 개수는 배고픔에 영향을 주지 않는다. 1개를 먹여도 100이 된다.
-// "얼마나 먹였나"는 이미 경험치가 표현하고, 배고픔은 "얼마나 들여다봤나"만 본다.
+// `User.lastFedAt` 컬럼은 남겨 뒀다. 이유 두 가지다.
+// - "일단 삭제"라서 되살릴 수 있어야 한다. 계산식이 시각 하나만 보므로 컬럼이 남아 있으면
+//   이 함수를 다시 붙이는 것으로 끝난다. 컬럼을 지웠다 되살리면 그 사이 기록이 비어
+//   전원이 만복으로 리셋된다
+// - `prisma/schema.prisma`는 5인 공유 파일이고 컬럼 드롭은 공유 DB 마이그레이션이다
+//   (CLAUDE.md 1·5절). 개발 마감 하루 전에 혼자 낼 변경이 아니다
 //
-// 배고픔이 0이 되어도 잃는 것은 없다. 재화·경험치·단계에 손대지 않는 표시 전용 값이다.
-// 대상 이용자에게 벌점형 압박을 주지 않는다는 SPEC.md 5절 취지(랭킹·경쟁 지표 배제)와
-// 같은 이유다. 여기에 페널티를 붙이려면 명세를 먼저 고친다.
-export const HUNGER_MAX = 100
-/** 배부름 100에서 0까지 걸리는 시간. 하루 한 번 들여다보면 유지되는 값이다 */
-export const HUNGER_EMPTY_HOURS = 24
-/** 이 값 아래면 화면이 경고색으로 바뀐다 */
-export const HUNGER_LOW = 30
+// 그래서 `POST /api/pet/feed`는 `lastFedAt`을 계속 쓴다. 읽는 곳은 아직 없다.
+// (2026-08-23에 아래 환영 문구가 잠깐 이 값을 읽었다가, 같은 날 사용자가 "날짜와 상관없이"로
+//  정해 다시 안 읽게 됐다. 컬럼을 남겨 둔 이유는 그대로 위 두 가지다)
+
+// ── 펫 대사 (2026-08-23) ──────────────────────────────────────────────────────
+//
+// 방에 들어오면 펫이 말풍선으로 한 줄을 건네고, 머무는 동안 평상시 대사로 바뀐다.
+// 목적은 **죄책감을 주지 않는 복귀**다 — 이 앱의 타겟은 실패 경험이 누적된 사람이고
+// (우울 57% · 소진 85%), 안 온 것을 지적하는 화면을 만나면 "또 실패했다"의 증거가 하나 더
+// 생겨 그 자리에서 앱을 지운다. 배고픔 게이지를 걷어낸 것과 같은 판단이며, 이 대사들이
+// 그 자리를 반대 방향으로 메운다.
+//
+// **문장은 전부 사용자가 직접 쓴 것이다 (2026-08-23).** 한 글자도 바꾸지 않았다.
+// 고칠 일이 있으면 임의로 다듬지 말고 사용자에게 확인한다.
+//
+// 이 기능은 하루에 세 번 모양이 바뀌었다. 기록으로 남긴다 —
+//  1차: 비운 일수로 3구간(2~3일 / 4~6일 / 7일 이상, 이틀 미만은 안 띄움)
+//  2차: 사용자가 "날짜랑 상관 없게" → 일수 계산·구간 분기를 전부 걷고 고정 한 줄
+//  3차: 사용자가 접속 10문장 + 평상시 10문장을 직접 써서 넘김 → 지금 이 형태
+// 2차에서 마지막 접속 시각(`max(lastFedAt, lastIdleClaimAt)`)을 안 보게 됐고 그건 그대로다.
+// 시계 오차·미래 시각·"새 유저는 기준이 없다" 같은 경계 처리가 이 기능에는 없다.
+//
+// 남은 규칙은 하나다. **비운 일수를 문장에 넣지 않는다** — "3일 만이네요"는 사실이지만
+// 질책으로 읽힌다. 사용자가 준 20문장 전부 이 규칙을 지킨다(일수를 아예 세지 않는다).
+// `scripts/check-pet.ts`가 일수 표현을 못 박는다 — 나중에 문장을 보태는 사람이 규칙을
+// 모르고 "며칠 만이야?"를 넣으면 거기서 걸린다.
+//
+// 내가 앞서 세웠던 톤 규칙 두 개는 사용자 결정으로 사라졌다.
+//  - "느낌표를 쓰지 않는다" → 사용자 문장이 느낌표를 쓴다. 밝은 반말이 이 펫의 목소리다
+//  - "펫이 기다렸다·보고 싶었다는 암시를 넣지 않는다" → 사용자가 그 표현을 직접 골랐다
+//    ("기다리고 있었어", "보고 싶었는데 딱 왔네"). 돌봄을 부채로 만든다고 봤던 판단을
+//    사용자가 뒤집었다
+// 다만 펫이 **나빠졌다**는 표현(외로웠어·아팠어·힘들었어)은 20문장에 없고, 넣지 않는다.
+// 기다림은 애정이고 악화는 처벌이다 — 경계는 거기다.
 
 /**
- * 배고픔 0~100. since는 User.lastFedAt이고, 한 번도 먹인 적이 없으면
- * 호출부가 User.createdAt을 넘긴다 — 기준 시각이 아예 없으면 감쇠를 계산할 수 없고,
- * 그렇다고 신규 유저에게 0을 보여 주면 시작부터 굶긴 것처럼 보인다.
+ * 접속했을 때. 페이지에 들어오면 이 중 하나가 말풍선에 뜬다.
+ * 사용자가 쓴 문장이다 — 순서·표기·느낌표를 그대로 둔다.
  */
-export function hungerFor(since: Date | null, now: Date): number {
-  if (!since) return HUNGER_MAX
+export const PET_GREETINGS = [
+  "왔네! 기다리고 있었어.",
+  "오늘도 와줬네! 반가워~",
+  "왔어? 나 방금 네 생각하고 있었어!",
+  "어, 왔다! 오늘은 무슨 하루였어?",
+  "오늘도 안녕! 잘 왔어!",
+  "보고 싶었는데 딱 왔네!",
+  "왔구나! 나랑 조금 놀다 갈래?",
+  "오늘은 어떤 기분이야? 나는 네가 와서 좋아.",
+  "네가 오니까 갑자기 여기가 덜 조용해졌어.",
+  "기다리다 보니까 네가 왔네. 오늘도 만나서 반가워!",
+] as const
 
-  const elapsed = now.getTime() - since.getTime()
-  // 기준 시각이 미래면(시계 오차·수동 수정) 감쇠하지 않는다
-  if (elapsed <= 0) return HUNGER_MAX
+/**
+ * 평상시. 인사 뒤에 머무는 동안 하나씩 바뀐다.
+ *
+ * 질문형이 많은데 답을 받는 입력칸은 두지 않았다(명세에 없다. 대화는 7절 챗봇이 한다).
+ * 답하지 않아도 되는 질문이 이 화면의 성격에 맞다 — 혼잣말을 옆에서 듣는 쪽이다.
+ */
+export const PET_IDLE_LINES = [
+  "오늘 하늘 봤어? 나는 못 봤지만 궁금해!",
+  "그냥 있는 게 제일 좋을 때도 있는 거잖아.",
+  "나 방금 네 생각하고 있었어!",
+  "오늘은 뭐 먹었어? 나는 네가 뭘 먹었는지 궁금해.",
+  "창밖에 뭐가 보일까? 나는 여기서 상상하고 있어.",
+  "오늘 하루도 천천히 흘러가고 있네.",
+  "아무 일 없는 날도 나쁘지 않은 것 같아.",
+  "혹시 지금 조금 쉬고 있어? 나도 같이 쉴래.",
+  "네가 없어도 나는 여기 있을게.",
+  "오늘 하루 중에 제일 기억에 남는 순간은 뭐였을까?",
+] as const
 
-  const spanMs = HUNGER_EMPTY_HOURS * MS_PER_HOUR
-  const left = HUNGER_MAX * (1 - elapsed / spanMs)
-  return Math.max(0, Math.min(HUNGER_MAX, Math.floor(left)))
+/**
+ * 문자열에서 문구 인덱스를 뽑는다. 문자 코드 합의 나머지다 — 암호용이 아니라
+ * "매번 같은 문장만 보이지 않게" 흩기 위한 것이므로 이 정도로 충분하다.
+ *
+ * `Math.random()`을 쓰지 않는 이유가 있다. 이 값을 서버 컴포넌트에서 정하는데(app/pet/page.tsx)
+ * 렌더마다 달라지면 하이드레이션에서 서버 HTML과 클라이언트 첫 렌더가 어긋난다.
+ * 같은 입력에 같은 값이 나와야 한다.
+ */
+export function lineIndex(seed: string, count: number): number {
+  if (count <= 0) return 0
+  let sum = 0
+  for (let i = 0; i < seed.length; i += 1) sum += seed.charCodeAt(i)
+  return sum % count
 }
 
-/** 배고픔 게이지 옆에 쓸 한 줄. 문구는 화면 두 곳(펫 화면·진화 연출)이 함께 쓴다 */
-export function hungerLabel(hunger: number): string {
-  if (hunger >= 60) return "배부르고 기분이 좋아요"
-  if (hunger >= HUNGER_LOW) return "조금 배고파졌어요"
-  return "배가 고파요. 씨앗을 먹여 주세요"
+/**
+ * 접속 인사 한 줄 (순수 함수).
+ *
+ * @param seed 유저·날짜처럼 렌더 사이에 안 바뀌는 문자열. 같은 사람이 같은 날 새로고침하면
+ *             같은 인사가 나오고, 날이 바뀌면 다른 인사가 나온다
+ */
+export function greetingFor(seed: string): string {
+  return PET_GREETINGS[lineIndex(seed, PET_GREETINGS.length)]
 }

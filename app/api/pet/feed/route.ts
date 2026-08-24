@@ -1,6 +1,6 @@
 import { fail, ok } from "@/lib/api"
 import { UnauthorizedError, getCurrentUserWithSkin } from "@/lib/auth"
-import { HUNGER_MAX, applySeeds } from "@/lib/pet"
+import { applySeeds } from "@/lib/pet"
 import { prisma } from "@/lib/prisma"
 
 // 소유자: C. 씨앗을 펫 경험치로 투입한다. (SPEC.md 5절)
@@ -47,7 +47,9 @@ export async function POST(request: Request) {
           level: growth.level,
           exp: growth.exp,
           evolutionStage: growth.evolutionStage,
-          // 배고픔은 개수가 아니라 "먹인 시각"만 본다 (lib/pet.ts hungerFor)
+          // 배고픔 게이지는 2026-08-21에 삭제했지만 이 기록은 계속 남긴다.
+          // 지금 읽는 곳은 없다 — 되살릴 때 공백 구간이 생기지 않게 두는 것이다
+          // (lib/pet.ts "배고픔 — 삭제" 주석)
           lastFedAt: now,
         },
         select: { seeds: true, level: true, exp: true, evolutionStage: true },
@@ -65,8 +67,7 @@ export async function POST(request: Request) {
         ? `${cloudfront}/${user.activePetSkin.imageKeyBase}-${result.evolutionStage}.png`
         : null
 
-    // 방금 먹였으므로 배고픔은 항상 만복이다. 계산하지 않고 상수를 돌려준다
-    return ok({ ...result, imageUrl, hunger: HUNGER_MAX })
+    return ok({ ...result, imageUrl })
   } catch (error) {
     if (error instanceof UnauthorizedError) return fail("UNAUTHORIZED", error.message, 401)
     console.error("[POST /api/pet/feed]", error)

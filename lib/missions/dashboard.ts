@@ -1,5 +1,7 @@
 import type { User } from "@prisma/client"
 import { prisma } from "@/lib/prisma"
+import { cappedStage } from "@/lib/pet"
+import { listClaimedDates } from "./attendance"
 import { getTodayKey, getToday } from "./reset"
 import { computeStageProgress } from "./stages"
 
@@ -42,8 +44,16 @@ export type DashboardDTO = {
     cycleDay: number
     claimedToday: boolean
     attendanceTotal: number
+    /** KST 기준 오늘(YYYY-MM-DD). 화면은 브라우저 시간대로 오늘을 정하지 않는다 */
+    todayKey: string
+    /** todayKey가 속한 달(YYYY-MM). claimedDates가 어느 달인지 알려준다 */
+    month: string
+    /** 그 달의 실제 출석 완료 날짜. 다른 달은 GET /api/missions/attendance?month=로 읽는다 */
+    claimedDates: string[]
   }
   userTypeCode: string | null
+  /** 미션 모달의 캐릭터 칸에 쓰는 펫 이미지. 스킨이 없거나 CDN 미설정이면 null(이모지로 떨어진다) */
+  petImageUrl: string | null
 }
 
 function getCompletionMode(mission: { code: string; requiresPhoto: boolean }): CompletionMode {
@@ -69,8 +79,16 @@ export async function buildDashboard(user: User): Promise<DashboardDTO> {
   // 서로 의존하지 않으므로 순차로 기다릴 이유가 없다. RDS가 us-east-1이라 왕복 1회가
   // 176ms다 — 순차로 6번 기다리면 그것만 1초가 넘는다.
   // 완료 기록은 앞 쿼리의 missionId 목록 대신 관계 필터로 같은 집합을 고른다.
-  const [dailyMissionsRaw, dailyCompletions, allStageMissions, allStageCompletions, weeklyCount, claimedToday] =
-    await Promise.all([
+  const [
+    dailyMissionsRaw,
+    dailyCompletions,
+    allStageMissions,
+    allStageCompletions,
+    weeklyCount,
+    claimedToday,
+    claimedDatesThisMonth,
+    activeSkin,
+  ] = await Promise.all([
       prisma.mission.findMany({
         where: { scope: "DAILY" },
         orderBy: { order: "asc" },
@@ -97,6 +115,16 @@ export async function buildDashboard(user: User): Promise<DashboardDTO> {
       prisma.attendanceClaim.count({
         where: { userId: user.id, claimDate: todayDate },
       }),
+      // 이번 달 출석 날짜. 첫 화면이 추가 요청 없이 캘린더를 그리도록 여기서 같이 읽는다
+      listClaimedDates(user.id, today.slice(0, 7)),
+      // 펫 이미지 키. getCurrentUser()는 스킨 관계를 붙이지 않으므로 여기서 따로 읽는다 —
+      // 라우트를 getCurrentUserWithSkin()으로 바꾸면 사이드바 프로필과 같은 조회가 두 번 난다.
+      user.activePetSkinId
+        ? prisma.petSkin.findUnique({
+            where: { id: user.activePetSkinId },
+            select: { imageKeyBase: true, stageCount: true },
+          })
+        : Promise.resolve(null),
     ])
 
   const dailyCompletedIds = new Set(dailyCompletions.map((c) => c.missionId))
@@ -158,6 +186,13 @@ export async function buildDashboard(user: User): Promise<DashboardDTO> {
 
   const cycleDay = user.attendanceTotal > 0 ? ((user.attendanceTotal - 1) % 7) + 1 : 1
 
+  // 사이드바(lib/profile.ts:44)와 같은 규칙으로 만든다. 규칙이 갈라지면 두 화면의 펫이 달라진다
+  const cloudfront = process.env.CLOUDFRONT_DOMAIN
+  const petImageUrl =
+    cloudfront && activeSkin
+      ? `${cloudfront}/${activeSkin.imageKeyBase}-${cappedStage(user.level, activeSkin.stageCount)}.png`
+      : null
+
   return {
     dailyMissions,
     stageMissions,
@@ -172,8 +207,12 @@ export async function buildDashboard(user: User): Promise<DashboardDTO> {
       cycleDay,
       claimedToday: claimedToday > 0,
       attendanceTotal: user.attendanceTotal,
+      todayKey: today,
+      month: today.slice(0, 7),
+      claimedDates: claimedDatesThisMonth,
     },
     userTypeCode: user.typeCode,
+    petImageUrl,
   }
 }
 

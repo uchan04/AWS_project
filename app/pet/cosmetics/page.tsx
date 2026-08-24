@@ -1,7 +1,7 @@
 import Link from "next/link"
 import type { TypeCode } from "@prisma/client"
 import { getCurrentUser } from "@/lib/auth"
-import { compareCosmetics } from "@/lib/pet"
+import { compareCosmetics, cosmeticLabel } from "@/lib/pet"
 import { prisma } from "@/lib/prisma"
 import CosmeticList, { type CosmeticRow } from "../_components/CosmeticList"
 import "@/styles/tokens.css"
@@ -34,18 +34,29 @@ export default async function CosmeticsPage() {
 
     const ownedById = new Map(owned.map((row) => [row.itemId, row]))
 
-    items = all
+    // 2026-08-22: 타일에 배경 그림을 띄운다. 그 전까지는 이름과 가격만 있어서 친밀도
+    // 600을 무엇인지 모르고 내야 했다. 규칙은 app/pet/page.tsx의 roomImageUrl과 같다 —
+    // imageKey에 확장자가 이미 붙어 있으므로(lib/pet.ts BACKGROUNDS: "backgrounds/….png")
+    // 여기서 .png를 덧붙이지 않는다. 도메인이 비면 null이고 타일은 이름만 보인다
+    const cloudfront = process.env.CLOUDFRONT_DOMAIN
+
+    // 정렬을 map보다 **먼저** 한다. compareCosmetics는 name이 코드일 때 진열 순서를 알고,
+    // map이 name을 표시명으로 바꾼 뒤에 정렬하면 코드를 못 찾아 한글 가나다순으로 떨어진다
+    // (노을빛 → 눈꽃 → 봄날 → …). 사용자가 정한 계절 순서가 조용히 깨지는 자리다
+    items = [...all]
+      .sort(compareCosmetics)
       .map((item) => ({
         id: item.id,
-        name: item.name,
+        // DB의 name은 코드("autumn_path")다. 화면에는 표시명("노을빛 단풍길")만 보낸다
+        name: cosmeticLabel(item.name),
         slot: item.slot,
         rarity: item.rarity,
         affinityOnly: item.affinityOnly,
         priceAffinity: item.priceAffinity,
+        imageUrl: cloudfront ? `${cloudfront}/${item.imageKey}` : null,
         owned: ownedById.has(item.id),
         equipped: ownedById.get(item.id)?.equipped ?? false,
       }))
-      .sort(compareCosmetics)
     progress = { owned: owned.length, total: all.length }
   } catch (error) {
     console.error("[/pet/cosmetics]", error)

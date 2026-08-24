@@ -90,7 +90,7 @@ export default function HomePage() {
         <div className="hm__col hm-intro">
           <div className="hm-intro__side">
             <div>
-              <p className="hm__note">함께 걷는 하루</p>
+              <p className="hm__note">모꼬지</p>
               <h1 className="hm-home__name">나는 어떤 존재일까요?</h1>
             </div>
             <p className="hm__lede">
