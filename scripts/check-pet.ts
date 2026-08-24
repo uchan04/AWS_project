@@ -24,7 +24,6 @@ import {
   idleAccrual,
   levelUpReply,
   lineIndex,
-  PET_TOUCH_REPLIES,
   petMood,
   petTouchReply,
   seedsToNextStage,
@@ -543,13 +542,23 @@ for (const gained of [1, 2, 9]) {
 }
 
 // ── 쓰다듬기 반응 (petTouchReply) ─────────────────────────────────────────────
+// **문구는 사용자가 쓴 20개 밖으로 나가지 않는다** (2026-08-24 사용자 결정).
+// 전에는 여기 전용 5문구가 따로 있었고 어투가 달랐다. 이 단정이 그 5문구가
+// 조용히 되살아나는 것을 막는다 — 펫이 하는 말은 전부 PET_IDLE_LINES다
+for (const n of [0, 1, 2, 7, 9, 10, 137]) {
+  assert.ok(
+    (PET_IDLE_LINES as readonly string[]).includes(petTouchReply(n)),
+    `petTouchReply(${n})가 사용자 문구 밖이다: "${petTouchReply(n)}"`,
+  )
+}
 // 연속으로 눌렀을 때 같은 말이 이어 나오지 않는다
 assert.notEqual(petTouchReply(0), petTouchReply(1))
-assert.equal(petTouchReply(0), petTouchReply(PET_TOUCH_REPLIES.length))
+assert.equal(petTouchReply(0), petTouchReply(PET_IDLE_LINES.length))
 // 음수·소수·큰 수에서 undefined가 나오지 않는다 (인덱스 계산 실수 방어)
 for (const n of [-1, -7, 0.5, 3.9, 1_000_001]) {
   assert.equal(typeof petTouchReply(n), "string", `petTouchReply(${n})`)
   assert.ok(petTouchReply(n).length > 0)
+  assert.ok((PET_IDLE_LINES as readonly string[]).includes(petTouchReply(n)))
 }
 
 // ── 시간대 인사 (timeOfDay / timeGreeting) ────────────────────────────────────

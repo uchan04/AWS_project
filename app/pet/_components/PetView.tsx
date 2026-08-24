@@ -498,8 +498,13 @@ export default function PetView({ initial }: { initial: PetState }) {
                 aria-live를 걸지 않았다. 주기마다 스크린리더가 대사를 읽으면 화면을 쓰는
                 내내 말이 끼어든다 — 이건 알림이 아니라 방 안의 혼잣말이라 그 자리에 있는
                 글자로 충분하다. 대신 문장이 바뀔 때 DOM에 그대로 남으므로 훑어 읽을 수 있다 */}
+            {/* 아래 data-tone은 먹이기에만 준다 (2026-08-24 사용자 결정). 쓰다듬기에도
+                "touch" 톤(갈색 테두리)을 줬는데, 그게 "이 문구는 사용자가 쓴 20문구가
+                아니다"를 눈으로 알려 주는 표시가 되어 있었다. 이제 쓰다듬기 문구도
+                평상시 10문구라 테두리를 달리 할 이유가 없다 — 같은 펫이 같은 어투로 말한다.
+                먹이기는 남긴다. 레벨업 알림처럼 결과를 알리는 자리라 성격이 다르다 */}
             {bubble ? (
-              <div className="pet-welcome" data-tone={reaction ? (reaction.eat ? "eat" : "touch") : undefined}>
+              <div className="pet-welcome" data-tone={reaction?.eat ? "eat" : undefined}>
                 {/* 말풍선 모양은 사용자가 준 그림(손그림 blob + 갈고리 꼬리)을 그대로 옮긴
                     path 하나다. border-radius로는 이 모양이 안 나온다 — 굴곡이 네 군데
                     다르고 꼬리가 박스 밖으로 나가는데, border-radius는 각 모서리에 타원
