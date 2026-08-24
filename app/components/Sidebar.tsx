@@ -30,7 +30,8 @@ const TABS: { href: string; label: string; emoji: string; desc: string }[] = [
   { href: "/", label: "홈", emoji: "🏡", desc: "오늘 현황" },
   { href: "/missions", label: "미션", emoji: "✅", desc: "작은 한 걸음" },
   { href: "/pet", label: "나의 펫", emoji: "🌱", desc: "함께 성장해요" },
-  { href: "/community", label: "커뮤니티", emoji: "💬", desc: "같은 종족 모임" },
+  { href: "/community", label: "커뮤니티", emoji: "💬", desc: "같은 종족 이야기" },
+  { href: "/community/meetups", label: "모임", emoji: "🤝", desc: "오프라인에서 만나기" },
 ]
 
 /**
