@@ -46,6 +46,9 @@ export type CosmeticListProps = {
   typeCode: TypeCode | null
 }
 
+// ArtImage(next/image)를 쓰지 않는다. 타일 그림이 CloudFront 절대 URL이 된 뒤로는
+// 최적화기를 통과시킬 이유가 없고(그 파일 주석 참고), 여기 <img>는 실패할 때 자기만
+// 숨는 게 아니라 흰 액자(.pet-item__thumb)까지 같이 숨겨야 해서 onError가 다르다
 const ko = (n: number) => n.toLocaleString("ko-KR")
 
 const SLOT_LABEL: Record<Slot, string> = {

@@ -100,7 +100,7 @@ model User {
 
   level          Int @default(1)
   exp            Int @default(0)
-  evolutionStage Int @default(1) // 1~3
+  evolutionStage Int @default(1) // 1~4 (알·아기·청소년·성체. PetSkin.stageCount가 상한)
 
   seeds      Int @default(0)
   starShards Int @default(0)
@@ -160,7 +160,7 @@ model Mission {
   code           String       @unique
   scope          MissionScope
   typeCode       TypeCode? // STAGE일 때만 사용
-  stage          Int? // 1~3
+  stage          Int? // 1~100 (prisma/seed/curriculum.ts. 2026-08-22에 3 → 100으로 늘렸다)
   title          String
   description    String
   rewardSeeds    Int          @default(0)
@@ -193,13 +193,13 @@ model PetSkin {
   typeCode TypeCode // 종족. 같은 값이면 같은 동물이고, 스킨 구매는 자기 종족으로 제한한다
 
   isDefault  Boolean @default(false) // 진단으로 지급되는 기본 외형
-  stageCount Int     @default(3) // 외형만 바뀌므로 변종도 기본 외형과 같은 3단이다
+  stageCount Int     @default(3) // 시드는 전부 4를 박는다(2026-08-21, S3에 종당 4장). 이 기본값에 기대는 행은 없다
 
   effectType EffectType @default(NONE) // 외형 스킨은 전부 NONE
   effectPct  Int        @default(0) // 15 = +15%
 
   priceShards  Int? // 별조각 구매가. 스킨은 별조각 전용이다. 기본 외형은 null
-  imageKeyBase String // S3 prefix. stageCount가 3이면 뒤에 -1 -2 -3을 붙인다
+  imageKeyBase String // S3 prefix. stageCount가 4면 뒤에 -1 -2 -3 -4를 붙인다
 
   owners      UserPetSkin[]
   activeUsers User[]        @relation("ActiveSkin")

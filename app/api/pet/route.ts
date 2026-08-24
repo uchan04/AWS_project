@@ -1,4 +1,5 @@
 import { fail, ok } from "@/lib/api"
+import { petImageUrl } from "@/lib/assets"
 import { UnauthorizedError, getCurrentUserWithSkin } from "@/lib/auth"
 import { cappedStage, idleAccrual } from "@/lib/pet"
 import { calculateReward } from "@/lib/reward"
@@ -17,12 +18,10 @@ export async function GET() {
 
     const evolutionStage = cappedStage(user.level, stageCount)
 
-    // S3 이미지 URL 생성
-    const cloudfront = process.env.CLOUDFRONT_DOMAIN
-    const imageUrl =
-      cloudfront && user.activePetSkin
-        ? `${cloudfront}/${user.activePetSkin.imageKeyBase}-${evolutionStage}.png`
-        : null
+    // 그림 URL은 lib/assets.ts만 만든다 (public/art에 구운 정적 자산)
+    const imageUrl = user.activePetSkin
+      ? petImageUrl(user.activePetSkin.imageKeyBase, evolutionStage)
+      : null
 
     return ok({
       level: user.level,

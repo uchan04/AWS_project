@@ -10,11 +10,28 @@ import { fail, ok } from "@/lib/api"
 import { localCognitoSub, setLocalSessionCookie } from "@/lib/auth"
 import { hashPassword } from "@/lib/password"
 import { prisma } from "@/lib/prisma"
+import { clientKey, recordAttempt, retryAfter } from "@/lib/ratelimit"
 
 const EMAIL_RE = /^[^\s@]+@[^\s@]+\.[^\s@]+$/
 const PASSWORD_MIN = 8
 
+// 가입은 성공도 센다. 막으려는 것이 "한 IP에서 계정을 대량 생성하는 것"이라 성공을 빼면
+// 세는 의미가 없다. 한 사람이 한 시간에 계정 5개를 만드는 정상 상황은 없다.
+const SIGNUP_LIMIT = 5
+const SIGNUP_WINDOW_MS = 60 * 60 * 1000
+
 export async function POST(request: Request) {
+  const key = `signup:${clientKey(request)}`
+  const wait = retryAfter(key, SIGNUP_LIMIT)
+  if (wait > 0) {
+    const minutes = Math.ceil(wait / 60)
+    return fail(
+      "TOO_MANY_ATTEMPTS",
+      `가입 시도가 너무 많습니다. ${minutes}분 후에 다시 시도해 주세요`,
+      400
+    )
+  }
+
   let body: unknown
   try {
     body = await request.json()
@@ -29,6 +46,9 @@ export async function POST(request: Request) {
   if (typeof password !== "string" || password.length < PASSWORD_MIN) {
     return fail("INVALID_PASSWORD", `비밀번호는 ${PASSWORD_MIN}자 이상이어야 합니다`, 400)
   }
+
+  // 형식 검증을 통과한 요청만 센다. 오타(8자 미만)로 다섯 번 막히면 정상 사용자가 한 시간 잠긴다
+  recordAttempt(key, SIGNUP_WINDOW_MS)
 
   // 유니크 제약에 맡기지 않고 먼저 본다. 제약 위반을 500으로 흘리면 화면에 안내가 안 나간다
   if (await prisma.user.findUnique({ where: { email } })) {

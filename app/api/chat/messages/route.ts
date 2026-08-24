@@ -5,7 +5,7 @@ import { ok, fail } from "@/lib/api"
 import { grantAffinity, CHAT_TURN_AFFINITY } from "@/app/community/_lib/affinity"
 import { completeMissionByCode } from "@/lib/missions/completion"
 
-export async function GET(_request: NextRequest) {
+export async function GET() {
   try {
     const user = await getCurrentUser()
 

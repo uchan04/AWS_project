@@ -1,4 +1,5 @@
 import { fail, ok } from "@/lib/api"
+import { cdnUrl } from "@/lib/assets"
 import { UnauthorizedError, getCurrentUser } from "@/lib/auth"
 import { compareCosmetics, cosmeticLabel } from "@/lib/pet"
 import { prisma } from "@/lib/prisma"
@@ -19,6 +20,7 @@ export async function GET() {
     const user = await getCurrentUser()
 
     const [items, owned] = await Promise.all([
+      // 필터 없음. 사유는 app/pet/cosmetics/page.tsx의 같은 자리 주석 참고
       prisma.cosmeticItem.findMany(),
       prisma.userCosmetic.findMany({
         where: { userId: user.id },
@@ -29,10 +31,10 @@ export async function GET() {
     const ownedById = new Map(owned.map((row) => [row.itemId, row]))
 
     // imageKey 그대로가 아니라 완성된 URL을 내린다. 키만 내리면 화면마다 도메인을 붙이게 되고
-    // 그러면 CLOUDFRONT_DOMAIN이 클라이언트로 새어 나가야 한다. 이 화면(cosmetics/page.tsx)과
-    // 같은 규칙이어야 하므로 두 곳이 같은 식을 쓴다 — 갈라지면 목록과 방 배경이 다른 그림이 된다
-    const cloudfront = process.env.CLOUDFRONT_DOMAIN
-
+    // 그러면 CLOUDFRONT_DOMAIN이 클라이언트로 새어 나가야 한다. 조립은 lib/assets.ts의
+    // cdnUrl() 한 곳에서만 한다 — 이 라우트와 cosmetics/page.tsx가 갈라지면 목록과 방
+    // 배경이 다른 그림이 된다
+    //
     // 2026-08-22: name은 DB에 코드로 들어 있다("autumn_path"). 응답에는 표시명만 내린다 —
     // 코드를 내리면 화면마다 이름표를 다시 붙이게 되고 한 곳을 빼먹으면 코드가 그대로 보인다.
     // 정렬은 map보다 **먼저** 한다. compareCosmetics는 코드로 진열 순서를 찾으므로
@@ -46,19 +48,22 @@ export async function GET() {
         rarity: item.rarity,
         affinityOnly: item.affinityOnly,
         priceAffinity: item.priceAffinity,
-        imageUrl: cloudfront ? `${cloudfront}/${item.imageKey}` : null,
+        // imageKey에 확장자가 이미 붙어 있다(lib/pet.ts BACKGROUNDS: "backgrounds/….png")
+        imageUrl: cdnUrl(item.imageKey),
         owned: ownedById.has(item.id),
         equipped: ownedById.get(item.id)?.equipped ?? false,
       }))
 
     // 별도 도감 화면을 만들지 않고 이 진행률로 겸용한다 (SPEC.md 5절 "제외한 것").
-    // 분모는 하드코딩하지 않는다 — 시드가 늘면 자동으로 따라간다
+    // 분모는 하드코딩하지 않는다 — 시드가 늘면 자동으로 따라간다.
+    // 분자는 owned.length가 아니라 list에서 센다 — 목록에서 빠진 행을 가진 계정이
+    // 6분의 7 같은 진행률을 보지 않게 한다
     //
     // affinity는 상점 잔액이다. GET /api/pet/skins가 starShards를 내려주는 것과 같은 형태다
     return ok({
       affinity: user.affinity,
       items: list,
-      progress: { owned: owned.length, total: items.length },
+      progress: { owned: list.filter((item) => item.owned).length, total: items.length },
     })
   } catch (error) {
     if (error instanceof UnauthorizedError) return fail("UNAUTHORIZED", error.message, 401)

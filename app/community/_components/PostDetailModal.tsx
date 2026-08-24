@@ -3,7 +3,10 @@
 import { useEffect, useState } from "react"
 import type { TypeCode } from "@prisma/client"
 import { authorLabel } from "@/lib/types"
+import { useModalA11y } from "@/app/components/useModalA11y"
+import { CrisisNotice } from "@/app/components/CrisisNotice"
 import { timeAgo } from "../_lib/format"
+import { COMMENT_MAX, remaining } from "../_lib/limits"
 
 type DetailUser = { nickname: string; typeCode: TypeCode | null }
 
@@ -40,6 +43,10 @@ export function PostDetailModal({
   onClose: () => void
   onDeleted: () => void
 }) {
+  // Escape로 닫기 · 초점 가두기 · 닫을 때 열었던 글 카드로 초점 되돌리기
+  // (app/components/useModalA11y.ts). PostList가 key={selectedPostId}로 그리므로
+  // 이 컴포넌트는 열릴 때만 마운트된다 — open 인자는 필요 없다
+  const boxRef = useModalA11y(onClose)
   const [post, setPost] = useState<DetailPost | null>(null)
   const [comments, setComments] = useState<DetailComment[]>([])
   const [loading, setLoading] = useState(true)
@@ -51,6 +58,8 @@ export function PostDetailModal({
   const [commentBody, setCommentBody] = useState("")
   const [commentPending, setCommentPending] = useState(false)
   const [affinityNotice, setAffinityNotice] = useState<string | null>(null)
+  // 내 댓글에 위기 신호가 있을 때 나에게만 뜨는 안내. 댓글은 막지 않는다(lib/safety.ts)
+  const [crisisNotice, setCrisisNotice] = useState<string | null>(null)
   const [deletePending, setDeletePending] = useState(false)
   // 어느 댓글이 처리 중인지 구분한다. 단일 boolean이면 삭제 중에 모든 댓글 버튼이 같이 비활성화된다.
   const [deletingCommentId, setDeletingCommentId] = useState<string | null>(null)
@@ -84,18 +93,43 @@ export function PostDetailModal({
     }
   }, [postId])
 
+  /**
+   * 좋아요 — 서버를 기다리지 않는다.
+   *
+   * POST가 왕복 7회(1281ms 실측). RDS가 us-east-1이라 그만큼은 구조적으로 든다.
+   * 커뮤니티에서 가장 많이 눌리는 버튼을 1.3초 회색으로 두면 두 번 세 번 누르게 된다.
+   * 그래서 하트를 즉시 뒤집고, 응답이 오면 서버가 준 수치로 맞추고, 실패하면 되돌린다.
+   *
+   * 요청이 하나 떠 있는 동안 들어온 탭은 무시한다(likePending). 서버 토글은 현재 DB
+   * 상태를 보고 뒤집으므로 두 요청이 겹치면 어느 쪽이 이겼는지 알 수 없다.
+   * 버튼을 disabled로 두지는 않는다 — 이미 뒤집혀 보이는 버튼이 회색이면 고장으로 읽힌다.
+   */
   async function handleLike() {
     if (!post || likePending) return
+    const before = { likedByMe: post.likedByMe, likeCount: post.likeCount }
+    const next = !before.likedByMe
+
     setLikePending(true)
     setActionError(null)
+    setPost((prev) =>
+      prev
+        ? { ...prev, likedByMe: next, likeCount: Math.max(0, prev.likeCount + (next ? 1 : -1)) }
+        : prev,
+    )
+
     try {
       const res = await fetch(`/api/community/posts/${postId}/like`, { method: "POST" })
       const json = await res.json()
       if (json.error) {
+        setPost((prev) => (prev ? { ...prev, ...before } : prev))
         setActionError(json.error.message)
         return
       }
+      // 서버 수치로 맞춘다. 다른 사람이 그 사이에 누른 것도 여기서 반영된다
       setPost((prev) => (prev ? { ...prev, likedByMe: json.data.liked, likeCount: json.data.likeCount } : prev))
+    } catch {
+      setPost((prev) => (prev ? { ...prev, ...before } : prev))
+      setActionError("네트워크 오류가 발생했어요. 좋아요를 되돌렸어요")
     } finally {
       setLikePending(false)
     }
@@ -157,6 +191,7 @@ export function PostDetailModal({
       setCommentBody("")
       setPost((prev) => (prev ? { ...prev, commentCount: prev.commentCount + 1 } : prev))
       setAffinityNotice(json.data.granted > 0 ? `친밀도 +${json.data.granted}` : "오늘 친밀도를 이미 다 받았어요")
+      if (json.data.crisisNotice) setCrisisNotice(json.data.crisisNotice)
       window.dispatchEvent(new CustomEvent("user-stats-changed"))
     } finally {
       setCommentPending(false)
@@ -166,14 +201,21 @@ export function PostDetailModal({
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/45 p-6" onClick={onClose}>
       <div
+        ref={boxRef}
+        role="dialog"
+        aria-modal="true"
+        aria-label={post ? post.title : "게시글"}
+        tabIndex={-1}
         className="flex max-h-[90vh] w-full max-w-2xl flex-col overflow-hidden rounded-3xl bg-white shadow-2xl"
         onClick={(e) => e.stopPropagation()}
       >
         {loading ? (
-          <div className="p-10 text-center text-sm text-neutral-500">불러오는 중...</div>
+          <div className="p-10 text-center text-sm text-neutral-500" role="status" aria-live="polite">
+            불러오는 중...
+          </div>
         ) : error || !post ? (
           <div className="flex flex-col gap-4 p-10 text-center text-sm text-neutral-500">
-            <p>{error ?? "게시글을 찾을 수 없어요"}</p>
+            <p role="alert">{error ?? "게시글을 찾을 수 없어요"}</p>
             <button
               type="button"
               onClick={onClose}
@@ -203,6 +245,7 @@ export function PostDetailModal({
                 <button
                   type="button"
                   onClick={onClose}
+                  aria-label="게시글 창 닫기"
                   className="flex h-9 w-9 items-center justify-center rounded-full bg-neutral-100 text-neutral-500 hover:bg-neutral-200"
                 >
                   ✕
@@ -217,9 +260,9 @@ export function PostDetailModal({
               <button
                 type="button"
                 onClick={handleLike}
-                disabled={likePending}
+                aria-pressed={post.likedByMe}
                 className={
-                  "mb-7 rounded-full border px-5 py-2 text-sm font-semibold transition disabled:opacity-60 " +
+                  "mb-7 rounded-full border px-5 py-2 text-sm font-semibold transition " +
                   (post.likedByMe
                     ? "border-neutral-900 bg-neutral-900 text-white"
                     : "border-neutral-300 bg-white text-neutral-500 hover:bg-neutral-50")
@@ -255,14 +298,31 @@ export function PostDetailModal({
             </div>
 
             <div className="flex flex-col gap-2 border-t border-neutral-200 px-7 py-4">
-              {actionError && <p className="text-xs text-red-500">{actionError}</p>}
-              {affinityNotice && <p className="text-xs text-neutral-400">{affinityNotice}</p>}
+              {/* 좋아요·댓글 결과는 화면 아래 작은 글씨로만 뜬다.
+                  live region이 없으면 눌러도 아무 일도 안 일어난 것처럼 읽힌다 */}
+              {actionError && (
+                <p role="alert" className="text-xs text-red-500">
+                  {actionError}
+                </p>
+              )}
+              {affinityNotice && (
+                <p role="status" aria-live="polite" className="text-xs text-neutral-400">
+                  {affinityNotice}
+                </p>
+              )}
+              {/* 한 번 뜨면 내리지 않는다 — 다음 댓글을 쓰면 사라지는 안내는 정작 전화를
+                  걸려던 순간에 화면에서 없어진다(ChatPanel과 같은 판단) */}
+              {crisisNotice && <CrisisNotice message={crisisNotice} />}
               <div className="flex gap-2">
                 <input
                   value={commentBody}
                   onChange={(e) => setCommentBody(e.target.value)}
                   onKeyDown={(e) => e.key === "Enter" && handleComment()}
                   placeholder="따뜻한 댓글을 남겨봐요"
+                  // placeholder는 접근 가능한 이름이 아니다 — 입력하면 사라진다
+                  aria-label="댓글"
+                  // maxLength는 UX다. 실제 거절은 서버가 한다
+                  maxLength={COMMENT_MAX}
                   className="flex-1 rounded-xl border border-neutral-300 bg-neutral-50 px-4 py-2.5 text-sm text-neutral-900 placeholder:text-neutral-400 outline-none focus:border-neutral-500"
                 />
                 <button
@@ -274,6 +334,12 @@ export function PostDetailModal({
                   전송
                 </button>
               </div>
+              {/* 한 줄 입력이라 늘 띄우면 시끄럽다. 50자 남았을 때만 */}
+              {remaining(commentBody, COMMENT_MAX) <= 50 && (
+                <p className="mt-1 text-right text-xs text-amber-600" aria-live="polite">
+                  {commentBody.length} / {COMMENT_MAX}자
+                </p>
+              )}
             </div>
           </>
         )}

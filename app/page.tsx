@@ -1,229 +1,101 @@
-"use client"
-
-// 소유자: A. 홈. 종족·펫·오늘 미션 진입점.
+// 소유자: A. 홈. 로그인·진단 여부만 서버에서 가르고 화면을 고른다.
 //
-// 진단 결과는 GET /api/diagnosis/me, 오늘 미션은 GET /api/missions에서 읽는다.
-// 미션 문구를 홈에 복사하거나 시드 배열을 직접 읽지 않는다 — 원본은 DB다(결정 10번).
-// 진단 전에는 다음 한 걸음만 남긴다. 홈에 아무것도 못 하는 카드를 늘리지 않는다.
-// 그 한 걸음이 미인증이면 가입, 로그인 상태면 문항이다 — 미인증을 /diagnosis로 보내면
-// 게이트 안내 카드에 부딪혀 한 번 더 눌러야 한다(흐름: 소개 → 가입/로그인 → 문항 → 결과 → 홈).
+// 2026-08-22 분리: 전에는 홈 전체가 클라이언트 컴포넌트였다. 그래서
+//   1) 처음 온 사람이 보는 첫 화면이 "불러오고 있어요…"였다. 소개 화면은
+//      /api/diagnosis/me 왕복이 끝난 뒤에야 떴다 — 랜딩으로 쓸 수 없는 순서다
+//   2) 서버가 쿠키를 읽어 이미 알고 있는 닉네임·종족을 API로 한 번 더 읽었다
+// 지금은 여기서 한 번 읽어 Intro(진단 전) / HomeDashboard(진단 후)로 나눈다.
 //
-// 스타일은 design.md가 정한다. Hallmark · macrostructure: Index-First.
-// 홈은 링크 목록이다. 화면을 채우는 가운데 정렬 히어로를 두지 않는다.
+// 미인증도 여기까지 온다 — middleware.ts가 "/"를 공개 경로로 둔다. 그래야 소개 화면이
+// 보인다. 실제 인증은 각 API·보호 페이지의 첫 줄이 계속 한다.
 
-import Link from "next/link"
-import { useEffect, useState } from "react"
-import type { TypeCode } from "@prisma/client"
-import { TRIBE } from "@/lib/types"
+import { petImageUrl } from "@/lib/assets"
+import { UnauthorizedError, getCurrentUser, getCurrentUserWithSkin } from "@/lib/auth"
+import { buildDashboard } from "@/lib/missions/dashboard"
+import { ensureMissionReset } from "@/lib/missions/reset"
+import { cappedStage } from "@/lib/pet"
+import { Intro } from "./_components/Intro"
+import HomeDashboard from "./HomeDashboard"
 import "@/styles/tokens.css"
-import { type MeState, fetchMeState } from "./diagnosis/api"
 
-// GET /api/missions(B 소유)가 돌려주는 DashboardDTO 중 홈이 쓰는 부분만 적는다.
-// lib/missions/dashboard.ts의 타입을 import하면 홈이 서버 모듈에 묶인다
-type DailyMissionView = { code: string; title: string; completed: boolean; reward: { seeds: number } }
+// 쿠키를 읽으므로 정적 프리렌더 대상이 아니다
+export const dynamic = "force-dynamic"
 
-// 진단 전 화면에서 세 종족을 나란히 보여줄 때 쓴다
-const TRIBE_LIST = (Object.keys(TRIBE) as TypeCode[]).map((code) => ({ code, ...TRIBE[code] }))
-
-// 시간대 인사. 서버 렌더 시각과 브라우저 시각이 다를 수 있으므로 마운트 후에만 계산한다
-function greetingFor(hour: number): string {
-  if (hour < 12) return "좋은 아침이에요"
-  if (hour < 18) return "오늘 하루도"
-  return "오늘도 수고했어요"
+/**
+ * 오늘의 미션·진행률. 실패해도 홈을 죽이지 않는다 — null이면 화면이
+ * "불러오지 못했어요"를 띄우고 나머지 카드는 그대로 나온다.
+ *
+ * buildDashboard를 그대로 쓴다. 홈용 쿼리를 따로 짜면 GET /api/missions와 값이 갈라진다.
+ * 필요한 두 조각만 뽑아 넘긴다 — 단계 미션까지 실어 보내면 홈이 쓰지 않는 바이트가 붙는다.
+ */
+async function loadMissions(user: Awaited<ReturnType<typeof getCurrentUser>>) {
+  try {
+    const dashboard = await buildDashboard(await ensureMissionReset(user))
+    return { dailyMissions: dashboard.dailyMissions, progress: dashboard.progress }
+  } catch (error) {
+    console.error("[/ missions]", error)
+    return null
+  }
 }
 
-export default function HomePage() {
-  // undefined = 아직 읽는 중. me=null과 구분해야 진단한 사람에게 시작 화면이 깜박이지 않는다
-  const [state, setState] = useState<MeState | undefined>(undefined)
-  const [greeting, setGreeting] = useState("")
-  // null = 못 읽었다(진단 전·미인증·에러). 빈 배열과 구분해서 안내 문구를 가른다
-  const [daily, setDaily] = useState<DailyMissionView[] | null>(null)
-
-  useEffect(() => {
-    let alive = true
-    // 인사말도 이 콜백 안에서 정한다. 이펙트 본문에서 바로 setState하면
-    // react-hooks/set-state-in-effect가 에러다. greeting은 me가 정해진 뒤에만 쓰이므로
-    // 여기로 옮겨도 화면에 보이는 순서는 같다
-    fetchMeState()
-      .then((next) => {
-        if (!alive) return
-        setGreeting(greetingFor(new Date().getHours()))
-        setState(next)
-      })
-      .catch(() => {
-        // 읽지 못했으면 미인증으로 취급한다. 소개 화면이 가입으로 보내는 쪽이 덜 막힌다
-        if (alive) setState({ authed: false, me: null })
-      })
-
-    // 미션은 별도로 읽는다. 진단 전에는 400이고 미인증이면 401인데, 둘 다 홈이
-    // 뜨는 것을 막을 이유가 아니다. 실패하면 미션 카드만 안내 문구로 남는다
-    fetch("/api/missions")
-      .then((response) => (response.ok ? response.json() : null))
-      .then((body) => {
-        if (alive) setDaily(body?.data?.dailyMissions ?? null)
-      })
-      .catch(() => {
-        if (alive) setDaily(null)
-      })
-
-    return () => {
-      alive = false
-    }
-  }, [])
-
-  if (state === undefined) {
+export default async function HomePage() {
+  let user
+  try {
+    // 스킨은 아래에서 따로 읽는다. 여기서 getCurrentUserWithSkin()을 부르면 스킨 왕복이
+    // 미션 조회 앞에 순차로 붙는다 — 실측으로 그게 홈 TTFB의 180ms였다(아래 주석)
+    user = await getCurrentUser()
+  } catch (error) {
+    if (error instanceof UnauthorizedError) return <Intro authed={false} />
+    // DB 장애다. 미인증 화면을 띄우면 이미 계정이 있는 사람에게 가입을 권하게 된다
+    console.error("[/]", error)
     return (
       <main className="hm hm--canvas">
         <div className="hm__col">
-          <p className="hm__note">불러오고 있어요…</p>
-        </div>
-      </main>
-    )
-  }
-
-  const me = state.me
-
-  // 진단 전 홈 = 시작 화면. Figma 인트로 구성(왼쪽 글, 오른쪽 안내 카드)을 가져왔다
-  if (!me) {
-    return (
-      <main className="hm hm--canvas">
-        <div className="hm__col hm-intro">
-          <div className="hm-intro__side">
-            <div>
-              <p className="hm__note">모꼬지</p>
-              <h1 className="hm-home__name">나는 어떤 존재일까요?</h1>
-            </div>
-            <p className="hm__lede">
-              몇 가지만 물어볼게요. 답하기 어려운 건 넘어가도 괜찮아요.
-              어떤 결과도 옳고 그름이 없어요.
-            </p>
-
-            {/* 세 종족을 미리 보여준다. 유형명은 쓰지 않는다(SPEC 2절) */}
-            <div className="hm-trio">
-              {TRIBE_LIST.map(({ code, animal, emoji }) => (
-                <div key={code} className="hm-tile hm-tile--tribe" data-tribe={code}>
-                  <span className="hm-tile__face" aria-hidden="true">
-                    {emoji}
-                  </span>
-                  <span className="hm-tile__title">{animal}</span>
-                </div>
-              ))}
-            </div>
-
-            {/* 미인증이면 가입부터. 로그인 상태로 여기 온 사람은 진단만 안 한 것이므로 문항으로 보낸다 */}
-            <Link href={state.authed ? "/diagnosis" : "/signup"} className="hm-btn">
-              시작하기
-            </Link>
-            {!state.authed && (
-              <Link href="/login" className="hm-link">
-                이미 계정이 있어요
-              </Link>
-            )}
-          </div>
-
           <div className="hm-card">
-            <span className="hm-intro__mascot hm-float" aria-hidden="true">
-              🌿
-            </span>
-            <ul className="hm-check">
-              {["낙인을 만들지 않아요", "경쟁이 없어요", "진단 결과는 나만 알아요"].map((line) => (
-                <li key={line}>
-                  <span className="hm-check__mark" aria-hidden="true">
-                    ✓
-                  </span>
-                  <span>{line}</span>
-                </li>
-              ))}
-            </ul>
-            <hr className="hm__rule" />
-            <p className="hm__note">약 3분 걸려요. 언제든 다시 할 수 있어요.</p>
-            {/* 결과가 서버에 저장되므로 "이 기기에만 남는다"고 쓸 수 없다 */}
-            <p className="hm__note">결과는 내 계정에만 저장돼요.</p>
+            <h1 className="hm-ask__question">지금은 불러올 수 없어요</h1>
+            <p className="hm__note">잠시 후 다시 들어와 주세요.</p>
           </div>
         </div>
       </main>
     )
   }
 
-  const tribe = TRIBE[me.typeCode]
+  // 진단 전이면 소개 화면. adjective까지 봐야 한다 — typeCode만 있고 형용사가 없는 행은
+  // 진단이 중간에 끊긴 상태라 종족 표시가 반쪽이 된다(lib/profile.ts의 diagnosed와 같은 기준)
+  // 여기서 먼저 갈라야 진단 전 방문자에게 미션 쿼리가 나가지 않는다
+  if (!user.typeCode || !user.adjective) return <Intro authed />
+
+  // 오늘의 미션·진행률을 서버에서 읽어 내려보낸다(2026-08-23).
+  //
+  // 전에는 HomeDashboard가 마운트 후 fetch("/api/missions")로 읽었고, 응답이 도착하는 순간
+  // "오늘의 나" 카드가 없던 자리에 끼어들어 아래 내용을 전부 밀어냈다.
+  // 실측(prod 빌드, 2026-08-22): CLS 0.2807, shift 1건, 발생 시각 2280ms —
+  // fetch가 끝난 그 시점이고 원인 노드는 DIV.hm-home__cards · A.hm-row · H1.hm-home__name이었다.
+  // 기준선 0.1의 2.8배다. HTML에 처음부터 들어 있으면 밀어낼 것이 없다.
+  //
+  // 스킨 읽기와 병렬로 돌린다. 둘 다 user만 있으면 되고 서로를 필요로 하지 않는다.
+  // 순차로 두면 왕복이 하나 더 붙는다 — 실측(prod, RDS us-east-1, 왕복 1회 180ms):
+  //   순차  912ms / 병렬  731ms
+  //
+  // 스킨 읽기가 실패해도 홈을 죽이지 않는다. 마스코트 그림 하나이고 이모지 폴백이 있다 —
+  // 여기서 throw를 흘리면 홈 전체가 에러 화면이 된다(Promise.all은 하나만 깨져도 거부한다)
+  const [skin, missions] = await Promise.all([
+    getCurrentUserWithSkin()
+      .then((full) => full.activePetSkin)
+      .catch(() => null),
+    loadMissions(user),
+  ])
+
+  // 스킨이 없으면(아직 아무것도 착용하지 않은 계정) null이고, 그때만 이모지로 떨어진다.
+  // 기본값 4는 prisma/seed/items.ts의 stageCount와 같다(lib/profile.ts와 같은 이유)
+  const petImage = skin ? petImageUrl(skin.imageKeyBase, cappedStage(user.level, skin.stageCount)) : null
 
   return (
-    <main className="hm" data-tribe={me.typeCode}>
-      <div className="hm__col hm-home">
-        {/* 인사말·이름은 왼쪽, 마스코트는 오른쪽. Figma 홈 헤더 구성이다 */}
-        <div className="hm-home__head">
-          <div className="hm-home__who">
-            <p className="hm__note">{greeting}</p>
-            <h1 className="hm-home__name">{me.nickname}</h1>
-            <span className="hm-pill">
-              <span aria-hidden="true">{tribe.emoji}</span> {tribe.family}
-            </span>
-          </div>
-          {/* 펫 이미지는 S3 업로드 전이다. 지금은 이모지 마스코트가 자리를 잡는다 */}
-          <span className="hm-home__mascot hm-float" aria-hidden="true">
-            {tribe.emoji}
-          </span>
-        </div>
-
-        <div className="hm-home__cards">
-          {/* 펫 카드. 레벨·경험치는 DATABASE_URL 공유 후에 넣는다. 없는 숫자를 지어내지 않는다 */}
-          <div className="hm-card hm-card--tribe">
-            <div className="hm-card__head">
-              <h2 className="hm-card__title">키우기</h2>
-              <span className="hm__note">{tribe.colorName}</span>
-            </div>
-            <p className="hm__note">씨앗을 모아 함께 자라요.</p>
-            <Link href="/pet" className="hm-btn hm-card__cta">
-              펫 보러 가기
-            </Link>
-          </div>
-
-          {/* 오늘의 미션 미리보기. GET /api/missions에서 읽는다. 완료한 것도 그대로 보여준다 —
-              홈에서 목록이 줄어들면 무엇을 했는지가 안 보인다 */}
-          <div className="hm-card">
-            <div className="hm-card__head">
-              <h2 className="hm-card__title">오늘의 미션</h2>
-              <Link href="/missions" className="hm-link">
-                전체 보기
-              </Link>
-            </div>
-            {daily === null ? (
-              <p className="hm__note">미션을 불러오지 못했어요. 전체 보기에서 확인해 주세요</p>
-            ) : (
-              <div className="hm-tiles">
-                {daily.slice(0, 4).map((mission) => (
-                  <div key={mission.code} className="hm-tile">
-                    <span className="hm-tile__title">
-                      {mission.completed ? "✓ " : ""}
-                      {mission.title}
-                    </span>
-                    <span className="hm-tile__hint">
-                      {mission.completed ? "완료했어요" : `씨앗 ${mission.reward.seeds}`}
-                    </span>
-                  </div>
-                ))}
-              </div>
-            )}
-          </div>
-        </div>
-
-        <Link href="/community" className="hm-row">
-          <span>
-            <span className="hm-row__label">커뮤니티</span>
-            <span className="hm-row__hint">한 줄만 남겨도 충분해요</span>
-          </span>
-          <span className="hm-row__mark" aria-hidden="true">
-            →
-          </span>
-        </Link>
-
-        <div className="hm-home__foot">
-          <hr className="hm__rule" />
-          <Link href="/diagnosis" className="hm-link">
-            다시 진단하기
-          </Link>
-        </div>
-      </div>
-    </main>
+    <HomeDashboard
+      nickname={user.nickname || "익명"}
+      typeCode={user.typeCode}
+      petImage={petImage}
+      initialMissions={missions}
+    />
   )
 }

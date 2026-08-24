@@ -1,0 +1,9 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 64 64" role="img" aria-label="함께 걷는 하루">
+  <!-- 앱 아이콘. 종이색 바탕 + 새싹 하나. 종족(여우·고양이·곰) 중 하나를 쓰면
+       진단 결과가 홈 화면 아이콘으로 새어 나가므로 중립 상징을 쓴다 -->
+  <rect width="64" height="64" rx="14" fill="#F5F0E8"/>
+  <path d="M32 50V28" stroke="#7AAE82" stroke-width="4" stroke-linecap="round"/>
+  <path d="M32 30C32 22 26 17 19 17c0 8 6 13 13 13Z" fill="#7AAE82"/>
+  <path d="M32 34c0-7 5-12 12-12 0 7-5 12-12 12Z" fill="#A9542A" opacity="0.85"/>
+  <path d="M22 52h20" stroke="#DDD0BC" stroke-width="4" stroke-linecap="round"/>
+</svg>

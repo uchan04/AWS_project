@@ -38,7 +38,7 @@
 }
 
 .logoTitle {
-  font-family: "Gowun Dodum", sans-serif;
+  font-family: var(--font-display);
   font-size: 18px;
   color: #2a1f14;
   margin: 0;
@@ -55,7 +55,7 @@
   margin: 0;
   font-size: 13px;
   font-weight: 500;
-  font-family: "Noto Sans KR", sans-serif;
+  font-family: var(--font-body);
 }
 
 .navDesc {

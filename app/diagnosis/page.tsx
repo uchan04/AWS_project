@@ -1,5 +1,7 @@
 import Link from "next/link"
-import { getCurrentUser } from "@/lib/auth"
+import { redirect } from "next/navigation"
+import { UnauthorizedError, getCurrentUser } from "@/lib/auth"
+import { REDIAGNOSIS_ENABLED } from "@/lib/diagnosis/flags"
 import AskFlow from "./_components/AskFlow"
 import "@/styles/tokens.css"
 
@@ -16,8 +18,10 @@ import "@/styles/tokens.css"
 //      막으면 로그인한 사람이 네트워크 한 번 끊겼다고 진단을 시작할 수 없다.
 //      서버 컴포넌트는 요청이 하나뿐이라 이 선택지가 아예 생기지 않는다
 //
-// getCurrentUser()는 DB 장애로도 throw한다. 그것까지 이 안내로 받는다 —
-// 미인증과 장애를 구분해 보여줘도 사용자가 할 수 있는 행동은 같다.
+// 미인증과 DB 장애를 갈라야 한다(2026-08-22 수정).
+// 미들웨어가 미인증 방문자를 이미 /login?next=/diagnosis로 보내므로, 여기 catch에
+// 걸리는 것은 위조·만료 쿠키이거나 DB 장애다. 전자에 필요한 것은 재로그인이고,
+// 후자에 "먼저 가입해 주세요"를 띄우면 이미 계정이 있는 사람이 가입을 시도하게 된다.
 // (app/pet/page.tsx·app/community/page.tsx와 같은 패턴)
 
 // 유저 인증을 읽으므로 정적 프리렌더 대상이 아니다.
@@ -25,30 +29,32 @@ import "@/styles/tokens.css"
 export const dynamic = "force-dynamic"
 
 export default async function DiagnosisPage() {
+  let user
   try {
-    await getCurrentUser()
+    user = await getCurrentUser()
   } catch (error) {
+    if (error instanceof UnauthorizedError) redirect("/login?next=%2Fdiagnosis")
     console.error("[/diagnosis]", error)
     return (
       <main className="hm hm--canvas">
         <div className="hm__col hm-ask">
           <div className="hm-card">
-            <h1 className="hm-ask__question">먼저 가입해 주세요</h1>
+            <h1 className="hm-ask__question">지금은 진단을 시작할 수 없어요</h1>
             <p className="hm__note">
-              진단 결과로 종족과 첫 친구가 정해져요. 저장할 곳이 있어야 해서 가입이 먼저예요.
-              오래 걸리지 않아요.
+              잠시 후 다시 들어와 주세요. 답한 내용이 저장되지 않을 수 있어서 시작을 미뤘어요.
             </p>
-            <Link href="/signup" className="hm-btn hm-card__cta">
-              가입하고 시작하기
-            </Link>
-            <Link href="/login" className="hm-link">
-              이미 계정이 있어요
+            <Link href="/" className="hm-btn hm-card__cta">
+              홈으로
             </Link>
           </div>
         </div>
       </main>
     )
   }
+
+  // 재진단이 잠겨 있으면 이미 진단한 사람은 문항을 다시 풀지 않는다.
+  // 문항을 다 풀고 나서 완료 API가 400을 내는 것보다 여기서 돌려보내는 쪽이 낫다.
+  if (!REDIAGNOSIS_ENABLED && user.typeCode) redirect("/diagnosis/result")
 
   return <AskFlow />
 }

@@ -4,6 +4,7 @@ import { useState } from "react"
 import Link from "next/link"
 import type { TypeCode } from "@prisma/client"
 import { animalEmoji } from "@/lib/pet"
+import { ArtImage } from "@/app/components/ArtImage"
 import { TRIBE } from "@/lib/types"
 import "@/styles/tokens.css"
 import "../pet.css"
@@ -31,6 +32,8 @@ export type SkinRow = {
   priceShards: number | null
   owned: boolean
   active: boolean
+  /** 성체 그림. public/art에서 온다 (lib/assets.ts). 없으면 이모지로 떨어진다 */
+  imageUrl?: string | null
 }
 
 export type SkinListProps = {
@@ -159,7 +162,24 @@ export default function SkinList({
                     className={`pet-item${skin.active ? " pet-item--on" : locked ? " pet-item--locked" : ""}`}
                     key={skin.id}
                   >
-                    <span className="pet-item__face" aria-hidden="true">
+                    {skin.imageUrl ? (
+                       
+                      // 그림이 없으면 이모지로 떨어진다 (PetView와 같은 방식).
+                      // .pet-item__img가 3.5rem(56px) 정사각이다
+                      <ArtImage
+                        className="pet-item__img"
+                        src={skin.imageUrl}
+                        width={56}
+                        height={56}
+                        decorative
+                        fallbackDisplay="grid"
+                      />
+                    ) : null}
+                    <span
+                      className="pet-item__face"
+                      aria-hidden="true"
+                      style={{ display: skin.imageUrl ? "none" : "grid" }}
+                    >
                       {animalEmoji(skin.name)}
                     </span>
                     <span className="pet-item__name">{skin.name}</span>

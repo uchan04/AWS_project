@@ -2,7 +2,13 @@ import type { TypeCode } from "@prisma/client"
 
 export type WriteTopic = { title: string; draft: string }
 
-// 글쓰기 주제 추천. 유형별 6개 중 3개를 랜덤으로 보여준다. LLM이 만든 문구가 아니다.
+// 글쓰기 주제 추천의 대비책. 본 추천은 GET /api/community/topics가 Bedrock으로 만들고
+// (lib/community/topics.ts), 그 호출이 실패하거나 검증에서 걸러지면 여기 문구가 남는다.
+// 유형별 6개 중 3개를 랜덤으로 보여준다.
+//
+// 지우지 말 것: 추천이 없어도 글은 쓸 수 있어야 한다. 이 파일을 없애고 LLM만 두면
+// Bedrock이 죽은 순간 글쓰기 창이 안내 없는 빈 입력칸으로 바뀐다.
+// 문구를 고칠 때는 `npm run check:community`를 돌린다 — LLM 출력과 같은 검사를 통과해야 한다.
 export const TOPICS: Record<TypeCode, WriteTopic[]> = {
   INDEPENDENT_LOW_INCOME: [
     { title: "오늘 창밖 풍경", draft: "커튼을 열었더니 밖이 생각보다 밝았다. 잠깐 그대로 서 있었다." },
