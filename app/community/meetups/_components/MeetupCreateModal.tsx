@@ -2,25 +2,25 @@
 
 import { useEffect, useRef, useState } from "react"
 import { GalleryType } from "@prisma/client"
-import { TRIBE } from "@/lib/types"
 import { FadeIn, Spinner } from "./transitions"
+
+/*
+ * 갤러리 선택 UI는 뺐고, 개설은 항상 galleryType: ALL로 보낸다.
+ *
+ * 스키마의 Meetup.galleryType 컬럼과 API(POST /api/community/meetups)의 galleryType 검증은
+ * 그대로 살려 둔다. 종족 모임을 열기로 하면 여기 선택지만 되살리면 되고,
+ * 컬럼을 지웠다면 마이그레이션과 라우트·화면을 전부 되돌려야 한다.
+ * 지금 화면에서만 ALL로 고정하는 이유다.
+ */
+const FIXED_GALLERY = GalleryType.ALL
 
 // 열림·닫힘 전환 길이. WriteModal.tsx에는 모달 전환이 없어 여기서 정한 값이며,
 // 닫힐 때 이 시간만큼 언마운트를 미뤄야 사라지는 전환이 보인다.
 const MODAL_MS = 150
 
-// 갤러리 선택지는 스키마 enum이 유일한 출처다. 로컬 상수로 4종을 다시 적으면
-// enum이 늘었을 때 화면만 조용히 낡는다.
-const GALLERY_OPTIONS = Object.values(GalleryType)
-
-function galleryLabel(gallery: GalleryType): string {
-  return gallery === GalleryType.ALL ? "전체" : `${TRIBE[gallery].animal} 갤러리`
-}
-
 /** 관리자 전용. MeetupList가 isAdmin일 때만 이 컴포넌트를 렌더 트리에 넣는다. */
 export function MeetupCreateModal({ onCreated }: { onCreated: () => void }) {
   const [isOpen, setIsOpen] = useState(false)
-  const [galleryType, setGalleryType] = useState<GalleryType>(GalleryType.ALL)
   const [title, setTitle] = useState("")
   const [place, setPlace] = useState("")
   const [startsAt, setStartsAt] = useState("")
@@ -63,7 +63,6 @@ export function MeetupCreateModal({ onCreated }: { onCreated: () => void }) {
     closeTimer.current = window.setTimeout(() => {
       closeTimer.current = null
       setIsOpen(false)
-      setGalleryType(GalleryType.ALL)
       setTitle("")
       setPlace("")
       setStartsAt("")
@@ -88,7 +87,7 @@ export function MeetupCreateModal({ onCreated }: { onCreated: () => void }) {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
-          galleryType,
+          galleryType: FIXED_GALLERY,
           title: title.trim(),
           place: place.trim(),
           body: body.trim(),
@@ -146,24 +145,6 @@ export function MeetupCreateModal({ onCreated }: { onCreated: () => void }) {
               >
                 ✕
               </button>
-            </div>
-
-            <div className="mb-3 flex flex-wrap gap-2">
-              {GALLERY_OPTIONS.map((option) => (
-                <button
-                  key={option}
-                  type="button"
-                  onClick={() => setGalleryType(option)}
-                  className={
-                    "rounded-xl border px-4 py-2 text-sm font-semibold transition duration-150 " +
-                    (option === galleryType
-                      ? "border-neutral-900 bg-neutral-900 text-white"
-                      : "border-neutral-300 bg-white text-neutral-600 hover:bg-neutral-50")
-                  }
-                >
-                  {galleryLabel(option)}
-                </button>
-              ))}
             </div>
 
             <input

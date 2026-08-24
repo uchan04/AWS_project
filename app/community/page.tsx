@@ -1,4 +1,3 @@
-import Link from "next/link"
 import type { TypeCode } from "@prisma/client"
 import { getCurrentUser } from "@/lib/auth"
 import { TRIBE } from "@/lib/types"
@@ -65,13 +64,6 @@ export default async function CommunityPage(props: PageProps<"/community">) {
       <GalleryTabs active={gallery} myTypeCode={myTypeCode} />
 
       <HopeBanner gallery={gallery} />
-
-      <Link
-        href="/community/meetups"
-        className="w-fit rounded-xl border border-neutral-300 bg-white px-5 py-2.5 text-sm font-semibold text-neutral-600 transition duration-150 hover:bg-neutral-50 hover:shadow-md focus-visible:ring-2 focus-visible:ring-neutral-900 focus-visible:ring-offset-2 focus-visible:outline-none motion-safe:hover:-translate-y-0.5"
-      >
-        오프라인 모임
-      </Link>
 
       {posts.length === 0 ? (
         <p className="py-24 text-center text-sm leading-relaxed text-neutral-500">

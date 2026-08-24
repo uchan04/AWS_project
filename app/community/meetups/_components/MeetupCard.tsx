@@ -9,6 +9,14 @@ import { FadeIn, Spinner } from "./transitions"
 // 전체 갤러리는 종족이 없어 TRIBE에 키가 없다. WriteModal이 같은 이유로 자기 파일에 둔 값을 그대로 쓴다.
 const NEUTRAL_COLOR = "#9CA3AF"
 
+// 신청 계열 주 버튼의 배경.
+// NEUTRAL_COLOR는 "종족색이 없음"을 뜻하는 부재 표시지 강조색이 아니다. 모든 모임이 ALL인 지금
+// galleryColor는 항상 이 회색으로 풀려서, 주 버튼이 눌리지 않는 버튼처럼 보였다.
+// 값을 lib/types.ts나 app/globals.css에 두지 않는다 — 둘 다 5인이 공유하는 파일이고(CLAUDE.md 1절)
+// 화면 하나 때문에 공유 색 토큰을 늘릴 이유가 없다. WriteModal.tsx가 NEUTRAL_COLOR를
+// 자기 파일에 둔 것과 같은 방식이다.
+const MEETUP_ACCENT = "#0F766E"
+
 // 카드 진입의 순차 지연. 상한을 두지 않으면 20번째 카드가 800ms 뒤에 떠서 화면이 느려 보인다.
 const ENTER_STEP_MS = 40
 const ENTER_MAX_DELAY_MS = 240
@@ -91,7 +99,6 @@ export function MeetupCard({
 
   const tribe = meetup.galleryType === "ALL" ? null : TRIBE[meetup.galleryType]
   const galleryColor = tribe ? tribe.colorHex : NEUTRAL_COLOR
-  const galleryLabel = tribe ? tribe.family : "전체"
 
   const isFull = meetup.joinCount >= meetup.capacity
   const shortBy = meetup.minCount - meetup.joinCount
@@ -163,13 +170,6 @@ export function MeetupCard({
             <p className="font-medium text-neutral-900">{meetup.title}</p>
             <p className="mt-1 text-xs text-neutral-400">{meetup.host.nickname}</p>
           </div>
-
-          <span
-            className="shrink-0 rounded-full px-2.5 py-1 text-[11px] font-bold"
-            style={{ backgroundColor: `${galleryColor}22`, color: galleryColor }}
-          >
-            {galleryLabel}
-          </span>
         </div>
 
         <div className="flex flex-col gap-1 text-sm text-neutral-600">
@@ -213,7 +213,9 @@ export function MeetupCard({
               onClick={() => setConfirmingJoin(true)}
               disabled={pending !== null || isFull || confirmingJoin}
               className={BUTTON_BASE + " text-white"}
-              style={{ backgroundColor: galleryColor }}
+              // 정원이 찬 버튼은 지금의 회색(galleryColor)을 그대로 둔다 — 거기서는 회색이 맞다.
+              // galleryColor는 종족 모임을 되살릴 때 다시 쓸 값이라 남겨둔다.
+              style={{ backgroundColor: isFull ? galleryColor : MEETUP_ACCENT }}
             >
               {pending === "join" && <Spinner />}
               <FadeIn key={isFull ? "full" : "join"}>{isFull ? "정원 마감" : "신청하기"}</FadeIn>
@@ -273,7 +275,7 @@ export function MeetupCard({
                 }
                 disabled={!confirmingJoin || pending !== null}
                 className={BUTTON_BASE + " text-white"}
-                style={{ backgroundColor: galleryColor }}
+                style={{ backgroundColor: MEETUP_ACCENT }}
               >
                 {pending === "join" && <Spinner />}
                 신청할게요
