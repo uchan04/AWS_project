@@ -27,7 +27,21 @@ export async function GET(_request: NextRequest, ctx: RouteContext<"/api/communi
 
     const participants = rows.map((row) => ({ nickname: row.user.nickname, joinedAt: row.joinedAt }))
 
-    return ok({ participants })
+    // 취소한 사람. cancelReason은 선택 입력이라 null이 정상이며, 여기서도 그대로 내려간다.
+    // 참가자 배열과 마찬가지로 식별자는 내보내지 않는다.
+    const canceledRows = await prisma.meetupParticipant.findMany({
+      where: { meetupId: id, canceledAt: { not: null } },
+      orderBy: { canceledAt: "desc" },
+      select: { canceledAt: true, cancelReason: true, user: { select: { nickname: true } } },
+    })
+
+    const canceled = canceledRows.map((row) => ({
+      nickname: row.user.nickname,
+      canceledAt: row.canceledAt,
+      cancelReason: row.cancelReason,
+    }))
+
+    return ok({ participants, canceled })
   } catch (error) {
     if (error instanceof UnauthorizedError) return fail("UNAUTHORIZED", error.message, 401)
     throw error

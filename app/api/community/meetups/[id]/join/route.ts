@@ -101,11 +101,22 @@ export async function POST(_request: NextRequest, ctx: RouteContext<"/api/commun
   }
 }
 
+// 취소 사유의 상한. 화면(MeetupCard)의 입력 제한과 같은 값이다.
+const REASON_MAX = 200
+
 // 신청 취소. 친밀도는 회수하지 않는다.
-export async function DELETE(_request: NextRequest, ctx: RouteContext<"/api/community/meetups/[id]/join">) {
+export async function DELETE(request: NextRequest, ctx: RouteContext<"/api/community/meetups/[id]/join">) {
   try {
     const user = await getCurrentUser()
     const { id } = await ctx.params
+
+    // 사유는 선택이다. body 없이 오는 DELETE도 정상이므로 파싱 실패를 그대로 흘려보낸다.
+    // 필수로 만들면 취소를 회피하고 말없이 안 나타나는 쪽으로 흐른다.
+    const payload = await request.json().catch(() => null)
+    const rawReason = typeof payload?.reason === "string" ? payload.reason.trim() : ""
+    if (rawReason.length > REASON_MAX) return fail("INVALID_BODY", "취소 사유가 너무 길어요", 400)
+    // 빈 문자열이면 컬럼을 건드리지 않는다. null이 정상 상태다.
+    const cancelReason = rawReason || null
 
     const meetup = await prisma.meetup.findUnique({ where: { id }, select: { deletedAt: true, status: true } })
     if (!meetup) return fail("NOT_FOUND", "모임을 찾을 수 없어요", 404)
@@ -120,9 +131,10 @@ export async function DELETE(_request: NextRequest, ctx: RouteContext<"/api/comm
       joinCount = await prisma.$transaction(async (tx) => {
         // updateMany의 count로 판정한다. 먼저 읽고 검사하면 동시 취소 두 건이 모두 통과해
         // joinCount가 두 번 깎인다. canceledAt이 null인 행만 갱신하므로 두 번째는 count 0이다.
+        // cancelReason을 같은 update에 얹는다. 따로 부르면 취소는 됐는데 사유만 빠지는 상태가 생긴다.
         const canceled = await tx.meetupParticipant.updateMany({
           where: { meetupId: id, userId: user.id, canceledAt: null },
-          data: { canceledAt: new Date() },
+          data: { canceledAt: new Date(), ...(cancelReason ? { cancelReason } : {}) },
         })
         if (canceled.count === 0) throw new MeetupJoinError("NOT_JOINED", "신청하지 않은 모임입니다")
 

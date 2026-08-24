@@ -75,7 +75,12 @@ export function CancelNotice({ notices }: { notices: CancelNoticeItem[] }) {
             {notices.map((notice) => (
               <li key={notice.meetupId} className="text-sm text-neutral-600">
                 {notice.title}
-                <span className="text-neutral-400"> · {meetupDateTime(notice.startsAt)}</span>
+                <span className="text-xs text-neutral-400">
+                  {" · "}
+                  {meetupDateTime(notice.startsAt)}
+                  {" · "}
+                  {notice.place}
+                </span>
               </li>
             ))}
           </ul>
