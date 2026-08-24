@@ -35,7 +35,35 @@
 - 확인: **별조각 60(일일 미션 전체 완료)이 구현됐다 (2026-08-24).** `lib/missions/completion.ts:120`. 옛 차단 4번이 닫히고 스킨 2500의 39일 계산이 실제와 맞는다. 다만 **그 보너스는 `Mission` 행이 아니라서 오늘의 활동 카드·출처 줄의 오늘 값에는 안 들어온다** — 아래 "남아 있는 것"
 - 완료: **펫 대사 순환 20초 → 5분 (2026-08-24, 사용자 요청)** — 위 "순환 간격은 5분이다" 절
 - 완료: **씨앗 줍기·상점 입구 2개를 입체로 (2026-08-24, 사용자 요청 — 같은 날 두 번)** — 없던 것은 광택이 아니라 면 밖 그림자였다. 1차로 단계 그림자(`0 4px 0`)를 넣었고, 사용자가 보고 "그림자 빼고 약간 주위에 퍼지게"라고 해서 **번짐(`0 4px 10px`, −·+ 원과 같은 값)으로 확정**했다. 상점 입구는 8/22의 "광택은 주지 않는다"를 뒤집어 면까지 주 버튼 값으로 올렸다(글자 `--color-muted` → `--color-ink`). 새 색 0개. 아래 "씨앗 줍기·상점 입구를 입체로" 절
+- 완료: **`develop` 재머지 + 8/24 변경분 실측 (2026-08-24)** — `01bd5d1`. 충돌 0, 펫 파일 변경 0. 아래 "`develop` 재머지와 검증" 절
 - **E에게 알림: `.env`·`.env.example`에 `SESSION_SECRET`이 없어 로그인이 500이다.** 아래 "막힌 것"
+
+## `develop` 재머지와 검증 (2026-08-24)
+
+`feat/pet`에 `origin/develop`을 머지했다(`01bd5d1`). 받아온 것은 **E의 인증**(`app/api/auth/callback|google|login`, `lib/auth.ts`, `lib/cognito.ts`, `amplify.yml`)과 **D의 커뮤니티 희망 배너**(`app/community/_components/HopeBanner.tsx`, `_lib/banner.ts`, `_lib/gallery.ts`, `page.tsx`) + 두 사람 문서뿐이다. 12파일 +218/−35.
+
+**펫 쪽은 한 줄도 안 바뀌었다** — `app/pet/**`·`lib/pet.ts`·`lib/types.ts`·`lib/reward.ts`·`prisma/**` 변경 0. 마이그레이션도 6개(`20260821090000_pet_last_fed_at`가 마지막) 그대로여서 **`npx prisma migrate deploy`가 필요 없다.** 8/21 머지 때 손댄 것(`user-stats-changed` 이벤트 이름, `app/pet/loading.tsx` 뼈대)처럼 이번엔 따라 고칠 것이 없었다.
+
+### 검증 결과
+
+| 검사 | 결과 |
+|---|---|
+| `npx tsc --noEmit` | 0오류 |
+| `npm run check:pet` | 통과 |
+| `npm run build` | 통과. 라우트 43개 |
+| 실 DB 개발 서버 `/pet` | 200 |
+
+SSR HTML로 8/24 변경분이 실제로 그려지는 것까지 확인했다 — `pet-btn--square` 1개, `pet-card--today` 1개, `pet__col--side` 1개, `pet-idle__body` 1개, `pet-today__tile` 1개, **걷어낸 `pet-today__badge`·`hm-pet` 0개**, 제목 이모지 6종(👛 ⭐ 🌱 🌿 📊 🌟). CSS에도 확정한 번짐 값이 그대로 있다 — 상점 입구 `0 4px 10px color-mix(in oklch, var(--tribe) 38%, transparent)`, 씨앗 줍기 같은 값의 `--pet-seed` 판, `:active`는 둘 다 `0 2px 5px … 30%`.
+
+**`오늘의 활동` 카드가 처음으로 실제 값으로 떴다.** 8/23까지는 이 계정의 오늘 값 3종이 다 0이라 카드 자체가 숨어서 필터를 잠시 풀고 봤는데, 이번에는 `🌱 +45 받은 씨앗` **한 칸만** 그려졌다 — 별조각·친밀도가 오늘 0이라 빠진 것이고 "0은 그리지 않는다"가 의도대로 동작한 실측이다.
+
+### 함정: 개발 서버가 떠 있으면 프로덕션 빌드가 실패한다 (Windows)
+
+```
+Error: EPERM: operation not permitted, unlink '.next\static\<hash>'
+```
+
+`next dev`가 `.next`를 잠근 상태에서 `npm run build`를 돌리면 이렇게 죽는다. 코드 문제가 아니고, **빌드 전에 dev 서버를 멈추면 그대로 통과한다**(`netstat -ano | grep :3000`으로 PID를 찾아 종료). `next.config.ts`에 `distDir`을 주면 피할 수 있지만 그 파일은 이 브랜치에서 건드릴 게 아니다.
 
 ## 오늘의 활동 카드 (2026-08-24)
 
