@@ -10,10 +10,34 @@ import { fail, ok } from "@/lib/api"
 import { setLocalSessionCookie, signInWithCognitoToken } from "@/lib/auth"
 import { verifyPassword } from "@/lib/password"
 import { prisma } from "@/lib/prisma"
+import { clearAttempts, clientKey, recordAttempt, retryAfter } from "@/lib/ratelimit"
 
 const client = new CognitoIdentityProviderClient({ region: process.env.AWS_REGION })
 
+// 실패만 센다. 성공하면 지운다 — 공용 IP(학교·카페 NAT)를 쓰는 정상 사용자가
+// 남의 실패 기록에 막히지 않게 한다.
+const LOGIN_LIMIT = 10
+const LOGIN_WINDOW_MS = 5 * 60 * 1000
+
 export async function POST(request: Request) {
+  // 레이트 리밋을 body 파싱보다 먼저 본다. 막을 요청에 JSON 파싱과 DB 조회를 들이지 않는다.
+  const key = `login:${clientKey(request)}`
+  const wait = retryAfter(key, LOGIN_LIMIT)
+  if (wait > 0) {
+    // 429가 맞는 코드지만 CLAUDE.md 7절이 상태 코드를 5개로 고정했다. 화면은 message만 읽는다
+    return fail(
+      "TOO_MANY_ATTEMPTS",
+      `로그인 시도가 너무 많습니다. ${wait}초 후에 다시 시도해 주세요`,
+      400
+    )
+  }
+
+  /** 실패 응답 + 시도 1회 기록. 로그인 실패는 전부 이 함수를 지난다. */
+  const rejected = (code: string, message: string) => {
+    recordAttempt(key, LOGIN_WINDOW_MS)
+    return fail(code, message, 401)
+  }
+
   let body: unknown
   try {
     body = await request.json()
@@ -31,9 +55,10 @@ export async function POST(request: Request) {
   const local = await prisma.user.findUnique({ where: { email } })
   if (local?.passwordHash) {
     if (!verifyPassword(password, local.passwordHash)) {
-      return fail("INVALID_CREDENTIALS", "이메일 또는 비밀번호가 올바르지 않습니다", 401)
+      return rejected("INVALID_CREDENTIALS", "이메일 또는 비밀번호가 올바르지 않습니다")
     }
     await setLocalSessionCookie(local.id)
+    clearAttempts(key)
     return ok({})
   }
 
@@ -47,16 +72,17 @@ export async function POST(request: Request) {
     )
 
     const accessToken = auth.AuthenticationResult?.AccessToken
-    if (!accessToken) return fail("LOGIN_FAILED", "로그인에 실패했습니다", 401)
+    if (!accessToken) return rejected("LOGIN_FAILED", "로그인에 실패했습니다")
 
     // Cognito 토큰은 쿠키에 담지 않는다. 자체 세션(7일)으로 바꿔 자체 계정과 수명을 맞춘다
     if (!(await signInWithCognitoToken(accessToken))) {
-      return fail("LOGIN_FAILED", "로그인에 실패했습니다", 401)
+      return rejected("LOGIN_FAILED", "로그인에 실패했습니다")
     }
+    clearAttempts(key)
     return ok({})
   } catch (error) {
     if (error instanceof NotAuthorizedException || error instanceof UserNotFoundException) {
-      return fail("INVALID_CREDENTIALS", "이메일 또는 비밀번호가 올바르지 않습니다", 401)
+      return rejected("INVALID_CREDENTIALS", "이메일 또는 비밀번호가 올바르지 않습니다")
     }
     throw error
   }

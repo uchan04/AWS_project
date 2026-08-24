@@ -88,3 +88,20 @@ export function evolutionStageFor(level: number): number {
   if (level >= EVOLUTION_LEVEL.STAGE2) return 2
   return 1
 }
+
+/**
+ * 주격 조사(이/가)를 받침에 맞춰 붙인다. `withSubject("곰")` → "곰이".
+ *
+ * TRIBE.animal을 문장에 넣는 곳이 세 군데인데, 셋 다 "…가"를 하드코딩하고 있었다.
+ * 여우·고양이는 맞지만 **곰은 "곰가"가 되어** 곰족 사용자만 깨진 문장을 본다.
+ * 종족은 진단 결과라 개발자가 자기 계정으로는 평생 못 볼 수도 있는 버그다.
+ *
+ * 한글 음절은 U+AC00부터 종성 28개 단위로 배열되므로 (code - 0xAC00) % 28 이
+ * 0이면 받침이 없다. 한글이 아닌 글자는 받침이 없는 것으로 본다.
+ */
+export function withSubject(word: string): string {
+  if (!word) return word
+  const code = word.charCodeAt(word.length - 1)
+  const hasFinalConsonant = code >= 0xac00 && code <= 0xd7a3 && (code - 0xac00) % 28 !== 0
+  return `${word}${hasFinalConsonant ? "이" : "가"}`
+}

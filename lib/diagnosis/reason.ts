@@ -8,13 +8,15 @@
 // 지표 이름을 프롬프트에 넣으면 "저소득", "우울"처럼 사용자가 고르지도 않은 낙인 단어가
 // 출력에 섞인다. 선택지 문장은 사용자가 직접 읽고 누른 은유 문장이라 그 위험이 없다.
 
-import { BedrockRuntimeClient, ConverseCommand } from "@aws-sdk/client-bedrock-runtime"
+import { ConverseCommand } from "@aws-sdk/client-bedrock-runtime"
 import type { TypeCode } from "@prisma/client"
 import { QUESTIONS } from "./questions"
 import type { Answer } from "./indicators"
+import { ONESHOT_TIMEOUT_MS, bedrockClient } from "@/lib/bedrock"
 import { TRIBE } from "@/lib/types"
 
-const bedrock = new BedrockRuntimeClient({ region: process.env.BEDROCK_REGION || "us-east-1" })
+// 타임아웃·재시도 설정은 lib/bedrock.ts에 있다. 결과 화면을 막는 호출이라 상한이 필요하다
+const bedrock = bedrockClient(ONESHOT_TIMEOUT_MS)
 
 export const REASON_LINES = 3
 const LINE_MAX = 60
@@ -59,7 +61,10 @@ const REASON_TOOL = {
 
 // 출력에 섞이면 안 되는 단어. 3번 규칙을 모델의 선의에만 맡기지 않는다.
 // 하나라도 걸리면 그 응답을 버린다 — 잘못된 문구를 띄우는 것보다 안 띄우는 것이 낫다.
-const BANNED = [
+//
+// export한 이유: 커뮤니티 주제 추천(lib/community/topics.ts)도 같은 낙인 단어를 막아야 한다.
+// 목록을 두 곳에 두면 한쪽에만 단어가 추가돼 다른 쪽으로 새어 나간다.
+export const BANNED = [
   "유형",
   "저소득",
   "빈곤",

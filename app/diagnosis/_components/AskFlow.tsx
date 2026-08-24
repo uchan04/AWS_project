@@ -77,13 +77,16 @@ export default function AskFlow() {
         <div className="hm__col hm-ask">
           {error ? (
             <div className="hm-card">
-              <p>{error}</p>
+              {/* 답변을 다 하고 마지막 왕복이 실패한 자리다. 사유를 반드시 읽어줘야 한다 */}
+              <p role="alert">{error}</p>
               <button type="button" onClick={() => void submit(answers)} className="hm-btn hm-card__cta">
                 다시 보내기
               </button>
             </div>
           ) : (
-            <p className="hm__note">결과를 준비하고 있어요…</p>
+            <p className="hm__note" role="status" aria-live="polite">
+              결과를 준비하고 있어요…
+            </p>
           )}
         </div>
       </main>
