@@ -20,10 +20,23 @@
  * 콘솔 값에 스킴이 붙어 있어도 두 번 붙지 않게 양쪽을 다 받는다.
  */
 export function cdnUrl(key: string): string | null {
+  const origin = cdnOrigin()
+  if (!origin) return null
+  return `${origin}/${key.replace(/^\/+/, "")}`
+}
+
+/**
+ * CLOUDFRONT_DOMAIN을 스킴 붙은 origin으로. 비어 있으면 null.
+ *
+ * 따로 내보내는 이유는 CSP다(2026-08-24). `middleware.ts`의 img-src에 이 origin이
+ * 없으면 브라우저가 그림을 **전부 차단**한다 — 8/24에 그림 출처를 CloudFront로
+ * 바꾸면서 실제로 그렇게 됐고, 로컬 실행에서 `pets/fox-4.png` 차단 로그로 잡았다.
+ * 조립 규칙이 두 벌이면 한쪽만 고쳐도 같은 증상이 다시 나므로 규칙은 여기 한 곳이다.
+ */
+export function cdnOrigin(): string | null {
   const raw = process.env.CLOUDFRONT_DOMAIN?.trim().replace(/\/+$/, "")
   if (!raw) return null
-  const origin = /^https?:\/\//.test(raw) ? raw : `https://${raw}`
-  return `${origin}/${key.replace(/^\/+/, "")}`
+  return /^https?:\/\//.test(raw) ? raw : `https://${raw}`
 }
 
 /**

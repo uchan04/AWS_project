@@ -1,4 +1,5 @@
 import { NextResponse, type NextRequest } from "next/server"
+import { cdnOrigin } from "@/lib/assets"
 
 // 소유자: E(인프라). 미인증 방문자를 /login으로 보내고, 요청마다 CSP nonce를 만든다.
 //
@@ -32,6 +33,13 @@ const PUBLIC_PATHS = ["/login", "/signup"]
 // 리전을 S3_REGION이 아니라 AWS_REGION에서 읽는 것도 그 파일과 같다.
 const S3_HOST = `https://*.s3.${process.env.AWS_REGION || "us-east-1"}.amazonaws.com`
 
+// 펫·치장·배경 그림을 내려주는 CloudFront. 2026-08-24에 그림 출처가 public/art에서
+// 여기로 바뀌면서 img-src에 추가가 필요해졌다 — 없으면 브라우저가 그림을 전부 차단하고
+// 화면에는 이모지 폴백만 남는다(로컬 실행에서 pets/fox-4.png 차단 로그로 잡았다).
+// origin 조립 규칙은 lib/assets.ts 한 곳에만 둔다. 도메인이 비면 빈 문자열이라
+// CSP에 아무것도 추가되지 않는다(그때는 cdnUrl()도 null이라 그림 자체가 없다).
+const CDN_HOST = cdnOrigin() ?? ""
+
 /**
  * 요청 1건당 nonce 1개를 만들어 CSP를 붙인다.
  *
@@ -56,7 +64,7 @@ function cspFor(nonce: string): string {
     `script-src 'self' 'nonce-${nonce}' 'strict-dynamic'${isDev ? " 'unsafe-eval'" : ""}`,
     "style-src 'self' 'unsafe-inline'",
     // blob: 은 업로드 전 미리보기(URL.createObjectURL), data: 는 인라인 아이콘
-    `img-src 'self' blob: data: ${S3_HOST}`,
+    `img-src 'self' blob: data: ${S3_HOST}${CDN_HOST ? ` ${CDN_HOST}` : ""}`,
     "font-src 'self'",
     // presigned PUT은 S3로 직접 나간다. 나머지는 우리 API·채팅 스트림
     `connect-src 'self' ${S3_HOST}${isDev ? " ws: wss:" : ""}`,
