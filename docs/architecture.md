@@ -59,7 +59,13 @@ flowchart TB
 
 | 서비스 | 리소스 | 용도 | 심사 설명 포인트 |
 |---|---|---|---|
-| Amplify Hosting | app `welli` (`d36bhb2dnkr0oj`) | Next.js 빌드·배포·HTTPS, `main` push 자동 배포 | 서버리스 SSR, 유휴 비용 0 |
+| Amplify Hosting | app `welli` (**`d2ynoyp44lt46h`**) | Next.js 빌드·배포·HTTPS, `main` push 자동 배포 | 서버리스 SSR, 유휴 비용 0 |
+
+> **app id 정정 (2026-08-22).** 이 줄에 `d36bhb2dnkr0oj`로 적혀 있었다. 실제로 배포가 도는 앱은
+> `d2ynoyp44lt46h`다 — 라이브 URL `https://main.d2ynoyp44lt46h.amplifyapp.com`이 그 앱이고
+> (`docs/기능체크리스트.md`, `docs/dev/diagnosis.md`의 프로덕션 검증 기록),
+> `app/layout.tsx:40`의 `APP_ORIGIN` 폴백도 같은 값이다. `d36bhb2dnkr0oj`는 CLI로 먼저 만들었다가
+> GitHub를 연결하지 않은 앱이다. `docs/dev/infra.md` 49·51·55행에도 옛 id가 남아 있다.
 | RDS PostgreSQL | `welli-db`, `db.t4g.micro`, PG 16.4 | 애플리케이션 데이터 전체, Prisma ORM | ARM(`t4g`) 인스턴스로 비용 최적화, 자동 백업 7일 |
 | Cognito | User Pool `us-east-1_EhWWTXiQJ` | 이메일+비밀번호 인증, 인증코드 비활성 | 인증·토큰 관리를 관리형 서비스에 위임 |
 | Bedrock | `us.anthropic.claude-sonnet-5` (us-east-1) | 진단 문항 다듬기, 자유 답변→enum 변환, 챗봇, 커뮤니티 주제 추천 | 모델 단일화로 호출 경로·버그 표면 최소화 |

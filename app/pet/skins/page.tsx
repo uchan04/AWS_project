@@ -1,6 +1,8 @@
 import Link from "next/link"
+import { redirect } from "next/navigation"
 import type { TypeCode } from "@prisma/client"
-import { getCurrentUser } from "@/lib/auth"
+import { petImageUrl } from "@/lib/assets"
+import { UnauthorizedError, getCurrentUser } from "@/lib/auth"
 import { cappedStage } from "@/lib/pet"
 import { prisma } from "@/lib/prisma"
 import SkinList, { type SkinRow } from "../_components/SkinList"
@@ -39,13 +41,18 @@ export default async function SkinsPage() {
     // 무엇을 사는지 안 보여 주고 있었다. 변종 스킨은 이모지가 기본 종족과 같아서
     // (lib/pet.ts animalEmoji: 어미로 찾는다) 여우와 북극여우가 화면에서 구분되지 않았다.
     //
-    // 규칙은 app/pet/page.tsx의 imageUrl과 같다: <imageKeyBase>-<단계>.png.
-    // **단계는 4단 고정이 아니라 유저의 현재 단계다.** 대표 그림으로 성체(4단)를 쓰면
-    // Lv.1 유저가 산 뒤 방에서 다른 그림(알)을 보게 된다 — 8/22에 배경 상점의 크롭을
-    // 방 크롭과 맞춘 것과 같은 원칙이다. 상점은 "바꾸면 지금 내 펫이 이렇게 보인다"를
-    // 보여 주는 곳이다. 도메인이 비면 null이고 타일은 이모지로 떨어진다
-    const cloudfront = process.env.CLOUDFRONT_DOMAIN
-
+    // 주소 조립은 lib/assets.ts의 petImageUrl 하나만 쓴다(2026-08-24 머지). 여기서
+    // `${CLOUDFRONT_DOMAIN}/${key}`를 직접 만들던 것을 걷었다 — 그 함수가 스킴 없는
+    // 도메인 값을 보정하는데(lib/assets.ts cdnOrigin 주석) 손으로 조립하면 그 보정이 빠져
+    // 상대 경로가 되고 404다.
+    //
+    // **단계는 마지막 단계 고정이 아니라 유저의 현재 단계다** (2026-08-24 사용자 결정).
+    // 대표 그림으로 성체를 쓰면 Lv.1 유저가 산 뒤 방에서 다른 그림(알)을 보게 된다 —
+    // 8/22에 배경 상점의 크롭을 방 크롭과 맞춘 것과 같은 원칙이다. 상점은 "바꾸면 지금
+    // 내 펫이 이렇게 보인다"를 보여 주는 곳이다.
+    // GET /api/pet/skins는 성체를 내린다 — 그쪽은 화면이 아니라 목록 데이터라 유저 레벨이
+    // 개입하지 않는 편이 맞고, 이 화면은 그 API를 쓰지 않는다(서버에서 직접 읽는다).
+    // 도메인이 비면 petImageUrl이 null이고 타일은 이모지로 떨어진다
     skins = all.map((skin) => ({
       id: skin.id,
       name: skin.name,
@@ -53,14 +60,14 @@ export default async function SkinsPage() {
       isDefault: skin.isDefault,
       stageCount: skin.stageCount,
       priceShards: skin.priceShards,
-      imageUrl: cloudfront
-        ? `${cloudfront}/${skin.imageKeyBase}-${cappedStage(user.level, skin.stageCount)}.png`
-        : null,
+      imageUrl: petImageUrl(skin.imageKeyBase, cappedStage(user.level, skin.stageCount)),
       owned: ownedIds.has(skin.id),
       active: skin.id === user.activePetSkinId,
     }))
     starShards = user.starShards
   } catch (error) {
+    // 미인증이면 로그인으로 보낸다. 아래 카드는 DB 장애용이다(app/pet/page.tsx와 같은 이유)
+    if (error instanceof UnauthorizedError) redirect("/login?next=%2Fpet%2Fskins")
     console.error("[/pet/skins]", error)
     return (
       <main className="pet pet--shop">

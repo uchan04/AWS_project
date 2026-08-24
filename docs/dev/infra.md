@@ -6,8 +6,12 @@
 ## 현재 상태
 - 완료: Next.js 프로젝트, Prisma 6 + 스키마, `lib/auth.ts`(실 Cognito 검증, 쿠키 기반), `lib/prisma.ts`, `lib/api.ts`, `.env.example`, RDS, Cognito, S3+CloudFront, CloudWatch+SNS, Bedrock 확인, Amplify 앱 생성(환경변수 포함), 로그인·가입 화면(이메일+비밀번호), `amplify.yml`(2026-08-20). 내비게이션은 B의 사이드바로 교체됨(하단 탭은 폐기, 아래 "삭제한 파일" 참고)
 - 2026-08-23 완료: **Google 로그인 Cognito 측 설정 전부 끝.** Google IdP 생성됨(scopes `profile email openid`, mapping `email→email` `username→sub`), App Client `welli-web-client`에 OAuth 활성화(`AllowedOAuthFlowsUserPoolClient=true`, flow `code`, scopes `openid email profile`, IdP `Google`+`COGNITO`), 콜백·로그아웃 URL 등록. `/oauth2/authorize`가 Google로 302하는 것까지 확인
-- 진행 중: Amplify GitHub 연동은 완료(아래 앱 ID 참고). 남은 것은 Google Cloud Console 쪽 승인된 리디렉션 URI 확인뿐
-- 미착수: 희망 문구 배너, 발표 자료
+- 2026-08-24 완료: **배포 환경에서 리다이렉트가 `localhost:3000`으로 튀던 문제 수정**(`fd8c21f`). 아래 "배포 환경에서 절대 URL을 만들지 않는다" 절 참고. Google IdP는 AWS CLI로 실제 연결 상태를 재확인했다 — User Pool에 `Google`(type `Google`)이 있고 App Client `idps`가 `["COGNITO","Google"]`, 콜백·로그아웃 URL은 로컬·배포 양쪽 다 등록돼 있다. `.env` 주석의 "Google IdP는 아직 연결 전"은 오래된 내용이다
+- 2026-08-24 완료: **모꼬지 Figma 시안 에셋 41장을 `public/images/`에 추가**(`feat/infra` `cea04c9`). 아래 "정적 UI 에셋은 DB도 S3도 아니다" 절 참고
+- 2026-08-24 완료: **`develop` → `main` 배포**(fast-forward 31커밋 `79741d0..d1c1cda`, Amplify job 14 SUCCEED). 배포본 실측 통과 — 이미지 41/41, 페이지 9장 200, 미인증 API 401, 로그아웃 303 `location: /login`, 로그인 401(500 아님 → `SESSION_SECRET` 정상). 아래 "로컬 `.env`에서만 깨지는 것 2건" 절도 함께 참고
+- 진행 중: Amplify GitHub 연동은 완료(아래 앱 ID 참고). Google 로그인 전 구간 실사용 검증(브라우저로 실제 계정 로그인)은 아직 안 했다 — OAuth 동의 화면이 "테스트" 상태면 등록된 테스트 사용자만 된다(아래 "막힌 것" 참고)
+- 미착수: 발표 자료
+- 2026-08-22 A가 넘긴 것: 희망 문구 배너 구현(`app/community/_lib/banner.ts`), `middleware.ts` 미인증 리다이렉트, `lib/ratelimit.ts` 로그인·가입 시도 제한, `/settings`(비밀번호 변경·회원 탈퇴). 아래 "다음 할 일" 3·4번이 이걸로 해소됐다
 
 ## 구현한 파일
 - `lib/auth.ts` — `getCurrentUser()`. `DEV_AUTH_BYPASS=true`면 고정 유저 upsert 스텁, 아니면 `access_token` httpOnly 쿠키를 `aws-jwt-verify`로 검증 후 `sub`으로 upsert. `Authorization` 헤더는 안 읽는다 — 문서 내비게이션(링크 클릭·주소창 이동)에는 커스텀 헤더가 안 붙어서 서버 컴포넌트 페이지를 인증할 수 없었다(`docs/STATUS.md` "외부 피드백 검증" 참고)
@@ -41,8 +45,8 @@
 ## 다음 할 일
 1. **(사용자 직접) Amplify GitHub 연동** — 아래 절차 참고. 끝나면 `main` push 시 자동 배포된다
 2. **(사용자 직접) Google Cloud OAuth 클라이언트 발급** — 위 "막힌 것" 참고
-3. 서버 컴포넌트 페이지의 미인증 리다이렉트 규칙 확정: API는 401 + `{ error: { code: "UNAUTHORIZED" } }`를 이미 쓰고 있다. 페이지 쪽(`getCurrentUser()` 직접 호출)의 미인증 처리는 각 화면 담당자가 정한다
-4. 희망 문구 배너 (상수 3~5개)
+3. ~~서버 컴포넌트 페이지의 미인증 리다이렉트 규칙 확정~~ → 2026-08-22 A가 `middleware.ts`로 정했다. 쿠키가 없으면 `/login?next=<원래 경로>`로 보낸다. 쿠키 존재만 보는 UX 게이트이고 보안 경계가 아니다(Edge 런타임에서 `lib/session.ts`의 Node crypto 검증을 못 돈다) — 실제 인증은 라우트·페이지 첫 줄의 `getCurrentUser()`가 그대로 한다
+4. ~~희망 문구 배너~~ → 해소 (`app/community/_lib/banner.ts`)
 5. 8/20부터 발표 자료 착수
 
 ## Amplify 배포 (연동 완료)
@@ -58,6 +62,78 @@
 ### 환경변수를 추가할 때 반드시 두 곳을 고친다
 
 Amplify 콘솔 환경변수는 빌드 컨테이너에만 주입되고 SSR 컴퓨트(Lambda)에는 전달되지 않는다. 그래서 `amplify.yml`의 `env | grep -e ...` 목록에 키를 **직접 추가**해야 런타임에 실린다. 콘솔에만 등록하면 런타임에서 `undefined`다. `COGNITO_REDIRECT_URI`가 콘솔에는 있는데 grep 목록에 없어서 코드에서 쓸 수 없던 상태였다(2026-08-23 수정).
+
+### 배포 환경에서 절대 URL을 만들지 않는다
+
+**`request.url`의 host는 배포 환경에서 공개 도메인이 아니라 `localhost:3000`이다.** Amplify SSR은 Lambda 안에서 Next 서버를 `localhost:3000`으로 띄우고 그 앞에 CloudFront가 붙는 구조다. 그래서 `new URL("/login", request.url)` 같은 절대 URL을 만들어 `Location`에 실으면 브라우저가 **사용자 PC의 3000번**을 찾아가 "연결을 거부했습니다"로 끝난다.
+
+2026-08-24 배포 환경 실제 응답으로 확인했다.
+
+| 요청 | 수정 전 `Location` | 수정 후 |
+|---|---|---|
+| `POST /api/auth/logout` | `https://localhost:3000/login` | `/login` |
+| `GET /api/auth/callback` | `https://localhost:3000/login` | `/login` |
+
+**원인을 못 찾게 만든 지점**: `redirect_uri`는 `COGNITO_REDIRECT_URI`로 이미 방어돼 있었다(2026-08-23). 그래서 Google 로그인은 Cognito 왕복과 토큰 교환까지 **다 성공한 뒤 홈으로 보내는 마지막 한 줄에서만** 깨졌다. 증상이 "Cognito를 연결했는데 사이트에 연결할 수 없음"으로 보였다.
+
+**규칙**: 앱 내부 경로로 보낼 때는 `lib/cognito.ts`의 `appRedirect(path)`를 쓴다. `Location`에 상대 경로를 넣으면 브라우저가 자기가 접속한 주소를 기준으로 해석하므로(RFC 7231 §7.1.2) 로컬·`main` 배포·프리뷰 브랜치가 도메인이 달라도 전부 맞는다. `NextResponse.redirect()`는 절대 URL을 요구하므로 이 용도에는 쓸 수 없다.
+
+**`APP_ORIGIN` 같은 환경변수로 풀지 않은 이유**: 위 절의 이중 등록(콘솔 + `amplify.yml` grep 목록)이 또 필요해지고, 빠뜨리면 런타임 `undefined`다. 프리뷰 브랜치 배포는 도메인이 달라 아예 깨진다. 상대 경로는 환경변수가 0개다.
+
+**곁들여 고친 것**: 로그아웃이 307이라 브라우저가 `/login`으로 **다시 POST**해 405가 될 수 있었다. 303으로 바꿔 다음 요청이 GET이 된다.
+
+## 정적 UI 에셋은 DB도 S3도 아니다
+
+2026-08-24, 모꼬지 Figma 시안에서 분리한 PNG 41장을 `public/images/`에 넣었다. 요청은 "DB에 올려 달라"였는데 **이미지 바이트가 DB에 들어가는 구조가 아니다.** 스키마의 이미지 필드는 전부 S3 키 문자열이다.
+
+| 필드 | 값의 형태 |
+|---|---|
+| `PetSkin.imageKeyBase` | `pets/fox` → 코드가 `-{1..4}.png`를 붙인다 |
+| `CosmeticItem.imageKey` | `cosmetics/bg-1.png` (확장자 포함) |
+| `UserMission.photoKey` | `mission-photos/<userId>/<ts>.png` |
+| `Post.imageKey` | 커뮤니티 첨부 |
+
+그림 자체는 `welli-uploads-185236887369` → CloudFront `diros91hbap9v.cloudfront.net`로 나가고, 코드는 `CLOUDFRONT_DOMAIN`과 키를 이어 붙인다(`app/api/pet/route.ts:23`, `lib/profile.ts:33` 등).
+
+**41장은 이 중 어디에도 해당하지 않는다.** 아이콘·로고·장식·말풍선에 대응하는 모델이 스키마에 없고, 펫·치장은 아래처럼 이미 채워졌거나 다른 그림이 필요하다. 그래서 DB 행을 만들지 않고 `public/images/`에 뒀다 — `/images/home_icon.png`로 바로 참조되고, Amplify가 CloudFront로 서빙하며, **`CLOUDFRONT_DOMAIN`이 빈 값인 현재 상태에 영향받지 않는다**(펫 그림이 이모지로 떨어지는 원인이 그 빈 값이다).
+
+**판단 근거 (2026-08-24 CloudFront 실측)**
+
+| 키 | 상태 |
+|---|---|
+| `pets/fox-1.png` · `pets/fox-4.png` · `pets/bear-arctic-4.png` | 200 — 펫 24장은 이미 다 있다 |
+| `cosmetics/bg-1.png` | 403 — **정상이다.** 아래 참고 |
+| `backgrounds/forest-autumn-0-0.png` | 200 |
+
+- **캐릭터 아트를 `PetSkin`에 끼우면 안 된다.** `fox_avatar`·`fox_standing`·`fox_laptop`은 포즈 3종이고, `PetSkin`은 성장 4단계를 요구한다(`prisma/seed/items.ts`의 `stageCount: 4`). 북극 변종 그림도 없다. 억지로 넣으면 종당 4장 규칙이 깨져 펫 화면이 폴백된다
+- **`cosmetics/bg-1..6.png` 403은 고칠 것이 아니다.** `main`에만 있던 기록(`docs/STATUS.md` 19번 마지막 줄)은 "E가 그 이름으로 6장을 올려야 한다"였는데, **C가 2026-08-22에 반대 방향으로 닫았다** — 시드 키를 실물 경로 `backgrounds/forest-autumn-*.png`에 맞췄다. 그 정정이 `develop`에만 있어서 `main` 기준으로 보면 미해결처럼 보인다. 배경 6종은 이미 상점에 연결돼 있고 이름도 계절 6종으로 확정됐다(`docs/dev/pet.md`). **E가 올릴 이미지는 없다**
+
+원본은 `~/Downloads/mokkoji_components/`(사용자 로컬)이고 `public/images/`와 바이트 동일하다(md5 41건 일치).
+
+## 로컬 `.env`에서만 깨지는 것 2건 (2026-08-24)
+
+`develop`을 로컬로 돌려서 찾았다. **둘 다 배포본은 정상이고 로컬 `.env`만의 문제다.** `.env`는 git 미추적이라 각자 고쳐야 한다.
+
+**1. `SESSION_SECRET`이 없어 로그인이 500이다.** `.env`가 8/20자라 8/21에 생긴 키가 없다. `lib/session.ts:23`이 `if (!value) throw`라 `POST /api/auth/login`이 본문 없는 500을 준다(`docs/STATUS.md` 차단 26). **`.env.example`에도 없어서** `cp .env.example .env`로 시작한 팀원 전원이 걸린다 — `.env.example`은 E 소유이니 여기에 키를 추가해야 한다.
+
+**2. `CLOUDFRONT_DOMAIN`에 `https://`가 없으면 그림이 상대 경로가 된다.** 코드가 `${cloudfront}/${key}`로 그냥 이어 붙인다(`app/api/pet/route.ts:24`, `lib/profile.ts:44` 등 5곳).
+
+| `CLOUDFRONT_DOMAIN` | 브라우저가 요청하는 주소 | 결과 |
+|---|---|---|
+| `diros91hbap9v.cloudfront.net` | `localhost:3000/diros91hbap9v.cloudfront.net/pets/fox-4.png` | **404** |
+| `https://diros91hbap9v.cloudfront.net` | `https://diros91hbap9v.cloudfront.net/pets/fox-4.png` | 200 |
+
+**문서에 오래 적혀 있던 "`CLOUDFRONT_DOMAIN`이 빈 값이라 펫 그림이 이모지로 떨어진다"는 이제 맞지 않는다.** 빈 값이 아니라 **스킴만 없는** 상태라, 이모지 폴백 조건(`cloudfront &&`)을 통과해 버리고 깨진 이미지가 된다. 빈 값보다 나쁘다. Amplify 환경변수에는 `https://`가 붙어 있어 배포본은 처음부터 정상이었다.
+
+로컬 `.env`는 이렇게 둔다.
+
+```
+SESSION_SECRET=<임의의 긴 문자열>
+CLOUDFRONT_DOMAIN=https://diros91hbap9v.cloudfront.net
+DEV_AUTH_BYPASS=false
+```
+
+`DEV_AUTH_BYPASS`가 `true`면 미인증 `GET /api/pet`이 401 대신 실데이터를 준다 — 로컬에서 인증 흐름을 검증할 수 없으니 `false`로 둔다(배포본은 `false`다).
 
 ## GitHub 레포·브랜치
 

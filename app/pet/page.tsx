@@ -1,4 +1,6 @@
-import { getCurrentUserWithSkin } from "@/lib/auth"
+import { redirect } from "next/navigation"
+import { cdnUrl, petImageUrl } from "@/lib/assets"
+import { UnauthorizedError, getCurrentUserWithSkin } from "@/lib/auth"
 // 오늘 날짜 기준은 B의 미션 초기화와 같은 함수를 쓴다(Asia/Seoul). 여기서 따로 계산하면
 // 자정 전후에 지갑의 "오늘"과 미션 화면의 "오늘"이 다른 날을 가리킨다
 import { getToday, getTodayKey } from "@/lib/missions/reset"
@@ -6,6 +8,7 @@ import {
   PET_IDLE_LINES,
   cappedStage,
   cosmeticLabel,
+  daysTogether,
   greetingFor,
   idleAccrual,
   lineIndex,
@@ -61,11 +64,19 @@ export default async function PetPage() {
     const welcome = greetingFor(lineSeed)
     const idleLineStart = lineIndex(lineSeed, PET_IDLE_LINES.length)
 
-    // 착용 중인 치장 (SPEC.md 5절)
-    const worn = await prisma.userCosmetic.findMany({
-      where: { userId: user.id, equipped: true },
-      select: { item: { select: { name: true, slot: true, imageKey: true } } },
-    })
+    // 두 질의를 **동시에** 보낸다. RDS가 us-east-1이라 순서대로 await하면 왕복이
+    // 하나씩 쌓인다(약 175ms/회 실측 — docs/dev/perf.md). 서로 의존하지 않는 읽기다
+    const [worn, missionsDone] = await Promise.all([
+      // 착용 중인 치장 (SPEC.md 5절)
+      prisma.userCosmetic.findMany({
+        where: { userId: user.id, equipped: true },
+        select: { item: { select: { name: true, slot: true, imageKey: true } } },
+      }),
+      // 함께한 기록 카드용 누적 완료 수. UserMission 한 행이 완료 한 번이고
+      // (completedAt이 not null인 스키마다) 일일 미션은 resetKey가 날짜별로 갈려
+      // 같은 미션을 다른 날 한 것도 각각 센다 — "지금까지 몇 번 해냈나"가 맞다
+      prisma.userMission.count({ where: { userId: user.id } }),
+    ])
 
     // ── 오늘 들어온 재화 ──────────────────────────────────────────────────────
     //
@@ -113,20 +124,19 @@ export default async function PetPage() {
     const todayAffinity = affinityFresh ? user.affinityToday : 0
 
     const evolutionStage = cappedStage(user.level, stageCount)
-    const cloudfront = process.env.CLOUDFRONT_DOMAIN
-    const imageUrl = cloudfront && skin ? `${cloudfront}/${skin.imageKeyBase}-${evolutionStage}.png` : null
+    const imageUrl = skin ? petImageUrl(skin.imageKeyBase, evolutionStage) : null
 
     // 착용한 배경이 방 배경이 된다 (2026-08-21 사용자 확정). 슬롯당 1개라 첫 행이 유일하다.
     // 없으면 null이고 PetRoom이 기본 방 SVG를 그린다.
     // imageKey에 확장자가 이미 붙어 있다(lib/pet.ts BACKGROUNDS: "backgrounds/….png").
+    // 그래서 여기서 .png를 덧붙이지 않는다 — petImageUrl과 다른 점이다
     const wornBackground = worn.find((row) => row.item.slot === "BACKGROUND")
-    const roomImageUrl =
-      cloudfront && wornBackground ? `${cloudfront}/${wornBackground.item.imageKey}` : null
+    const roomImageUrl = wornBackground ? cdnUrl(wornBackground.item.imageKey) : null
 
     // 진화 단계 카드가 단계별 그림을 쓴다. 규칙은 imageUrl과 같은 <base>-<단계>.png다
     // (prisma/seed/items.ts가 imageKeyBase를 고정해 뒀다)
     const stageImageUrls = Array.from({ length: stageCount }, (_, i) =>
-      cloudfront && skin ? `${cloudfront}/${skin.imageKeyBase}-${i + 1}.png` : null,
+      skin ? petImageUrl(skin.imageKeyBase, i + 1) : null,
     )
 
     state = {
@@ -167,8 +177,15 @@ export default async function PetPage() {
       imageUrl,
       stageImageUrls,
       roomImageUrl,
+      daysTogether: daysTogether(user.createdAt, now),
+      missionsDone,
+      attendanceTotal: user.attendanceTotal,
     }
   } catch (error) {
+    // 미인증이면 "불러오지 못했어요"가 아니라 로그인이다. 미들웨어가 쿠키 "존재"만 보므로
+    // 위조·만료 쿠키를 들고 온 사람이 여기까지 온다 — 그 사람에게 필요한 것도 재로그인이다.
+    // /login은 공개 경로라 리다이렉트 루프가 생기지 않는다.
+    if (error instanceof UnauthorizedError) redirect("/login?next=%2Fpet")
     console.error("[/pet]", error)
     return (
       <main className="pet pet--shop">

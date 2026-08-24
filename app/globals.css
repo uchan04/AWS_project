@@ -1,27 +1,103 @@
-@import url('https://fonts.googleapis.com/css2?family=Gowun+Dodum&family=Noto+Sans+KR:wght@400;500;600;700&display=swap');
 @import "tailwindcss";
 
+/* 소유자: E. 전역 스타일. 화면별 어휘는 styles/tokens.css(.hm-*)와 app/pet/pet.css(.pet-*)에 있다.
+ *
+ * 2026-08-22 정리. create-next-app 뼈대가 남아 있어 세 가지가 실제로 어긋나 있었다.
+ *   1) body { font-family: Arial } — 한국어 본문에 Arial이 걸려서 .hm/.pet 스코프 밖의
+ *      글자(로그인·에러 화면 등)가 다른 서체로 떴다. 본문 서체는 --font-korean-system이다
+ *      (2026-08-23 이전에는 Noto Sans KR 웹폰트였다. 아래 --font-korean-system 주석)
+ *   2) prefers-color-scheme: dark 블록이 --background를 #0a0a0a로 뒤집었다. 앱 배경은
+ *      app/layout.tsx가 #F5F0E8로 고정하므로, 다크모드 사용자는 검은 body 위에
+ *      크림색 본문 칸이 뜨는 화면을 봤다. 이 서비스에는 다크 테마가 없다
+ *   3) --font-geist-sans / --font-geist-mono는 이 프로젝트에 존재하지 않는다.
+ *      --font-sans / --font-mono가 빈 값으로 해석돼 Tailwind의 font-sans가 죽어 있었다
+ */
+
 :root {
-  --background: #ffffff;
-  --foreground: #171717;
+  /* 종이색. app/layout.tsx의 배경과 같은 값이어야 한다 */
+  --background: #f5f0e8;
+  --foreground: #2a1f14;
+
+  /* 본문 서체 = 기기의 시스템 한국어 서체. 웹폰트를 쓰지 않는다 (2026-08-23).
+   *
+   * 전에는 Noto Sans KR을 next/font로 받았다. 실측하면 `/missions` 콜드 로드에서
+   * **폰트만 380.9KB**였고(woff2 24개) 그중 Noto Sans KR이 **220.8KB**였다.
+   * `subsets: ["latin"]`은 한국어 폰트에 아무 효과가 없다 — Google이 한글을
+   * 이름 없는 unicode-range 조각 120여 개로 쪼개 내려주므로 subsets 필터가
+   * 걸리지 않는다. @font-face 선언만 221개(gzip 41.5KB)였다.
+   *
+   * 그 220.8KB가 사는 것이 거의 없다:
+   *   - Android의 시스템 한국어 서체가 **Noto Sans CJK KR**이다. 기기에 이미
+   *     있는 같은 디자인의 글꼴을 매번 다시 받고 있었다
+   *   - iOS·macOS는 Apple SD Gothic Neo가 있다. 굵기 100~900 전부 있다
+   *   - Windows는 Malgun Gothic
+   * 게다가 시스템 서체는 swap이 없어 본문 레이아웃 이동이 0이 된다.
+   *
+   * 순서에 의미가 있다. 라틴 글자는 앞쪽(SF/Segoe UI/Roboto)이 잡고 한글은
+   * 뒤쪽이 잡는다 — CSS 폰트 폴백은 글자 단위라 숫자·영문과 한글이 각각
+   * 그 기기에서 가장 잘 보이는 글꼴로 떨어진다.
+   *
+   * 제목의 Gowun Dodum은 남긴다(160.1KB). 시스템에 대체품이 없는 서체이고
+   * 이 서비스의 인상 자체다. --font-display 참고.
+   *
+   * 알려진 손실: Malgun Gothic은 400·700뿐이라 Windows에서 font-weight
+   * 500은 400으로, 600은 700으로 스냅된다(코드에 13곳). 모바일(iOS·Android)은
+   * 굵기가 다 있어 영향이 없다.
+   */
+  --font-korean-system: -apple-system, BlinkMacSystemFont, "Apple SD Gothic Neo",
+    "Segoe UI", "Malgun Gothic", Roboto, "Helvetica Neue", system-ui, sans-serif;
 }
 
 @theme inline {
   --color-background: var(--background);
   --color-foreground: var(--foreground);
-  --font-sans: var(--font-geist-sans);
-  --font-mono: var(--font-geist-mono);
-}
-
-@media (prefers-color-scheme: dark) {
-  :root {
-    --background: #0a0a0a;
-    --foreground: #ededed;
-  }
+  /* next/font가 <html>에 심는 변수. app/layout.tsx 참고 —
+     실제 family 이름은 빌드마다 바뀌므로 이름을 직접 쓰지 않는다 */
+  --font-sans: var(--font-korean-system, sans-serif);
+  --font-display: var(--font-gowun-dodum), var(--font-korean-system, sans-serif);
 }
 
 body {
   background: var(--background);
   color: var(--foreground);
-  font-family: Arial, Helvetica, sans-serif;
+  font-family: var(--font-korean-system, sans-serif);
+}
+
+/* 키보드 사용자용 초점 표시. 브라우저 기본값은 종이색 배경에서 잘 안 보인다 */
+:focus-visible {
+  outline: 2px solid #a9542a;
+  outline-offset: 2px;
+}
+
+/* 본문으로 건너뛰기. 하단 탭·사이드바를 Tab으로 다 지나야 본문에 닿는 문제를 없앤다.
+   초점을 받을 때만 보인다 */
+.skip-to-content {
+  position: fixed;
+  top: 8px;
+  left: 8px;
+  z-index: 1000;
+  padding: 10px 16px;
+  border-radius: 12px;
+  background: #a9542a;
+  color: #fff;
+  font-size: 14px;
+  font-weight: 600;
+  transform: translateY(-200%);
+}
+
+.skip-to-content:focus {
+  transform: translateY(0);
+}
+
+/* 사용자가 "동작 줄이기"를 켰으면 전역 전환·애니메이션을 멈춘다 (WCAG 2.3.3).
+   화면별 CSS에 같은 규칙이 또 있어도 무해하다 */
+@media (prefers-reduced-motion: reduce) {
+  *,
+  *::before,
+  *::after {
+    animation-duration: 0.01ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.01ms !important;
+    scroll-behavior: auto !important;
+  }
 }

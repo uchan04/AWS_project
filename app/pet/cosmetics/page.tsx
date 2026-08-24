@@ -1,6 +1,8 @@
 import Link from "next/link"
+import { redirect } from "next/navigation"
 import type { TypeCode } from "@prisma/client"
-import { getCurrentUser } from "@/lib/auth"
+import { cdnUrl } from "@/lib/assets"
+import { UnauthorizedError, getCurrentUser } from "@/lib/auth"
 import { compareCosmetics, cosmeticLabel } from "@/lib/pet"
 import { prisma } from "@/lib/prisma"
 import CosmeticList, { type CosmeticRow } from "../_components/CosmeticList"
@@ -25,6 +27,9 @@ export default async function CosmeticsPage() {
     typeCode = user.typeCode
 
     const [all, owned] = await Promise.all([
+      // 필터를 두지 않는다. 전에는 imageKey가 "cosmetics/"로 시작하는 행만 골랐는데
+      // (SHIPPED_COSMETIC), C가 배경 6종을 "backgrounds/" 키로 다시 심어서 6행 중
+      // **0행**이 걸렸다 — 상점이 빈 화면이었다. 지금 DB의 6행이 곧 판매 목록 전체다
       prisma.cosmeticItem.findMany(),
       prisma.userCosmetic.findMany({
         where: { userId: user.id },
@@ -35,10 +40,9 @@ export default async function CosmeticsPage() {
     const ownedById = new Map(owned.map((row) => [row.itemId, row]))
 
     // 2026-08-22: 타일에 배경 그림을 띄운다. 그 전까지는 이름과 가격만 있어서 친밀도
-    // 600을 무엇인지 모르고 내야 했다. 규칙은 app/pet/page.tsx의 roomImageUrl과 같다 —
-    // imageKey에 확장자가 이미 붙어 있으므로(lib/pet.ts BACKGROUNDS: "backgrounds/….png")
-    // 여기서 .png를 덧붙이지 않는다. 도메인이 비면 null이고 타일은 이름만 보인다
-    const cloudfront = process.env.CLOUDFRONT_DOMAIN
+    // 600을 무엇인지 모르고 내야 했다. 조립은 lib/assets.ts cdnUrl() 한 곳에서만 한다 —
+    // imageKey에 확장자가 이미 붙어 있으므로 여기서 .png를 덧붙이지 않는다.
+    // 도메인이 비면 null이고 타일은 이름만 보인다
 
     // 정렬을 map보다 **먼저** 한다. compareCosmetics는 name이 코드일 때 진열 순서를 알고,
     // map이 name을 표시명으로 바꾼 뒤에 정렬하면 코드를 못 찾아 한글 가나다순으로 떨어진다
@@ -53,12 +57,17 @@ export default async function CosmeticsPage() {
         rarity: item.rarity,
         affinityOnly: item.affinityOnly,
         priceAffinity: item.priceAffinity,
-        imageUrl: cloudfront ? `${cloudfront}/${item.imageKey}` : null,
+        imageUrl: cdnUrl(item.imageKey),
         owned: ownedById.has(item.id),
         equipped: ownedById.get(item.id)?.equipped ?? false,
       }))
-    progress = { owned: owned.length, total: all.length }
+
+    // 분자를 items에서 센다 — owned.length를 쓰면 목록에서 빠진 행을 가진 계정이
+    // 6/6을 넘는 진행률을 본다
+    progress = { owned: items.filter((item) => item.owned).length, total: all.length }
   } catch (error) {
+    // 미인증이면 로그인으로 보낸다. 아래 카드는 DB 장애용이다(app/pet/page.tsx와 같은 이유)
+    if (error instanceof UnauthorizedError) redirect("/login?next=%2Fpet%2Fcosmetics")
     console.error("[/pet/cosmetics]", error)
     return (
       <main className="pet pet--shop">

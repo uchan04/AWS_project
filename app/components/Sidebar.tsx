@@ -2,11 +2,13 @@
 
 import { useState, useEffect } from "react"
 import Link from "next/link"
-import { usePathname, useRouter } from "next/navigation"
+import { usePathname, useRouter, useSearchParams } from "next/navigation"
 import { TRIBE } from "@/lib/types"
 import type { SidebarProfile } from "@/lib/profile"
 import type { TypeCode } from "@prisma/client"
 import styles from "./Sidebar.module.css"
+import { useModalA11y } from "./useModalA11y"
+import { ArtImage } from "./ArtImage"
 
 function getBgColor(hex: string): string {
   // colorHex → 배경색 (약한 톤)
@@ -18,7 +20,7 @@ function getBgColor(hex: string): string {
   return map[hex] || "#F5F0E8"
 }
 
-function getStageEmoji(typeCode: TypeCode | null): string {
+function getTribeEmoji(typeCode: TypeCode | null): string {
   if (!typeCode) return "🌱"
   const tribe = TRIBE[typeCode]
   return tribe.emoji
@@ -28,14 +30,90 @@ const TABS: { href: string; label: string; emoji: string; desc: string }[] = [
   { href: "/", label: "홈", emoji: "🏡", desc: "오늘 현황" },
   { href: "/missions", label: "미션", emoji: "✅", desc: "작은 한 걸음" },
   { href: "/pet", label: "나의 펫", emoji: "🌱", desc: "함께 성장해요" },
-  { href: "/community", label: "커뮤니티", emoji: "💬", desc: "같은 종족 모임" },
+  { href: "/community", label: "커뮤니티", emoji: "💬", desc: "같은 종족 이야기" },
+  { href: "/community/meetups", label: "모임", emoji: "🤝", desc: "오프라인에서 만나기" },
 ]
+
+/**
+ * 프로필 아바타 원. 좁은 폭 사이드바·넓은 폭 사이드바·내 계정 모달 세 곳이
+ * **같은 22줄을 복사**하고 있었다(2026-08-23 정리). 값은 크기와 배경뿐이 달랐다.
+ *
+ * 이미지가 404면 종족 이모지로 떨어진다. 404는 서버가 알 수 없어 onError로만
+ * 알 수 있으므로(ArtImage) <img>와 <span>을 둘 다 그려 두고 display로 가린다.
+ */
+function Avatar({
+  imageUrl,
+  emoji,
+  size,
+  fontSize = 22,
+  plain = false,
+}: {
+  imageUrl: string | null
+  emoji: string
+  size: number
+  fontSize?: number
+  /** 모달 쪽은 흰 원판 없이 그림만 쓴다 */
+  plain?: boolean
+}) {
+  return (
+    <div
+      style={{
+        width: size,
+        height: size,
+        borderRadius: "50%",
+        background: plain ? undefined : "white",
+        display: "flex",
+        alignItems: "center",
+        justifyContent: "center",
+        fontSize,
+        overflow: "hidden",
+      }}
+    >
+      {imageUrl ? (
+        <ArtImage
+          src={imageUrl}
+          alt="펫"
+          width={size}
+          height={size}
+          style={{ width: "100%", height: "100%", objectFit: "cover" }}
+          fallbackDisplay="block"
+        />
+      ) : null}
+      <span style={{ display: imageUrl ? "none" : "block" }}>{emoji}</span>
+    </div>
+  )
+}
 
 export function Sidebar({ profile }: { profile: SidebarProfile | null }) {
   const pathname = usePathname()
   const router = useRouter()
-  const [showAccount, setShowAccount] = useState(false)
-  const [compact, setCompact] = useState(false)
+  // `/diagnosis/result`의 `?new=1`을 보기 위해 읽는다. 아래 inDiagnosisFlow 주석 참고.
+  // 루트 레이아웃이 cookies()를 읽어 이미 동적 렌더라(lib/profile.ts) 여기서
+  // useSearchParams를 써도 정적 프리렌더를 깨지 않는다 — 그 제약은 정적 페이지 쪽이다.
+  const searchParams = useSearchParams()
+  // 내 계정 모달. 열린 상태를 boolean이 아니라 **열었던 경로**로 들고 있다 (2026-08-24 제보).
+  //
+  // 전에는 boolean이라 "계정 설정"을 눌러 /settings로 가도 모달이 그 위에 그대로 떠 있었다 —
+  // 사이드바는 루트 레이아웃에 있어 클라이언트 이동으로 언마운트되지 않으므로 상태가 남는다.
+  // "이름 바꾸기"에서 증상이 안 보였던 건 목적지 /diagnosis/result가 hiddenPaths라
+  // 사이드바 자체가 사라졌기 때문이고 버튼이 옳았던 게 아니다.
+  //
+  // 경로를 담으면 이동하는 순간 pathname이 달라져 저절로 닫힌다. 버튼마다
+  // setShowAccount(false)를 붙이는 것보다 짧고, 링크가 늘어도 같은 버그가 다시 나지 않는다.
+  // useEffect로 동기화하지 않는 이유는 react-hooks/set-state-in-effect다 — effect 안의
+  // setState는 렌더를 한 번 더 유발하고, 여기서는 렌더 중에 값을 유도할 수 있다.
+  const [accountOpenAt, setAccountOpenAt] = useState<string | null>(null)
+  const showAccount = accountOpenAt === pathname
+  const setShowAccount = (open: boolean) => setAccountOpenAt(open ? pathname : null)
+  // narrow: 창이 좁아 자동으로 접힌 상태. collapsed: 사용자가 버튼으로 접은 상태.
+  // 둘을 나눠 둔 것은 넓은 화면에서도 직접 접을 수 있어야 하기 때문이다.
+  const [narrow, setNarrow] = useState(false)
+  const [collapsed, setCollapsed] = useState(false)
+  const compact = narrow || collapsed
+
+  // 내 계정 모달: Escape로 닫기 · 초점 가두기 · 닫을 때 "내 계정" 버튼으로 초점 되돌리기.
+  // 모달을 조건부로 그리므로 showAccount를 같이 넘긴다(app/components/useModalA11y.ts)
+  const accountBoxRef = useModalA11y(() => setShowAccount(false), showAccount)
 
   // 재화·상태 변경 시 갱신(2026-08-21 A 수정).
   // 프로필은 layout.tsx가 서버에서 읽어 props로 주므로 여기서 fetch하지 않는다.
@@ -52,7 +130,7 @@ export function Sidebar({ profile }: { profile: SidebarProfile | null }) {
   // 화면 크기 감지
   useEffect(() => {
     function checkWidth() {
-      setCompact(window.innerWidth <= 768)
+      setNarrow(window.innerWidth <= 768)
     }
     checkWidth()
     window.addEventListener("resize", checkWidth)
@@ -60,14 +138,37 @@ export function Sidebar({ profile }: { profile: SidebarProfile | null }) {
   }, [])
 
   // 진단/로그인/회원가입 화면에서 숨김
-  const hiddenPaths = ["/diagnosis", "/diagnosis/result", "/login", "/signup"]
-  if (hiddenPaths.includes(pathname)) {
+  const hiddenPaths = ["/diagnosis", "/login", "/signup"]
+
+  // `/diagnosis/result`는 목록에 넣지 않고 따로 가른다 (2026-08-24 제보).
+  // 이 경로가 **두 용도를 공유**하기 때문이다.
+  //   · 진단 직후 — AskFlow가 `?new=1`을 붙여 보낸다. 진단 흐름의 마지막 단계이므로
+  //     사이드바를 숨긴다(`STATUS.md` 차단 21번이 여기 사이드바가 뜨는 것을 결함으로 올렸다).
+  //   · 이름 바꾸기 — 내 계정 모달에서 들어온다. 그때는 이미 진단을 마치고 앱을 쓰는
+  //     중이므로 사이드바가 있어야 하고, 없으면 **돌아갈 입구가 브라우저 뒤로가기뿐이다.**
+  // 같은 값을 결과 화면도 이미 쓴다(`app/diagnosis/result/page.tsx` justDiagnosed) —
+  // 버튼 문구를 "이 이름으로 시작하기"와 "이름 저장하기"로 가르는 그 값이다.
+  const inDiagnosisFlow = pathname === "/diagnosis/result" && searchParams.get("new") === "1"
+
+  if (hiddenPaths.includes(pathname) || inDiagnosisFlow) {
     return null
   }
 
   // 미인증이거나 프로필을 못 읽었으면 그리지 않는다. 폴백으로 가짜 프로필을 만들면
   // 미인증에도 "익명 · 미분류 · Lv.1"과 로그아웃 버튼이 뜬다(2026-08-21 제보, A 수정).
   if (!profile) {
+    return null
+  }
+
+  // 진단 전에는 그리지 않는다 (2026-08-24 제보). 위 hiddenPaths가 /login·/diagnosis는
+  // 막지만 **진단 시작 대기 화면은 "/"**다 — app/page.tsx:66이 typeCode·adjective가
+  // 없으면 그 경로에서 <Intro authed />를 그린다. 경로로는 홈과 구분할 수 없으므로
+  // 조건으로 막는다. 판정은 profile.diagnosed 하나만 쓴다(lib/profile.ts) — 그 값이
+  // page.tsx와 같은 식이고, 여기에 `!typeCode || !adjective`를 다시 쓰면 두 벌이 된다.
+  //
+  // 진단 전 사이드바는 갈 곳이 없다: 펫·미션·커뮤니티가 전부 종족과 유형에 매여 있어
+  // 눌러도 빈 화면이거나 에러다. 챗봇 버튼도 같은 값으로 이미 숨는다(ChatLauncher).
+  if (!profile.diagnosed) {
     return null
   }
 
@@ -83,93 +184,54 @@ export function Sidebar({ profile }: { profile: SidebarProfile | null }) {
 
   return (
     <>
-      <aside className={styles.sidebar}>
+      <aside className={compact ? `${styles.sidebar} ${styles.rail}` : styles.sidebar}>
         {/* Logo */}
         <div className={styles.logo}>
-          <h1 className={styles.logoTitle}>함께 걷는 하루</h1>
+          <h1 className={styles.logoTitle}>모꼬지</h1>
           <p className={styles.logoSubtitle}>작은 한 걸음, 매일</p>
+          {/* 접기 토글. 창이 좁아 자동으로 접힌 상태에서는 폭을 CSS가 고정하므로 숨긴다 */}
+          {!narrow && (
+            <button
+              onClick={() => setCollapsed((v) => !v)}
+              aria-label={collapsed ? "사이드바 펼치기" : "사이드바 접기"}
+              title={collapsed ? "사이드바 펼치기" : "사이드바 접기"}
+              className={styles.railToggle}
+            >
+              {collapsed ? "»" : "«"}
+            </button>
+          )}
         </div>
 
         {/* Profile card */}
         {compact ? (
+          // 접힌 상태 카드. 둥근 모서리·종족색 배경은 유지하고 레일 폭(64px)을
+          // 거의 채우도록 좌우 마진을 4px로 줄였다 — 56×48로 가로가 조금 길다.
+          // 안쪽 흰 원은 뺐고 펫 이미지 대신 종족 아이콘(🦊·🐱·🐻)을 쓴다.
+          // 아이콘은 내비와 같은 방식으로 둔다 — flex 중앙 + fontSize만.
+          // lineHeight를 건드리면 이모지 글리프가 줄 상자 안에서 위로 밀린다.
           <div
             style={{
-              margin: "8px",
+              margin: "8px 4px",
+              height: 48,
               background: bg,
               borderRadius: 12,
-              padding: "12px 8px",
               display: "flex",
+              alignItems: "center",
               justifyContent: "center",
             }}
           >
-            <div
-              style={{
-                width: 40,
-                height: 40,
-                borderRadius: "50%",
-                background: "white",
-                display: "flex",
-                alignItems: "center",
-                justifyContent: "center",
-                fontSize: 22,
-                overflow: "hidden",
-              }}
-            >
-              {profile.imageUrl ? (
-                // eslint-disable-next-line @next/next/no-img-element
-                <img
-                  src={profile.imageUrl}
-                  alt="펫"
-                  style={{ width: "100%", height: "100%", objectFit: "cover" }}
-                  onError={(e) => {
-                    e.currentTarget.style.display = "none"
-                    if (e.currentTarget.nextSibling) {
-                      ;(e.currentTarget.nextSibling as HTMLElement).style.display = "block"
-                    }
-                  }}
-                />
-              ) : null}
-              <span style={{ display: profile.imageUrl ? "none" : "block" }}>{getStageEmoji(profile.typeCode)}</span>
-            </div>
+            <Avatar imageUrl={profile.imageUrl} emoji={getTribeEmoji(profile.typeCode)} size={40} />
           </div>
         ) : (
           <div style={{ margin: "16px 16px 8px", background: bg, borderRadius: 16, padding: "16px" }}>
             <div style={{ display: "flex", alignItems: "center", gap: 10, marginBottom: 10 }}>
-              <div
-                style={{
-                  width: 40,
-                  height: 40,
-                  borderRadius: "50%",
-                  background: "white",
-                  display: "flex",
-                  alignItems: "center",
-                  justifyContent: "center",
-                  fontSize: 22,
-                  overflow: "hidden",
-                }}
-              >
-                {profile.imageUrl ? (
-                  // eslint-disable-next-line @next/next/no-img-element
-                  <img
-                    src={profile.imageUrl}
-                    alt="펫"
-                    style={{ width: "100%", height: "100%", objectFit: "cover" }}
-                    onError={(e) => {
-                      e.currentTarget.style.display = "none"
-                      if (e.currentTarget.nextSibling) {
-                        ;(e.currentTarget.nextSibling as HTMLElement).style.display = "block"
-                      }
-                    }}
-                  />
-                ) : null}
-                <span style={{ display: profile.imageUrl ? "none" : "block" }}>{getStageEmoji(profile.typeCode)}</span>
-              </div>
+              <Avatar imageUrl={profile.imageUrl} emoji={getTribeEmoji(profile.typeCode)} size={40} />
               <div style={{ flex: 1, minWidth: 0 }}>
                 <div style={{ display: "flex", alignItems: "center", gap: 6, marginBottom: 2 }}>
                   <p
                     style={{
                       margin: 0,
-                      fontFamily: "'Gowun Dodum', sans-serif",
+                      fontFamily: "var(--font-display)",
                       fontSize: 14,
                       color: "#2A1F14",
                       overflow: "hidden",
@@ -282,7 +344,7 @@ export function Sidebar({ profile }: { profile: SidebarProfile | null }) {
                 style={{
                   fontSize: 13,
                   color: "#5A4A3A",
-                  fontFamily: "'Noto Sans KR', sans-serif",
+                  fontFamily: "var(--font-body)",
                   fontWeight: 500,
                 }}
               >
@@ -309,6 +371,11 @@ export function Sidebar({ profile }: { profile: SidebarProfile | null }) {
           onClick={() => setShowAccount(false)}
         >
           <div
+            ref={accountBoxRef}
+            role="dialog"
+            aria-modal="true"
+            aria-labelledby="account-modal-title"
+            tabIndex={-1}
             onClick={(e) => e.stopPropagation()}
             className="screen-enter"
             style={{
@@ -329,9 +396,16 @@ export function Sidebar({ profile }: { profile: SidebarProfile | null }) {
                 justifyContent: "space-between",
               }}
             >
-              <h2 style={{ fontFamily: "'Gowun Dodum', sans-serif", fontSize: 18, color: "#2A1F14", margin: 0 }}>내 계정</h2>
+              <h2
+                id="account-modal-title"
+                style={{ fontFamily: "var(--font-display)", fontSize: 18, color: "#2A1F14", margin: 0 }}
+              >
+                내 계정
+              </h2>
               <button
+                type="button"
                 onClick={() => setShowAccount(false)}
+                aria-label="내 계정 창 닫기"
                 style={{
                   width: 32,
                   height: 32,
@@ -364,72 +438,34 @@ export function Sidebar({ profile }: { profile: SidebarProfile | null }) {
                   gap: 16,
                 }}
               >
-                <div
-                  style={{
-                    width: 52,
-                    height: 52,
-                    display: "flex",
-                    alignItems: "center",
-                    justifyContent: "center",
-                    fontSize: 52,
-                    overflow: "hidden",
-                    borderRadius: "50%",
-                  }}
-                >
-                  {profile.imageUrl ? (
-                    // eslint-disable-next-line @next/next/no-img-element
-                    <img
-                      src={profile.imageUrl}
-                      alt="펫"
-                      style={{ width: "100%", height: "100%", objectFit: "cover" }}
-                      onError={(e) => {
-                        e.currentTarget.style.display = "none"
-                        if (e.currentTarget.nextSibling) {
-                          ;(e.currentTarget.nextSibling as HTMLElement).style.display = "block"
-                        }
-                      }}
-                    />
-                  ) : null}
-                  <span style={{ display: profile.imageUrl ? "none" : "block" }}>{tribe?.emoji || "🌱"}</span>
-                </div>
+                <Avatar
+                  imageUrl={profile.imageUrl}
+                  emoji={getTribeEmoji(profile.typeCode)}
+                  size={52}
+                  fontSize={52}
+                  plain
+                />
                 <div style={{ textAlign: "left" }}>
-                  <p style={{ fontFamily: "'Gowun Dodum', sans-serif", fontSize: 18, color: "#2A1F14", margin: "0 0 3px" }}>
+                  <p style={{ fontFamily: "var(--font-display)", fontSize: 18, color: "#2A1F14", margin: "0 0 3px" }}>
                     {profile.nickname}
                   </p>
                   <p style={{ margin: 0, fontSize: 12, color, fontWeight: 700 }}>{familyLabel}</p>
+                  {/* 정보 칸 3개(펫 레벨·보유 씨앗·시작한 날)를 지우고 시작한 날만 여기로 옮겼다
+                      (2026-08-23). 이 모달은 사이드바 **위에** 열리는데 사이드바 프로필 카드가
+                      `Lv.N`과 `🌱 씨앗 N개`를 이미 말하고 있다 — 같은 값이 60px 옆에 두 번이었다.
+                      시작한 날만 사이드바에 없는 정보다. 모달이 실제로 하는 일은 정보 표시가
+                      아니라 행동 3개(이름 바꾸기·계정 설정·로그아웃)다.
+                      덤으로 `1fr 1fr` 격자에 항목 3개라 마지막 칸이 혼자 한 줄이던 것도 없어졌다 */}
+                  <p style={{ margin: "5px 0 0", fontSize: 11, color: "#7A6B58" }}>📅 {joinDate}부터</p>
                 </div>
               </div>
 
-              <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 8, marginBottom: 20 }}>
-                {[
-                  { label: "펫 레벨", value: `Lv.${profile.level}`, emoji: "⭐" },
-                  { label: "보유 씨앗", value: `${profile.seeds}개`, emoji: "🌱" },
-                  { label: "시작한 날", value: joinDate, emoji: "📅" },
-                ].map((item) => (
-                  <div
-                    key={item.label}
-                    style={{
-                      display: "flex",
-                      alignItems: "center",
-                      gap: 10,
-                      padding: "11px 14px",
-                      background: "#F5F0E8",
-                      borderRadius: 14,
-                    }}
-                  >
-                    <span style={{ fontSize: 16 }}>{item.emoji}</span>
-                    <div>
-                      <p style={{ margin: 0, fontSize: 10, color: "#9A8A76" }}>{item.label}</p>
-                      <p style={{ margin: 0, fontSize: 13, color: "#2A1F14", fontWeight: 600 }}>{item.value}</p>
-                    </div>
-                  </div>
-                ))}
-              </div>
-
               <div style={{ display: "flex", flexDirection: "column", gap: 8 }}>
+                {/* 재진단은 잠겼다(lib/diagnosis/flags.ts, 2026-08-22 A). 같은 자리를 이름 바꾸기로 쓴다 —
+                    결과 화면에 이름 입력이 이미 있고, 그 화면으로 가는 입구가 하단 탭뿐이었다 */}
                 <button
                   onClick={() => {
-                    window.location.href = "/diagnosis"
+                    router.push("/diagnosis/result")
                   }}
                   style={{
                     width: "100%",
@@ -450,7 +486,34 @@ export function Sidebar({ profile }: { profile: SidebarProfile | null }) {
                     e.currentTarget.style.background = "#F5F0E8"
                   }}
                 >
-                  다시 진단하기
+                  이름 바꾸기
+                </button>
+                {/* 계정 설정(비밀번호 변경·탈퇴) 입구. 2026-08-22 A 추가 —
+                    가입 이후 계정을 손댈 수 있는 화면이 하나도 없었다 */}
+                <button
+                  onClick={() => {
+                    router.push("/settings")
+                  }}
+                  style={{
+                    width: "100%",
+                    padding: "12px",
+                    background: "#F5F0E8",
+                    border: "1px solid #DDD0BC",
+                    borderRadius: 12,
+                    fontSize: 13,
+                    color: "#5A4A3A",
+                    cursor: "pointer",
+                    fontWeight: 500,
+                    transition: "all 0.15s",
+                  }}
+                  onMouseEnter={(e) => {
+                    e.currentTarget.style.background = "#F0EAD8"
+                  }}
+                  onMouseLeave={(e) => {
+                    e.currentTarget.style.background = "#F5F0E8"
+                  }}
+                >
+                  계정 설정
                 </button>
                 <button
                   onClick={() => {
@@ -458,6 +521,10 @@ export function Sidebar({ profile }: { profile: SidebarProfile | null }) {
                     // /api/auth/logout은 POST만 받는다(GET으로 열면 405). 쿠키 두 개를 지운다
                     void fetch("/api/auth/logout", { method: "POST", redirect: "manual" }).finally(
                       () => {
+                        // 로그아웃은 일부러 전체 새로고침이다. router.push는 RSC 캐시를 남겨
+                        // 쿠키가 지워진 뒤에도 사이드바가 방금 로그아웃한 사람의 닉네임·재화를
+                        // 그대로 보여준다(lib/profile.ts는 루트 레이아웃에서 한 번만 읽는다).
+                        // eslint-disable-next-line @next/next/no-location-assign-relative-destination
                         window.location.href = "/login"
                       }
                     )

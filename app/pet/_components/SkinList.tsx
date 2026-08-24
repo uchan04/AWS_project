@@ -4,6 +4,7 @@ import { useState, type SyntheticEvent } from "react"
 import Link from "next/link"
 import type { TypeCode } from "@prisma/client"
 import { animalEmoji } from "@/lib/pet"
+import { ArtImage } from "@/app/components/ArtImage"
 import { TRIBE } from "@/lib/types"
 import "@/styles/tokens.css"
 import "../pet.css"
@@ -36,7 +37,14 @@ export type SkinRow = {
   isDefault: boolean
   stageCount: number
   priceShards: number | null
-  /** 타일 그림. 유저의 현재 진화 단계 그림이다. CLOUDFRONT_DOMAIN이 비면 null이고 이모지로 떨어진다 */
+  /**
+   * 타일 그림. **유저의 현재 진화 단계**다(2026-08-24 사용자 결정) — 성체 고정이 아니다.
+   * 주소는 lib/assets.ts의 petImageUrl이 만든다. CLOUDFRONT_DOMAIN이 비면 null이고
+   * 타일은 이모지로 떨어진다.
+   * 이 필드를 두 브랜치가 각각 추가해 8/24 머지에서 겹쳤다. optional이 아닌 쪽으로 남긴다 —
+   * 유일한 호출부(app/pet/skins/page.tsx)가 항상 채우고, optional이면 안 채운 화면이
+   * 조용히 이모지로 떨어지는 것을 타입이 잡아 주지 못한다
+   */
   imageUrl: string | null
   owned: boolean
   active: boolean
@@ -282,21 +290,25 @@ export default function SkinList({
                   <span className="pet-item__tag pet-item__tag--own">보유</span>
                 ) : null}
 
-                {/* 2026-08-24: 이모지 자리에 실제 외형 그림이 온다. 폴백 방식은 방의
-                    캐릭터(PetView의 .pet-char__img)와 같다 — 그림이 실패하면 자기를
+                {/* 2026-08-24: 이모지 자리에 실제 외형 그림이 온다. 그림이 실패하면 자기를
                     숨기고 바로 뒤 이모지 스팬을 켠다. 둘 다 aria-hidden이고 이름이
-                    아래 글자로 있으므로 스크린리더가 읽는 것은 이름 한 번이다 */}
+                    아래 글자로 있으므로 스크린리더가 읽는 것은 이름 한 번이다.
+
+                    같은 기능을 이 브랜치와 develop이 각각 만들어 8/24 머지에서 겹쳤다.
+                    develop 쪽(<ArtImage>)을 남긴 것은 사용자 결정이다 — 그 컴포넌트가
+                    CloudFront 주소와 public/art 파일을 갈라 다루고(외부 도메인은
+                    next/image 최적화기를 통과시키면 렌더 중에 throw한다) 같은 폴백 블록을
+                    복사해 갖고 있던 7곳을 한 곳으로 모은다. 클래스도 develop의
+                    .pet-item__img로 맞췄다 — 배경 타일과 이름이 한 벌이 된다 */}
                 {skin.imageUrl ? (
-                  // eslint-disable-next-line @next/next/no-img-element
-                  <img
-                    className="pet-item__pet"
+                  <ArtImage
+                    className="pet-item__img"
                     src={skin.imageUrl}
-                    alt=""
-                    aria-hidden="true"
-                    // 6장 × 약 60KB다. 접힘 아래 칸은 스크롤할 때 받게 미룬다
-                    loading="lazy"
-                    decoding="async"
-                    onError={swapToEmoji}
+                    // 표시 크기다(원본 픽셀이 아니다). pet.css의 3.5rem = 56px
+                    width={56}
+                    height={56}
+                    decorative
+                    fallbackDisplay="grid"
                   />
                 ) : null}
                 <span

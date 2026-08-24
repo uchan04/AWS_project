@@ -11,6 +11,7 @@
 import { useRouter } from "next/navigation"
 import Link from "next/link"
 import { useEffect, useState } from "react"
+import { REDIAGNOSIS_ENABLED } from "@/lib/diagnosis/flags"
 import { NICKNAME_MAX, TRIBE, isValidNickname } from "@/lib/types"
 import "@/styles/tokens.css"
 import { type DiagnosisView, fetchMe, fetchReason, saveNickname } from "../api"
@@ -27,12 +28,17 @@ export default function DiagnosisResultPage() {
   const [saveError, setSaveError] = useState<string | null>(null)
   // 판정 근거 3줄. undefined = 아직 읽는 중, null = 못 만들었다(카드를 뺀다)
   const [reason, setReason] = useState<string[] | null | undefined>(undefined)
+  // 방금 진단을 마치고 온 것인지. AskFlow가 ?new=1을 붙여 보낸다.
+  // 이 화면은 이름을 바꾸러 다시 들어오는 경로이기도 해서(하단 탭·사이드바) 문구를 갈라야 한다.
+  const [justDiagnosed, setJustDiagnosed] = useState(false)
 
   useEffect(() => {
     let alive = true
     fetchMe()
       .then((me) => {
         if (!alive) return
+        // 쿼리는 마운트 후에 읽는다. 렌더 중에 읽으면 서버·클라이언트 문구가 달라 하이드레이션이 깨진다
+        setJustDiagnosed(new URLSearchParams(window.location.search).has("new"))
         if (!me) {
           setView({ status: "empty" })
           return
@@ -84,7 +90,10 @@ export default function DiagnosisResultPage() {
     return (
       <main className="hm hm--canvas">
         <div className="hm__col">
-          <p className="hm__note">결과를 준비하고 있어요…</p>
+          {/* 결과 계산은 왕복이 있다. 그 사이 화면이 비어 보이지 않게 알린다 */}
+          <p className="hm__note" role="status" aria-live="polite">
+            결과를 준비하고 있어요…
+          </p>
         </div>
       </main>
     )
@@ -207,13 +216,20 @@ export default function DiagnosisResultPage() {
               className="hm-btn"
             >
               {/* 닉네임을 문장에 넣지 않는다. 조사(으로/로)가 받침에 따라 갈려서 어색해진다 */}
-              {saving ? "저장하고 있어요…" : "이 이름으로 시작하기"}
+              {saving ? "저장하고 있어요…" : justDiagnosed ? "이 이름으로 시작하기" : "이름 저장하기"}
             </button>
-            {saveError && <p className="hm-field__help hm-field__help--error">{saveError}</p>}
+            {saveError && (
+              <p role="alert" className="hm-field__help hm-field__help--error">
+                {saveError}
+              </p>
+            )}
 
-            <Link href="/diagnosis" className="hm-link">
-              다시 진단하기
-            </Link>
+            {/* 재진단은 잠겨 있다(lib/diagnosis/flags.ts) */}
+            {REDIAGNOSIS_ENABLED && (
+              <Link href="/diagnosis" className="hm-link">
+                다시 진단하기
+              </Link>
+            )}
           </div>
         </div>
       </div>

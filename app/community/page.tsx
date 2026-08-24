@@ -1,11 +1,14 @@
+import { redirect } from "next/navigation"
 import type { TypeCode } from "@prisma/client"
-import { getCurrentUser } from "@/lib/auth"
+import { UnauthorizedError, getCurrentUser } from "@/lib/auth"
 import { TRIBE } from "@/lib/types"
 import { GalleryTabs } from "./_components/GalleryTabs"
 import { HopeBanner } from "./_components/HopeBanner"
 import { PostList } from "./_components/PostList"
 import { WriteModal } from "./_components/WriteModal"
 import { resolveGallery, listGalleryPosts, type GalleryTab, type GalleryPost } from "./_lib/gallery"
+import { MeetupNotice } from "./meetups/_components/MeetupNotice"
+import { pendingMeetupNotices, type MeetupNoticeItem } from "./meetups/_lib/notice"
 
 // 유저별 데이터를 읽으므로 정적 프리렌더 대상이 아니다. 이걸 빼면 빌드 시점에
 // 아래 catch의 안내 화면이 정적으로 굳어 로그인한 뒤에도 그대로 나온다(pet/page.tsx와 같은 이유).
@@ -18,6 +21,7 @@ export default async function CommunityPage(props: PageProps<"/community">) {
   let myTypeCode: TypeCode | null
   let gallery: GalleryTab
   let posts: GalleryPost[]
+  let notices: MeetupNoticeItem[]
 
   // 인증이나 DB가 실패해도 화면을 죽이지 않고 안내를 띄운다(C의 pet/page.tsx와 같은 패턴).
   try {
@@ -25,16 +29,20 @@ export default async function CommunityPage(props: PageProps<"/community">) {
     myTypeCode = user.typeCode
     gallery = resolveGallery(tab, user.typeCode)
     posts = await listGalleryPosts(gallery)
+    // 모임 화면에 들르지 않아도 무산 사실은 알아야 한다. 커뮤니티 첫 화면에도 같은 배너를 띄운다.
+    notices = await pendingMeetupNotices(user.id)
   } catch (error) {
+    // 미인증이면 로그인으로 보낸다. 여기 남는 카드는 DB 장애용이다 —
+    // 장애에 "로그인이 필요해요"를 띄우면 이미 로그인한 사람이 로그아웃하고
+    // 다시 로그인하는 헛수고를 한다(/pet과 같은 이유).
+    if (error instanceof UnauthorizedError) redirect("/login?next=%2Fcommunity")
     console.error("[/community]", error)
     return (
       <main className="mx-auto flex max-w-3xl flex-col gap-6 p-4 sm:p-6">
         <h1 className="text-xl font-bold text-neutral-900">커뮤니티</h1>
         <div className="rounded-2xl bg-white p-8 text-center">
-          <p className="text-sm text-neutral-700">로그인이 필요해요</p>
-          <p className="mt-2 text-sm leading-relaxed text-neutral-500">
-            진단을 아직 안 했다면 진단을 먼저 완료해 주세요.
-          </p>
+          <p className="text-sm text-neutral-700">글을 불러오지 못했어요</p>
+          <p className="mt-2 text-sm leading-relaxed text-neutral-500">잠시 후 다시 들어와 주세요.</p>
         </div>
       </main>
     )
@@ -42,6 +50,8 @@ export default async function CommunityPage(props: PageProps<"/community">) {
 
   return (
     <main className="mx-auto flex max-w-3xl flex-col gap-6 p-4 sm:p-6">
+      <MeetupNotice notices={notices} />
+
       <div className="flex flex-wrap items-end justify-between gap-3">
         <div>
           <h1 className="text-xl font-bold text-neutral-900">커뮤니티</h1>
@@ -51,11 +61,14 @@ export default async function CommunityPage(props: PageProps<"/community">) {
               : `${TRIBE[gallery].animal} 종족 전용 공간이에요 · 나만 볼 수 있어요`}
           </p>
         </div>
-        <WriteModal gallery={gallery} />
+        <WriteModal gallery={gallery} myTypeCode={myTypeCode} />
       </div>
 
       <GalleryTabs active={gallery} myTypeCode={myTypeCode} />
 
+      {/* 희망 문구 배너(SPEC 9절). 탭 아래에 둔다 — 배너 문구가 지금 고른 탭에 따라
+          갈리므로("고양잇과족에게:"), 원인인 탭이 결과인 배너보다 위에 있어야 읽힌다.
+          위에 두면 아래 탭을 눌러 위가 바뀌는 순서가 된다 */}
       <HopeBanner gallery={gallery} />
 
       {posts.length === 0 ? (

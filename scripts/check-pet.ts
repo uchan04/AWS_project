@@ -2,6 +2,11 @@ import assert from "node:assert/strict"
 import { COSMETICS, PET_SKINS, PRICE_BY_RARITY } from "../prisma/seed/items"
 import {
   BACKGROUNDS,
+  BREATH_CYCLE,
+  BREATH_CYCLE_SECONDS,
+  breathAt,
+  timeGreeting,
+  timeOfDay,
   IDLE_CAP_HOURS,
   IDLE_MAX_SEEDS,
   IDLE_SEEDS_PER_HOUR,
@@ -13,12 +18,17 @@ import {
   cappedStage,
   compareCosmetics,
   cosmeticLabel,
+  daysTogether,
   expProgress,
   greetingFor,
   idleAccrual,
+  levelUpReply,
   lineIndex,
+  petMood,
+  petTouchReply,
+  seedsToNextStage,
 } from "../lib/pet"
-import { EVOLUTION_LEVEL, SEED_TO_EXP, TRIBE, expToNextLevel } from "../lib/types"
+import { EVOLUTION_LEVEL, SEED_TO_EXP, TRIBE, expToNextLevel, withSubject } from "../lib/types"
 
 // npm run check:pet
 // 성장 곡선과 진화 임계값은 SPEC.md 5절 수치다. 로직을 고쳤으면 이걸 돌려본다.
@@ -425,5 +435,229 @@ assert.ok(spread.size >= 3, `인사가 ${spread.size}종만 나온다 — seed�
 // ── 배고픔 ────────────────────────────────────────────────────────────────────
 // 2026-08-21 사용자 결정으로 삭제했다. 여기 있던 단정 12개(24시간 선형 감쇠, 음수 방지,
 // 미래 시각, 라벨 3구간)도 함께 걷었다. lib/pet.ts "배고픔 — 삭제" 주석 참고.
+
+// ── 다음 진화까지 남은 씨앗 (seedsToNextStage) ────────────────────────────────
+//
+// **applySeeds로 교차 검증한다.** 이 함수는 누적 경험치를 닫힌 식(50·N·(N-1))으로
+// 계산하는데, 곡선(expToNextLevel)이 바뀌면 그 식이 조용히 틀린다. 그러면 화면이
+// "씨앗 320개"라고 말한 뒤 실제로는 진화하지 않는다. 실제 함수를 돌려 확인한다.
+for (const [level, exp] of [
+  [1, 0],
+  [1, 50],
+  [3, 120],
+  [4, 399],
+  [7, 0],
+  [14, 700],
+  [20, 55],
+  [24, 2_399],
+] as const) {
+  const next = seedsToNextStage(level, exp)
+  assert.ok(next, `Lv.${level}은 아직 다음 진화가 있어야 한다`)
+
+  const before = cappedStage(level, 4)
+  const grown = applySeeds({ level, exp, evolutionStage: before }, next.seeds)
+  assert.equal(
+    grown.evolutionStage,
+    next.stage,
+    `Lv.${level} exp ${exp}에서 씨앗 ${next.seeds}개로 ${next.stage}단계에 닿아야 한다`,
+  )
+
+  // 1개 적게 넣으면 아직 진화하지 않는다 = 개수가 최소값이다
+  if (next.seeds > 1) {
+    const short = applySeeds({ level, exp, evolutionStage: before }, next.seeds - 1)
+    assert.equal(short.evolutionStage, before, `Lv.${level}: 안내한 개수가 실제보다 많다`)
+  }
+}
+
+// 마지막 단계에 닿으면 더 이상 목표가 없다
+assert.equal(seedsToNextStage(EVOLUTION_LEVEL.STAGE4, 0), null)
+assert.equal(seedsToNextStage(EVOLUTION_LEVEL.STAGE4 + 30, 500), null)
+
+// docs/dev/pet.md에 적어 둔 누적 씨앗 값과 맞는지 확인한다 (Lv.15 = 1,050 / Lv.25 = 3,000)
+assert.equal(seedsToNextStage(1, 0)?.seeds, 100) // Lv.5 = 5×5×4 = 100
+assert.equal(seedsToNextStage(5, 0)?.seeds, 1_050 - 100)
+assert.equal(seedsToNextStage(15, 0)?.seeds, 3_000 - 1_050)
+
+// 경계에서 0개가 나오지 않는다. "씨앗 0개만 더"는 문장이 되지 않는다
+assert.ok((seedsToNextStage(4, expToNextLevel(4) - 1)?.seeds ?? 0) >= 1)
+
+// ── 펫의 한 줄 (petMood) ──────────────────────────────────────────────────────
+//
+// 우선순위가 뒤집히면 진화가 임박한 펫이 "씨앗이 떨어져 있어요"라고 말한다.
+// 배고픔 분기는 2026-08-24에 사라졌다 — 사유는 lib/pet.ts PetMoodTone 주석
+const FULL = { level: 7, exp: 0, idleSeeds: 0, idleCapped: false }
+
+// 상한에 닿으면 진화 임박보다 먼저 말한다 — 그쪽은 지금 손해가 진행 중이다
+assert.equal(petMood({ ...FULL, level: 4, exp: 399, idleCapped: true }).tone, "harvest")
+assert.equal(petMood({ ...FULL, idleSeeds: IDLE_MAX_SEEDS }).tone, "harvest")
+
+// 진화 임박(10개 이하)은 떨어진 씨앗보다 먼저다
+assert.equal(petMood({ ...FULL, level: 4, exp: 399, idleSeeds: 3 }).tone, "soon")
+assert.match(petMood({ ...FULL, level: 4, exp: 399 }).text, /씨앗 1개/)
+
+assert.equal(petMood({ ...FULL, idleSeeds: 5 }).tone, "harvest")
+assert.match(petMood({ ...FULL, idleSeeds: 5 }).text, /5개/)
+
+// 아무 일도 없으면 평온한 한 줄. 같은 상태를 두 번 물으면 같은 답이 나와야 한다
+// (매초 리렌더에서 대사가 흔들리면 읽을 수 없다)
+assert.equal(petMood(FULL).tone, "calm")
+assert.equal(petMood(FULL).text, petMood(FULL).text)
+assert.notEqual(petMood(FULL).text, petMood({ ...FULL, level: 8 }).text)
+
+// 마지막 단계에 닿은 펫은 "진화 임박"을 말하지 않는다 (seedsToNextStage가 null)
+assert.equal(petMood({ ...FULL, level: EVOLUTION_LEVEL.STAGE4 + 5 }).tone, "calm")
+
+// 어떤 상태에서도 빈 문장이 나오지 않는다
+for (const level of [1, 5, 15, 25, 60]) {
+  for (const idleSeeds of [0, 1, IDLE_MAX_SEEDS]) {
+    const mood = petMood({ level, exp: 0, idleSeeds, idleCapped: false })
+    assert.ok(mood.text.trim().length > 0, `빈 대사: Lv.${level} 씨앗 ${idleSeeds}`)
+  }
+}
+
+// hour를 넣으면 평온한 한 줄이 시간대 인사로 바뀐다. 안 넣으면 CALM_LINES다.
+// 이 분기가 화면 쪽에 있던 동안 CALM_LINES 5줄은 첫 페인트에만 스쳐 사실상 죽어 있었다
+assert.equal(petMood(FULL, 9).text, timeGreeting(9))
+assert.equal(petMood(FULL, 2).text, timeGreeting(2))
+assert.notEqual(petMood(FULL, 9).text, petMood(FULL, 23).text)
+// null·미지정은 서버 렌더의 값이다(서버 UTC / 브라우저 KST라 시각을 서버에서 읽지 않는다)
+assert.equal(petMood(FULL, null).text, petMood(FULL).text)
+// 급한 상태에서는 시각을 무시한다 — 씨앗이 가득 쌓인 펫이 "좋은 아침"만 말하면 안 된다
+assert.equal(petMood({ ...FULL, idleCapped: true }, 9).text, petMood({ ...FULL, idleCapped: true }).text)
+assert.equal(petMood({ ...FULL, idleSeeds: 5 }, 9).tone, "harvest")
+
+// ── 레벨업 축하 (levelUpReply) ────────────────────────────────────────────────
+// 오르지 않았으면 null이다. 빈 문자열을 돌려주면 호출부의 ?? 폴백이 걸리지 않아
+// 말풍선이 빈 채로 3초 떠 있는다
+assert.equal(levelUpReply(0, 5), null)
+assert.equal(levelUpReply(-1, 5), null)
+// 한 단계와 여러 단계의 문장이 다르고, 도달한 레벨을 반드시 말한다
+assert.match(levelUpReply(1, 5) as string, /Lv\.5$/)
+assert.match(levelUpReply(3, 12) as string, /3 올랐어요/)
+assert.match(levelUpReply(3, 12) as string, /Lv\.12$/)
+assert.notEqual(levelUpReply(1, 5), levelUpReply(3, 5))
+// 숫자 뒤에 주격 조사를 붙이지 않는다 — "Lv.5이/가"는 읽는 법에 따라 받침이 갈린다
+for (const gained of [1, 2, 9]) {
+  assert.doesNotMatch(levelUpReply(gained, 5) as string, /\d\s*(이|가)\b/)
+}
+
+// ── 쓰다듬기 반응 (petTouchReply) ─────────────────────────────────────────────
+// **문구는 사용자가 쓴 20개 밖으로 나가지 않는다** (2026-08-24 사용자 결정).
+// 전에는 여기 전용 5문구가 따로 있었고 어투가 달랐다. 이 단정이 그 5문구가
+// 조용히 되살아나는 것을 막는다 — 펫이 하는 말은 전부 PET_IDLE_LINES다
+for (const n of [0, 1, 2, 7, 9, 10, 137]) {
+  assert.ok(
+    (PET_IDLE_LINES as readonly string[]).includes(petTouchReply(n)),
+    `petTouchReply(${n})가 사용자 문구 밖이다: "${petTouchReply(n)}"`,
+  )
+}
+// 연속으로 눌렀을 때 같은 말이 이어 나오지 않는다
+assert.notEqual(petTouchReply(0), petTouchReply(1))
+assert.equal(petTouchReply(0), petTouchReply(PET_IDLE_LINES.length))
+// 음수·소수·큰 수에서 undefined가 나오지 않는다 (인덱스 계산 실수 방어)
+for (const n of [-1, -7, 0.5, 3.9, 1_000_001]) {
+  assert.equal(typeof petTouchReply(n), "string", `petTouchReply(${n})`)
+  assert.ok(petTouchReply(n).length > 0)
+  assert.ok((PET_IDLE_LINES as readonly string[]).includes(petTouchReply(n)))
+}
+
+// ── 시간대 인사 (timeOfDay / timeGreeting) ────────────────────────────────────
+// 경계값. 5구간의 시작·끝을 못 박는다 — 구간을 옮기면 여기서 걸린다
+assert.equal(timeOfDay(0), "dawn")
+assert.equal(timeOfDay(5), "dawn")
+assert.equal(timeOfDay(6), "morning")
+assert.equal(timeOfDay(10), "morning")
+assert.equal(timeOfDay(11), "afternoon")
+assert.equal(timeOfDay(16), "afternoon")
+assert.equal(timeOfDay(17), "evening")
+assert.equal(timeOfDay(21), "evening")
+assert.equal(timeOfDay(22), "night")
+assert.equal(timeOfDay(23), "night")
+
+// 24시간을 감아 넣는다. getHours()가 24를 주는 일은 없지만 음수·소수는 들어올 수 있다
+assert.equal(timeOfDay(24), "dawn")
+assert.equal(timeOfDay(-1), "night")
+assert.equal(timeOfDay(3.9), "dawn")
+
+// 5구간 전부 서로 다른 문장이고, 빈 문장이 없다
+{
+  const lines = new Set<string>()
+  for (let h = 0; h < 24; h += 1) {
+    const line = timeGreeting(h)
+    assert.ok(line.trim().length > 0, `빈 인사: ${h}시`)
+    lines.add(line)
+  }
+  assert.equal(lines.size, 5)
+}
+
+// ── 함께한 기록 (daysTogether) ────────────────────────────────────────────────
+{
+  const now = new Date("2026-08-23T12:00:00Z")
+  // 가입 당일은 1일째다. 0일째라고 말하는 화면은 "아직 아무것도 아니다"로 읽힌다
+  assert.equal(daysTogether(now, now), 1)
+  assert.equal(daysTogether(new Date("2026-08-23T00:00:00Z"), now), 1)
+  // 경과 시간으로 센다. 달력으로 세면 서버(UTC)와 브라우저(KST)가 자정 근처에서 갈린다
+  assert.equal(daysTogether(new Date("2026-08-22T11:00:00Z"), now), 2)
+  assert.equal(daysTogether(new Date("2026-07-24T12:00:00Z"), now), 31)
+  // 기준 시각이 없거나 미래면 1로 떨어진다 (시계 오차·수동 수정)
+  assert.equal(daysTogether(null, now), 1)
+  assert.equal(daysTogether(new Date("2026-09-01T00:00:00Z"), now), 1)
+}
+
+// ── 호흡 안내 (breathAt) ──────────────────────────────────────────────────────
+assert.equal(BREATH_CYCLE_SECONDS, 14)
+assert.equal(BREATH_CYCLE.length, 3)
+// 내쉬기가 들이쉬기보다 길어야 한다(부교감 우세). 값을 줄이면 여기서 걸린다
+assert.ok(BREATH_CYCLE[2].seconds > BREATH_CYCLE[0].seconds)
+
+// 구간 경계. 4초에 들이쉬기가 끝나고, 8초에 참기가 끝난다
+assert.equal(breathAt(0).phase, "in")
+assert.equal(breathAt(3.9).phase, "in")
+assert.equal(breathAt(4).phase, "hold")
+assert.equal(breathAt(7.9).phase, "hold")
+assert.equal(breathAt(8).phase, "out")
+assert.equal(breathAt(13.9).phase, "out")
+// 주기가 감긴다 — 14초는 다시 들이쉬기다
+assert.equal(breathAt(14).phase, "in")
+assert.equal(breathAt(180).phase, breathAt(180 % BREATH_CYCLE_SECONDS).phase)
+
+// progress는 구간 안에서 0에서 시작해 1 미만으로 끝난다(원 지름 계산이 튀지 않게)
+assert.equal(breathAt(0).progress, 0)
+assert.equal(breathAt(4).progress, 0)
+assert.equal(breathAt(8).progress, 0)
+for (let t = 0; t < 3 * BREATH_CYCLE_SECONDS; t += 0.5) {
+  const b = breathAt(t)
+  assert.ok(b.progress >= 0 && b.progress < 1, `progress 범위 벗어남: ${t}초 → ${b.progress}`)
+  // 남은 초를 0으로 보여 주면 카운트다운이 0에서 멈춘 것처럼 보인다. 최소 1이다
+  assert.ok(b.remaining >= 1, `remaining < 1: ${t}초`)
+  assert.ok(b.label.trim().length > 0)
+}
+// 음수(시계 오차)에서도 죽지 않는다
+assert.equal(breathAt(-5).phase, "in")
+
+// ── 주격 조사 (withSubject) ───────────────────────────────────────────────────
+//
+// 종족 동물명을 문장에 넣는 곳이 "…가"를 하드코딩하고 있어 곰족만 "곰가"를 봤다.
+// 종족은 진단으로 갈리므로 개발자 계정으로는 평생 못 보는 버그다. 값을 못 박는다.
+assert.equal(withSubject("곰"), "곰이")
+assert.equal(withSubject("여우"), "여우가")
+assert.equal(withSubject("고양이"), "고양이가")
+
+// 세 종족 전부. 종족이 늘어도 조사가 어긋나지 않는다
+for (const tribe of Object.values(TRIBE)) {
+  const sentence = withSubject(tribe.animal)
+  assert.ok(
+    sentence.endsWith("이") || sentence.endsWith("가"),
+    `${tribe.animal}: 조사가 붙지 않았다`,
+  )
+  // 받침 유무와 조사가 맞는지 — 동물명 마지막 글자로 직접 다시 계산해 교차 검증한다
+  const code = tribe.animal.charCodeAt(tribe.animal.length - 1)
+  const hasFinal = (code - 0xac00) % 28 !== 0
+  assert.equal(sentence, `${tribe.animal}${hasFinal ? "이" : "가"}`, `${tribe.animal}: 조사 어긋남`)
+}
+
+// 빈 문자열·한글 아닌 글자에서 죽지 않는다
+assert.equal(withSubject(""), "")
+assert.equal(withSubject("Welli"), "Welli가")
 
 console.log("pet 체크 통과")

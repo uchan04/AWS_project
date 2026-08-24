@@ -12,7 +12,15 @@
     "db:seed": "tsx prisma/seed.ts",
     "check:reward": "tsx scripts/check-reward.ts",
     "check:pet": "tsx scripts/check-pet.ts",
-    "check:diagnosis": "tsx scripts/check-diagnosis.ts"
+    "check:diagnosis": "tsx scripts/check-diagnosis.ts",
+    "check:auth": "tsx scripts/check-auth.ts",
+    "check:attendance": "tsx scripts/check-attendance.ts",
+    "slice:art": "tsx scripts/slice-art.ts",
+    "check:curriculum": "tsx scripts/check-curriculum.ts",
+    "check:community": "tsx scripts/check-community.ts",
+    "check:safety": "tsx scripts/check-safety.ts",
+    "check:optimistic": "tsx scripts/check-optimistic.ts",
+    "e2e": "tsx scripts/e2e-scenario.ts"
   },
   "prisma": {
     "seed": "tsx prisma/seed.ts"

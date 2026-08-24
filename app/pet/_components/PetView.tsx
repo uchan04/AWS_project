@@ -1,16 +1,22 @@
 "use client"
 
-import { useEffect, useState } from "react"
+import { useEffect, useRef, useState } from "react"
 import Link from "next/link"
 import type { TypeCode } from "@prisma/client"
 import {
   IDLE_MAX_SEEDS,
+  IDLE_SEEDS_PER_HOUR,
   MS_PER_IDLE_SEED,
   PET_IDLE_LINES,
   animalEmoji,
+  applySeeds,
   expProgress,
+  levelUpReply,
+  petTouchReply,
+  seedsToNextStage,
 } from "@/lib/pet"
 import { EVOLUTION_LEVEL, SEED_TO_EXP, expToNextLevel } from "@/lib/types"
+import { ArtImage } from "@/app/components/ArtImage"
 import PetRoom from "./PetRoom"
 import "@/styles/tokens.css"
 import "../pet.css"
@@ -33,6 +39,18 @@ import "../pet.css"
 //   상단은 제목만 남는다 — 재화와 상점 입구가 두 곳에 겹쳐 있을 이유가 없다
 // - 방 배경: 착용한 배경 치장이 있으면 그 그림, 없으면 PetRoom의 기본 방 SVG다
 //   (2026-08-21 사용자 확정). 펫은 배경과 무관하게 방 중앙 하단에 고정한다
+//
+// 2026-08-24 두 갈래(develop / improve)를 합쳤다. 사용자가 항목별로 고른 결과다:
+// - 말풍선은 develop 쪽(손그림 SVG + PET_IDLE_LINES 순환, 닫기 가능)을 쓴다.
+//   improve 쪽에 있던 petMood() 상태 한 줄(.pet-bubble)은 걷었다 — 같은 자리에 두 계통이
+//   말할 수 없다. petMood()가 알리던 두 가지는 다른 자리에 이미 있다:
+//   씨앗 상한은 "그동안 쌓인 씨앗" 카드의 각주("가득 찼어요"), 진화 임박은 경험치 카드의
+//   각주("N단계까지 씨앗 N개")다. 쓰다듬기·먹이기 반응 대사만 살려서 말풍선을 3초 덮는다
+// - 개수 버튼은 develop의 누적 더하기(feedStep). 프리셋은 1·5·10·50
+// - 오늘의 활동 3칸(todayTiles)·보유 재화 카드는 develop 것
+// - 배고픔 게이지·방 안 씨앗 줍기 버튼·상단 나무판 3개는 지웠다
+// - improve에서 가져온 것: 쓰다듬기 반응, 씨앗 0개일 때의 안내, 함께한 기록 카드,
+//   먹이기 낙관적 갱신, 방치형 타이머의 절대 시각 계산, ArtImage 폴백
 
 export type PetState = {
   level: number
@@ -85,6 +103,12 @@ export type PetState = {
   stageImageUrls: (string | null)[]
   /** 착용한 배경 치장의 이미지. null이면 기본 방 SVG가 나온다 */
   roomImageUrl: string | null
+  /** 가입일부터 며칠째인가. 가입 당일이 1이다 (lib/pet.ts daysTogether) */
+  daysTogether: number
+  /** 지금까지 완료한 미션 수(일일 + 단계 전부) */
+  missionsDone: number
+  /** 누적 출석일 */
+  attendanceTotal: number
 }
 
 // 단계 이름. 단계 임계값은 lib/types.ts의 EVOLUTION_LEVEL이 정본이라
@@ -103,14 +127,6 @@ function stageRange(stage: number): string {
   if (stage === 2) return `Lv.${EVOLUTION_LEVEL.STAGE2} ~ ${EVOLUTION_LEVEL.STAGE3 - 1}`
   if (stage === 3) return `Lv.${EVOLUTION_LEVEL.STAGE3} ~ ${EVOLUTION_LEVEL.STAGE4 - 1}`
   return `Lv.${EVOLUTION_LEVEL.STAGE4}+`
-}
-
-/** 다음 진화까지 남은 것. 최종 단계면 null */
-function nextMilestone(level: number): string | null {
-  if (level < EVOLUTION_LEVEL.STAGE2) return `Lv.${EVOLUTION_LEVEL.STAGE2} 첫 진화`
-  if (level < EVOLUTION_LEVEL.STAGE3) return `Lv.${EVOLUTION_LEVEL.STAGE3} 다음 진화`
-  if (level < EVOLUTION_LEVEL.STAGE4) return `Lv.${EVOLUTION_LEVEL.STAGE4} 마지막 진화`
-  return null
 }
 
 // 2026-08-22 사용자 결정: 100을 빼고 5를 넣었다. 100개를 한 번에 넣는 일이 거의 없다.
@@ -138,6 +154,12 @@ const ko = (n: number) => n.toLocaleString("ko-KR")
  */
 const IDLE_LINE_MS = 5 * 60_000
 
+/** 쓰다듬기·먹이기 반응 대사가 말풍선을 덮는 시간 */
+const REACTION_MS = 3000
+
+/** 레벨이 오르지 않은 평범한 먹이기의 기본 대사 */
+const FEED_REPLY = "맛있어요! 힘이 나요"
+
 export default function PetView({ initial }: { initial: PetState }) {
   const [pet, setPet] = useState(initial)
   const [pending, setPending] = useState(false)
@@ -148,22 +170,38 @@ export default function PetView({ initial }: { initial: PetState }) {
   // amount === p로는 어느 버튼을 눌렀는지 알 수 없게 됐다 — 10을 세 번 누르면 30이고
   // 그 값과 같은 버튼이 없다. 알약 하나가 차 있는 시안의 모양을 지키려고 따로 담는다
   const [lastPreset, setLastPreset] = useState<number | null>(null)
-  const [msLeft, setMsLeft] = useState(initial.msToNextSeed)
   // 말풍선. 닫으면 이 화면에 있는 동안 다시 뜨지 않는다
   const [bubbleClosed, setBubbleClosed] = useState(false)
   // 평상시 대사 순환 위치. null이면 아직 접속 인사를 보여 주는 중이다.
   // 시작 위치는 서버가 정한다 — 여기서 고르면 하이드레이션에서 어긋난다
   const [lineAt, setLineAt] = useState<number | null>(null)
+  // 쓰다듬기·먹이기 반응. 3초 동안 말풍선 자리를 덮고 그 뒤 원래 대사로 돌아간다.
+  // burst는 파티클 span의 key다 — 값이 바뀌면 remount되어 CSS 애니메이션이 처음부터 다시 돈다
+  // (같은 요소의 class만 갈면 연속 클릭에서 두 번째부터 애니메이션이 재생되지 않는다)
+  const [reaction, setReaction] = useState<{ text: string; eat: boolean } | null>(null)
+  const [burst, setBurst] = useState(0)
+  const [touches, setTouches] = useState(0)
+  // 다음 방치형 씨앗이 쌓이는 목표 시각(epoch ms). 0은 "아직 안 심었다"는 뜻이다
+  const nextSeedAt = useRef(0)
 
-  // 말풍선에 지금 들어갈 문장. 닫혔으면 null, 순환 전이면 접속 인사, 그다음은 평상시 대사다
-  const bubble = bubbleClosed ? null : lineAt === null ? pet.welcome : PET_IDLE_LINES[lineAt]
+  // 말풍선에 지금 들어갈 문장. 반응 대사가 있으면 그것이 이기고, 없으면 닫힘 → 접속 인사 →
+  // 평상시 대사 순이다. 반응은 닫아 둔 말풍선도 되살린다 — 내가 누른 것에 대한 답이라
+  // "닫아 뒀으니 조용히 있어라"의 대상이 아니다
+  const bubble = reaction
+    ? reaction.text
+    : bubbleClosed
+      ? null
+      : lineAt === null
+        ? pet.welcome
+        : PET_IDLE_LINES[lineAt]
 
   const need = expToNextLevel(pet.level)
   const progress = expProgress(pet.level, pet.exp)
   const emoji = animalEmoji(pet.animal)
   // 단일 형태(친밀도 캐릭터)는 단계 크기를 쓰지 않는다. 중간 크기로 고정한다
   const stage = pet.stageCount > 1 ? Math.min(pet.evolutionStage, MAX_STAGE) : 2
-  const milestone = nextMilestone(pet.level)
+  // 다음 진화까지 남은 씨앗. 최종 단계면 null (lib/pet.ts seedsToNextStage)
+  const nextStage = seedsToNextStage(pet.level, pet.exp)
   // evolutionStageFor가 MAX_STAGE에서 멈추므로 카드도 그 수를 넘기지 않는다
   const stages = Array.from({ length: Math.min(pet.stageCount, MAX_STAGE) }, (_, i) => i + 1)
   const feedable = Math.min(amount, pet.seeds)
@@ -258,23 +296,85 @@ export default function PetView({ initial }: { initial: PetState }) {
   // 다음 씨앗까지 남은 시간. 2026-08-21부터 화면에 띄우지 않고, 쌓인 개수를 1씩 올리는
   // 타이머로만 쓴다 — 실제 지급량은 받기를 누를 때 서버가 다시 센다.
   // 상한에 닿아 있으면 더 쌓이지 않으므로 돌리지 않는다.
+  //
+  // **절대 시각으로 센다.** 전에는 매 tick마다 `left - 1000`으로 깎았다. 브라우저는
+  // 배경 탭의 1초 타이머를 분당 1회까지 줄이므로, 탭을 5분 이상 뒤에 두면 30분이
+  // 지나도 화면은 30초만 흐른 것으로 셌다 — 돌아와 보면 방에 쌓인 씨앗이 늘지 않았고
+  // 새로고침해야 진짜 값이 나왔다.
+  // 목표 시각을 ref에 두고 매번 now와 비교하면 탭이 깨어날 때 스스로 따라잡는다.
+  //
+  // 값을 렌더가 아니라 effect에서 심는 이유: 서버(SSR)에서 Date.now()를 읽으면
+  // 하이드레이션 값과 어긋난다. 첫 페인트는 서버가 준 msToNextSeed 그대로 쓴다.
   useEffect(() => {
     if (pet.idleCapped || pet.idleSeeds >= IDLE_MAX_SEEDS) return
+    // 0이면 아직 안 심은 것이다. 심기 전에 while을 돌면 무한 루프가 된다
+    if (!nextSeedAt.current) nextSeedAt.current = Date.now() + initial.msToNextSeed
+
     const tick = setInterval(() => {
-      setMsLeft((left) => {
-        if (left > 1000) return left - 1000
-        setPet((prev) =>
-          prev.idleSeeds >= IDLE_MAX_SEEDS ? prev : { ...prev, idleSeeds: prev.idleSeeds + 1 },
-        )
-        return MS_PER_IDLE_SEED
-      })
+      const now = Date.now()
+      let due = 0
+      while (nextSeedAt.current <= now) {
+        due += 1
+        nextSeedAt.current += MS_PER_IDLE_SEED
+      }
+      if (due > 0) {
+        setPet((prev) => ({
+          ...prev,
+          idleSeeds: Math.min(IDLE_MAX_SEEDS, prev.idleSeeds + due),
+        }))
+      }
+      // 남은 시간을 state에 담지 않는다. 화면에 띄우는 곳이 없어서(아래 방치형 카드 주석)
+      // 1초마다 리렌더만 유발했다. 개수가 오를 때만 setPet이 돌면 충분하다
     }, 1000)
     return () => clearInterval(tick)
-  }, [pet.idleCapped, pet.idleSeeds])
+  }, [pet.idleCapped, pet.idleSeeds, initial.msToNextSeed])
+
+  // 반응 대사 정리. burst에 걸어야 3초 안에 다시 누른 경우 타이머가 새로 시작한다
+  useEffect(() => {
+    if (!reaction) return
+    const t = setTimeout(() => setReaction(null), REACTION_MS)
+    return () => clearTimeout(t)
+  }, [reaction, burst])
+
+  function react(text: string, eat = false) {
+    setReaction({ text, eat })
+    setBurst((n) => n + 1)
+  }
+
+  /**
+   * 쓰다듬기. 재화도 저장값도 움직이지 않는다 — 서버를 부르지 않는 순수 상호작용이다.
+   * 벤치마크(My Talking Tom·다마고치)에서 펫을 만지는 것은 이 장르의 기본 동작이고,
+   * 우리 화면은 그동안 펫을 눌러도 아무 일이 없었다.
+   */
+  function pat() {
+    react(petTouchReply(touches))
+    setTouches((n) => n + 1)
+  }
 
   async function feed(seeds: number) {
     if (pending || seeds < 1 || seeds > pet.seeds) return
     setPending(true)
+
+    // 낙관적 갱신. Bedrock이 아니라 RDS(us-east-1) 왕복이라 400~900ms인데, 그동안
+    // 게이지가 멈춰 있으면 버튼이 안 눌린 것처럼 읽힌다.
+    //
+    // 예측값을 손으로 계산하지 않고 서버가 쓰는 것과 **같은** applySeeds()를 부른다.
+    // 레벨이 한 번에 여러 개 오르는 경우(씨앗 100개)를 근사식으로 처리하면 화면이
+    // 잠깐 틀린 레벨·단계를 보여 주고 응답이 오면서 되돌아가 깜빡인다.
+    const before = pet
+    const guess = applySeeds(
+      { level: pet.level, exp: pet.exp, evolutionStage: pet.evolutionStage },
+      seeds,
+      pet.stageCount,
+    )
+    setPet((prev) => ({
+      ...prev,
+      level: guess.level,
+      exp: guess.exp,
+      evolutionStage: guess.evolutionStage,
+      // 씨앗 차감만 예측한다. 스킨 배율(effectPct)은 획득에만 붙고 소모에는 붙지 않는다
+      seeds: Math.max(0, prev.seeds - seeds),
+    }))
 
     try {
       const res = await fetch("/api/pet/feed", {
@@ -285,6 +385,9 @@ export default function PetView({ initial }: { initial: PetState }) {
       const json = await res.json()
 
       if (!res.ok) {
+        // 예측을 되돌린다. 씨앗이 줄어든 화면을 남기면 실제로는 있는 씨앗을
+        // 못 쓰는 상태가 되고, 새로고침 전까지 사용자가 그걸 알 방법이 없다
+        setPet(before)
         setToast({ text: json?.error?.message ?? "잠시 후 다시 시도해 주세요", error: true })
         return
       }
@@ -301,6 +404,10 @@ export default function PetView({ initial }: { initial: PetState }) {
       setAmount(1)
       setLastPreset(null)
       setToast({ text: `씨앗 ${ko(seeds)}개를 먹였어요. 경험치 +${ko(seeds * SEED_TO_EXP)}` })
+      // 진화하지 않는 대부분의 먹이기에도 반응을 남긴다. 지금까지는 숫자만 바뀌었다.
+      //
+      // 레벨이 올랐으면 그걸 말하고, 아니면 기본 대사다 (lib/pet.ts levelUpReply)
+      react(levelUpReply(next.gainedLevels ?? 0, next.level) ?? FEED_REPLY, true)
 
       // 진화 풀스크린 연출 2초 (SPEC.md 5절)
       if (next.evolvedTo) {
@@ -310,6 +417,7 @@ export default function PetView({ initial }: { initial: PetState }) {
 
       window.dispatchEvent(new CustomEvent("user-stats-changed"))
     } catch {
+      setPet(before)
       setToast({ text: "네트워크 연결을 확인해 주세요", error: true })
     } finally {
       setPending(false)
@@ -321,23 +429,32 @@ export default function PetView({ initial }: { initial: PetState }) {
     if (pending || pet.idleSeeds < 1) return
     setPending(true)
 
+    // 쌓인 개수는 바로 0으로 둔다 — 응답을 기다리는 동안 그대로 남아 있으면 두 번 누른다.
+    // 실제 지급량은 서버가 다시 계산하므로(스킨 배율 포함) 보유량은 예측하지 않는다.
+    const before = pet
+    setPet((prev) => ({ ...prev, idleSeeds: 0, idleCapped: false }))
+
     try {
       const res = await fetch("/api/pet/idle", { method: "POST" })
       const json = await res.json()
 
       if (!res.ok) {
+        setPet(before)
         setToast({ text: json?.error?.message ?? "잠시 후 다시 시도해 주세요", error: true })
         return
       }
 
-      const gained = json.data.seeds - pet.seeds
+      const gained = json.data.seeds - before.seeds
       setPet((prev) => ({ ...prev, seeds: json.data.seeds, idleSeeds: 0, idleCapped: false }))
-      setMsLeft(MS_PER_IDLE_SEED)
+      // 수확 직후에는 다음 씨앗까지 꽉 찬 30분이다. 이 줄이 없으면 목표 시각이 과거로
+      // 남아 다음 tick이 곧바로 1개를 더 얹는다
+      nextSeedAt.current = Date.now() + MS_PER_IDLE_SEED
       setToast({ text: `씨앗 ${ko(Math.max(0, gained))}개를 수확했어요` })
       // develop이 넣은 줄이다. 수령으로 씨앗이 늘면 상단 재화 HUD를 갱신해야 한다.
       // 2026-08-21 머지: develop이 이벤트 이름을 user-stats-changed로 바꿨다(35746be)
       window.dispatchEvent(new CustomEvent("user-stats-changed"))
     } catch {
+      setPet(before)
       setToast({ text: "네트워크 연결을 확인해 주세요", error: true })
     } finally {
       setPending(false)
@@ -347,16 +464,13 @@ export default function PetView({ initial }: { initial: PetState }) {
   const petFace = (
     <>
       {pet.imageUrl ? (
-        // eslint-disable-next-line @next/next/no-img-element
-        <img
+        // .pet-char__img가 단계별로 5.5~10rem(88~160px)을 정한다. 가장 큰 칸을 기준으로 넘긴다
+        <ArtImage
           className="pet-char__img"
           src={pet.imageUrl}
-          alt=""
-          onError={(e) => {
-            e.currentTarget.style.display = "none"
-            const fallback = e.currentTarget.nextElementSibling as HTMLElement | null
-            if (fallback) fallback.style.display = "block"
-          }}
+          width={160}
+          height={160}
+          fallbackDisplay="block"
         />
       ) : null}
       <span className="pet-char__emoji" style={{ display: pet.imageUrl ? "none" : "block" }}>
@@ -367,7 +481,10 @@ export default function PetView({ initial }: { initial: PetState }) {
 
   return (
     <main className="pet" data-tribe={pet.typeCode ?? undefined}>
-      {/* 재화와 상점 입구는 아래 지갑 카드가 갖는다. 상단은 제목만 남긴다 */}
+      {/* 재화와 상점 입구는 아래 지갑 카드가 갖는다. 상단은 제목만 남긴다.
+          2026-08-24: 나무판 3개(잠깐 쉬기·외형 상점·배경 상점)를 걷었다. 상점 2개는
+          지갑 카드가 이미 갖고 있어 같은 링크가 한 화면에 두 벌이었고, 잠깐 쉬기는
+          맨 아래 각주로 내렸다 — 사용자 결정 */}
       <header className="pet__top">
         <div>
           <h1 className="pet__title">나의 펫</h1>
@@ -388,6 +505,7 @@ export default function PetView({ initial }: { initial: PetState }) {
 
             {/* 펫 대사 (2026-08-23 사용자 요청). 20문장 전부 사용자가 직접 쓴 것이다.
                 들어오면 접속 인사(서버가 고른다), 5분마다 평상시 대사로 넘어간다.
+                쓰다듬거나 먹이면 3초 동안 그 반응이 이 자리를 덮는다(위 bubble 주석).
                 문장 목록과 규칙은 lib/pet.ts "펫 대사" 절에 있다.
 
                 말풍선을 캐릭터 **위**에 두고 꼬리를 아래로 내려 펫이 말하는 것으로 읽히게
@@ -396,8 +514,13 @@ export default function PetView({ initial }: { initial: PetState }) {
                 aria-live를 걸지 않았다. 주기마다 스크린리더가 대사를 읽으면 화면을 쓰는
                 내내 말이 끼어든다 — 이건 알림이 아니라 방 안의 혼잣말이라 그 자리에 있는
                 글자로 충분하다. 대신 문장이 바뀔 때 DOM에 그대로 남으므로 훑어 읽을 수 있다 */}
+            {/* 아래 data-tone은 먹이기에만 준다 (2026-08-24 사용자 결정). 쓰다듬기에도
+                "touch" 톤(갈색 테두리)을 줬는데, 그게 "이 문구는 사용자가 쓴 20문구가
+                아니다"를 눈으로 알려 주는 표시가 되어 있었다. 이제 쓰다듬기 문구도
+                평상시 10문구라 테두리를 달리 할 이유가 없다 — 같은 펫이 같은 어투로 말한다.
+                먹이기는 남긴다. 레벨업 알림처럼 결과를 알리는 자리라 성격이 다르다 */}
             {bubble ? (
-              <div className="pet-welcome">
+              <div className="pet-welcome" data-tone={reaction?.eat ? "eat" : undefined}>
                 {/* 말풍선 모양은 사용자가 준 그림(손그림 blob + 갈고리 꼬리)을 그대로 옮긴
                     path 하나다. border-radius로는 이 모양이 안 나온다 — 굴곡이 네 군데
                     다르고 꼬리가 박스 밖으로 나가는데, border-radius는 각 모서리에 타원
@@ -425,14 +548,18 @@ export default function PetView({ initial }: { initial: PetState }) {
                   />
                 </svg>
                 <p className="pet-welcome__text">{bubble}</p>
-                <button
-                  type="button"
-                  className="pet-welcome__close"
-                  onClick={() => setBubbleClosed(true)}
-                  aria-label="펫 말풍선 닫기"
-                >
-                  ✕
-                </button>
+                {/* 반응 대사일 때는 닫기를 그리지 않는다. 3초면 스스로 사라지고, 그때 닫으면
+                    반응이 끝난 뒤 평상시 대사까지 같이 사라져 이유를 알 수 없다 */}
+                {reaction ? null : (
+                  <button
+                    type="button"
+                    className="pet-welcome__close"
+                    onClick={() => setBubbleClosed(true)}
+                    aria-label="펫 말풍선 닫기"
+                  >
+                    ✕
+                  </button>
+                )}
               </div>
             ) : null}
 
@@ -441,16 +568,47 @@ export default function PetView({ initial }: { initial: PetState }) {
                 좁은 화면에서는 말풍선과 배지가 겹쳤다(위 .pet-welcome 주석의 계산).
                 레벨은 아래 진화 카드의 "현재 Lv.N"에 그대로 있으므로 정보가 사라지지 않는다.
                 배지 CSS(.pet-char__badge)와 petBounceBadge 키프레임도 함께 걷었다 */}
-            {/* 펫 주위를 돌던 반짝임 3개(✨⭐✨, data-i로 위치·타이밍이 달랐다)를
-                2026-08-24 사용자 요청("주위에 둥둥 떠다니는 이모티콘들 지워줘")으로 걷었다.
+            {/* 반짝임 3개(✨⭐✨)를 2026-08-24 사용자 요청("주위에 둥둥 떠다니는 이모티콘들
+                지워줘")으로 걷었다가 **같은 날 develop 병합에서 사용자 결정으로 되살렸다.**
+                develop이 이 상자에 쓰다듬기 버튼과 반응 파티클을 붙여 놓았고, 셋을 한 벌로
+                가져오는 쪽을 골랐다. 방의 떠다니는 씨앗(.pet-room__seeds)은 되살리지 않았다 —
+                그쪽은 develop에도 새 기능이 붙지 않아 지운 상태 그대로다.
                 CSS(.pet-char__sparkle[data-i])와 petSparkle 키프레임, prefers-reduced-motion
-                목록의 항목도 함께 지웠다. 이 상자에 남는 것은 그림과 그림자 두 줄이다 —
-                그림자 자리(pet.css의 bottom·margin-top 한 쌍)는 반짝임과 무관하므로
-                걷어도 펫 위치가 움직이지 않는다 */}
+                목록의 항목도 pet.css에서 함께 되살렸다 */}
             <div className="pet-char" data-stage={stage}>
-              <span className="pet-char__body" aria-hidden="true">
-                {petFace}
+              {/* 반짝임 3개. 위치·타이밍이 각각 달라 pet.css가 data-i로 구분한다 */}
+              <span className="pet-char__sparkle" data-i="1" aria-hidden="true">
+                ✨
               </span>
+              <span className="pet-char__sparkle" data-i="2" aria-hidden="true">
+                ⭐
+              </span>
+              <span className="pet-char__sparkle" data-i="3" aria-hidden="true">
+                ✨
+              </span>
+
+              {/* 눌러서 쓰다듬는다. span이던 것을 button으로 감쌌다 —
+                  키보드로도 닿아야 하고, 그림 자체는 aria-hidden이라 라벨을 여기 붙인다 */}
+              <button
+                type="button"
+                className="pet-char__touch"
+                onClick={pat}
+                aria-label={`${pet.skinName} 쓰다듬기`}
+              >
+                <span className="pet-char__body" aria-hidden="true">
+                  {petFace}
+                </span>
+              </button>
+
+              {/* 반응 파티클. key가 바뀌면 remount되어 애니메이션이 처음부터 다시 돈다 */}
+              {reaction ? (
+                <span className="pet-char__burst" key={burst} aria-hidden="true">
+                  <span data-i="1">{reaction.eat ? "🌱" : "💗"}</span>
+                  <span data-i="2">{reaction.eat ? "✨" : "💗"}</span>
+                  <span data-i="3">{reaction.eat ? "🌿" : "💗"}</span>
+                </span>
+              ) : null}
+
               <span className="pet-char__shadow" aria-hidden="true" />
 
               {/* 2026-08-21 사용자 결정으로 방에서 이름("북극여우")과 상태 문구("다 자란
@@ -552,18 +710,23 @@ export default function PetView({ initial }: { initial: PetState }) {
               aria-valuemax={need}
               aria-valuenow={pet.exp}
             >
+              {/* 게이지 안에 {exp} / {need}를 겹쳐 쓰던 것을 지웠다 (2026-08-23).
+                  바로 위 .pet-card__meta가 **같은 문자열**을 이미 쓴다 — 8px 간격으로
+                  같은 숫자가 두 번이었다. 지운 쪽이 게이지 안이다:
+                  움직이는 그라디언트 위 글자라 대비가 채움률에 따라 변한다.
+                  배경 상점의 .pet-gauge__value는 그 게이지의 **유일한** 라벨이라 남는다 */}
               <div className="pet-gauge__fill" style={{ width: `${progress * 100}%` }} />
-              <span className="pet-gauge__value">
-                {ko(pet.exp)} / {ko(need)}
-              </span>
             </div>
-            {/* 2026-08-21 사용자 결정으로 "마지막 단계예요"를 지웠다. 최종 단계에 닿으면
-                다음 진화 안내가 없으므로 오른쪽 칸을 비우고 "현재 Lv.N"만 남긴다 —
-                빈 <span>을 두면 space-between이 왼쪽 글자를 그대로 왼쪽에 두므로
-                자리가 어긋나지는 않는다 */}
+            {/* 지금까지 `Lv.25 마지막 진화`만 보여 줬다. 그 문구는 지금 무엇을 얼마나
+                해야 하는지 알려 주지 않는다. 벤치마크한 육성 게임은 전부 남은 개수를 쓴다
+                (2026-08-24 사용자 확정: seedsToNextStage 쪽을 쓴다) */}
             <p className="pet-card__foot">
               <span>현재 Lv.{pet.level}</span>
-              {milestone ? <span>{milestone}</span> : null}
+              <span>
+                {nextStage
+                  ? `${STAGE_NAME[nextStage.stage - 1] ?? `${nextStage.stage}단계`}까지 씨앗 ${ko(nextStage.seeds)}개`
+                  : "마지막 단계예요"}
+              </span>
             </p>
           </div>
 
@@ -576,6 +739,9 @@ export default function PetView({ initial }: { initial: PetState }) {
               자리가 버튼 것이 되므로 __head를 쓸 수 없고, 개수("N개")가 제목 아래로 내려간다.
               그래서 제목 + 개수를 .pet-idle__body로 묶고 .pet-idle이 그 상자와 버튼을
               한 줄에 세운다. 개수는 클래스를 바꾸지 않았다 — .pet-card__meta 그대로다.
+
+              방 안의 씨앗을 직접 줍는 버튼(.pet-room__pickup)도 같은 claim()을 불렀는데
+              2026-08-24 사용자 결정으로 걷었다. 수확 입구는 이 버튼 하나다.
 
               각주("가득 찼어요")는 .pet-idle 밖에 남긴다. 안에 넣으면 버튼과 같은 줄을
               다투게 되고, 각주는 카드 전체에 붙는 말이라 자리가 카드 맨 아래가 맞다 */}
@@ -605,8 +771,8 @@ export default function PetView({ initial }: { initial: PetState }) {
 
             {/* 2026-08-21 사용자 결정으로 각주가 "가득 찼어요" 하나로 줄었다. 지운 두 문구는
                 "시간당 N개, 최대 N시간분까지 모여요"와 "다음 씨앗까지 N분"이다.
-                msLeft는 화면에서 사라졌을 뿐 계속 돌아간다 — 아래 useEffect가 그 타이머로
-                쌓인 개수를 1씩 올리므로 지우면 개수가 새로고침 전까지 멈춘다.
+                타이머 자체는 계속 돌아간다 — 위 useEffect가 그것으로 쌓인 개수를 1씩
+                올리므로 지우면 개수가 새로고침 전까지 멈춘다.
                 가득 찼을 때만 각주를 그린다. 빈 <p>를 남기면 gap만큼 카드가 길어진다 */}
             {pet.idleCapped ? (
               <p className="pet-card__foot">
@@ -625,108 +791,138 @@ export default function PetView({ initial }: { initial: PetState }) {
               <span className="pet-card__meta">보유 {ko(pet.seeds)}개</span>
             </div>
 
-            <div className="pet-step">
-              <button
-                type="button"
-                className="pet-step__btn"
-                onClick={() => {
-                  // −·+로 수를 손대면 개수 버튼의 표시를 끈다. 안 끄면 10을 누른 뒤
-                  // −를 눌러 9가 돼도 "10개" 알약이 계속 차 있어 값과 어긋난다
-                  //
-                  // 2026-08-22 사용자 결정: 개수 버튼이 더하기 전용이 된 뒤에도 −는
-                  // 하나씩만 줄인다. "1로 초기화" 버튼은 두지 않는다
-                  setLastPreset(null)
-                  setAmount((a) => Math.max(1, a - 1))
-                }}
-                disabled={amount <= 1}
-                aria-label="한 개 줄이기"
-              >
-                −
-              </button>
-              <p>
-                <span className="pet-step__value">{ko(amount)}</span>
-                <span className="pet-step__unit">개</span>
-              </p>
-              <button
-                type="button"
-                className="pet-step__btn"
-                onClick={() => {
-                  setLastPreset(null)
-                  setAmount((a) => Math.min(Math.max(1, pet.seeds), a + 1))
-                }}
-                disabled={amount >= pet.seeds}
-                aria-label="한 개 늘리기"
-              >
-                +
-              </button>
-            </div>
+            {/* 씨앗이 0개면 조작부를 전부 비활성으로 두지 않는다. 전에는 스테퍼·개수 버튼
+                4개·먹이기 버튼이 모두 회색으로 남아 **어디서 씨앗을 얻는지는 아무데도
+                적혀 있지 않았다** — 처음 온 사람이 가장 자주 만나는 상태다.
+                고장난 화면 대신 다음 행동(미션) 하나만 보여 준다 */}
+            {pet.seeds < 1 ? (
+              <div className="pet-empty">
+                <p className="pet-empty__text">씨앗이 없어요. 미션을 하나 해내면 씨앗이 생겨요</p>
+                <Link className="pet-btn pet-btn--block" href="/missions">
+                  오늘의 미션 보기
+                </Link>
+                <p className="pet-empty__hint">
+                  방치형으로도 시간당 {IDLE_SEEDS_PER_HOUR}개씩 모여요
+                </p>
+              </div>
+            ) : (
+              <>
+                <div className="pet-step">
+                  <button
+                    type="button"
+                    className="pet-step__btn"
+                    onClick={() => {
+                      // −·+로 수를 손대면 개수 버튼의 표시를 끈다. 안 끄면 10을 누른 뒤
+                      // −를 눌러 9가 돼도 "10개" 알약이 계속 차 있어 값과 어긋난다
+                      //
+                      // 2026-08-22 사용자 결정: 개수 버튼이 더하기 전용이 된 뒤에도 −는
+                      // 하나씩만 줄인다. "1로 초기화" 버튼은 두지 않는다
+                      setLastPreset(null)
+                      setAmount((a) => Math.max(1, a - 1))
+                    }}
+                    disabled={amount <= 1}
+                    aria-label="한 개 줄이기"
+                  >
+                    −
+                  </button>
+                  <p>
+                    <span className="pet-step__value">{ko(amount)}</span>
+                    <span className="pet-step__unit">개</span>
+                  </p>
+                  <button
+                    type="button"
+                    className="pet-step__btn"
+                    onClick={() => {
+                      setLastPreset(null)
+                      setAmount((a) => Math.min(Math.max(1, pet.seeds), a + 1))
+                    }}
+                    disabled={amount >= pet.seeds}
+                    aria-label="한 개 늘리기"
+                  >
+                    +
+                  </button>
+                </div>
 
-            {/* export는 1·5·10·20이었다. 씨앗 1 = 경험치 10이고 Lv.1→2가 100이라
-                실제 경제(일일 미션 60/일)에 맞춰 잡았다 — 값은 위 FEED_PRESETS에 있다
+                {/* export는 1·5·10·20이었다. 씨앗 1 = 경험치 10이고 Lv.1→2가 100이라
+                    실제 경제(일일 미션 60/일)에 맞춰 잡았다 — 값은 위 FEED_PRESETS에 있다
 
-                2026-08-22 사용자 요청: 개수 버튼이 "그 값으로 정하기"에서 "그 값만큼
-                더하기"로 바뀌었다. 10개를 세 번 누르면 30개다. 최소값(1)에서 누를 때만
-                더하지 않고 그 값이 된다 — 1 + 10 = 11이 되면 "10개를 눌렀는데 11"이라
-                버튼 이름과 결과가 어긋난다. 그래서 첫 누름은 10, 그다음부터 20·30이다.
+                    2026-08-22 사용자 요청: 개수 버튼이 "그 값으로 정하기"에서 "그 값만큼
+                    더하기"로 바뀌었다. 10개를 세 번 누르면 30개다. 최소값(1)에서 누를 때만
+                    더하지 않고 그 값이 된다 — 1 + 10 = 11이 되면 "10개를 눌렀는데 11"이라
+                    버튼 이름과 결과가 어긋난다. 그래서 첫 누름은 10, 그다음부터 20·30이다.
 
-                **더한 값이 보유량을 넘으면 자르지 않고 버튼을 막는다**(2026-08-22 사용자
-                지적). 보유 27개에서 10개는 10 → 20까지만 눌리고 그 뒤로는 비활성이다.
-                자르면 "10개"를 눌렀는데 7개가 들어가 버튼 이름과 결과가 어긋나고, 남은
-                씨앗을 의도 없이 다 쓰게 된다. 남은 7개를 넣고 싶으면 5개·1개나 +로 채운다.
-                onClick도 넘는 경우 값을 그대로 두는데, 이건 disabled와 겹치는 방어다 —
-                눌림과 상태 갱신 사이에 보유량이 줄면(다른 탭에서 먹이기) disabled만으로는
-                못 막는다.
+                    **더한 값이 보유량을 넘으면 자르지 않고 버튼을 막는다**(2026-08-22 사용자
+                    지적). 보유 27개에서 10개는 10 → 20까지만 눌리고 그 뒤로는 비활성이다.
+                    자르면 "10개"를 눌렀는데 7개가 들어가 버튼 이름과 결과가 어긋나고, 남은
+                    씨앗을 의도 없이 다 쓰게 된다. 남은 7개를 넣고 싶으면 5개·1개나 +로 채운다.
+                    onClick도 넘는 경우 값을 그대로 두는데, 이건 disabled와 겹치는 방어다 —
+                    눌림과 상태 갱신 사이에 보유량이 줄면(다른 탭에서 먹이기) disabled만으로는
+                    못 막는다.
 
-                aria-pressed를 뺐다 — 이제 고른 상태가 아니라 실행하는 동작이고,
-                누른 값을 표시하는 것은 아래 lastPreset(data-active)이 맡는다 */}
-            <div className="pet-presets">
-              {FEED_PRESETS.map((p) => (
+                    aria-pressed를 뺐다 — 이제 고른 상태가 아니라 실행하는 동작이고,
+                    누른 값을 표시하는 것은 lastPreset(data-active)이 맡는다 */}
+                <div className="pet-presets">
+                  {FEED_PRESETS.map((p) => (
+                    <button
+                      key={p}
+                      type="button"
+                      className="pet-preset"
+                      data-active={lastPreset === p ? "true" : undefined}
+                      aria-label={`${ko(p)}개 더하기`}
+                      onClick={() => {
+                        setLastPreset(p)
+                        setAmount((a) => {
+                          const next = feedStep(a, p)
+                          return next > pet.seeds ? a : next
+                        })
+                      }}
+                      disabled={feedStep(amount, p) > pet.seeds}
+                    >
+                      {ko(p)}개
+                    </button>
+                  ))}
+                </div>
+
                 <button
-                  key={p}
                   type="button"
-                  className="pet-preset"
-                  data-active={lastPreset === p ? "true" : undefined}
-                  aria-label={`${ko(p)}개 더하기`}
-                  onClick={() => {
-                    setLastPreset(p)
-                    setAmount((a) => {
-                      const next = feedStep(a, p)
-                      return next > pet.seeds ? a : next
-                    })
-                  }}
-                  disabled={feedStep(amount, p) > pet.seeds}
+                  className="pet-btn pet-btn--block"
+                  onClick={() => feed(feedable)}
+                  disabled={pending || amount > pet.seeds}
+                  aria-disabled={pending || amount > pet.seeds}
                 >
-                  {ko(p)}개
+                  {/* 글자 앞에 🌱이 있었다(시안대로). 2026-08-24 사용자 요청("씨앗 먹이기
+                      버튼 속 문구에서 새싹 이모티콘 삭제해줘")으로 걷었다. 스크린리더가 읽는
+                      이름은 전부터 aria-hidden 덕에 "씨앗 1개 먹이기"였으므로 이 삭제로
+                      바뀌지 않는다. 같은 카드의 제목(🌱 씨앗 투입)과 위 지갑 줄의 🌱은
+                      그대로다 — 요청이 버튼 문구 하나였다 */}
+                  씨앗 {ko(amount)}개 먹이기
                 </button>
-              ))}
-            </div>
 
-            <button
-              type="button"
-              className="pet-btn pet-btn--block"
-              onClick={() => feed(feedable)}
-              disabled={pending || pet.seeds < 1 || amount > pet.seeds}
-              aria-disabled={pending || pet.seeds < 1 || amount > pet.seeds}
-            >
-              {/* 글자 앞에 🌱이 있었다(시안대로). 2026-08-24 사용자 요청("씨앗 먹이기 버튼
-                  속 문구에서 새싹 이모티콘 삭제해줘")으로 걷었다. 스크린리더가 읽는 이름은
-                  전부터 aria-hidden 덕에 "씨앗 1개 먹이기"였으므로 이 삭제로 바뀌지 않는다.
-                  같은 카드의 제목(🌱 씨앗 투입)과 위 지갑 줄의 🌱은 그대로다 — 요청이
-                  버튼 문구 하나였다 */}
-              씨앗 {ko(amount)}개 먹이기
-            </button>
-
-            <p className="pet-card__foot">
-              <span>씨앗 1개는 경험치 {SEED_TO_EXP}이 돼요</span>
-            </p>
+                {/* 투입할 개수가 정해지면 그것이 무엇이 되는지 바로 옆에서 말한다.
+                    "씨앗 1개는 경험치 10"만으로는 100개를 넣기 전에 곱셈을 시켜야 했다 */}
+                <p className="pet-card__foot">
+                  <span>씨앗 1개는 경험치 {SEED_TO_EXP}이 돼요</span>
+                  <em>경험치 +{ko(feedable * SEED_TO_EXP)}</em>
+                </p>
+              </>
+            )}
           </div>
+
+          {/* develop의 "📖 함께한 기록" 카드(함께한 날 · 해낸 미션 · 출석)가 여기 있었다.
+              **2026-08-24 병합에서 사용자 결정으로 가져오지 않았다.** 그 카드의 출석 칸이
+              아래 "오늘의 활동" 네 번째 칸(같은 user.attendanceTotal)과 같은 수를 한 화면에
+              두 번 보여 주게 되고, 두 카드 중 하나를 고르는 자리에서 오늘의 활동 쪽이
+              같은 날 사용자 요청으로 만들어진 것이다.
+              데이터는 그대로 내려온다 — PetState의 daysTogether·missionsDone·attendanceTotal은
+              app/pet/page.tsx가 계속 채우고, pet.css의 .pet-log 규칙도 남아 있다.
+              되살릴 일이 생기면 그 두 벌이 이미 있으므로 이 자리에 카드만 다시 세우면 된다 */}
 
           {/* 오늘의 활동 (2026-08-24 사용자 요청). 값의 출처와 시안에서 달라진 점은 위
               todayTiles 주석에 있다.
 
               자리는 오른쪽 열 **맨 아래**다(2026-08-24 사용자 요청: "씨앗 투입 밑으로").
               처음에는 맨 위에 뒀었다 — 요약이 먼저 오는 순서라고 봤다. 내려 보니 그쪽이
-              맞다: 위 카드 셋은 다 "지금 무엇을 할 수 있는지"라 눈이 먼저 가야 하고,
+              맞다: 위 카드들은 다 "지금 무엇을 할 수 있는지"라 눈이 먼저 가야 하고,
               이 카드는 "오늘 무엇이 있었는지"라 다 하고 나서 확인하는 것이다.
 
               왼쪽 열에 두지 않은 이유는 골격이다 — .pet__col--room이
@@ -778,7 +974,10 @@ export default function PetView({ initial }: { initial: PetState }) {
           <h2 className="pet-card__title">
             <span aria-hidden="true">🌟</span> 진화 단계
           </h2>
-          {pet.effectLabel ? <span className="pet-card__meta">{pet.effectLabel}</span> : null}
+          {/* 헤더의 effectLabel을 지웠다 (2026-08-23). 같은 섹션 안 "현재" 카드가
+              같은 문자열을 이미 쓴다(.pet-evo-card__effect). 카드 쪽을 남긴 이유는
+              그쪽이 "어느 단계에 붙은 효과인가"를 같이 말하기 때문이다 —
+              헤더 meta는 4칸을 다 본 뒤에도 같은 말을 반복하는 것뿐이었다 */}
         </div>
         <div className="pet-evo__list">
           {stages.map((s) => {
@@ -794,8 +993,7 @@ export default function PetView({ initial }: { initial: PetState }) {
               >
                 {current ? <span className="pet-evo-card__now">현재</span> : null}
                 {img ? (
-                  // eslint-disable-next-line @next/next/no-img-element
-                  <img className="pet-evo-card__img" src={img} alt="" aria-hidden="true" />
+                  <ArtImage className="pet-evo-card__img" src={img} width={64} height={64} decorative />
                 ) : (
                   <span className="pet-evo-card__emoji" aria-hidden="true">
                     {emoji}
@@ -819,6 +1017,14 @@ export default function PetView({ initial }: { initial: PetState }) {
           })}
         </div>
       </section>
+
+      {/* 쉬는 화면(/pet/rest) 입구. 상단 나무판을 걷으면서 유일한 입구가 사라졌다.
+          각주 크기로 화면 맨 아래에 둔다(2026-08-24 결정) — 홈·미션에서 링크하지 않는
+          이유와 같다. 쉬는 화면을 눈에 띄는 자리에서 권하면 "쉬어라"는 지시가 된다.
+          찾아온 사람만 닿으면 되고, 여기 있다는 사실만 남으면 된다 */}
+      <p className="pet__rest">
+        <Link href="/pet/rest">잠깐 쉬어 가기</Link>
+      </p>
 
       {toast ? (
         <p

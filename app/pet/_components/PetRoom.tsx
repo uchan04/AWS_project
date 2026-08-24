@@ -21,6 +21,8 @@
 //
 // 장식이므로 aria-hidden이다. 방 안의 정보는 전부 옆 카드에 글자로 있다.
 
+import { ArtImage } from "@/app/components/ArtImage"
+
 const WALL_H = 210 // 300의 70%
 const STRIPE_COUNT = 13
 const PLANK_COUNT = 9
@@ -31,15 +33,14 @@ export default function PetRoom({ imageUrl }: { imageUrl?: string | null }) {
       <RoomSvg />
       {imageUrl ? (
         // 착용한 배경 치장. 기본 방을 덮는다. 안 뜨면 스스로 숨어 아래 방이 다시 보인다
-        // eslint-disable-next-line @next/next/no-img-element
-        <img
+        // 방 카드 폭(최대 720px)을 꽉 채운다. 원본은 770×288이고 .pet-room__bg가
+        // absolute inset:0 · object-fit:cover로 늘린다
+        <ArtImage
           className="pet-room__bg pet-room__bg--img"
           src={imageUrl}
-          alt=""
-          aria-hidden="true"
-          onError={(e) => {
-            e.currentTarget.style.display = "none"
-          }}
+          width={720}
+          height={269}
+          decorative
         />
       ) : null}
     </>

@@ -1,6 +1,6 @@
 import { getCurrentUser } from "@/lib/auth"
 import { ok, fail } from "@/lib/api"
-import { prisma } from "@/lib/prisma"
+import { loadCompletableMission } from "@/lib/missions/completion"
 import { generatePresignedUrl } from "@/lib/missions/upload"
 
 export async function POST(req: Request) {
@@ -14,16 +14,19 @@ export async function POST(req: Request) {
       return fail("INVALID_INPUT", "필수 정보가 누락되었습니다", 400)
     }
 
-    const mission = await prisma.mission.findUnique({ where: { id: missionId } })
-    if (!mission) {
-      return fail("MISSION_NOT_FOUND", "미션을 찾을 수 없습니다", 404)
+    // 완료 경로와 **같은** 검증을 태운다. findUnique(id)만 하면 남의 유형 미션이나
+    // 잠긴 단계의 미션 id로도 presigned PUT URL이 나갔다 — 미션은 완료되지 않지만
+    // 버킷에는 쓸 수 있다. 여기 있던 `// TODO: 단계 해금 확인 추가 가능`이 그 구멍이었다.
+    if (!user.typeCode) {
+      return fail("DIAGNOSIS_NOT_COMPLETED", "진단을 먼저 완료해주세요", 400)
     }
 
-    if (!mission.requiresPhoto) {
+    const loaded = await loadCompletableMission(user.id, user.typeCode, missionId)
+    if (loaded.error) return loaded.error
+
+    if (!loaded.mission.requiresPhoto) {
       return fail("PHOTO_NOT_REQUIRED", "사진이 필요하지 않은 미션입니다", 400)
     }
-
-    // TODO: 단계 해금 확인 추가 가능
 
     const result = await generatePresignedUrl({
       userId: user.id,
