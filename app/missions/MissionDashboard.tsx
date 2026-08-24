@@ -497,6 +497,7 @@ function CarouselArrows({
   hasNext,
   onPrev,
   onNext,
+  topOffset = 0,
   children,
 }: {
   color: string
@@ -504,11 +505,13 @@ function CarouselArrows({
   hasNext: boolean
   onPrev: () => void
   onNext: () => void
+  /** 감싼 영역의 헤더가 더 높을 때 화살표를 카드 중심으로 되돌리는 보정값(px). */
+  topOffset?: number
   children: React.ReactNode
 }) {
   const arrowStyle = (enabled: boolean): React.CSSProperties => ({
     position: "absolute",
-    top: "50%",
+    top: topOffset === 0 ? "50%" : `calc(50% + ${topOffset}px)`,
     transform: "translateY(0%) scaleX(0.7)",
     background: "transparent",
     color: enabled ? color : "#DDD0BC",
@@ -843,6 +846,10 @@ export default function MissionDashboard() {
               hasNext={start < maxStart}
               onPrev={() => setDailyIndex((i) => Math.max(0, i - 1))}
               onNext={() => setDailyIndex((i) => Math.min(maxStart, i + 1))}
+              // 추가 미션은 "추가 미션" 제목·설명이 CarouselArrows 밖에 있지만
+              // 일일 미션은 subtitle까지 안에 들어와 헤더가 그만큼 높다.
+              // 그 절반을 내려 화살표를 추가 미션과 같은 카드 중심에 맞춘다.
+              topOffset={9}
             >
               <StepSection
                 title="일일 미션"
