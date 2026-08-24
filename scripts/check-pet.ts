@@ -1,16 +1,22 @@
 import assert from "node:assert/strict"
 import { COSMETICS, PET_SKINS, PRICE_BY_RARITY } from "../prisma/seed/items"
 import {
+  BACKGROUNDS,
   IDLE_CAP_HOURS,
   IDLE_MAX_SEEDS,
   IDLE_SEEDS_PER_HOUR,
   MS_PER_IDLE_SEED,
+  PET_GREETINGS,
+  PET_IDLE_LINES,
   animalEmoji,
   applySeeds,
   cappedStage,
   compareCosmetics,
+  cosmeticLabel,
   expProgress,
+  greetingFor,
   idleAccrual,
+  lineIndex,
 } from "../lib/pet"
 import { EVOLUTION_LEVEL, SEED_TO_EXP, TRIBE, expToNextLevel } from "../lib/types"
 
@@ -258,10 +264,46 @@ assert.equal(idleAccrual(T0, T0).seeds, 0)
 // 시드가 조용히 늘거나 슬롯이 섞이면 여기서 걸린다. 화면은 슬롯별 카드로 그리므로
 // 모자·목도리가 다시 들어오면 빈 카드가 아니라 새 카드가 생긴다 — 의도한 변경일 때만 이 값을 고친다.
 
+// 2026-08-22: name이 표시명("배경1")에서 코드("autumn_path")로 바뀌었다.
+// 코드는 DB의 유니크 upsert 키다 — 여기 값을 고치면 실 DB에 새 행이 생기고 옛 행이 남는다.
+// 이름을 바꾸고 싶으면 코드가 아니라 BACKGROUNDS의 label을 고친다(lib/pet.ts 주석).
+const BG_CODES = ["autumn_path", "forest_camp", "spring_garden", "aurora_field", "frozen_ocean", "winter_village"]
+
 assert.deepEqual(
   COSMETICS.map((item) => item.name),
-  ["배경1", "배경2", "배경3", "배경4", "배경5", "배경6"],
+  BG_CODES,
 )
+// 시드는 BACKGROUNDS에서 파생된다. 두 곳에 손으로 적으면 갈라지므로 파생 자체를 못 박는다
+assert.deepEqual(
+  BACKGROUNDS.map((bg) => bg.code),
+  BG_CODES,
+)
+assert.deepEqual(
+  COSMETICS.map((item) => item.imageKey),
+  BACKGROUNDS.map((bg) => bg.imageKey),
+)
+
+// 사용자가 정한 표시명 (2026-08-22). 순서는 계절 흐름이다: 가을 → 숲 → 봄 → 오로라 → 빙해 → 겨울
+assert.deepEqual(BG_CODES.map(cosmeticLabel), [
+  "노을빛 단풍길",
+  "숲 속 캠프",
+  "봄날의 정원",
+  "오로라 들판",
+  "푸른 빙해",
+  "눈꽃 마을",
+])
+// 모르는 코드는 빈 칸이 아니라 그대로 보여야 한다 (옛 이름이 남은 DB·나중에 추가된 아이템)
+assert.equal(cosmeticLabel("배경1"), "배경1")
+
+// 실제 S3 키가 아닌 값이 들어오면 화면이 조용히 403 이미지가 된다.
+// 키는 "우리가 정한 규칙"이 아니라 올라간 파일명이 정본이다(prisma/seed/items.ts 주석)
+assert.ok(
+  BACKGROUNDS.every((bg) => bg.imageKey.startsWith("backgrounds/") && bg.imageKey.endsWith(".png")),
+  "배경 imageKey는 backgrounds/ 아래 .png다",
+)
+assert.equal(new Set(BACKGROUNDS.map((bg) => bg.imageKey)).size, BACKGROUNDS.length)
+assert.equal(new Set(BACKGROUNDS.map((bg) => bg.label)).size, BACKGROUNDS.length)
+
 assert.ok(
   COSMETICS.every((item) => item.slot === "BACKGROUND"),
   "치장은 배경 슬롯만 쓴다 (모자·목도리 컷)",
@@ -290,10 +332,11 @@ for (let i = 1; i < RARITY_LADDER.length; i += 1) {
 const cos = (name: string, slot: "HAT" | "SCARF" | "BACKGROUND", rarity: "COMMON" | "RARE" | "EPIC" | "LEGENDARY") =>
   ({ name, slot, rarity }) as const
 
-// 실제 시드 순서. 등급이 같으므로 이름 가나다순이 그대로 나온다
+// 실제 시드 순서. 등급이 전부 같으므로 BACKGROUNDS의 진열 순서가 그대로 나와야 한다.
+// 코드 가나다순으로 떨어지면(aurora_field가 맨 앞) 계절 흐름이 깨진 것이다
 assert.deepEqual(
   [...COSMETICS].reverse().sort(compareCosmetics).map((item) => item.name),
-  ["배경1", "배경2", "배경3", "배경4", "배경5", "배경6"],
+  BG_CODES,
 )
 
 // 슬롯·등급 정렬은 지금 시드에 없는 조합까지 처리한다 (Slot enum·비교 함수는 3슬롯을 유지한다).
@@ -319,6 +362,65 @@ assert.deepEqual(
     .map((item) => item.name),
   ["밤별 모자", "이끼 모자"],
 )
+
+// ── 펫 대사 (2026-08-23) ──────────────────────────────────────────────────────
+//
+// 20문장은 **사용자가 직접 쓴 것**이다. 여기서 개수와 내용을 못 박는 이유는 문장이 조용히
+// 다듬어지는 것을 막기 위해서다 — 오탈자로 보이는 표기("궁금해")까지 사용자 원문이고,
+// 고치려면 사용자에게 확인해야 한다. 아래 단정이 그 확인 없이 바뀌는 것을 막는다.
+//
+// 이 기능은 하루에 세 번 모양이 바뀌었다(구간 3개 → 고정 한 줄 → 사용자 20문장).
+// 여기 있던 구간 단정·`daysAway` 단정·미래 시각 단정·느낌표 금지는 그 과정에서 다 걷혔다 —
+// 세는 값이 없으면 검증할 경계도 없고, 느낌표는 이제 사용자 문장의 목소리다.
+
+// 개수. 한쪽만 늘면 화면에서 어느 쪽이 늘었는지 안 보인다
+assert.equal(PET_GREETINGS.length, 10)
+assert.equal(PET_IDLE_LINES.length, 10)
+
+// 원문 그대로. 첫 문장·마지막 문장을 양쪽 다 못 박아 순서까지 고정한다
+assert.equal(PET_GREETINGS[0], "왔네! 기다리고 있었어.")
+assert.equal(PET_GREETINGS[9], "기다리다 보니까 네가 왔네. 오늘도 만나서 반가워!")
+assert.equal(PET_IDLE_LINES[0], "오늘 하늘 봤어? 나는 못 봤지만 궁금해!")
+assert.equal(PET_IDLE_LINES[9], "오늘 하루 중에 제일 기억에 남는 순간은 뭐였을까?")
+
+// 20문장이 서로 다르다. 같은 문장이 두 번 들어가면 순환에서 연달아 보인다
+assert.equal(new Set([...PET_GREETINGS, ...PET_IDLE_LINES]).size, 20)
+
+// 빈 문장·앞뒤 공백이 없다. 말풍선이 빈 칸으로 뜨는 것을 막는다
+for (const line of [...PET_GREETINGS, ...PET_IDLE_LINES]) {
+  assert.ok(line.length > 0 && line === line.trim(), `대사에 빈 문장이나 앞뒤 공백이 있다: "${line}"`)
+}
+
+// 유일하게 남은 문구 규칙: **비운 일수를 문장에 넣지 않는다**(lib/pet.ts). "3일 만이네요"는
+// 사실이지만 질책으로 읽힌다. 나중에 문장을 보태는 사람이 규칙을 모르고 넣으면 여기서 걸린다.
+// 펫이 **나빠졌다**는 표현도 같이 막는다 — 기다림은 애정이고 악화는 처벌이다
+const BANNED = ["일 만", "일째", "일 동안", "며칠", "그동안 안", "외로", "슬퍼", "슬펐", "아팠", "힘들었", "미안"]
+for (const line of [...PET_GREETINGS, ...PET_IDLE_LINES]) {
+  for (const word of BANNED) {
+    assert.ok(
+      !line.includes(word),
+      `대사에 금지 표현 "${word}"가 있다 — lib/pet.ts 문구 규칙 참고: "${line}"`,
+    )
+  }
+}
+
+// 문구 고르기. 같은 입력에 같은 값이어야 한다 — 서버에서 고르므로 렌더마다 달라지면
+// 하이드레이션에서 서버 HTML과 클라이언트 첫 렌더가 어긋난다
+assert.equal(lineIndex("abc", 10), lineIndex("abc", 10))
+assert.equal(greetingFor("abc"), greetingFor("abc"))
+// 범위를 벗어나지 않는다. 빈 문자열·긴 문자열·유니코드가 들어와도 목록 안이다
+for (const seed of ["", "a", "user-1-2026-08-23", "🐻", "x".repeat(500)]) {
+  const i = lineIndex(seed, PET_GREETINGS.length)
+  assert.ok(i >= 0 && i < PET_GREETINGS.length, `lineIndex("${seed}")가 범위를 벗어났다: ${i}`)
+  assert.ok(PET_GREETINGS.includes(greetingFor(seed) as (typeof PET_GREETINGS)[number]))
+}
+// count가 0이면 나머지 연산이 NaN이 된다. 0을 돌려주는지 확인한다
+assert.equal(lineIndex("abc", 0), 0)
+// seed가 다르면 문장도 흩어진다. 10개 중 3종 이상 나오면 한 문장에 몰린 것이 아니다
+const spread = new Set(
+  Array.from({ length: 30 }, (_, i) => greetingFor(`user-${i}-2026-08-23`)),
+)
+assert.ok(spread.size >= 3, `인사가 ${spread.size}종만 나온다 — seed가 골고루 흩어지지 않는다`)
 
 // ── 배고픔 ────────────────────────────────────────────────────────────────────
 // 2026-08-21 사용자 결정으로 삭제했다. 여기 있던 단정 12개(24시간 선형 감쇠, 음수 방지,
