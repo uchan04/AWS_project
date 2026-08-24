@@ -2,6 +2,7 @@
 
 import { useEffect, useRef, useState } from "react"
 import { GalleryType } from "@prisma/client"
+import { meetupDateTime } from "../../_lib/format"
 import { FadeIn, Spinner } from "./transitions"
 
 /*
@@ -18,6 +19,17 @@ const FIXED_GALLERY = GalleryType.ALL
 // 닫힐 때 이 시간만큼 언마운트를 미뤄야 사라지는 전환이 보인다.
 const MODAL_MS = 150
 
+// 검증에 걸린 칸의 링을 걷어내기까지의 시간. 한 번만 강조하고 멈춘다 —
+// 계속 깜빡이면 시선이 붙잡혀 정작 그 칸에 뭘 적어야 하는지 읽기 어렵다.
+const EMPHASIS_MS = 450
+
+// POST /api/community/meetups의 상한과 같은 값.
+const TITLE_MAX = 80
+const PLACE_MAX = 120
+const BODY_MAX = 2000
+
+type FieldName = "title" | "place" | "startsAt" | "minCount" | "capacity" | "body"
+
 /** 관리자 전용. MeetupList가 isAdmin일 때만 이 컴포넌트를 렌더 트리에 넣는다. */
 export function MeetupCreateModal({ onCreated }: { onCreated: () => void }) {
   const [isOpen, setIsOpen] = useState(false)
@@ -29,8 +41,15 @@ export function MeetupCreateModal({ onCreated }: { onCreated: () => void }) {
   const [body, setBody] = useState("")
   const [pending, setPending] = useState(false)
   const [error, setError] = useState<string | null>(null)
+  const [invalid, setInvalid] = useState<FieldName[]>([])
+  // 검증을 돌린 시각. "모임 일시는 현재보다 뒤" 판정의 기준이며, 렌더 중에 Date.now()를 부르지 않으려고
+  // 개설하기를 누른 순간의 값을 붙들어 둔다(렌더마다 값이 달라지면 순수하지 않은 컴포넌트가 된다).
+  const [checkedAt, setCheckedAt] = useState(0)
+  const [emphasized, setEmphasized] = useState(false)
   const [entered, setEntered] = useState(false)
   const closeTimer = useRef<number | null>(null)
+  const emphasisTimer = useRef<number | null>(null)
+  const startsAtRef = useRef<HTMLInputElement | null>(null)
 
   // 마운트된 프레임에 최종 상태를 칠하면 전환이 생기지 않는다. 한 프레임 뒤에 올린다.
   useEffect(() => {
@@ -42,8 +61,54 @@ export function MeetupCreateModal({ onCreated }: { onCreated: () => void }) {
   useEffect(() => {
     return () => {
       if (closeTimer.current !== null) window.clearTimeout(closeTimer.current)
+      if (emphasisTimer.current !== null) window.clearTimeout(emphasisTimer.current)
     }
   }, [])
+
+  /**
+   * 서버 POST 검증(app/api/community/meetups/route.ts)과 같은 조건으로,
+   * 통과하지 못한 칸의 이름을 모은다. 조건이 갈리면 화면은 멀쩡한데 서버가 400을 주는
+   * 상황이 생기므로 여기에 새 조건을 더하지 않는다.
+   */
+  function collectInvalid(now: number): FieldName[] {
+    const next: FieldName[] = []
+
+    const trimmedTitle = title.trim()
+    if (!trimmedTitle || trimmedTitle.length > TITLE_MAX) next.push("title")
+
+    const trimmedPlace = place.trim()
+    if (!trimmedPlace || trimmedPlace.length > PLACE_MAX) next.push("place")
+
+    // new Date("")는 throw하지 않고 Invalid Date를 준다. 서버와 같이 getTime()이 NaN인지로 본다.
+    const startsAtDate = new Date(startsAt)
+    if (!startsAt || Number.isNaN(startsAtDate.getTime()) || startsAtDate.getTime() <= now) {
+      next.push("startsAt")
+    }
+
+    // 서버는 Number.isInteger로 받는다. 빈 칸은 Number("")가 0이라 여기서 함께 걸린다.
+    const capacityNumber = Number(capacity)
+    const capacityOk = capacity.trim() !== "" && Number.isInteger(capacityNumber) && capacityNumber >= 1
+    if (!capacityOk) next.push("capacity")
+
+    const minCountNumber = Number(minCount)
+    const minCountOk = minCount.trim() !== "" && Number.isInteger(minCountNumber) && minCountNumber >= 1
+    // "최소 인원은 정원보다 많을 수 없어요"도 최소 인원 칸에 표시한다 — 고칠 곳이 그쪽이다.
+    if (!minCountOk || (capacityOk && minCountNumber > capacityNumber)) next.push("minCount")
+
+    const trimmedBody = body.trim()
+    if (!trimmedBody || trimmedBody.length > BODY_MAX) next.push("body")
+
+    return next
+  }
+
+  /*
+   * 고친 칸의 붉은 테두리는 다음 렌더에서 바로 풀린다. 상태를 되쓰지 않고 렌더 중에 걸러내는 이유는
+   * 입력할 때마다 effect로 setState를 돌리면 타이핑 한 글자마다 렌더가 두 번씩 나기 때문이다.
+   * 걷어내기만 하고 더하지는 않는다 — 아직 개설하기를 누르지도 않은 칸을 입력 도중에 붉게 칠하면
+   * 재촉하는 화면이 된다.
+   */
+  const stillInvalid = invalid.length > 0 ? collectInvalid(checkedAt) : null
+  const shownInvalid = stillInvalid ? invalid.filter((field) => stillInvalid.includes(field)) : invalid
 
   function open() {
     // 닫힘 전환이 도는 중에 다시 열면 예약된 언마운트를 취소한다.
@@ -56,6 +121,10 @@ export function MeetupCreateModal({ onCreated }: { onCreated: () => void }) {
     setIsOpen(true)
   }
 
+  /**
+   * 닫는 길은 X 버튼과 취소 버튼뿐이다. 오버레이 클릭·Esc로는 닫지 않는다 —
+   * 작성 도중 한 번 잘못 누르면 적어 둔 내용이 통째로 날아간다.
+   */
   function close() {
     if (closeTimer.current !== null) return
     setEntered(false)
@@ -70,13 +139,29 @@ export function MeetupCreateModal({ onCreated }: { onCreated: () => void }) {
       setCapacity("")
       setBody("")
       setError(null)
+      setInvalid([])
+      setEmphasized(false)
     }, MODAL_MS)
   }
 
-  const canSubmit = Boolean(title.trim() && place.trim() && body.trim() && startsAt && capacity)
-
   async function handleSubmit() {
-    if (!canSubmit || pending) return
+    if (pending) return
+
+    // 버튼은 항상 눌린다. 막는 대신 누른 시점에 검증해서 어느 칸이 문제인지 보여준다.
+    const now = Date.now()
+    const failed = collectInvalid(now)
+    if (failed.length > 0) {
+      setCheckedAt(now)
+      setInvalid(failed)
+      setError(null)
+      setEmphasized(true)
+      if (emphasisTimer.current !== null) window.clearTimeout(emphasisTimer.current)
+      emphasisTimer.current = window.setTimeout(() => {
+        emphasisTimer.current = null
+        setEmphasized(false)
+      }, EMPHASIS_MS)
+      return
+    }
 
     setPending(true)
     setError(null)
@@ -108,8 +193,22 @@ export function MeetupCreateModal({ onCreated }: { onCreated: () => void }) {
     }
   }
 
-  const FIELD =
-    "w-full rounded-xl border border-neutral-300 bg-neutral-50 px-4 py-2.5 text-sm text-neutral-900 placeholder:text-neutral-400 outline-none focus:border-neutral-500"
+  const FIELD_BASE =
+    "w-full rounded-xl border bg-neutral-50 px-4 py-2.5 text-sm text-neutral-900 placeholder:text-neutral-400 outline-none motion-safe:transition motion-safe:duration-300 motion-safe:ease-out"
+
+  // 강조는 링을 한 번 켰다 끄는 것으로 끝내고, 그 뒤에는 붉은 테두리만 남긴다.
+  function fieldClass(field: FieldName) {
+    if (!shownInvalid.includes(field)) return FIELD_BASE + " border-neutral-300 focus:border-neutral-500"
+    return (
+      FIELD_BASE +
+      " border-red-400 focus:border-red-500 " +
+      (emphasized ? "motion-safe:ring-4 motion-safe:ring-red-100" : "ring-0")
+    )
+  }
+
+  const startsAtDate = startsAt ? new Date(startsAt) : null
+  const startsAtLabel =
+    startsAtDate && !Number.isNaN(startsAtDate.getTime()) ? meetupDateTime(startsAtDate) : null
 
   return (
     <>
@@ -127,14 +226,12 @@ export function MeetupCreateModal({ onCreated }: { onCreated: () => void }) {
             "fixed inset-0 z-50 flex items-center justify-center bg-black/35 p-6 motion-safe:transition-opacity motion-safe:duration-150 motion-safe:ease-out " +
             (entered ? "" : "motion-safe:opacity-0")
           }
-          onClick={close}
         >
           <div
             className={
               "max-h-full w-full max-w-lg overflow-y-auto rounded-3xl bg-white p-8 shadow-2xl motion-safe:transition motion-safe:duration-150 motion-safe:ease-out " +
               (entered ? "" : "motion-safe:scale-95 motion-safe:opacity-0")
             }
-            onClick={(e) => e.stopPropagation()}
           >
             <div className="mb-5 flex items-center justify-between">
               <h2 className="text-base font-bold text-neutral-900">오프라인 모임 개설</h2>
@@ -151,22 +248,39 @@ export function MeetupCreateModal({ onCreated }: { onCreated: () => void }) {
               value={title}
               onChange={(e) => setTitle(e.target.value)}
               placeholder="모임 제목을 입력해주세요"
-              className={"mb-3 " + FIELD}
+              className={"mb-3 " + fieldClass("title")}
             />
 
             <input
               value={place}
               onChange={(e) => setPlace(e.target.value)}
               placeholder="장소를 입력해주세요"
-              className={"mb-3 " + FIELD}
+              className={"mb-3 " + fieldClass("place")}
             />
 
-            <input
-              type="datetime-local"
-              value={startsAt}
-              onChange={(e) => setStartsAt(e.target.value)}
-              className={"mb-3 " + FIELD}
-            />
+            {/*
+              브라우저 기본 달력은 밖에서 열고 닫을 방법이 없다. "완료"는 입력의 포커스를 빼서
+              달력이 스스로 닫히게 하는 것뿐이다 — showPicker()로 닫히지는 않는다.
+            */}
+            <div className="mb-3">
+              <div className="flex gap-2">
+                <input
+                  ref={startsAtRef}
+                  type="datetime-local"
+                  value={startsAt}
+                  onChange={(e) => setStartsAt(e.target.value)}
+                  className={fieldClass("startsAt")}
+                />
+                <button
+                  type="button"
+                  onClick={() => startsAtRef.current?.blur()}
+                  className="shrink-0 rounded-xl border border-neutral-300 bg-white px-4 py-2.5 text-sm font-medium text-neutral-600 transition duration-150 hover:bg-neutral-100"
+                >
+                  완료
+                </button>
+              </div>
+              {startsAtLabel && <p className="mt-1.5 text-xs text-neutral-500">{startsAtLabel} 시작</p>}
+            </div>
 
             <div className="mb-3 flex gap-2">
               <label className="flex-1">
@@ -176,7 +290,7 @@ export function MeetupCreateModal({ onCreated }: { onCreated: () => void }) {
                   min={1}
                   value={minCount}
                   onChange={(e) => setMinCount(e.target.value)}
-                  className={FIELD}
+                  className={fieldClass("minCount")}
                 />
               </label>
               <label className="flex-1">
@@ -186,7 +300,7 @@ export function MeetupCreateModal({ onCreated }: { onCreated: () => void }) {
                   min={1}
                   value={capacity}
                   onChange={(e) => setCapacity(e.target.value)}
-                  className={FIELD}
+                  className={fieldClass("capacity")}
                 />
               </label>
             </div>
@@ -196,7 +310,7 @@ export function MeetupCreateModal({ onCreated }: { onCreated: () => void }) {
               onChange={(e) => setBody(e.target.value)}
               placeholder={"어떤 모임인지 알려주세요\n무엇을 하고, 무엇을 준비하면 되는지요."}
               rows={5}
-              className={"mb-4 resize-none leading-relaxed " + FIELD}
+              className={"mb-4 resize-none leading-relaxed " + fieldClass("body")}
             />
 
             {error && (
@@ -205,12 +319,22 @@ export function MeetupCreateModal({ onCreated }: { onCreated: () => void }) {
               </FadeIn>
             )}
 
-            <div className="flex justify-end">
+            <div className="flex items-center justify-end gap-3">
+              {shownInvalid.length > 0 && (
+                <FadeIn className="text-xs text-red-500">표시된 칸을 모두 채워주세요.</FadeIn>
+              )}
+              <button
+                type="button"
+                onClick={close}
+                className="rounded-xl border border-neutral-300 bg-white px-5 py-2.5 text-sm font-medium text-neutral-600 transition duration-150 hover:bg-neutral-100"
+              >
+                취소
+              </button>
               <button
                 type="button"
                 onClick={handleSubmit}
-                disabled={pending || !canSubmit}
-                className="inline-flex items-center rounded-xl border border-neutral-900 bg-neutral-900 px-6 py-2.5 text-sm font-bold text-white transition duration-150 disabled:cursor-not-allowed disabled:opacity-40"
+                aria-busy={pending}
+                className="inline-flex items-center rounded-xl border border-neutral-900 bg-neutral-900 px-6 py-2.5 text-sm font-bold text-white transition duration-150"
               >
                 {pending && <Spinner />}
                 개설하기
