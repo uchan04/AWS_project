@@ -64,11 +64,15 @@ export function MeetupCard({
   meetup,
   isAdmin,
   index,
+  // "지금"은 서버가 한 번 찍어 내려준다. 렌더 중에 Date.now()를 부르면 순수하지 않아
+  // 서버와 하이드레이션 결과가 갈릴 수 있다(react-hooks의 impure function 규칙).
+  nowMs,
   onChanged,
 }: {
   meetup: MeetupListItem
   isAdmin: boolean
   index: number
+  nowMs: number
   onChanged: () => void
 }) {
   const [pending, setPending] = useState<PendingAction | null>(null)
@@ -102,6 +106,13 @@ export function MeetupCard({
 
   const isFull = meetup.joinCount >= meetup.capacity
   const shortBy = meetup.minCount - meetup.joinCount
+
+  // "내가 신청한 모임" 구역은 지난 모임과 결성된 모임도 보여준다. 둘 다 더 이상 조작할 게 없다.
+  // isPast는 모든 액션을, isConfirmed는 취소만 막는다(확정된 모임은 API도 취소를 거부한다).
+  const isPast = meetup.startsAt.getTime() < nowMs
+  const isConfirmed = meetup.status === "CONFIRMED"
+  const canAct = !isPast
+  const canCancel = canAct && !isConfirmed
 
   // 요청 중에는 모든 버튼을 잠근다. 신청과 취소가 겹쳐 들어가면 joinCount가 어긋난다.
   async function run(
@@ -170,6 +181,21 @@ export function MeetupCard({
             <p className="font-medium text-neutral-900">{meetup.title}</p>
             <p className="mt-1 text-xs text-neutral-400">{meetup.host.nickname}</p>
           </div>
+
+          {/* 배지 어휘는 카드에 있던 종족 배지와 같다 — 알약 모양에 22 알파 배경, 원색 글자.
+              지난 모임이 결성된 모임보다 앞선다. 지나갔으면 결성 여부는 이제 중요하지 않다. */}
+          {(isPast || isConfirmed) && (
+            <span
+              className="shrink-0 rounded-full px-2.5 py-1 text-[11px] font-bold"
+              style={
+                isPast
+                  ? { backgroundColor: `${NEUTRAL_COLOR}22`, color: NEUTRAL_COLOR }
+                  : { backgroundColor: `${MEETUP_ACCENT}22`, color: MEETUP_ACCENT }
+              }
+            >
+              {isPast ? "지난 모임" : "결성됨"}
+            </span>
+          )}
         </div>
 
         <div className="flex flex-col gap-1 text-sm text-neutral-600">
@@ -196,7 +222,7 @@ export function MeetupCard({
         )}
 
         <div className="flex flex-wrap gap-2">
-          {meetup.joined && (
+          {meetup.joined && canCancel && (
             <button
               type="button"
               onClick={() => setChoosingReason(true)}
@@ -211,7 +237,7 @@ export function MeetupCard({
 
           {/* 관리자는 신청 대상이 아니다. "신청하기"도 "정원 마감" 비활성 표시도 렌더하지 않는다.
               이 변경 전에 이미 신청해둔 관리자는 위 "신청 취소"로 빠질 수 있다. */}
-          {!meetup.joined && !isAdmin && (
+          {!meetup.joined && !isAdmin && canAct && (
             <button
               type="button"
               onClick={() => setConfirmingJoin(true)}
@@ -226,7 +252,7 @@ export function MeetupCard({
             </button>
           )}
 
-          {isAdmin && (
+          {isAdmin && canAct && (
             <>
               <button
                 type="button"
@@ -249,11 +275,11 @@ export function MeetupCard({
           )}
         </div>
 
-        {isAdmin && shortBy > 0 && <p className="text-xs text-neutral-400">{shortBy}명 더 모이면 결성돼요</p>}
+        {isAdmin && canAct && shortBy > 0 && <p className="text-xs text-neutral-400">{shortBy}명 더 모이면 결성돼요</p>}
 
         {/* 신청 확인. 무게는 전하되 압박하지 않는다 — 오실 수 있는지 되묻거나 책임을 말하지 않는다.
             관리자에게는 여는 버튼이 없으므로 영역 자체를 렌더 트리에 넣지 않는다. */}
-        {!isAdmin && (
+        {!isAdmin && canAct && (
           <div
             aria-hidden={!confirmingJoin}
             className={EXPAND_BASE + " " + (confirmingJoin ? "max-h-96 opacity-100" : EXPAND_CLOSED)}
@@ -300,66 +326,68 @@ export function MeetupCard({
         )}
 
         {/* 취소 사유. 고르지 않아도 취소된다 — 위 CANCEL_REASONS 주석 참고. */}
-        <div
-          aria-hidden={!choosingReason}
-          className={EXPAND_BASE + " " + (choosingReason ? "max-h-[32rem] opacity-100" : EXPAND_CLOSED)}
-        >
-          <div className={EXPAND_PANEL}>
-            <p className="text-xs leading-relaxed text-neutral-600">괜찮으시면 이유를 하나만 알려주세요. 선택이에요.</p>
+        {canCancel && (
+          <div
+            aria-hidden={!choosingReason}
+            className={EXPAND_BASE + " " + (choosingReason ? "max-h-[32rem] opacity-100" : EXPAND_CLOSED)}
+          >
+            <div className={EXPAND_PANEL}>
+              <p className="text-xs leading-relaxed text-neutral-600">괜찮으시면 이유를 하나만 알려주세요. 선택이에요.</p>
 
-            <div className="flex flex-wrap gap-2">
-              {CANCEL_REASONS.map((reason) => (
+              <div className="flex flex-wrap gap-2">
+                {CANCEL_REASONS.map((reason) => (
+                  <button
+                    key={reason}
+                    type="button"
+                    // 다시 누르면 해제된다. 한 번 고르면 못 무르는 선택은 부담이 된다.
+                    onClick={() => setPickedReason((current) => (current === reason ? null : reason))}
+                    disabled={!choosingReason || pending !== null}
+                    className={
+                      "rounded-xl border px-3 py-1.5 text-xs font-semibold transition duration-150 disabled:cursor-not-allowed " +
+                      (pickedReason === reason
+                        ? "border-neutral-900 bg-neutral-900 text-white"
+                        : "border-neutral-300 bg-white text-neutral-600 hover:bg-neutral-100")
+                    }
+                  >
+                    {reason}
+                  </button>
+                ))}
+              </div>
+
+              <input
+                value={reasonNote}
+                onChange={(event) => setReasonNote(event.target.value)}
+                maxLength={REASON_MAX}
+                disabled={!choosingReason || pending !== null}
+                placeholder="한 줄 덧붙이기 (선택)"
+                className="w-full rounded-xl border border-neutral-300 bg-white px-3 py-2 text-xs text-neutral-900 placeholder:text-neutral-400 outline-none focus:border-neutral-500"
+              />
+
+              <div className="flex flex-wrap gap-2">
                 <button
-                  key={reason}
                   type="button"
-                  // 다시 누르면 해제된다. 한 번 고르면 못 무르는 선택은 부담이 된다.
-                  onClick={() => setPickedReason((current) => (current === reason ? null : reason))}
+                  onClick={cancelWithReason}
+                  // 아무것도 고르지 않아도 눌린다. 사유를 필수로 만들지 않는다.
                   disabled={!choosingReason || pending !== null}
-                  className={
-                    "rounded-xl border px-3 py-1.5 text-xs font-semibold transition duration-150 disabled:cursor-not-allowed " +
-                    (pickedReason === reason
-                      ? "border-neutral-900 bg-neutral-900 text-white"
-                      : "border-neutral-300 bg-white text-neutral-600 hover:bg-neutral-100")
-                  }
+                  className={QUIET_BUTTON}
                 >
-                  {reason}
+                  {pending === "leave" && <Spinner />}
+                  취소하기
                 </button>
-              ))}
-            </div>
-
-            <input
-              value={reasonNote}
-              onChange={(event) => setReasonNote(event.target.value)}
-              maxLength={REASON_MAX}
-              disabled={!choosingReason || pending !== null}
-              placeholder="한 줄 덧붙이기 (선택)"
-              className="w-full rounded-xl border border-neutral-300 bg-white px-3 py-2 text-xs text-neutral-900 placeholder:text-neutral-400 outline-none focus:border-neutral-500"
-            />
-
-            <div className="flex flex-wrap gap-2">
-              <button
-                type="button"
-                onClick={cancelWithReason}
-                // 아무것도 고르지 않아도 눌린다. 사유를 필수로 만들지 않는다.
-                disabled={!choosingReason || pending !== null}
-                className={QUIET_BUTTON}
-              >
-                {pending === "leave" && <Spinner />}
-                취소하기
-              </button>
-              <button
-                type="button"
-                onClick={() => run("leave", `/api/community/meetups/${meetup.id}/join`, "DELETE")}
-                disabled={!choosingReason || pending !== null}
-                className={BUTTON_BASE + " text-neutral-500 underline underline-offset-4 hover:text-neutral-700"}
-              >
-                말하지 않고 취소
-              </button>
+                <button
+                  type="button"
+                  onClick={() => run("leave", `/api/community/meetups/${meetup.id}/join`, "DELETE")}
+                  disabled={!choosingReason || pending !== null}
+                  className={BUTTON_BASE + " text-neutral-500 underline underline-offset-4 hover:text-neutral-700"}
+                >
+                  말하지 않고 취소
+                </button>
+              </div>
             </div>
           </div>
-        </div>
+        )}
 
-        {isAdmin && (
+        {isAdmin && canAct && (
           // window.confirm은 쓰지 않는다. 높이·투명도를 함께 전환하려고 항상 렌더해 두고
           // max-h로 접는다. 접혀 있는 동안에는 버튼을 disabled로 둬서 탭 이동에도 잡히지 않는다.
           <div
