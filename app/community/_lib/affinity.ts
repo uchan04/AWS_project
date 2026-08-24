@@ -8,6 +8,8 @@ import { calculateReward, capAffinity } from "@/lib/reward"
 export const POST_AFFINITY = 20
 export const COMMENT_AFFINITY = 5
 export const CHAT_TURN_AFFINITY = 5
+// 오프라인 모임 신규 신청. 재신청(취소 후 재신청)에는 지급하지 않는다.
+export const MEETUP_JOIN_AFFINITY = 10
 
 type UserWithSkin = User & { activePetSkin: PetSkin | null }
 
