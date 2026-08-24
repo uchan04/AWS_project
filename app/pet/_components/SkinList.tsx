@@ -29,6 +29,8 @@ export type SkinRow = {
   isDefault: boolean
   stageCount: number
   priceShards: number | null
+  /** 타일 그림. 유저의 현재 진화 단계 그림이다. CLOUDFRONT_DOMAIN이 비면 null이고 이모지로 떨어진다 */
+  imageUrl: string | null
   owned: boolean
   active: boolean
 }
@@ -169,7 +171,32 @@ export default function SkinList({
                     className={`pet-item${skin.active ? " pet-item--on" : locked ? " pet-item--locked" : ""}`}
                     key={skin.id}
                   >
-                    <span className="pet-item__face" aria-hidden="true">
+                    {/* 2026-08-24: 이모지 자리에 실제 외형 그림이 온다. 폴백 방식은 방의
+                        캐릭터(PetView의 .pet-char__img)와 같다 — 그림이 실패하면 자기를
+                        숨기고 바로 뒤 이모지 스팬을 켠다. 둘 다 aria-hidden이고 이름이
+                        아래 글자로 있으므로 스크린리더가 읽는 것은 이름 한 번이다 */}
+                    {skin.imageUrl ? (
+                      // eslint-disable-next-line @next/next/no-img-element
+                      <img
+                        className="pet-item__pet"
+                        src={skin.imageUrl}
+                        alt=""
+                        aria-hidden="true"
+                        // 6장 × 약 60KB다. 접힘 아래 칸은 스크롤할 때 받게 미룬다
+                        loading="lazy"
+                        decoding="async"
+                        onError={(e) => {
+                          e.currentTarget.style.display = "none"
+                          const fallback = e.currentTarget.nextElementSibling as HTMLElement | null
+                          if (fallback) fallback.style.display = "grid"
+                        }}
+                      />
+                    ) : null}
+                    <span
+                      className="pet-item__face"
+                      aria-hidden="true"
+                      style={{ display: skin.imageUrl ? "none" : "grid" }}
+                    >
                       {animalEmoji(skin.name)}
                     </span>
                     <span className="pet-item__name">{skin.name}</span>
