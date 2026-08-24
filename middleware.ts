@@ -1,5 +1,6 @@
 import { NextResponse, type NextRequest } from "next/server"
 import { cdnOrigin } from "@/lib/assets"
+import { appOrigin } from "@/lib/oauth"
 
 // 소유자: E(인프라). 미인증 방문자를 /login으로 보내고, 요청마다 CSP nonce를 만든다.
 //
@@ -119,20 +120,30 @@ export function middleware(request: NextRequest) {
   // 열린 리다이렉트를 막기 위해 경로만 싣는다 — 절대 URL은 싣지 않는다
   // "/"는 위에서 이미 통과했으므로 여기 오는 경로는 항상 홈이 아니다
   //
-  // 2026-08-24: Location에 절대 URL을 싣지 않는다. Amplify SSR은 Lambda 안에서 Next를
-  // localhost:3000으로 띄우고 그 앞에 CloudFront가 붙으므로 request.url의 host가
-  // 공개 도메인이 아니다 — `new URL("/login", request.url)`이면 배포 환경에서
-  // `https://localhost:3000/login`이 나가고 브라우저는 사용자 PC의 3000번을 찾는다.
-  // `main`의 `fd8c21f`가 로그아웃·로그인 콜백 2곳에서 이 함정을 고쳤는데
-  // 미인증 리다이렉트인 여기가 빠져 있었다(실측은 `lib/oauth.ts` appRedirect 주석).
-  // 상대 경로는 브라우저가 자기가 실제로 요청한 주소를 기준으로 푼다(RFC 7231 §7.1.2).
-  const nextParam = encodeURIComponent(`${pathname}${search}`)
-  return new NextResponse(null, {
-    // 307을 유지한다. NextResponse.redirect의 기본값이 307이었고 여기서 메서드를
-    // 바꾸면 보호된 API에 POST하던 요청의 실패 모양이 달라진다
-    status: 307,
-    headers: { Location: `/login?next=${nextParam}`, "Content-Security-Policy": csp },
-  })
+  // **여기는 절대 URL이어야 한다. 라우트 핸들러와 규칙이 다르다.**
+  //
+  // 2026-08-24에 이 자리를 상대 경로 Location으로 바꿨다가 되돌렸다. 이유는 Next가
+  // 미들웨어 응답의 Location을 자기가 `new URL(location)`으로 파싱하기 때문이다 —
+  // 상대 경로면 그 자리에서 던진다:
+  //   TypeError: Invalid URL  code: ERR_INVALID_URL  input: '/login?next=%2Fpet'
+  // 그래서 로그인 안 한 사람이 /pet을 열면 로그인 화면이 아니라 **500**을 받았다.
+  // `npm run e2e`의 "/pet은 /login으로 보낸다"가 이것을 잡았다(check:* 9종은 못 잡는다 —
+  // 미인증 리다이렉트를 검사하는 것은 e2e뿐이다).
+  // `lib/oauth.ts`의 appRedirect()가 상대 경로로 되는 것은 그쪽이 라우트 핸들러라
+  // 응답이 Next의 미들웨어 검증을 지나지 않기 때문이다.
+  //
+  // 그러면 원래 함정(request.url의 host가 Amplify SSR에서 localhost:3000이다)이 돌아오므로
+  // origin을 request.url이 아니라 appOrigin()에서 얻는다 — APP_ORIGIN 환경변수가 먼저고,
+  // 없으면 x-forwarded-host(localhost는 건너뛴다), 최후에 request.url이다.
+  // 로컬에서는 마지막 갈래로 떨어져 http://localhost:3000이 되고 그게 맞는 값이다.
+  const login = new URL("/login", appOrigin(request))
+  // 로그인 후 원래 가려던 곳으로 돌아갈 수 있게 남긴다. 열린 리다이렉트를 막기 위해
+  // 경로만 싣는다 — 절대 URL은 싣지 않는다
+  login.searchParams.set("next", `${pathname}${search}`)
+  // 307을 유지한다. 보호된 API에 POST하던 요청의 실패 모양을 바꾸지 않는다
+  const redirect = NextResponse.redirect(login, 307)
+  redirect.headers.set("Content-Security-Policy", csp)
+  return redirect
 }
 
 export const config = {
