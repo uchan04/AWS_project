@@ -34,11 +34,18 @@ let verifier: ReturnType<typeof CognitoJwtVerifier.create> | null = null
 
 function getVerifier() {
   if (!verifier) {
-    verifier = CognitoJwtVerifier.create({
-      userPoolId: process.env.COGNITO_USER_POOL_ID ?? "",
-      tokenUse: "access",
-      clientId: process.env.COGNITO_CLIENT_ID ?? "",
-    })
+    // 빈 Pool ID면 create()가 throw한다. 아래 verify() 호출은 try 안에 있어서 그 throw가
+    // 토큰 만료와 똑같이 401로 뭉개졌다 — 환경변수가 런타임에 안 실린 배포에서 "로그인은
+    // 되는데 모든 API가 401"로만 보이고 원인을 못 찾았다(2026-08-23). 여기서 먼저 끊는다.
+    const userPoolId = process.env.COGNITO_USER_POOL_ID
+    const clientId = process.env.COGNITO_CLIENT_ID
+    if (!userPoolId || !clientId) {
+      throw new Error(
+        "COGNITO_USER_POOL_ID 또는 COGNITO_CLIENT_ID가 런타임에 없다. " +
+          "amplify.yml이 .env.production으로 구워 넣는지 확인한다"
+      )
+    }
+    verifier = CognitoJwtVerifier.create({ userPoolId, tokenUse: "access", clientId })
   }
   return verifier
 }
@@ -70,16 +77,22 @@ export async function getCurrentUser(): Promise<User> {
   const token = jar.get("access_token")?.value ?? null
   if (!token) throw new UnauthorizedError()
 
+  // try 밖에서 만든다. 설정 오류는 401이 아니라 500으로 터져야 원인이 보인다
+  const jwt = getVerifier()
+
+  let sub: string
   try {
-    const payload = await getVerifier().verify(token)
-    return prisma.user.upsert({
-      where: { cognitoSub: payload.sub },
-      update: {},
-      create: { cognitoSub: payload.sub },
-    })
+    sub = (await jwt.verify(token)).sub
   } catch {
+    // 여기 도달하는 건 토큰이 만료·위조·다른 풀 발급인 경우뿐이다
     throw new UnauthorizedError()
   }
+
+  return prisma.user.upsert({
+    where: { cognitoSub: sub },
+    update: {},
+    create: { cognitoSub: sub },
+  })
 }
 
 /**

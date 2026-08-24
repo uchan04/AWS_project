@@ -1,9 +1,11 @@
 import type { Prisma, PrismaClient, Rarity } from "@prisma/client"
+import { BACKGROUNDS } from "../../lib/pet"
 
 // 소유자: C. 종족 외형 스킨 6종 + 치장(배경) 6종.
-// 이미지는 아직 없다. imageKey는 아래 규칙으로 미리 고정했으니 같은 이름으로 S3에 올린다.
-//   펫:   pets/{base}-{1|2|3}.png
-//   치장: cosmetics/{key}.png
+// 이미지는 S3에 다 올라와 있다. 키는 "우리가 정한 규칙"이 아니라 **실제 올라간 파일명**이
+// 정본이다 — 규칙대로 적어 두고 파일명이 다르면 조용히 403이 된다(아래 2026-08-22 메모).
+//   펫:   pets/{base}-{1..4}.png
+//   치장: backgrounds/{파일명}.png
 //
 // TypeCode ↔ 종족 매핑 (2026-08-19 팀 확인, A의 feat/diagnosis 기준):
 //   HEALTH_EMOTION         = 개과   / 여우   / 노을 주황 #E8956A
@@ -34,8 +36,10 @@ import type { Prisma, PrismaClient, Rarity } from "@prisma/client"
 // 수급 = 60/일 + 출석 4·7일차 25(7일 주기 = 약 3.6/일) = 약 63.6/일이므로 2500은 약 39일이다.
 // 치장 6종 합계 3600 친밀도(상한 100/일 = 36일)와 비슷한 속도로 맞췄다.
 //
-// !! 일일 전체 완료 60은 아직 구현되지 않았다 (lib/missions/completion.ts:128 TODO, B 담당) !!
-// 그게 없으면 수급이 출석 3.6/일뿐이라 2500은 약 700일이다. B가 넣기 전에는 상점이 사실상 잠긴다.
+// 일일 전체 완료 60은 **구현됐다** (2026-08-24 확인, lib/missions/completion.ts:120 —
+// dailyCount >= dailyTotal이면 calculateReward(skin, { starShards: 60 }) 후 increment).
+// 그전 주석은 "미구현, B 담당 TODO"였다. 그때는 수급이 출석 3.6/일뿐이라 2500이 약 700일이었다.
+// 이제 위 39일 계산이 실제와 맞는다 — 2500을 다시 손댈 이유가 없다.
 //
 // 실 DB 반영 완료 (2026-08-20). 이제 시드 파일과 실 DB가 일치한다 — 어긋나게 두지 않는다.
 // 8/26 녹화용 데모 계정은 별조각을 시드로 넣는다(39일은 실제로 모을 수 있는 기간이 아니다.
@@ -43,8 +47,9 @@ import type { Prisma, PrismaClient, Rarity } from "@prisma/client"
 const VARIANT_PRICE_SHARDS = 2500
 
 // scripts/check-pet.ts가 "이름 어미 = 종족 동물명"을 단정하려고 이 배열을 읽는다.
-// 이 파일은 런타임 import가 없고(@prisma/client는 type import뿐이다) 순수 데이터라
-// 체크 스크립트가 DB 없이 그대로 읽을 수 있다.
+// 이 파일은 순수 데이터라 체크 스크립트가 DB 없이 그대로 읽을 수 있다. 2026-08-22에
+// lib/pet.ts의 BACKGROUNDS 하나를 런타임 import하게 됐는데, 그쪽도 DB를 모르는 순수
+// 상수·함수뿐이라 이 성질은 그대로다 (check-pet.ts는 이미 두 파일을 함께 읽고 있었다).
 export const PET_SKINS: Prisma.PetSkinCreateInput[] = [
   // 개과 — 건강·정서취약형
   { name: "여우", typeCode: "HEALTH_EMOTION", isDefault: true, stageCount: 4, imageKeyBase: "pets/fox" },
@@ -114,14 +119,28 @@ type CosmeticSeed = Omit<Prisma.CosmeticItemCreateInput, "affinityOnly" | "price
 // 시드로 넣어 수집 진행률이 채워진 화면을 찍는다(업무분담.md 5장).
 //
 // scripts/check-pet.ts가 위 구성(6종·전부 BACKGROUND·이름 배경1~6)을 단정한다.
-export const COSMETICS: CosmeticSeed[] = [
-  { name: "배경1", slot: "BACKGROUND", rarity: "COMMON", imageKey: "cosmetics/bg-1.png" },
-  { name: "배경2", slot: "BACKGROUND", rarity: "COMMON", imageKey: "cosmetics/bg-2.png" },
-  { name: "배경3", slot: "BACKGROUND", rarity: "COMMON", imageKey: "cosmetics/bg-3.png" },
-  { name: "배경4", slot: "BACKGROUND", rarity: "COMMON", imageKey: "cosmetics/bg-4.png" },
-  { name: "배경5", slot: "BACKGROUND", rarity: "COMMON", imageKey: "cosmetics/bg-5.png" },
-  { name: "배경6", slot: "BACKGROUND", rarity: "COMMON", imageKey: "cosmetics/bg-6.png" },
-]
+// 2026-08-22: imageKey를 실제 S3 키로 고쳤다. 예상했던 cosmetics/bg-N.png는 없는 키였고
+// (OAC로 ListBucket이 없어서 없는 파일도 404가 아니라 403으로 온다 — 북극곰 -polar와 같은
+// 함정이다) 실물은 backgrounds/ 아래 forest-autumn-{0..2}-{0..1}.png 6장이다.
+// 사용자가 콘솔에서 확인해 준 키이고 6장 전부 CloudFront 200으로 확인했다.
+//
+// 같은 날 이름도 바꿨다. name에 표시명("배경1")이 아니라 **코드**("autumn_path")를 넣고
+// 화면에는 lib/pet.ts의 cosmeticLabel()이 표시명을 붙인다. 코드·표시명·이미지 키 세 값은
+// lib/pet.ts의 BACKGROUNDS 한 배열이 정본이고 이 파일은 거기서 만든다 — 두 곳에 적으면
+// 갈라진다. 왜 스키마에 code 컬럼을 안 만들었는지는 그 배열 주석에 있다.
+//
+// 실 DB 6행은 시드 재실행이 아니라 제자리 UPDATE로 이름을 바꿨다(보유자가 있는 행을
+// 시드로 개명하면 새 행이 생기고 옛 행이 남는다. 아래 pruneCosmetics 주석).
+//
+// 위 17~19줄 경고가 이제 치장에도 적용된다: name이 코드라서 코드를 바꾸면 새 행이 된다.
+// 코드는 화면에 안 보이는 값이니 한 번 정한 뒤 건드리지 않는다 — 이름을 고치고 싶으면
+// BACKGROUNDS의 label만 바꾸면 되고 DB는 손댈 필요가 없다. 그게 코드를 넣은 이유다.
+export const COSMETICS: CosmeticSeed[] = BACKGROUNDS.map((bg) => ({
+  name: bg.code,
+  slot: "BACKGROUND",
+  rarity: "COMMON",
+  imageKey: bg.imageKey,
+}))
 
 export async function seedItems(prisma: PrismaClient) {
   // 스킨 6종은 이름이 그대로라 upsert가 typeCode를 알아서 고친다.
