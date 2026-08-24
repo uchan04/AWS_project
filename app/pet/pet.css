@@ -902,8 +902,16 @@
    상점 쪽이 .pet-card--wallet을 앞에 다는 것은 특이도 때문이다 — 클래스 하나(0,1,0)로 두면
    파일 뒤쪽의 .pet-btn 본체가 순서로 이겨 min-height·font-size·font-weight가 되돌아간다.
    **서체는 이 규칙에 넣을 수 없다.** 먹이기 버튼은 카드(.pet-card--feed)에서 물려받는데
-   지갑 카드는 본문 서체이므로, 상점 입구에는 아래 .pet-wallet__shop 규칙이 직접 준다 */
-.pet-card--feed .pet-btn,
+   지갑 카드는 본문 서체이므로, 상점 입구에는 아래 .pet-wallet__shop 규칙이 직접 준다.
+
+   2026-08-24 방치형 카드 통합: 선택자가 `.pet-btn` → **`.pet-btn--block`**으로 좁아졌다.
+   이 카드에 씨앗 줍기 버튼(.pet-btn--seed)이 들어왔기 때문이다 — `.pet-btn`으로 두면
+   이 규칙(0,2,0)이 .pet-btn--seed(0,1,0)를 특이도로 눌러 그 버튼이 48px · 0.9rem ·
+   **종족색 번짐**이 된다(자기 색인 초록 번짐이 사라진다). --block은 이 카드의 주 버튼
+   하나(먹이기)에만 붙으므로 이 규칙이 원래 겨냥한 것과 정확히 같다. 씨앗 줍기 쪽에서
+   값을 되돌리는 방법(.pet-card--feed .pet-btn--seed에 초록 번짐을 다시 쓰기)을 고르지 않은
+   이유는 그러면 같은 값이 두 곳에 적히는 것이다 */
+.pet-card--feed .pet-btn--block,
 .pet-card--wallet .pet-wallet__shop {
   min-height: 3rem;
   border-radius: var(--radius-pill);
@@ -918,20 +926,29 @@
 /* 상점 입구가 :not(:disabled)를 같이 다는 것은 특이도 때문이다(<a>는 :disabled가 될 수 없어
    항상 참이다) — 이게 없으면 파일 뒤쪽 .pet-btn:active:not(:disabled)와 특이도가 같아져
    순서로 지고, 2px 눌림 + box-shadow: none이 걸린다 */
-.pet-card--feed .pet-btn:active:not(:disabled),
+.pet-card--feed .pet-btn--block:active:not(:disabled),
 .pet-card--wallet .pet-wallet__shop:active:not(:disabled) {
   transform: translateY(1px);
   box-shadow: 0 3px 8px color-mix(in oklch, var(--tribe) 34%, transparent);
 }
 
-.pet-card--feed .pet-btn:disabled {
+/* 위 두 규칙과 같은 이유로 --block까지 좁혔다. 씨앗 줍기 버튼은 꺼져 있을 때
+   .pet-btn:disabled의 회색 단(0 4px 0 --color-rule)을 그대로 딛는다 — 통합 전 방치형
+   카드에서 쓰던 모습이고, 쌓인 씨앗이 0이면 꺼져 있는 것이 그 버튼의 평상시 상태다 */
+.pet-card--feed .pet-btn--block:disabled {
   box-shadow: none;
 }
 
 /* 이 카드의 각주는 도움말 한 줄뿐이다. 2026-08-21 사용자 요청으로 --text-label에서 한 단계
    더 내렸다. 0.64rem은 tokens.css의 1.25배 스케일에서 --text-label 아래 칸이다
-   (0.8 / 1.25 = 0.64). 다른 카드 각주는 --text-label 그대로다 */
+   (0.8 / 1.25 = 0.64). 다른 카드 각주는 --text-label 그대로다.
+
+   2026-08-24 통합 시안: 이 카드의 각주만 가운데로 온다. .pet-card__foot 본체가
+   space-between이라 한 줄뿐인 각주가 왼쪽 끝에 붙어 있었는데, 시안은 카드 가운데다.
+   본체를 고치지 않는 이유는 다른 카드의 각주가 두 조각(예: "현재 Lv.3" | "다음 진화까지")
+   이고 그건 양끝이 맞다 */
 .pet-card--feed .pet-card__foot {
+  justify-content: center;
   font-size: 0.64rem;
 }
 
@@ -1429,13 +1446,26 @@
  *
  * 이 카드만 골격이 달라지는 것은 감수한 것이다. 2026-08-21에 통일한 이유가 "이 카드만
  * 제목 줄이 없어서"였는데, 지금은 제목 줄이 있고 그 아래가 아니라 옆에 버튼이 서는 것뿐이라
- * 제목·개수·각주는 옆 카드들과 같은 클래스를 계속 쓴다 */
+ * 제목·개수·각주는 옆 카드들과 같은 클래스를 계속 쓴다
+ *
+ * **2026-08-24: 방치형 카드가 없어졌다.** 사용자 시안 한 장으로 씨앗 투입 카드에 통합했고
+ * ("이 이미지처럼 그동안 쌓인 씨앗 카드와 씨앗투입 카드를 통합해줘"), 이 두 벌은 그 카드의
+ * **첫 줄**이 됐다. 이름을 바꾸지 않은 이유: 이 줄이 하는 일이 그대로다(왼쪽 두 줄 상자 +
+ * 오른쪽 방치형 조각). 그리고 이름을 고치면 두 파일과 이 주석 뭉치가 같이 움직여야 하는데
+ * 얻는 것이 이름 하나다.
+ * .pet-card__head를 쓸 수 없어서 이 두 벌이 필요하다 — __head는 좌우 한 짝씩만 세우고,
+ * 시안의 첫 줄은 왼쪽 두 줄(제목 + 쌓인 씨앗) · 오른쪽 두 조각(보유 개수 + 줍기 버튼)이다.
+ * 아래 밑줄은 시안에 있는 것이다. 첫 줄과 스테퍼 사이를 가르는 선이고, 통합으로 한 카드에
+ * 두 가지 일(쌓인 씨앗 수확 / 씨앗 투입)이 들어왔으므로 그 경계를 눈에 보이게 만든다.
+ * 색은 이 화면이 이미 쓰는 --color-rule이다(새 색 0개) */
 .pet-idle {
   display: flex;
   align-items: center;
   /* 개수가 짧아 왼쪽 상자가 좁다. space-between으로 버튼을 카드 오른쪽 끝에 붙인다 */
   justify-content: space-between;
   gap: var(--space-2xs);
+  padding-bottom: var(--space-2xs);
+  border-bottom: 1px solid var(--color-rule);
 }
 
 /* 제목 + 개수. min-width: 0이 있어야 좁은 화면에서 이 상자가 버튼을 밀어내지 않는다
@@ -1444,6 +1474,25 @@
   display: grid;
   gap: var(--space-3xs);
   min-width: 0;
+}
+
+/* "가득 찼어요". 통합 전에는 카드 각주에 있던 <em>이고 그 자리의 규칙(.pet-card__foot em)이
+   --tribe-cta를 준다. 여기서도 같은 색을 쓰되 **기울임을 끈다** — Gowun Dodum에 이탤릭이
+   없어서 브라우저가 기울여 만들면 획이 뭉갠다(이 카드가 --font-display 한 벌이다) */
+.pet-idle__body em {
+  color: var(--tribe-cta);
+  font-style: normal;
+}
+
+/* 오른쪽 두 조각("보유 N개" + 줍기 버튼)을 한 줄에 세운다 (2026-08-24 통합 시안).
+   flex-shrink: 0이 있어야 좁은 화면에서 이 상자가 눌리지 않는다 — 눌리면 버튼 라벨이
+   먼저 넘친다(.pet-btn은 nowrap이 아니다). 대신 왼쪽 __body가 min-width: 0으로 줄고
+   "그동안 쌓인 씨앗 N개"가 두 줄로 접힌다. 두 줄로 접히는 쪽이 버튼이 깨지는 것보다 낫다 */
+.pet-idle__aside {
+  display: flex;
+  flex-shrink: 0;
+  align-items: center;
+  gap: var(--space-2xs);
 }
 
 /* ── 버튼 ────────────────────────────────────────────────────────────────── */
@@ -1503,7 +1552,12 @@
   border-radius: var(--radius-pill);
 }
 
-/* 정사각형 버튼 (2026-08-24 사용자 요청). 지금 붙는 곳은 씨앗 줍기 하나뿐이다.
+/* 정사각형 버튼 (2026-08-24 사용자 요청). 붙는 곳은 씨앗 줍기 하나뿐이었다.
+ *
+ * **2026-08-24 방치형 카드 통합으로 쓰는 곳이 0이 됐다.** 시안의 줍기 버튼이 제목 줄에서
+ * "보유 N개"와 나란히 앉은 가로 버튼이라 4.5rem 정사각형이 들어갈 자리가 없다. 규칙은
+ * 지우지 않고 둔다 — 되돌릴 때 아래 계산이 다시 필요하고, 아무 요소도 이 클래스를 쓰지
+ * 않으므로 남아 있어도 화면에 나타나지 않는다.
  *
  * **모서리를 알약으로 만들지 않는다.** --block이 알약인 것은 폭이 카드 전체라 각을 세우면
  * 카드 테두리와 겹쳐 보이기 때문이고, 정사각형에 --radius-pill을 주면 원이 된다.
