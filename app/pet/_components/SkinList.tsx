@@ -91,9 +91,17 @@ export default function SkinList({
     }
   }
 
+  // emoji는 카드 제목 앞에 붙는다 (2026-08-24). 홈의 카드 제목 5장과 같은 방식이고
+  // aria-hidden이므로 스크린리더가 읽는 제목은 title 그대로다
   const groups = [
-    { title: "기본 외형", hint: "진단으로 받았어요", rows: skins.filter((row) => row.isDefault) },
     {
+      emoji: "🐾",
+      title: "기본 외형",
+      hint: "진단으로 받았어요",
+      rows: skins.filter((row) => row.isDefault),
+    },
+    {
+      emoji: "🛒",
       title: "상점",
       hint: "외형만 바뀌어요",
       rows: skins.filter((row) => !row.isDefault),
@@ -142,7 +150,9 @@ export default function SkinList({
         group.rows.length === 0 ? null : (
           <section className="pet-card" key={group.title}>
             <div className="pet-card__head">
-              <h2 className="pet-card__title">{group.title}</h2>
+              <h2 className="pet-card__title">
+                <span aria-hidden="true">{group.emoji}</span> {group.title}
+              </h2>
               <span className="pet-card__meta">{group.hint}</span>
             </div>
 

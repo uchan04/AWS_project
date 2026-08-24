@@ -54,6 +54,16 @@ const SLOT_LABEL: Record<Slot, string> = {
   BACKGROUND: "배경",
 }
 
+// 카드 제목 앞 이모지 (2026-08-24). 홈의 카드 제목 5장이 쓰는 방식과 같다 — 글자 앞에
+// aria-hidden 스팬 하나이므로 스크린리더가 읽는 이름은 위 SLOT_LABEL 그대로다.
+// 배경은 🖼️가 아니라 🏞️다: 8/22에 그림 6장의 흰 액자를 잘라낸 화면이라 액자를 다시
+// 제목에 놓으면 방금 걷어낸 것을 가리킨다. 실제 상품이 계절 풍경 6종이기도 하다.
+const SLOT_EMOJI: Record<Slot, string> = {
+  HAT: "🎩",
+  SCARF: "🧣",
+  BACKGROUND: "🏞️",
+}
+
 const RARITY_LABEL: Record<Rarity, string> = {
   COMMON: "일반",
   RARE: "희귀",
@@ -200,7 +210,9 @@ export default function CosmeticList({
         return (
           <section className="pet-card" key={slot}>
             <div className="pet-card__head">
-              <h2 className="pet-card__title">{SLOT_LABEL[slot]}</h2>
+              <h2 className="pet-card__title">
+                <span aria-hidden="true">{SLOT_EMOJI[slot]}</span> {SLOT_LABEL[slot]}
+              </h2>
               <span className="pet-card__meta">한 번에 하나만 착용해요</span>
             </div>
 
