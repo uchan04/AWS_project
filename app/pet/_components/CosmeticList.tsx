@@ -32,6 +32,8 @@ export type CosmeticRow = {
   rarity: Rarity
   affinityOnly: boolean
   priceAffinity: number | null
+  /** 타일 미리보기 그림. CLOUDFRONT_DOMAIN이 비었으면 null이고 타일은 이름만 보인다 */
+  imageUrl: string | null
   owned: boolean
   equipped: boolean
 }
@@ -212,6 +214,37 @@ export default function CosmeticList({
                     className={`pet-item${item.equipped ? " pet-item--on" : item.owned ? "" : " pet-item--locked"}`}
                     key={item.id}
                   >
+                    {/* 배경 그림. 사기 전에 무엇인지 보여야 한다 — 이름과 가격만 있으면
+                        친밀도 600(6일치)을 무엇인지 모르고 내는 화면이 된다.
+                        안 뜨면 스스로 숨어 이름만 남는다(PetRoom의 배경 <img>와 같은 처리).
+                        장식이 아니라 상품 정보이므로 aria-hidden이 아니고, 이름이 옆에
+                        글자로 있으므로 alt는 빈 값이다 — 읽으면 이름이 두 번 나온다 */}
+                    {item.imageUrl ? (
+                      // 감싸는 span은 흰 액자 테두리를 자르는 창이다 (2026-08-22).
+                      // 그림 6장에 추출이 덜 된 흰 여백이 남아 있어 pet.css가 <img>를
+                      // 1.2배로 확대하는데, 자르는 쪽(overflow: hidden)이 없으면 확대분이
+                      // 타일 밖으로 삐져나온다. 방은 .pet-room이 그 역할을 이미 한다
+                      <span className="pet-item__thumb">
+                        {/* eslint-disable-next-line @next/next/no-img-element */}
+                        <img
+                          className="pet-item__img"
+                          src={item.imageUrl}
+                          alt=""
+                          // 6장 합쳐 약 3MB다(장당 약 500KB, 810×324). 접힘 아래 칸은
+                          // 스크롤할 때 받게 미룬다 — 상점에 들어오는 순간 3MB를 다 받으면
+                          // 모바일에서 첫 화면이 늦는다
+                          loading="lazy"
+                          decoding="async"
+                          onError={(e) => {
+                            // 창까지 같이 숨긴다. <img>만 숨기면 빈 창이 남아 그림이
+                            // 안 온 칸에 회색 판이 놓인다
+                            const frame = e.currentTarget.closest(".pet-item__thumb")
+                            if (frame instanceof HTMLElement) frame.style.display = "none"
+                          }}
+                        />
+                      </span>
+                    ) : null}
+
                     <span className="pet-item__name">{item.name}</span>
                     <span className="pet-item__meta">
                       {RARITY_LABEL[item.rarity]}
