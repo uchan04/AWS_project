@@ -2,7 +2,9 @@ import { MeetupStatus } from "@prisma/client"
 import { getCurrentUser } from "@/lib/auth"
 import { prisma } from "@/lib/prisma"
 import { MeetupList } from "./_components/MeetupList"
+import { CancelNotice } from "./_components/CancelNotice"
 import type { MeetupListItem } from "./_components/MeetupCard"
+import { pendingCancelNotices, type CancelNoticeItem } from "./_lib/notice"
 
 // 유저별 데이터(joined·isAdmin)를 읽으므로 정적 프리렌더 대상이 아니다. community/page.tsx와 같은 이유다.
 export const dynamic = "force-dynamic"
@@ -10,6 +12,7 @@ export const dynamic = "force-dynamic"
 export default async function MeetupsPage() {
   let isAdmin: boolean
   let meetups: MeetupListItem[]
+  let notices: CancelNoticeItem[]
 
   // 인증이나 DB가 실패해도 화면을 죽이지 않고 안내를 띄운다(community/page.tsx와 같은 패턴).
   try {
@@ -38,6 +41,9 @@ export default async function MeetupsPage() {
     })
 
     meetups = rows.map(({ participants, ...meetup }) => ({ ...meetup, joined: participants.length > 0 }))
+
+    // 무산된 모임은 위 목록(status OPEN)에 없다. 신청해 뒀던 사람에게는 배너로만 알린다.
+    notices = await pendingCancelNotices(user.id)
   } catch (error) {
     console.error("[/community/meetups]", error)
     return (
@@ -55,6 +61,8 @@ export default async function MeetupsPage() {
 
   return (
     <main className="mx-auto flex max-w-3xl flex-col gap-6 p-4 sm:p-6">
+      <CancelNotice notices={notices} />
+
       <div>
         <h1 className="text-xl font-bold text-neutral-900">오프라인 모임</h1>
         <p className="mt-1 text-sm text-neutral-500">천천히, 준비됐을 때 나가면 돼요</p>
