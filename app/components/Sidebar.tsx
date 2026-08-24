@@ -2,7 +2,7 @@
 
 import { useState, useEffect } from "react"
 import Link from "next/link"
-import { usePathname, useRouter } from "next/navigation"
+import { usePathname, useRouter, useSearchParams } from "next/navigation"
 import { TRIBE } from "@/lib/types"
 import type { SidebarProfile } from "@/lib/profile"
 import type { TypeCode } from "@prisma/client"
@@ -30,7 +30,8 @@ const TABS: { href: string; label: string; emoji: string; desc: string }[] = [
   { href: "/", label: "홈", emoji: "🏡", desc: "오늘 현황" },
   { href: "/missions", label: "미션", emoji: "✅", desc: "작은 한 걸음" },
   { href: "/pet", label: "나의 펫", emoji: "🌱", desc: "함께 성장해요" },
-  { href: "/community", label: "커뮤니티", emoji: "💬", desc: "같은 종족 모임" },
+  { href: "/community", label: "커뮤니티", emoji: "💬", desc: "같은 종족 이야기" },
+  { href: "/community/meetups", label: "모임", emoji: "🤝", desc: "오프라인에서 만나기" },
 ]
 
 /**
@@ -86,7 +87,24 @@ function Avatar({
 export function Sidebar({ profile }: { profile: SidebarProfile | null }) {
   const pathname = usePathname()
   const router = useRouter()
-  const [showAccount, setShowAccount] = useState(false)
+  // `/diagnosis/result`의 `?new=1`을 보기 위해 읽는다. 아래 inDiagnosisFlow 주석 참고.
+  // 루트 레이아웃이 cookies()를 읽어 이미 동적 렌더라(lib/profile.ts) 여기서
+  // useSearchParams를 써도 정적 프리렌더를 깨지 않는다 — 그 제약은 정적 페이지 쪽이다.
+  const searchParams = useSearchParams()
+  // 내 계정 모달. 열린 상태를 boolean이 아니라 **열었던 경로**로 들고 있다 (2026-08-24 제보).
+  //
+  // 전에는 boolean이라 "계정 설정"을 눌러 /settings로 가도 모달이 그 위에 그대로 떠 있었다 —
+  // 사이드바는 루트 레이아웃에 있어 클라이언트 이동으로 언마운트되지 않으므로 상태가 남는다.
+  // "이름 바꾸기"에서 증상이 안 보였던 건 목적지 /diagnosis/result가 hiddenPaths라
+  // 사이드바 자체가 사라졌기 때문이고 버튼이 옳았던 게 아니다.
+  //
+  // 경로를 담으면 이동하는 순간 pathname이 달라져 저절로 닫힌다. 버튼마다
+  // setShowAccount(false)를 붙이는 것보다 짧고, 링크가 늘어도 같은 버그가 다시 나지 않는다.
+  // useEffect로 동기화하지 않는 이유는 react-hooks/set-state-in-effect다 — effect 안의
+  // setState는 렌더를 한 번 더 유발하고, 여기서는 렌더 중에 값을 유도할 수 있다.
+  const [accountOpenAt, setAccountOpenAt] = useState<string | null>(null)
+  const showAccount = accountOpenAt === pathname
+  const setShowAccount = (open: boolean) => setAccountOpenAt(open ? pathname : null)
   // narrow: 창이 좁아 자동으로 접힌 상태. collapsed: 사용자가 버튼으로 접은 상태.
   // 둘을 나눠 둔 것은 넓은 화면에서도 직접 접을 수 있어야 하기 때문이다.
   const [narrow, setNarrow] = useState(false)
@@ -120,14 +138,37 @@ export function Sidebar({ profile }: { profile: SidebarProfile | null }) {
   }, [])
 
   // 진단/로그인/회원가입 화면에서 숨김
-  const hiddenPaths = ["/diagnosis", "/diagnosis/result", "/login", "/signup"]
-  if (hiddenPaths.includes(pathname)) {
+  const hiddenPaths = ["/diagnosis", "/login", "/signup"]
+
+  // `/diagnosis/result`는 목록에 넣지 않고 따로 가른다 (2026-08-24 제보).
+  // 이 경로가 **두 용도를 공유**하기 때문이다.
+  //   · 진단 직후 — AskFlow가 `?new=1`을 붙여 보낸다. 진단 흐름의 마지막 단계이므로
+  //     사이드바를 숨긴다(`STATUS.md` 차단 21번이 여기 사이드바가 뜨는 것을 결함으로 올렸다).
+  //   · 이름 바꾸기 — 내 계정 모달에서 들어온다. 그때는 이미 진단을 마치고 앱을 쓰는
+  //     중이므로 사이드바가 있어야 하고, 없으면 **돌아갈 입구가 브라우저 뒤로가기뿐이다.**
+  // 같은 값을 결과 화면도 이미 쓴다(`app/diagnosis/result/page.tsx` justDiagnosed) —
+  // 버튼 문구를 "이 이름으로 시작하기"와 "이름 저장하기"로 가르는 그 값이다.
+  const inDiagnosisFlow = pathname === "/diagnosis/result" && searchParams.get("new") === "1"
+
+  if (hiddenPaths.includes(pathname) || inDiagnosisFlow) {
     return null
   }
 
   // 미인증이거나 프로필을 못 읽었으면 그리지 않는다. 폴백으로 가짜 프로필을 만들면
   // 미인증에도 "익명 · 미분류 · Lv.1"과 로그아웃 버튼이 뜬다(2026-08-21 제보, A 수정).
   if (!profile) {
+    return null
+  }
+
+  // 진단 전에는 그리지 않는다 (2026-08-24 제보). 위 hiddenPaths가 /login·/diagnosis는
+  // 막지만 **진단 시작 대기 화면은 "/"**다 — app/page.tsx:66이 typeCode·adjective가
+  // 없으면 그 경로에서 <Intro authed />를 그린다. 경로로는 홈과 구분할 수 없으므로
+  // 조건으로 막는다. 판정은 profile.diagnosed 하나만 쓴다(lib/profile.ts) — 그 값이
+  // page.tsx와 같은 식이고, 여기에 `!typeCode || !adjective`를 다시 쓰면 두 벌이 된다.
+  //
+  // 진단 전 사이드바는 갈 곳이 없다: 펫·미션·커뮤니티가 전부 종족과 유형에 매여 있어
+  // 눌러도 빈 화면이거나 에러다. 챗봇 버튼도 같은 값으로 이미 숨는다(ChatLauncher).
+  if (!profile.diagnosed) {
     return null
   }
 
