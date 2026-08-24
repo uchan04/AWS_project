@@ -4,6 +4,7 @@ import { getCurrentUser, getCurrentUserWithSkin, UnauthorizedError } from "@/lib
 import { prisma } from "@/lib/prisma"
 import { ok, fail } from "@/lib/api"
 import { grantAffinity, MEETUP_JOIN_AFFINITY } from "@/app/community/_lib/affinity"
+import { kstDayRange } from "@/app/community/meetups/_lib/kst"
 
 /**
  * 트랜잭션 안에서 판정한 실패를 밖으로 내보내는 통로.
@@ -46,6 +47,27 @@ export async function POST(_request: NextRequest, ctx: RouteContext<"/api/commun
     // DELETE에는 넣지 않는다 — 이 검사가 생기기 전에 신청해둔 관리자 행이 남아 있을 수 있고,
     // 취소까지 막으면 joinCount만 부풀린 채 빠져나갈 길이 없다.
     if (user.isAdmin) return fail("FORBIDDEN", "관리자는 모임에 신청할 수 없어요", 400)
+
+    // 같은 날에는 하나만. 날짜는 KST 달력 기준이다 — 이유는 _lib/kst.ts 주석 참고.
+    // 무산된 모임(CANCELED)과 소프트 삭제된 모임은 갈 일이 없으므로 겹침으로 세지 않는다.
+    // DELETE에는 넣지 않는다. 취소는 언제나 열려 있어야 한다.
+    const { start, end } = kstDayRange(meetup.startsAt)
+    const sameDay = await prisma.meetupParticipant.findFirst({
+      where: {
+        userId: user.id,
+        canceledAt: null,
+        meetupId: { not: id },
+        meetup: {
+          deletedAt: null,
+          status: { not: MeetupStatus.CANCELED },
+          startsAt: { gte: start, lt: end },
+        },
+      },
+      select: { id: true },
+    })
+    if (sameDay) {
+      return fail("ALREADY_JOINED_SAME_DAY", "같은 날에는 하나의 모임만 신청할 수 있어요", 400)
+    }
 
     let result: { joinCount: number; isNewJoin: boolean }
     try {
