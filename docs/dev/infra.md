@@ -6,7 +6,8 @@
 ## 현재 상태
 - 완료: Next.js 프로젝트, Prisma 6 + 스키마, `lib/auth.ts`(실 Cognito 검증, 쿠키 기반), `lib/prisma.ts`, `lib/api.ts`, `.env.example`, RDS, Cognito, S3+CloudFront, CloudWatch+SNS, Bedrock 확인, Amplify 앱 생성(환경변수 포함), 로그인·가입 화면(이메일+비밀번호), `amplify.yml`(2026-08-20). 내비게이션은 B의 사이드바로 교체됨(하단 탭은 폐기, 아래 "삭제한 파일" 참고)
 - 2026-08-23 완료: **Google 로그인 Cognito 측 설정 전부 끝.** Google IdP 생성됨(scopes `profile email openid`, mapping `email→email` `username→sub`), App Client `welli-web-client`에 OAuth 활성화(`AllowedOAuthFlowsUserPoolClient=true`, flow `code`, scopes `openid email profile`, IdP `Google`+`COGNITO`), 콜백·로그아웃 URL 등록. `/oauth2/authorize`가 Google로 302하는 것까지 확인
-- 진행 중: Amplify GitHub 연동은 완료(아래 앱 ID 참고). 남은 것은 Google Cloud Console 쪽 승인된 리디렉션 URI 확인뿐
+- 2026-08-24 완료: **배포 환경에서 리다이렉트가 `localhost:3000`으로 튀던 문제 수정**(`fd8c21f`). 아래 "배포 환경에서 절대 URL을 만들지 않는다" 절 참고. Google IdP는 AWS CLI로 실제 연결 상태를 재확인했다 — User Pool에 `Google`(type `Google`)이 있고 App Client `idps`가 `["COGNITO","Google"]`, 콜백·로그아웃 URL은 로컬·배포 양쪽 다 등록돼 있다. `.env` 주석의 "Google IdP는 아직 연결 전"은 오래된 내용이다
+- 진행 중: Amplify GitHub 연동은 완료(아래 앱 ID 참고). Google 로그인 전 구간 실사용 검증(브라우저로 실제 계정 로그인)은 아직 안 했다 — OAuth 동의 화면이 "테스트" 상태면 등록된 테스트 사용자만 된다(아래 "막힌 것" 참고)
 - 미착수: 발표 자료
 - 2026-08-22 A가 넘긴 것: 희망 문구 배너 구현(`app/community/_lib/banner.ts`), `middleware.ts` 미인증 리다이렉트, `lib/ratelimit.ts` 로그인·가입 시도 제한, `/settings`(비밀번호 변경·회원 탈퇴). 아래 "다음 할 일" 3·4번이 이걸로 해소됐다
 
@@ -59,6 +60,25 @@
 ### 환경변수를 추가할 때 반드시 두 곳을 고친다
 
 Amplify 콘솔 환경변수는 빌드 컨테이너에만 주입되고 SSR 컴퓨트(Lambda)에는 전달되지 않는다. 그래서 `amplify.yml`의 `env | grep -e ...` 목록에 키를 **직접 추가**해야 런타임에 실린다. 콘솔에만 등록하면 런타임에서 `undefined`다. `COGNITO_REDIRECT_URI`가 콘솔에는 있는데 grep 목록에 없어서 코드에서 쓸 수 없던 상태였다(2026-08-23 수정).
+
+### 배포 환경에서 절대 URL을 만들지 않는다
+
+**`request.url`의 host는 배포 환경에서 공개 도메인이 아니라 `localhost:3000`이다.** Amplify SSR은 Lambda 안에서 Next 서버를 `localhost:3000`으로 띄우고 그 앞에 CloudFront가 붙는 구조다. 그래서 `new URL("/login", request.url)` 같은 절대 URL을 만들어 `Location`에 실으면 브라우저가 **사용자 PC의 3000번**을 찾아가 "연결을 거부했습니다"로 끝난다.
+
+2026-08-24 배포 환경 실제 응답으로 확인했다.
+
+| 요청 | 수정 전 `Location` | 수정 후 |
+|---|---|---|
+| `POST /api/auth/logout` | `https://localhost:3000/login` | `/login` |
+| `GET /api/auth/callback` | `https://localhost:3000/login` | `/login` |
+
+**원인을 못 찾게 만든 지점**: `redirect_uri`는 `COGNITO_REDIRECT_URI`로 이미 방어돼 있었다(2026-08-23). 그래서 Google 로그인은 Cognito 왕복과 토큰 교환까지 **다 성공한 뒤 홈으로 보내는 마지막 한 줄에서만** 깨졌다. 증상이 "Cognito를 연결했는데 사이트에 연결할 수 없음"으로 보였다.
+
+**규칙**: 앱 내부 경로로 보낼 때는 `lib/cognito.ts`의 `appRedirect(path)`를 쓴다. `Location`에 상대 경로를 넣으면 브라우저가 자기가 접속한 주소를 기준으로 해석하므로(RFC 7231 §7.1.2) 로컬·`main` 배포·프리뷰 브랜치가 도메인이 달라도 전부 맞는다. `NextResponse.redirect()`는 절대 URL을 요구하므로 이 용도에는 쓸 수 없다.
+
+**`APP_ORIGIN` 같은 환경변수로 풀지 않은 이유**: 위 절의 이중 등록(콘솔 + `amplify.yml` grep 목록)이 또 필요해지고, 빠뜨리면 런타임 `undefined`다. 프리뷰 브랜치 배포는 도메인이 달라 아예 깨진다. 상대 경로는 환경변수가 0개다.
+
+**곁들여 고친 것**: 로그아웃이 307이라 브라우저가 `/login`으로 **다시 POST**해 405가 될 수 있었다. 303으로 바꿔 다음 요청이 GET이 된다.
 
 ## GitHub 레포·브랜치
 

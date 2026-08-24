@@ -110,11 +110,21 @@ export function middleware(request: NextRequest) {
   // 로그인 후 원래 가려던 곳으로 돌아갈 수 있게 남겨둔다.
   // 열린 리다이렉트를 막기 위해 경로만 싣는다 — 절대 URL은 싣지 않는다
   // "/"는 위에서 이미 통과했으므로 여기 오는 경로는 항상 홈이 아니다
-  const login = new URL("/login", request.url)
-  login.searchParams.set("next", `${pathname}${search}`)
-  const redirect = NextResponse.redirect(login)
-  redirect.headers.set("Content-Security-Policy", csp)
-  return redirect
+  //
+  // 2026-08-24: Location에 절대 URL을 싣지 않는다. Amplify SSR은 Lambda 안에서 Next를
+  // localhost:3000으로 띄우고 그 앞에 CloudFront가 붙으므로 request.url의 host가
+  // 공개 도메인이 아니다 — `new URL("/login", request.url)`이면 배포 환경에서
+  // `https://localhost:3000/login`이 나가고 브라우저는 사용자 PC의 3000번을 찾는다.
+  // `main`의 `fd8c21f`가 로그아웃·로그인 콜백 2곳에서 이 함정을 고쳤는데
+  // 미인증 리다이렉트인 여기가 빠져 있었다(실측은 `lib/oauth.ts` appRedirect 주석).
+  // 상대 경로는 브라우저가 자기가 실제로 요청한 주소를 기준으로 푼다(RFC 7231 §7.1.2).
+  const nextParam = encodeURIComponent(`${pathname}${search}`)
+  return new NextResponse(null, {
+    // 307을 유지한다. NextResponse.redirect의 기본값이 307이었고 여기서 메서드를
+    // 바꾸면 보호된 API에 POST하던 요청의 실패 모양이 달라진다
+    status: 307,
+    headers: { Location: `/login?next=${nextParam}`, "Content-Security-Policy": csp },
+  })
 }
 
 export const config = {

@@ -16,6 +16,7 @@ import { OAUTH_STATE_COOKIE, appOrigin, appRedirect, cognitoDomain } from "@/lib
 // 2026-08-23 디버깅을 막았다. CloudWatch의 SSR 로그 그룹에서 이 문자열로 찾는다.
 function bounce(reason: string) {
   console.error(`[auth/callback] ${reason}`)
+  // url.origin은 배포 환경에서 https://localhost:3000이다. appRedirect 주석 참고
   return appRedirect("/login")
 }
 
