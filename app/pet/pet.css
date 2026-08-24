@@ -39,6 +39,16 @@
   --tribe-soft: color-mix(in oklch, var(--tribe) 22%, var(--color-card));
   --tribe-wash: color-mix(in oklch, var(--tribe) 12%, var(--color-paper));
 
+  /* 2026-08-23 사용자 요청(광택 버튼 시안 2차): 머리 위 레벨 배지를 광택 있는 연한 칩으로
+     바꿨다. "시안보다 연한 색을 원한다, 종족색을 따르되 투명도를 높이든 흰색을 섞든 알아서
+     연하게" — 흰색(카드색)을 섞는 쪽을 골랐다. 반투명으로 연하게 만들면 배지 뒤가 방 배경
+     **그림**이라 면 색이 배경마다 달라진다. 어두운 배경(노을빛 단풍길)에서는 연한 칩이
+     탁해지고 그 위 글자 명암비가 배경에 따라 흔들린다. 불투명하면 6종 배경에서 같은 색이다.
+     52%는 --tribe-face(85%)보다 훨씬 연하게 잡은 값이다. 이 면에는 흰 글자를 얹을 수 없고
+     (연한 면 위 흰 글자는 1.6~2:1) 잉크 글자로 여우 10.4:1 / 고양이 9.3:1 / 곰 10.1:1이다 */
+  --tribe-chip: color-mix(in oklch, var(--tribe) 52%, var(--color-card));
+  --tribe-chip-light: color-mix(in oklch, var(--tribe) 34%, var(--color-card));
+
   /* 2026-08-21 사용자 결정: 씨앗 투입 칸의 버튼 면을 종족색 원색으로 바꿨다. --tribe-cta
      계열은 --color-ink(#2a1f14 = 짙은 갈색)를 42%까지 섞어 어둡게 만든 값이라 여우·고양이·곰
      어느 유형에서도 면이 갈색으로 보였다(사용자 지적).
@@ -48,6 +58,24 @@
      명암비가 4.4:1로 떨어져 기준(4.5:1) 아래가 된다.
      아래 단계 그림자만 잉크 섞은 값(--tribe-cta)을 계속 쓴다 — 3~4px 띠라 글자가 안 얹힌다 */
   --tribe-face: color-mix(in oklch, var(--tribe) 85%, var(--color-card));
+
+  /* 2026-08-22 사용자 요청("게임 UI처럼"): 경험치 게이지 채움에만 있던 광택을 주요 기능
+     버튼으로 넓혔다. 시안이 곧 우리 게이지 캡처였으므로 새 색을 들이지 않고 그 규칙을
+     이름만 붙여 꺼낸 것이다 — 값은 .pet-gauge__fill이 쓰던 것 그대로다.
+     흰색·검은색 투명도만 쓰는 이유는 게이지 쪽 주석에 있다: 종족색을 섞으면 종족마다
+     광택 세기가 달라져 색을 3벌 관리해야 한다. 투명도면 6종 스킨·3종족·초록 씨앗 면까지
+     같은 규칙 하나로 덮인다.
+     쓰는 법은 두 겹이다 — background에 var(--pet-gloss)를 **면 색보다 앞에** 두고,
+     box-shadow에 var(--pet-gloss-edge)를 얹는다. 순서를 바꾸면 불투명한 면이 광택을 덮는다 */
+  --pet-gloss: linear-gradient(
+    180deg,
+    rgb(255 255 255 / 0.55),
+    rgb(255 255 255 / 0.16) 45%,
+    rgb(42 31 20 / 0) 52%,
+    rgb(42 31 20 / 0.16)
+  );
+  /* 위 1px 밝은 선 = 빛 닿는 모서리, 아래 어두운 번짐 = 두께. 두 줄이 면을 부풀린다 */
+  --pet-gloss-edge: inset 0 1px 0 rgb(255 255 255 / 0.6), inset 0 -2px 3px rgb(42 31 20 / 0.14);
 
   /* 재화·오브제 색 (종족 무관). 흰 글자를 얹는 값은 명암비 4.5:1을 맞춰 뒀다 */
   --pet-seed: #4a7a3c; /* 흰 글자 5.07:1 */
@@ -187,14 +215,62 @@
   grid-template-rows: 1fr auto;
 }
 
+/* 오른쪽 열 (2026-08-24 사용자 요청: "왼쪽 카드랑 밑 끝나는 지점 맞게").
+
+   두 열의 **상자**는 이미 같은 높이였다 — .pet__grid이 align-items: stretch다. 어긋나
+   보이던 건 안쪽이다: .pet__col이 align-content: start라 카드가 위로 뭉치고 남는 높이가
+   맨 아래에 여백으로 남는다. 왼쪽 열만 grid-template-rows: 1fr auto라 방이 그 여백을
+   먹고 지갑 카드가 바닥에 붙어 있었다.
+
+   왼쪽처럼 줄 수를 못 박을 수는 없다. 오른쪽 열의 카드 수가 3개 아니면 4개로 바뀐다
+   (오늘의 활동은 오늘 값 3종이 다 0이면 렌더되지 않는다). 그래서 이 열만 flex로 바꾸고
+   마지막 카드에 margin-top: auto를 준다 — flex의 auto 여백은 컨테이너에 남는 공간을
+   먹으므로 그 카드가 바닥으로 내려간다.
+
+   grid로는 안 된다. align-content: start에서 남는 공간은 컨테이너 것이고, grid 아이템의
+   margin: auto는 자기가 배정받은 칸 안에서만 정렬한다. 컨테이너의 여백은 건드리지 못한다.
+
+   **:last-child가 아니라 .pet-card--today를 지목한 이유**: 오늘의 활동이 없는 날에는
+   씨앗 투입이 마지막 카드가 되고, 그게 바닥으로 내려가면 위 카드들과 사이에 200px짜리
+   구멍이 생긴다. 카드가 하나 빠진 날은 지금처럼 위에서부터 쌓이는 것이 맞다.
+
+   flex-shrink는 0으로 묶는다. flex 아이템은 기본이 1이라, 오른쪽 열이 더 길어서 높이를
+   정하는 쪽이 됐을 때(넓은 화면에서 흔하다 — 아래 .pet-room 주석) 반올림 오차만큼
+   카드가 눌릴 수 있다. 방어용이다 */
+.pet__col--side {
+  display: flex;
+  flex-direction: column;
+}
+
+.pet__col--side > * {
+  flex-shrink: 0;
+}
+
+.pet__col--side > .pet-card--today {
+  margin-top: auto;
+}
+
 /* ── 펫 방 ───────────────────────────────────────────────────────────────── */
 
+/* 사용자 요청으로 두 번 키웠다. 21 → 23rem (2026-08-22) → **27rem** (2026-08-23).
+   좁은 화면은 15 → 16.5 → 19.5rem.
+
+   min-height라 위쪽 방향으로만 자란다 — 펫은 bottom: 0으로 바닥에 붙어 있으므로
+   커진 만큼 펫 위 여백이 늘고 펫이 서는 자리는 그대로다.
+   배경 SVG·치장 이미지는 둘 다 cover(slice)라 늘어난 높이를 알아서 채운다.
+
+   **펫 그림 크기는 그대로다**(단계별 6.25~11.5rem, 아래 .pet-char__img). 방만 키우면
+   큰 방에 작은 펫이 서 있는 비율이 되므로, 펫도 같이 키우려면 그 값들을 따로 올려야 한다.
+
+   min-height는 **하한**이다. 오른쪽 열(재화·경험치·수확·투입·진화 카드)이 더 길면
+   .pet__grid의 align-items: stretch가 방을 그 높이까지 늘리므로, 넓은 화면에서 이 값을
+   올려도 눈에 안 보일 수 있다 — 그때는 이미 오른쪽 열이 높이를 정하고 있는 것이다 */
 .pet-room {
   position: relative;
   display: flex;
   align-items: flex-end;
   justify-content: center;
-  min-height: 21rem;
+  min-height: 27rem;
   overflow: hidden;
   border: 3px solid var(--tribe-line);
   border-radius: var(--radius-card);
@@ -213,6 +289,19 @@
    투명 PNG가 올라와도 두 방이 겹쳐 보이지 않게 불투명 바닥을 깐다 */
 .pet-room__bg--img {
   background: var(--color-card);
+
+  /* 흰 액자 테두리를 잘라낸다 (2026-08-22). S3의 배경 6장은 추출이 덜 돼서 그림 바깥에
+     흰 여백이 남아 있다 — 6장을 재 본 최악값이 위 19px·아래 26px·좌 16px·우 17px
+     (810×324 기준, 둥근 모서리 포함)이고, 가장 두꺼운 쪽이 한 변의 8.0%다.
+     그래서 각 변에서 8.3%를 버리는 1.2배로 확대해 .pet-room의 overflow: hidden으로 자른다.
+
+     px 여백(margin: -26px 같은 것)으로 잘라내지 않는 이유: 그림이 방 크기에 맞춰
+     늘어나므로 흰 테두리의 화면상 두께도 창 크기에 따라 변한다. px로 맞추면 한 크기에서만
+     맞고 전체화면·창 축소에서 다시 새어 나온다. 비율(scale)은 어느 크기에서도 같은 8.3%다.
+
+     그림 원본이 잘 다듬어져 올라오면 이 한 줄만 지우면 된다 (그때 여백까지 보이게 된다면
+     이 값이 원인이다). */
+  transform: scale(1.2);
 }
 
 /* 방 배경 색. 벽·커튼·러그는 종족색을 따르고, 바닥(나무)과 창밖(하늘)·화분(초록)은
@@ -300,15 +389,197 @@
   animation: petFloatSeed 2.8s var(--ease-in-out) 1.5s infinite;
 }
 
+/* ── 환영 문구 말풍선 (2026-08-23) ───────────────────────────────────────── */
+
+/* 펫이 방에서 건네는 한 줄. 들어오면 접속 인사가 뜨고 5분마다 평상시 대사로 바뀐다
+   (문장 20개와 규칙은 lib/pet.ts "펫 대사" 절. 클래스 이름이 pet-welcome인 것은
+   이 기능이 환영 문구로 시작했기 때문이고, 이름은 바꾸지 않았다).
+
+   자리는 방의 **위쪽**이다. .pet-room이 min-height 27rem이고 .pet-char는 bottom: 0이라
+   위가 비어 있어서, 여기에 두면 펫·재화 알약·씨앗 장식 중 아무것도 가리지 않는다.
+   꼬리를 아래로 내려 펫이 말하는 것으로 읽히게 한다.
+
+   면은 **불투명한 카드색**이다. 배지와 같은 이유다(위 --tribe-chip 주석) — 뒤가 방 배경
+   **그림** 6종이라 반투명이면 배경마다 글자 명암비가 달라진다. 문구가 이 기능의 전부인데
+   어떤 배경에서 안 읽히면 기능이 없는 것과 같다. 카드색 위 잉크 글자는 어느 배경에서도
+   같은 12:1이다. 종족색은 테두리와 꼬리에만 쓴다 */
+/* 말풍선을 펫 **머리 바로 위**에 붙이는 값 (2026-08-23 사용자 요청: "너무 위에 있어").
+   전에는 방의 위 기준(top: 1rem)이었다. 방이 27rem으로 커진 뒤 4단 펫과의 사이가 92px,
+   1단은 176px까지 벌어져 말풍선이 펫과 무관한 판처럼 떠 있었다.
+
+   그래서 **바닥 기준(bottom)**으로 뒤집었다. .pet-char도 bottom: 0으로 바닥에 붙어 있으니
+   둘 다 바닥을 기준으로 두면 방 높이가 변해도(넓은 화면에서 .pet__grid가 stretch로 늘린다)
+   펫과 말풍선의 간격이 그대로다. top 기준이면 방이 늘어난 만큼 간격이 벌어졌다.
+
+   단계마다 값이 다른 이유는 펫 키가 다르기 때문이다(6.25~11.5rem). 계산은
+   `펫 그림 + 4px(그림자 자리) + 15.5px(꼬리) − 8px(겹침)`이고, 결과가 "꼬리 끝이 그림
+   상자 위 테두리보다 8px 아래"다. data-stage는 .pet-char에 있으므로 :has()로 읽는다 —
+   방에 같은 값을 한 번 더 심으면 상태가 두 곳에 생긴다.
+   기본값 9.75rem은 data-stage가 1~4가 아닐 때 쓰는 그림 크기(9rem)에 맞춘 값이다.
+   **펫 그림 크기를 바꾸면 이 네 값도 같이 움직여야 한다**
+
+   2026-08-23에 두 번 내렸다.
+   2차: Lv 배지를 걷으면서 머리 위 20px이 비어 그만큼 (9.5/11.25/13/14.75rem →).
+   3차: 사용자 요청("조금만 더 밑에")으로 1rem씩 더 (8/9.75/11.5/13.25rem →).
+   그림 상자를 8px 넘어 들어가는데도 꼬리가 머리에 닿지 않는다 — .pet-char__img가
+   object-fit: contain인 정사각형이라 캐릭터 위에 투명 여백이 남는다. 더 내리려면 이
+   여백이 한계이고, 그림마다 여백 양이 달라 여기서부터는 눈으로 확인해야 한다 */
+.pet-room:has(.pet-char[data-stage="1"]) {
+  --pet-bubble-lift: 7rem;
+}
+.pet-room:has(.pet-char[data-stage="2"]) {
+  --pet-bubble-lift: 8.75rem;
+}
+.pet-room:has(.pet-char[data-stage="3"]) {
+  --pet-bubble-lift: 10.5rem;
+}
+.pet-room:has(.pet-char[data-stage="4"]) {
+  --pet-bubble-lift: 12.25rem;
+}
+
+.pet-welcome {
+  position: absolute;
+  /* min()의 두 번째 항이 **방 위쪽 상한**이다. 100%는 방 높이로 풀리므로
+     "말풍선 높이 + 0.5rem"만큼은 위에 남긴다 = 말풍선 윗부분이 방 밖으로 잘리지 않는다.
+     지금 네 값에서는 이 상한이 실제로 걸리지 않는다(가장 빡빡한 좁은 화면 4단이
+     12.25rem이고 상한이 12.75rem이다). 값을 다시 올릴 때를 위한 방어로 남긴다 —
+     이 상한이 있어서 좁은 화면에도 같은 규칙을 쓸 수 있다(전에는 top 기준으로 따로 뒀다) */
+  bottom: min(
+    var(--pet-bubble-lift, 9.75rem),
+    100% - var(--pet-bubble-min-h) - var(--space-2xs)
+  );
+  left: 50%;
+  transform: translateX(-50%);
+  /* 펫(--z-raised)보다 위. 말풍선 꼬리가 캐릭터 쪽으로 내려가므로 겹칠 때 위에 있어야 한다 */
+  z-index: var(--z-sticky);
+  display: flex;
+  /* flex-start가 아니라 center다. 상자 크기가 고정되면서 오른쪽 위 모서리가 blob 곡선
+     **밖**이 됐다 — 그 자리에 ✕를 두면 테두리에 걸치거나 아예 밖에 뜬다.
+     세로 가운데는 blob이 가장 넓은 구간이라(x가 202까지 나간다) 안전하다 */
+  align-items: center;
+  /* 0.5 → 0.75rem. 닫기 버튼이 사방 0.3rem 음수 margin으로 터치 면을 넓히고 있어서
+     (아래 .pet-welcome__close) gap 0.5rem이면 글자와 ✕가 0.2rem으로 붙어 보인다 */
+  gap: var(--space-xs);
+  /* 2026-08-23 사용자 요청 2차: 모양을 참고 그림 그대로 맞췄다. 알약(1차)은 "이 모양으로
+     똑같이" 하고 싶다는 요청에 못 미쳤다. 그림의 blob은 네 굴곡이 서로 다르고 꼬리가
+     갈고리라 border-radius로는 그릴 수 없다 — 그래서 SVG path 하나로 옮겼고
+     (PetView.tsx .pet-welcome__shape), 여기서는 테두리·면색·radius를 전부 걷었다.
+
+     그 대신 **크기를 고정한다.** width: max-content면 글자 길이마다 상자 비율이
+     4:1~8:1로 흔들리고, 그림을 그 비율에 맞춰 늘리면 꼬리가 납작해지고 굴곡이 뭉갠다.
+     13rem × 6.5rem = 208 × 104px = 정확히 viewBox 비율이라 늘어남이 0이다.
+     부수 효과가 하나 더 있다: 대사가 다음 문장으로 넘어갈 때 말풍선 크기가 튀지 않는다.
+
+     그림의 원래 비율은 약 1.4:1인데 그건 쓰지 않았다. 글자가 읽히는 폭(208px)에서
+     1.4:1이면 높이가 150px가 되고, 방(모바일 312px)에서 성체 그림 184px과 겹친다.
+     굴곡·선 굵기·꼬리 모양은 그림 그대로 두고 가로 비율만 넓혔다.
+
+     20문장 중 가장 긴 것("오늘 하루 중에 제일 기억에 남는 순간은 뭐였을까?" 27자)이
+     세 줄이고, 안쪽 높이 72px에 세 줄 61px이 들어간다 — 상자가 늘어나지 않는다 */
+  width: 13rem;
+  /* 위 bottom의 상한 계산이 이 값을 읽는다. 두 곳에 적으면 갈라지므로 변수로 둔다 */
+  --pet-bubble-min-h: 6.5rem;
+  min-height: var(--pet-bubble-min-h);
+  /* 좌우 1.5rem은 blob 곡선을 피하는 값이다. 세 줄일 때 글자 띠가 viewBox y 21~82을
+     쓰는데, 그 구간에서 왼쪽 테두리가 가장 안쪽으로 들어오는 지점이 x≈24다.
+     위아래 1rem도 같은 이유로 줄이지 않는다 — 0.5rem으로 내리면 첫 줄이 위쪽 곡선에 닿는다 */
+  padding: var(--space-sm) var(--space-md);
+  animation: petSlideIn var(--dur-short) var(--ease-out);
+}
+
+/* 손그림 blob 본체 + 꼬리. path 하나이므로 옛 방식처럼 "본체의 아래 테두리를 면색으로
+   지워 입을 연다"는 겹치기가 필요 없다 — 꼬리가 애초에 같은 윤곽선의 일부다.
+
+   z-index: -1로 글자 뒤로 보낸다. 절대 위치 요소는 z-index: auto만으로도 형제 텍스트
+   **위**에 그려지기 때문이다. 부모가 position + z-index를 가져 쌓임 문맥을 만들므로
+   -1이 방 배경까지 뚫고 내려가지는 않는다 */
+.pet-welcome__shape {
+  position: absolute;
+  inset: 0;
+  z-index: -1;
+  width: 100%;
+  height: 100%;
+  /* 꼬리는 viewBox 밖(y 104~118)에 있다. SVG 기본값이 overflow: hidden이라 이걸 빼면
+     꼬리가 통째로 잘린다 */
+  overflow: visible;
+  /* 옛 box-shadow 자리. 상자가 아니라 그려진 도형에 그림자를 줘야 하므로 filter다 */
+  filter: drop-shadow(0 4px 10px rgb(42 31 20 / 0.22));
+}
+
+/* 면은 **불투명한 카드색**, 선은 종족색이다 — 이유는 위 .pet-welcome 앞 주석 참고.
+   stroke-width는 3인데, path에 vector-effect="non-scaling-stroke"가 걸려 있어
+   상자가 늘어나도 화면에서 3px을 유지한다 */
+.pet-welcome__shape path {
+  fill: var(--color-card);
+  stroke: var(--tribe-line);
+  stroke-width: 3;
+  /* 손그림 느낌은 여기서 나온다. 굴곡이 만나는 자리와 꼬리 끝이 둥글어진다 */
+  stroke-linejoin: round;
+  stroke-linecap: round;
+}
+
+.pet-welcome__text {
+  /* 상자 폭이 고정이라 남는 자리를 글자가 받고, ✕는 늘 오른쪽 끝에 붙는다
+     (사용자 요청은 "끝에 작게"였다) */
+  flex: 1;
+  /* 짧은 문장이 왼쪽에 몰리지 않게. blob은 좌우 대칭에 가까워서 가운데가 맞다 */
+  text-align: center;
+  margin: 0;
+  color: var(--color-ink);
+  font-size: var(--text-label);
+  /* 두 줄 이상이 되므로 줄 간격을 조금 넓힌다. 위로하는 문장을 빽빽하게 쓰지 않는다 */
+  line-height: 1.6;
+  /* 대사가 "왔어? 나 방금 네 생각하고 있었어!"처럼 두 마디로 되어 있어서
+     낱말 중간이 아니라 마디에서 끊기게 한다 */
+  word-break: keep-all;
+}
+
+/* 닫기. 대사는 알림이 아니라 혼잣말이므로 스스로 사라지지 않고 유저가 닫는다.
+   (닫으면 순환 타이머도 멈춘다 — PetView의 bubbleClosed)
+
+   2026-08-23 사용자 요청: 원형 배경을 걷고 **끝에 작은 회색 ✕** 하나만 남겼다.
+   1.5rem 알약이던 옛 모양은 말풍선 안에서 버튼이 문구보다 먼저 읽혔다 — 닫기는 부수
+   동작이고 안 닫아도 화면을 쓰는 데 지장이 없으므로, 눈에 걸리지 않는 크기가 맞다.
+
+   보이는 글자는 작지만 **눌리는 면은 그대로 두었다.** padding으로 사방 0.3rem을 넓히고
+   같은 값의 음수 margin으로 되돌리면 글자 위치는 그대로고 터치 면만 커진다 —
+   0.7rem 글자만으로는 모바일에서 조준이 안 된다.
+   44px 터치 타깃까지는 키우지 않는다(design.md 하한선은 주요 동작에 대한 것이다). */
+.pet-welcome__close {
+  flex-shrink: 0;
+  padding: 0.3rem;
+  margin: -0.3rem;
+  border: none;
+  background: none;
+  color: var(--color-muted);
+  font-size: 0.7rem;
+  /* 글자와 같은 줄 간격. 부모가 align-items: center라 문장이 몇 줄이든 세로 가운데다 */
+  line-height: 1.6;
+  cursor: pointer;
+  transition: color var(--dur-micro) var(--ease-out);
+}
+
+.pet-welcome__close:hover {
+  color: var(--color-ink);
+}
+
 /* ── 펫 캐릭터 ───────────────────────────────────────────────────────────── */
 
 /* 펫은 방 **중앙 하단**에 고정한다 (2026-08-21 사용자 확정).
    배경이 기본 방이든 구매한 그림이든 서는 자리가 같아야 한다 — 배경마다 바닥 높이가
    다르므로 어느 한 그림에 맞춰 좌표를 잡지 않고 방의 아래 가운데에 심는다.
-   flex 흐름에 두면 이름·설명 줄 수에 따라 펫이 위아래로 흔들려서 absolute로 뺐다. */
+   flex 흐름에 두면 이름·설명 줄 수에 따라 펫이 위아래로 흔들려서 absolute로 뺐다.
+
+   2026-08-21: bottom을 1.5rem → 0.5rem으로 낮췄다(사용자 요청). 이 값은 그림 하나가 아니라
+   .pet-char 전체(그림 + 바닥 그림자, 치장 착용 시 배지까지)의 바닥 여백이다.
+
+   2026-08-22: 같은 요청을 한 번 더 받아 0.5rem → 0으로 붙였다. 이제 바닥 그림자가 방
+   테두리(3px)에 닿는다 — 0.5rem을 남겨 뒀던 이유가 그거였는데, 더 내리라는 요청이
+   그보다 앞이다. 여기가 끝이다: 방이 overflow: hidden이라 음수 값은 잘려 나간다.
+   더 내려 보이게 하려면 방을 키우거나(.pet-room min-height) 그림을 줄이는 쪽이다 */
 .pet-char {
   position: absolute;
-  bottom: var(--space-md);
+  bottom: 0;
   left: 50%;
   transform: translateX(-50%);
   z-index: var(--z-raised);
@@ -317,22 +588,15 @@
   text-align: center;
 }
 
-.pet-char__badge {
-  position: absolute;
-  top: -0.5rem;
-  right: -0.5rem;
-  z-index: var(--z-raised);
-  padding: 0.1rem var(--space-2xs);
-  border: 2px solid var(--color-card);
-  border-radius: var(--radius-pill);
-  background: linear-gradient(135deg, var(--tribe-cta), var(--tribe-cta-2));
-  box-shadow: 0 2px 6px rgb(42 31 20 / 0.25);
-  color: var(--color-accent-ink);
-  font-family: var(--font-display);
-  font-size: var(--text-label);
-  /* Gowun Dodum 400 고정. 합성 굵기를 쓰지 않는다 */
-  font-weight: 400;
-}
+/* 머리 위 Lv. 배지 — 2026-08-23 사용자 요청으로 **삭제했다.**
+   말풍선을 캐릭터 바로 위에 붙이라는 요청과 같은 요청이었다. 배지가 머리 위 20px를
+   쓰고 있어서 말풍선을 그만큼 위로 밀어야 했고, 좁은 화면에서는 그래도 겹쳤다.
+   레벨은 아래 진화 카드의 "현재 Lv.N"에 남아 있다 — 방에서만 걷혔다.
+
+   여기 있던 규칙(연한 종족색 칩 + 짙은 갈색 글자 + 광택 두 겹, 하루에 두 번 고쳤다)과
+   petBounceBadge 키프레임, prefers-reduced-motion 목록의 항목도 함께 걷었다.
+   되살릴 일이 생기면 docs/dev/pet.md "머리 위 레벨 배지" 절에 색·명암비 계산이 남아 있다.
+   그때 말풍선 자리(--pet-bubble-lift 네 값)를 배지 높이만큼 다시 올려야 한다 */
 
 .pet-char__sparkle {
   position: absolute;
@@ -365,48 +629,65 @@
 /* 진화 단계별 크기. SPEC.md 5절은 "CSS transform 수준"까지만 요구한다.
    design.md가 금지하는 것은 scale 애니메이션이고, 단계별 고정 크기는 애니메이션이 아니다.
    2026-08-21: 4단 진화(알·아기·청소년·성체)가 되면서 3구간 → 4구간으로 늘렸다.
-   기본값은 stageCount = 1(단일 형태 캐릭터)이 쓰는 중간 크기다. */
+   기본값은 stageCount = 1(단일 형태 캐릭터)이 쓰는 중간 크기다.
+
+   2026-08-22 사용자 요청: 방을 23rem으로 키운 뒤 캐릭터가 작아 보여 네 단계를 **1.15배**로
+   같이 올렸다(5.5→6.25 / 7→8 / 8.5→9.75 / 10→11.5rem, 기본값 8→9rem).
+   단계별로 다른 비율을 주지 않는다 — 단계 간 크기 차이가 "자랐다"는 유일한 신호이므로
+   비율이 갈리면 진화 폭이 들쭉날쭉해진다.
+   2026-08-23에 방만 23 → 27rem(432px)으로 커졌고 **이 값들은 안 올렸다**(사용자 요청이
+   방이었다). 그래서 4단 11.5rem(184px)은 방 높이의 절반에서 43%로 내려왔다 — 캐릭터를
+   방에 맞춰 다시 키우려면 네 값을 같은 비율로 함께 올린다(예: 1.15배로 7.2/9.2/11.2/13.2rem,
+   기본값 10.35rem). 방보다 캐릭터가 먼저 읽히기 시작하는 지점이 상한이다.
+   emoji의 font-size·line-height는 이미지가 없을 때 쓰는 폴백이라 width와 함께 움직인다 —
+   line-height를 width와 같게 두는 것이 이모지를 상자 가운데 세우는 방법이다 */
 .pet-char__img,
 .pet-char__emoji {
-  width: 8rem;
-  height: 8rem;
+  width: 9rem;
+  height: 9rem;
   object-fit: contain;
-  font-size: 5.5rem;
-  line-height: 8rem;
+  font-size: 6.25rem;
+  line-height: 9rem;
 }
 .pet-char[data-stage="1"] .pet-char__img,
 .pet-char[data-stage="1"] .pet-char__emoji {
-  width: 5.5rem;
-  height: 5.5rem;
-  font-size: 4rem;
-  line-height: 5.5rem;
+  width: 6.25rem;
+  height: 6.25rem;
+  font-size: 4.5rem;
+  line-height: 6.25rem;
 }
 .pet-char[data-stage="2"] .pet-char__img,
 .pet-char[data-stage="2"] .pet-char__emoji {
-  width: 7rem;
-  height: 7rem;
-  font-size: 5rem;
-  line-height: 7rem;
+  width: 8rem;
+  height: 8rem;
+  font-size: 5.75rem;
+  line-height: 8rem;
 }
 .pet-char[data-stage="3"] .pet-char__img,
 .pet-char[data-stage="3"] .pet-char__emoji {
-  width: 8.5rem;
-  height: 8.5rem;
-  font-size: 6rem;
-  line-height: 8.5rem;
+  width: 9.75rem;
+  height: 9.75rem;
+  font-size: 6.75rem;
+  line-height: 9.75rem;
 }
 .pet-char[data-stage="4"] .pet-char__img,
 .pet-char[data-stage="4"] .pet-char__emoji {
-  width: 10rem;
-  height: 10rem;
-  font-size: 7rem;
-  line-height: 10rem;
+  width: 11.5rem;
+  height: 11.5rem;
+  font-size: 8rem;
+  line-height: 11.5rem;
 }
 
+/* 2026-08-22: 위 여백을 0.25rem → -0.5rem으로 바꿨다(사용자 요청, 펫을 더 내리기).
+   .pet-char가 bottom: 0으로 바닥에 붙은 뒤에도 **그림**은 12px 떠 있었다 — 그림 아래
+   이 그림자(0.75rem)와 위 여백(0.25rem)이 자리를 차지하기 때문이다. 방이
+   overflow: hidden이라 bottom을 음수로 주면 그림자가 잘리므로, 대신 그림자를 그림 쪽으로
+   끌어올려 겹쳤다. 그림은 0.75rem 내려가고 잘리는 것은 없다.
+   그림자가 발밑에 겹치는 것은 원래 그림자가 있어야 할 자리라 어색하지 않다 */
 .pet-char__shadow {
   width: 4rem;
   height: 0.75rem;
-  margin-top: var(--space-3xs);
+  margin-top: -0.5rem;
   border-radius: var(--radius-pill);
   background: radial-gradient(ellipse, rgb(42 31 20 / 0.3), transparent 70%);
 }
@@ -414,17 +695,14 @@
 /* .pet-char__name / .pet-char__desc는 여기 있었다. 2026-08-21 사용자 결정으로 방에서
    이름과 상태 문구를 걷어 규칙까지 지웠다. 두 줄은 배경 그림 위에 얹히는 유일한 글자였고
    배경 6종의 밝기를 알 수 없어 반투명 바닥(--color-card 76%)을 깔아 뒀는데, 글자가
-   사라지면서 그 장치도 쓸 데가 없어졌다. 방에 남는 글자는 .pet-char__badge(Lv.)와
-   .pet-char__worn(착용 배지)이고 둘 다 자기 배경을 갖고 있다. */
+   사라지면서 그 장치도 쓸 데가 없어졌다.
 
-/* 착용 중인 치장. 이미지가 없어 이름 배지로만 보여준다 (SPEC.md 5절) */
-.pet-char__worn {
-  display: flex;
-  flex-wrap: wrap;
-  gap: var(--space-3xs);
-  justify-content: center;
-  margin-top: var(--space-2xs);
-}
+   2026-08-22: .pet-char__worn(착용 치장 이름 배지)도 같은 이유로 걷었다. 배경 그림이
+   S3에서 뜨기 시작하자 "배경1"이라는 이름표가 그림 위 잡음이 됐다. 규칙도 함께 지운다.
+
+   2026-08-23: .pet-char__badge(Lv.)까지 걷혔다(위 그 자리 주석). 이제 방에 보이는 글자는
+   말풍선 대사 한 줄뿐이다 — 배경 그림 위 글자 명암비 문제는 그 하나로 모인다.
+   그래서 말풍선 면을 불투명한 카드색으로 두는 것이 더 중요해졌다(.pet-welcome 주석) */
 
 /* ── 카드 ────────────────────────────────────────────────────────────────── */
 
@@ -466,11 +744,30 @@
 /* 먹이기 버튼. 한 번 --text-label(0.8rem)까지 줄였다가 2026-08-21 사용자 요청으로 한 단계
    되올렸다. 0.9rem은 --text-label과 --text-body 사이의 스케일 밖 값이다 — tokens.css의
    1.25배 스케일에는 그 사이 칸이 없고, --text-body로 되돌리면 줄이기 전과 같아진다.
-   버튼 자체도 --control-h(44px)에서 3rem(48px)으로 올렸다 */
+   버튼 자체도 --control-h(44px)에서 3rem(48px)으로 올렸다
+
+   2026-08-21 사용자 시안 반영: 12px 라운드 → 알약, 아래 단계 그림자(0 4px 0 --tribe-cta)
+   → 같은 종족색의 부드러운 번짐이다. 색을 바꾼 것이 아니라 같은 색을 퍼뜨린 것이다.
+   .pet-btn 본체를 고치지 않고 이 카드에만 거는 이유: 상점 2화면의 --ghost 버튼과 옆 칸의
+   씨앗 줍기 버튼이 같은 .pet-btn을 쓴다. 본체를 알약으로 바꾸면 세 화면이 같이 바뀐다 */
 .pet-card--feed .pet-btn {
   min-height: 3rem;
+  border-radius: var(--radius-pill);
+  box-shadow: 0 6px 16px color-mix(in oklch, var(--tribe) 42%, transparent);
   font-size: 0.9rem;
   font-weight: 400;
+}
+
+/* 아래 두 규칙은 .pet-btn 본체의 :active·:disabled가 하드 단계 그림자를 되살리기 때문에
+   필요하다. 본체 규칙(.pet-btn:disabled)은 이 파일 뒤쪽에 있고 특이도가 위 규칙과 같아서
+   순서로 이긴다 — 클래스 하나를 더 얹어 특이도로 눌러 둔다 */
+.pet-card--feed .pet-btn:active:not(:disabled) {
+  transform: translateY(1px);
+  box-shadow: 0 3px 8px color-mix(in oklch, var(--tribe) 34%, transparent);
+}
+
+.pet-card--feed .pet-btn:disabled {
+  box-shadow: none;
 }
 
 /* 이 카드의 각주는 도움말 한 줄뿐이다. 2026-08-21 사용자 요청으로 --text-label에서 한 단계
@@ -539,14 +836,24 @@
 
    2026-08-21 사용자 결정(3차): 3D를 걷어냈다. 안쪽 그림자 2겹·세로 그라데이션·글자 흰
    그림자와, 그 그림자 자리를 벌리려고 올렸던 높이(1.5rem)를 전부 되돌렸다.
-   채움 색은 원색 그대로다 — 아래 참고 */
+   채움 색은 원색 그대로다 — 아래 참고
+
+   2026-08-21 사용자 결정(4차): 시안 이미지를 받고 **광택을 되살렸다** — 3차에서 걷어낸
+   것을 다시 넣은 것이므로 그때 지운 이유(막대가 무거워 보였다)를 알고 되돌리는 것이다.
+   3차와 다른 점은 두 가지다. 가로 그라데이션(채움 방향과 결을 맞춘 원색 → 밝은 색)을
+   유지한 채 광택을 그 **위에 겹으로** 얹었고, 글자 흰 그림자는 되살리지 않았다.
+   높이는 1.25 → 1.5rem으로 올렸다. 광택은 위아래로 밝은 띠·어두운 띠를 나눠야 보이는데
+   1.25rem(테두리 2px 빼면 실효 16px)에서는 띠가 각각 8px밖에 안 돼 뭉개졌다. */
 .pet-gauge {
   position: relative;
-  height: 1.25rem;
+  height: 1.5rem;
   overflow: hidden;
   border: 2px solid var(--tribe-line);
   border-radius: var(--radius-pill);
   background: var(--color-paper);
+  /* 빈 칸이 파인 홈으로 보이게 하는 안쪽 그림자. 채움이 덮은 자리에서는
+     자식(.pet-gauge__fill)이 위에 그려지므로 남은 칸에만 보인다 */
+  box-shadow: inset 0 2px 3px rgb(42 31 20 / 0.09);
 }
 
 /* 원색(--tribe)을 그대로 쓰는 자리다. 위 .pet 주석의 "원색은 면 전용" 규칙에 맞는다 —
@@ -562,10 +869,25 @@
    그라데이션은 채움 폭 안에서 늘고 줄기 때문에 경험치가 적어도 두 색이 다 보인다.
    글자(.pet-gauge__value)는 잉크색이고 밝은 끝(--tribe-face)이 원색보다 밝으므로
    명암비는 원색 기준(여우 6.9:1)보다 나빠지지 않는다 */
+/* 2026-08-21(4차) 광택. 배경을 2겹으로 쌓는다 — 위가 광택(세로), 아래가 종족색(가로)이다.
+   순서를 바꾸면 불투명한 색 겹이 광택을 덮어 아무 변화가 없다.
+   광택 겹은 흰색·검은색의 투명도만 쓴다. 종족색을 섞은 값을 쓰면 종족마다 광택 세기가
+   달라지고(원색 명도가 여우 > 곰 > 고양이 순으로 다르다) 색을 3벌 관리해야 한다.
+   투명도만 쓰면 6종 스킨·3종족에 같은 규칙 하나로 얹힌다.
+   위쪽 절반이 흰 띠, 52% 지점부터 어두운 띠다. 경계를 정확히 반이 아니라 조금 아래로
+   내린 것은 반반이면 막대가 두 색으로 갈린 것처럼 보이고 광택으로 읽히지 않기 때문이다.
+   명암비: 흰 겹이 위쪽을 밝히므로 잉크 글자 기준으로 3차보다 나빠지는 구간이 없다.
+   아래쪽 어두운 띠(최대 16%)는 잉크(#2A1F14 계열)와 같은 방향이라 대비가 줄지만,
+   글자는 세로 가운데 정렬이어서 가장 어두운 아래 끝에 얹히지 않는다 */
+/* 2026-08-22: 광택 두 겹을 .pet 스코프의 --pet-gloss / --pet-gloss-edge로 옮겼다.
+   값은 그대로이고 이 게이지의 모양은 바뀌지 않는다. 꺼낸 이유는 같은 광택을 주요 기능
+   버튼들이 쓰게 됐기 때문이다(사용자 요청) — 정의가 4곳에 복사되면 다음에 세기를
+   조절할 때 게이지만 바뀌고 버튼은 남는다 */
 .pet-gauge__fill {
   height: 100%;
   border-radius: var(--radius-pill);
-  background: linear-gradient(90deg, var(--tribe-face), var(--tribe));
+  background: var(--pet-gloss), linear-gradient(90deg, var(--tribe-face), var(--tribe));
+  box-shadow: var(--pet-gloss-edge);
   transition: width var(--dur-long) var(--ease-out);
 }
 
@@ -642,6 +964,21 @@
   font-variant-numeric: tabular-nums;
 }
 
+/* 오늘 들어온 재화의 출처 줄 (2026-08-22). 잔액 목록 아래에 붙는다.
+   .pet-card__meta와 같은 값(라벨 크기 + muted)이다 — 카드 안의 보조 설명은 이 화면 전체가
+   그 규칙을 쓰고, 여기만 다르면 새 위계가 생긴다.
+   줄 배경도 테두리도 주지 않는다. 위 재화 줄(.pet-wallet__row)이 유일하게 면을 갖는 요소여야
+   목록과 설명이 구분된다. padding-inline만 재화 줄과 맞춰 왼쪽 끝을 정렬한다 */
+.pet-wallet__source {
+  display: grid;
+  gap: var(--space-3xs);
+  margin: var(--space-2xs) 0 0;
+  padding: 0 var(--space-2xs);
+  list-style: none;
+  color: var(--color-muted);
+  font-size: var(--text-label);
+}
+
 /* 상점 입구 2개. auto-fit이라 좁아지면 두 줄로 갈린다 — 라벨이 nowrap이어서 억지로 한 줄에
    두면 320px에서 글자가 칸을 넘어간다 */
 .pet-wallet__shops {
@@ -663,15 +1000,30 @@
    이름이 .pet-shop이었다. 파일 아래쪽 "상점 화면" 절에 상점 두 화면의 타일 격자를 잡는
    .pet-shop이 이미 있어서, 같은 이름이 겹치면 여기 면 색·가운데 정렬·nowrap이 그 격자에도
    먹었다(외형/배경 상점 목록 전체가 종족색 면으로 깔렸다). 홈 지갑 카드 안에만 있는
-   요소이므로 .pet-wallet__shop으로 옮긴다 */
+   요소이므로 .pet-wallet__shop으로 옮긴다
+
+   2026-08-24 사용자 요청("눈에 잘 안 보여서"): 2026-08-22에 "광택은 주지 않는다"고 정했던
+   것을 뒤집는다. 그때 판단은 옳았지만 전제가 틀렸다 — 흰 띠가 안 보이는 것은 광택 탓이
+   아니라 면이 --tribe-soft(22%)로 너무 옅어서다. 그래서 광택을 얹는 대신 면부터 주 버튼과
+   같은 값(--tribe-face → --tribe 135deg)으로 올리고, 그 위에 광택 두 겹 + 사방으로 옅게
+   퍼지는 번짐을 준다(같은 날 두 번째 요청 "그림자 빼고 약간 주위에 퍼지게" — 처음에는
+   0 4px 0 단계 그림자였다). 면이 진해졌으므로 글자는 --color-muted를 쓸 수 없다 — 같은 면
+   위에서 이미 검증된 .pet-btn의 --color-ink로 올린다(design.md 명암비 규칙).
+
+   위계는 면 색이 아니라 글자와 모서리로 지킨다: 주 동작은 --text-body 600 + 알약,
+   여기는 --text-label 400 + --radius-card다 */
 .pet-wallet__shop {
   display: grid;
   place-items: center;
   min-height: var(--control-h);
   padding: var(--space-2xs) var(--space-xs);
   border-radius: var(--radius-card);
-  background: var(--tribe-soft);
-  color: var(--color-muted);
+  background: var(--pet-gloss), linear-gradient(135deg, var(--tribe-face), var(--tribe));
+  /* 단계 그림자(0 4px 0)가 아니라 번짐이다 — 2026-08-24 두 번째 요청("그림자 빼고 약간
+     주위에 퍼지게"). 값은 −·+ 원(.pet-step__btn)과 같다. 원래 이 자리에도 0 2px 6px 번짐이
+     있었으므로, 바뀐 것은 번짐이 한 단계 넓어진 것과 그 위에 광택이 얹힌 것뿐이다 */
+  box-shadow: var(--pet-gloss-edge), 0 4px 10px color-mix(in oklch, var(--tribe) 38%, transparent);
+  color: var(--color-ink);
   font-family: var(--font-display);
   font-size: var(--text-label);
   text-align: center;
@@ -680,26 +1032,154 @@
   transition: transform var(--dur-micro) var(--ease-out);
 }
 
+/* 번짐은 딛고 앉을 단이 아니므로 눌림은 1px 그대로다. 번짐만 한 단계 줄인다 */
 .pet-wallet__shop:active {
   transform: translateY(1px);
+  box-shadow: var(--pet-gloss-edge), 0 2px 5px color-mix(in oklch, var(--tribe) 30%, transparent);
+}
+
+/* ── 오늘의 활동 (2026-08-24) ────────────────────────────────────────────── */
+
+/* 사용자 시안(스크린샷 한 장)을 이 화면의 색 체계로 옮긴 것이다. 시안은 분홍·연보라 계열이고
+   숫자 세 개가 각각 초록·파랑·분홍이었다. 그 팔레트를 그대로 쓰지 않은 이유는 design.md의
+   "채도 높은 색은 종족색 하나뿐"과 SPEC.md 2절 소속감이다 — 종족색이 여우·고양이·곰 세 색으로
+   도는데 이 카드만 고정 분홍이면 화면에서 유일하게 종족을 안 따르는 조각이 된다.
+   **가져온 것은 모양이다**: 알약 제목 배지, 둥근 타일 3칸, 칸 안에 이모지 → 큰 숫자 → 작은 이름.
+
+   타일 면을 종족색으로 칠하지 않았다. design.md는 한 화면의 색 면을 "종족 원판 1개 +
+   희석된 면 1개"로 묶는데, 이 화면은 이미 먹이기·씨앗 줍기·−/+·상점 입구 2개가 색 면을
+   나눠 갖고 있다(파일 앞 주석의 "이 화면만 예외"). 여기에 타일 3칸을 더 칠하면 요약 카드가
+   주 동작보다 진해진다. 그래서 면은 종이색이고 **테두리만 종족색**이다 —
+   시안의 "옅은 면 + 색 테두리"가 이 조합으로도 나온다.
+   면이 --color-paper(#f5f0e8)이고 카드가 --color-card(#fdfbf5)라 명도 차이가 1.07:1뿐이라서
+   테두리를 지우면 칸 3개가 사라진다(.pet-preset 주석과 같은 사정) */
+
+.pet-today {
+  /* auto-fit이다. 0인 칸은 렌더하지 않으므로(PetView의 todayTiles) 실제 칸 수가 1~3으로
+     변한다 — repeat(3, 1fr)로 두면 1칸일 때 왼쪽 1/3에 붙고 오른쪽 2/3이 빈다.
+     min(5rem, 100%)의 5rem은 좁은 화면에서 3칸을 한 줄에 유지하는 값이다:
+     320px 화면의 카드 안쪽이 약 18rem이고 5 × 3 + gap 0.5 × 2 = 16rem이라 들어간다.
+     6rem으로 올리면 19rem이 되어 2 + 1로 갈린다 */
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(min(5rem, 100%), 1fr));
+  gap: var(--space-2xs);
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+/* 제목 알약(.pet-today__badge)은 **걷었다** (2026-08-24 사용자 요청: "제목에 씌워진
+   파란 동그라미 지워"). 시안이 알약 모양이라 --tribe-soft 면 + --tribe-line 테두리 +
+   --radius-pill로 만들어 뒀는데, 고양이 종족(--tribe #6a95c8)에서 그게 제목을 감싼
+   **파란 동그라미**로 읽혔다. 요약 카드 하나가 다르게 서는 값이 그만큼은 아니다.
+   이제 이 카드도 다른 카드 넷과 같은 .pet-card__title 한 줄을 쓴다 — 새 규칙이 아니라
+   이 화면의 기본으로 돌아온 것이고, 카드 제목 CSS가 한 벌로 줄었다.
+   되살릴 일이 있으면 위 문단이 필요한 값을 다 갖고 있다 */
+
+/* 칸 하나. 모양은 .pet-evo-card 가족을 따른다(둥근 사각 + 테두리 + 가운데 정렬) —
+   같은 화면군에서 "칸 하나 = 값 하나"가 같은 어휘로 읽혀야 한다.
+   align-content: start는 이름이 두 줄이 되는 칸이 생겨도 세 칸의 이모지·숫자 줄이
+   같은 높이에 서게 한다(격자가 칸 높이를 가장 긴 칸에 맞추므로) */
+.pet-today__tile {
+  display: grid;
+  justify-items: center;
+  align-content: start;
+  gap: var(--space-3xs);
+  padding: var(--space-xs) var(--space-3xs);
+  border: 1.5px solid var(--tribe-line);
+  border-radius: var(--radius-card);
+  background: var(--color-paper);
+  text-align: center;
+}
+
+/* 색 면을 두지 않는 맨 이모지다. 이 화면의 카드 제목들이 이미 그 방식이고
+   (수확 카드 주석: "제목 앞에 글자로만 붙는다 — 색 면을 두지 않는다"),
+   지갑 줄의 --tribe 20% 아이콘 칸까지 여기서 반복하면 타일이 지갑 줄처럼 보인다 */
+.pet-today__icon {
+  font-size: var(--text-lg);
+  line-height: 1;
+}
+
+/* 큰 숫자. 시안의 숫자가 굵어서 본문 서체(Noto Sans KR) 600을 쓴다 — 카드 제목 배지는
+   Gowun Dodum이지만 그 서체는 400 한 벌이라 굵게 만들 수 없다.
+   색은 --tribe-cta다. 이 화면이 강조 숫자에 쓰는 색이고(.pet-card__foot em,
+   .pet-evo-card__effect가 같은 값), 종족색 원색은 글자에 쓰지 않는다(파일 앞 --tribe-cta 주석:
+   원색은 면·테두리 전용). 카드색 위 --tribe-cta는 여우 5.6:1 / 고양이 6.4:1 / 곰 5.9:1이다.
+   tabular-nums는 세 칸의 자릿수가 달라도 숫자가 칸 가운데에서 흔들리지 않게 한다 */
+.pet-today__value {
+  color: var(--tribe-cta);
+  font-family: var(--font-body);
+  font-size: var(--text-md);
+  font-weight: 600;
+  font-variant-numeric: tabular-nums;
+}
+
+/* 씨앗 칸만 초록이다. 새 색이 아니라 파일 앞 --pet-seed의 그 값이다 — "채도 높은 색은
+   종족색 하나뿐" 규칙에서 씨앗 초록이 유일하게 남은 예외이고(씨앗은 어느 종족에게나 씨앗),
+   이 화면의 씨앗 줍기 버튼·경험치 게이지 채움이 이미 그 계열이다.
+   종이색 위 --pet-seed(#4a7a3c)는 5.4:1이다.
+   별조각·친밀도까지 색을 따로 주지 않는 이유: 시안처럼 세 칸을 다 다른 색으로 하려면
+   파랑·분홍을 새로 들여야 하고 그건 위 카드 앞 주석에서 안 하기로 한 부분이다 */
+.pet-today__value[data-seed="true"] {
+  color: var(--pet-seed);
+}
+
+/* 이름. .pet-card__meta와 같은 값(라벨 크기 + muted)이다 — 이 화면의 보조 설명이 전부
+   그 규칙이라 여기만 다르면 새 위계가 생긴다.
+   keep-all은 "받은 별조각"이 두 줄로 갈릴 때 낱말 중간이 아니라 띄어쓰기에서 끊기게 한다 */
+.pet-today__name {
+  color: var(--color-muted);
+  font-size: var(--text-label);
+  word-break: keep-all;
 }
 
 /* ── 방치형 씨앗 수확 ────────────────────────────────────────────────────── */
 
 /* 2026-08-21 사용자 결정: .pet-idle 6벌을 걷어냈다. 아이콘 칸(연두 색 면) + 숫자 + 작은
  * 버튼을 한 줄에 늘어놓던 전용 레이아웃이었는데, 이 카드만 제목 줄이 없어서 옆 카드들과
- * 골격이 달랐다. 이제 .pet-card__head / .pet-btn--block / .pet-card__foot을 그대로 쓴다 */
+ * 골격이 달랐다. 그때는 .pet-card__head / .pet-btn--block / .pet-card__foot을 그대로 썼다.
+ *
+ * 2026-08-24 사용자 요청("하단에 긴 버튼으로 두지 말고 오른쪽에 정사각형 버튼으로"):
+ * **2벌만** 되살렸다. 버튼이 오른쪽으로 가면 제목 줄의 오른쪽 자리가 버튼 것이 되므로
+ * 개수("N개")가 제목 아래로 내려간다 — 그 두 줄을 묶는 상자가 필요해서다.
+ * 옛 6벌(색 면 아이콘 칸 · 큰 숫자 · 단위)을 다 되살리지는 않았다. 요청은 버튼 모양이고,
+ * 개수는 .pet-card__meta를 그대로 재사용하므로 새 글자 규칙이 필요 없다.
+ *
+ * 이 카드만 골격이 달라지는 것은 감수한 것이다. 2026-08-21에 통일한 이유가 "이 카드만
+ * 제목 줄이 없어서"였는데, 지금은 제목 줄이 있고 그 아래가 아니라 옆에 버튼이 서는 것뿐이라
+ * 제목·개수·각주는 옆 카드들과 같은 클래스를 계속 쓴다 */
+.pet-idle {
+  display: flex;
+  align-items: center;
+  /* 개수가 짧아 왼쪽 상자가 좁다. space-between으로 버튼을 카드 오른쪽 끝에 붙인다 */
+  justify-content: space-between;
+  gap: var(--space-2xs);
+}
+
+/* 제목 + 개수. min-width: 0이 있어야 좁은 화면에서 이 상자가 버튼을 밀어내지 않는다
+   (design.md "격자를 감싼 flex 부모에는 min-width: 0"과 같은 사정) */
+.pet-idle__body {
+  display: grid;
+  gap: var(--space-3xs);
+  min-width: 0;
+}
 
 /* ── 버튼 ────────────────────────────────────────────────────────────────── */
 
-/* 먹이기 버튼. 면은 종족색 원색, 글자는 잉크색이다(.pet 스코프의 --tribe-face 주석 참고) */
+/* 먹이기 버튼. 면은 종족색 원색, 글자는 잉크색이다(.pet 스코프의 --tribe-face 주석 참고)
+ *
+ * 2026-08-22 사용자 요청("게임 UI 디자인처럼"): 광택 두 겹을 얹었다. 시안으로 받은 것이
+ * 우리 경험치 게이지였으므로 그 게이지가 쓰던 규칙(--pet-gloss / --pet-gloss-edge)을
+ * 그대로 가져온다. 새로 만든 것은 없다 — 색도, 아래 단계 그림자(0 4px 0)도, 높이도 같다.
+ * 종족색 그라데이션은 135deg로 남긴다. 광택이 180deg 세로라서 두 겹의 결이 갈려야
+ * 면이 사선으로 흐르고 그 위에 빛이 얹힌 것으로 읽힌다 */
 .pet-btn {
   min-height: var(--control-h);
   padding: 0 var(--space-sm);
   border: none;
   border-radius: var(--radius-input);
-  background: linear-gradient(135deg, var(--tribe-face), var(--tribe));
-  box-shadow: 0 4px 0 var(--tribe-cta);
+  background: var(--pet-gloss), linear-gradient(135deg, var(--tribe-face), var(--tribe));
+  box-shadow: var(--pet-gloss-edge), 0 4px 0 var(--tribe-cta);
   color: var(--color-ink);
   font-family: inherit;
   font-size: var(--text-body);
@@ -716,19 +1196,53 @@
    #a8d99a 위 흰 글자는 1.6:1이다. 짙은 초록(#2f5026, 전에 이 버튼의 그림자색이던 값)으로
    바꾸면 5.6:1이라 굵기 400에서도 읽힌다.
 
-   2026-08-21 사용자 결정: 아래 단계 그림자(0 4px 0)를 없앴다. .pet-btn 본체가 그림자를
-   갖고 있으므로 상속을 끊으려면 none을 명시해야 한다 — 규칙만 지우면 종족색 그림자가
-   되살아나 초록 면 아래 갈색 띠가 깔린다 */
+   2026-08-21 사용자 결정으로 아래 단계 그림자(0 4px 0)를 없앴고, 2026-08-24 사용자 요청
+   ("반 나눠서 입체감 있는 모양")으로 초록 단계 그림자를 되살렸다가, 같은 날 다시 요청
+   ("그림자 빼고 약간 주위에 퍼지게")으로 **단이 아니라 번짐**으로 바꿨다. 단계 그림자는
+   면 아래에 색 띠 한 줄을 깔아 버튼이 판에 박힌 것처럼 보이고, 번짐은 사방으로 옅게
+   퍼져 떠 있는 것처럼 보인다 — 같은 카드의 −·+ 원(.pet-step__btn)이 쓰던 방식이고
+   그 값(0 4px 10px, 색 38%)을 그대로 가져왔다. 새 색은 없다. 초록 계열이어야 하므로
+   --tribe가 아니라 --pet-seed를 섞는다 */
 .pet-btn--seed {
-  background: linear-gradient(135deg, #c4e6b8, var(--pet-seed-fill-2));
-  box-shadow: none;
+  background: var(--pet-gloss), linear-gradient(135deg, #c4e6b8, var(--pet-seed-fill-2));
+  /* box-shadow는 목록이 통째로 교체되므로, 광택 두 줄을 여기서도 다시 써야 한다.
+     본체의 단계 그림자(0 4px 0 --tribe-cta)는 이 교체로 사라진다 — 그것이 의도다 */
+  box-shadow: var(--pet-gloss-edge), 0 4px 10px color-mix(in oklch, var(--pet-seed) 38%, transparent);
   color: #2f5026;
   font-size: var(--text-label);
   font-weight: 400;
 }
 
+/* 2026-08-22: 12px 라운드 → 알약. 이 화면의 −·+·개수 알약·게이지가 이미 알약이라
+   주 버튼 두 개만 각진 사각이었다. --block에만 준 것은 이 클래스가 붙는 곳이 홈의
+   씨앗 줍기·먹이기 두 개뿐이라서다 — 상점 타일의 .pet-btn--ghost는 칸에 맞춰 각을 유지한다 */
 .pet-btn--block {
   width: 100%;
+  border-radius: var(--radius-pill);
+}
+
+/* 정사각형 버튼 (2026-08-24 사용자 요청). 지금 붙는 곳은 씨앗 줍기 하나뿐이다.
+ *
+ * **모서리를 알약으로 만들지 않는다.** --block이 알약인 것은 폭이 카드 전체라 각을 세우면
+ * 카드 테두리와 겹쳐 보이기 때문이고, 정사각형에 --radius-pill을 주면 원이 된다.
+ * 그래서 .pet-btn 본체의 --radius-input(12px)을 그대로 물려받는다 — 요청이 "정사각형"이므로
+ * 각이 남아 있어야 한다. 여기에 border-radius를 다시 쓰지 않은 것이 의도다.
+ *
+ * 4.5rem = 72px이다. 라벨 "씨앗 줍기"가 한 줄로 들어가는 하한에서 고른 값이다:
+ * --text-label이 0.8rem(12.8px)이고 한글 4자 + 공백이 약 56px이라 72px 안에 남는다.
+ * padding을 0으로 지우는 이유가 이것이다 — 본체의 0 var(--space-sm)이 남으면 좌우 32px를
+ * 먹어 안쪽이 40px로 줄고 라벨이 두 줄로 갈린다(design.md "버튼 라벨 2줄 금지").
+ * 라벨을 더 늘리려면 이 값을 같이 올려야 한다. nowrap은 그 사고를 두 줄이 아니라
+ * 넘침으로 드러내려고 둔 안전핀이다.
+ *
+ * --control-h(44px)보다 크므로 터치 영역은 저절로 충족된다.
+ * flex-shrink: 0이 없으면 좁은 화면에서 옆 상자에 밀려 정사각형이 깨진다 */
+.pet-btn--square {
+  flex-shrink: 0;
+  width: 4.5rem;
+  height: 4.5rem;
+  padding: 0;
+  white-space: nowrap;
 }
 
 /* 누름 효과. export의 .btn-press를 그대로 옮겼다 */
@@ -737,11 +1251,12 @@
   box-shadow: none;
 }
 
-/* 씨앗 줍기는 그림자가 없어 2px를 내려앉을 데가 없다. 나무판을 걷은 .pet-plank와 같은
-   이유로 1px만 눌린다. 위 규칙과 특이도가 같으므로 반드시 그 뒤에 와야 한다 —
-   앞에 두면 본체의 2px가 이긴다 */
+/* 씨앗 줍기는 그림자가 번짐이라 딛고 앉을 단이 없다 — 1px만 눌린다(.pet-step__btn과 같은
+   이유). 위 규칙과 특이도가 같으므로 반드시 그 뒤에 와야 한다. 번짐은 지우지 않고 줄인다:
+   none으로 만들면 누르는 순간 버튼이 종이에 붙었다가 손을 떼며 튀어오른다 */
 .pet-btn--seed:active:not(:disabled) {
   transform: translateY(1px);
+  box-shadow: var(--pet-gloss-edge), 0 2px 5px color-mix(in oklch, var(--pet-seed) 30%, transparent);
 }
 
 /* 나무판일 때는 4px 그림자를 깔고 앉는 2px였다. 이제 그림자가 없으니 1px만 눌린다 */
@@ -758,25 +1273,35 @@
 
 /* ── 씨앗 투입 스테퍼 ────────────────────────────────────────────────────── */
 
+/* 2026-08-21 사용자 시안 반영: 스테퍼를 감싸던 칸(2px --tribe-line 테두리 + --tribe-wash
+   면)을 걷었다. 시안은 −·숫자·+가 카드 위에 그대로 놓인 형태다. 칸을 지워도 세 요소가
+   흩어지지 않는 것은 양 끝 버튼이 원이라 스스로 끝을 잡아 주기 때문이다.
+   이 카드에서 색을 덜어낸 유일한 자리다 — 되살리려면 아래 두 줄을 지우면 된다 */
 .pet-step {
   display: flex;
   align-items: center;
   justify-content: space-between;
-  padding: var(--space-2xs) var(--space-xs);
-  border: 2px solid var(--tribe-line);
-  border-radius: var(--radius-input);
-  background: var(--tribe-wash);
+  padding: var(--space-3xs) 0;
+  border: none;
+  background: none;
 }
 
+/* 시안대로 정사각(12px 라운드) → **원**이다. 지름은 2.25rem에서 --control-h(44px)로
+   올렸다 — 원은 같은 크기의 사각보다 작아 보이고, 44px는 이 화면의 다른 컨트롤과 같은
+   값이라 새로 만든 치수가 아니다(tokens.css의 --control-h).
+   글자 크기·색은 그대로다. 아래 단계 그림자(0 3px 0)만 부드러운 번짐으로 바꿨다 —
+   시안의 버튼은 종이에 얹힌 판이 아니라 떠 있는 원이다 */
 .pet-step__btn {
   display: grid;
   place-items: center;
-  width: 2.25rem;
-  height: 2.25rem;
+  width: var(--control-h);
+  height: var(--control-h);
   border: none;
-  border-radius: var(--radius-input);
-  background: linear-gradient(135deg, var(--tribe-face), var(--tribe));
-  box-shadow: 0 3px 0 var(--tribe-cta);
+  border-radius: var(--radius-pill);
+  background: var(--pet-gloss), linear-gradient(135deg, var(--tribe-face), var(--tribe));
+  /* 2026-08-22: 광택 두 줄 + 원래의 번짐 그림자. 번짐은 지우지 않는다 — 광택은 면 안쪽,
+     번짐은 면 밖이라 서로 대신하지 못한다(광택만 남기면 원이 종이에 붙는다) */
+  box-shadow: var(--pet-gloss-edge), 0 4px 10px color-mix(in oklch, var(--tribe) 38%, transparent);
   color: var(--color-ink);
   font-family: inherit;
   font-size: var(--text-md);
@@ -784,11 +1309,18 @@
   font-weight: 400;
   line-height: 1;
   cursor: pointer;
+  transition: transform var(--dur-micro) var(--ease-out);
 }
 
+/* 딛고 앉을 3px 단계가 없어졌으므로 2px가 아니라 1px만 눌린다. 2026-08-24부터 씨앗 줍기·
+   상점 입구가 이 원의 방식(번짐 + 1px)을 그대로 따라간다 — 사용자 요청이 "약간 주위에
+   퍼지게"였고 그 값이 여기 있었다.
+   그림자는 지우지 않고 줄인다 — 없애면 원이 종이에 붙었다가 떠오르는 것처럼 튄다 */
 .pet-step__btn:active:not(:disabled) {
-  transform: translateY(2px);
-  box-shadow: none;
+  transform: translateY(1px);
+  /* 광택 두 줄을 여기서도 다시 써 준다. 목록이 통째로 바뀌므로 빼면 누르는 순간
+     원이 납작해지고, 손을 떼면 다시 부푼다 */
+  box-shadow: var(--pet-gloss-edge), 0 2px 5px color-mix(in oklch, var(--tribe) 30%, transparent);
 }
 
 /* 2026-08-21 사용자 지적: −와 +의 색이 달라 보였다. 두 버튼은 클래스가 하나이고, 갈린 것은
@@ -820,34 +1352,48 @@
 .pet-presets {
   display: grid;
   grid-template-columns: repeat(4, 1fr);
-  gap: var(--space-3xs);
+  /* 시안의 알약 4개는 서로 붙어 있지 않다. 3xs(4px)에서 2xs(8px)로 벌렸다 */
+  gap: var(--space-2xs);
 }
 
+/* 2026-08-21 사용자 시안 반영: 12px 라운드 → 알약이고, 아래 단계 그림자(0 2px 0)를 걷었다.
+   테두리는 남긴다 — 시안의 안 고른 알약은 테두리가 없지만, 그건 면이 강조색 연한 톤이라
+   저절로 칸이 서기 때문이다. 우리 안 고른 면은 --color-paper(#f5f0e8)고 카드가
+   --color-card(#fdfbf5)라 명도 차이가 1.07:1뿐이다 — 테두리를 지우면 알약 4개가
+   사라진다. 대신 2px에서 1.5px로 얇혔다.
+   크기·색은 그대로다(--text-label / --color-ink-2 / 2.25rem) */
 .pet-preset {
   min-height: 2.25rem;
-  border: 2px solid var(--color-rule);
-  border-radius: var(--radius-input);
+  border: 1.5px solid var(--color-rule);
+  border-radius: var(--radius-pill);
   background: var(--color-paper);
-  box-shadow: 0 2px 0 var(--color-rule);
   color: var(--color-ink-2);
   font-family: inherit;
   font-size: var(--text-label);
   font-weight: 400;
   cursor: pointer;
+  transition: transform var(--dur-micro) var(--ease-out);
 }
 
-/* 고른 개수 버튼. 고르지 않은 것은 종이색 그대로다 — 둘 다 색을 가지면 무엇을 골랐는지
-   사라진다 */
-.pet-preset[aria-pressed="true"] {
+/* 방금 누른 개수 버튼. 고르지 않은 것은 종이색 그대로다 — 둘 다 색을 가지면 무엇을 눌렀는지
+   사라진다. 시안처럼 하나만 떠 보이게 번짐 그림자를 준다.
+   2026-08-22: 선택자를 aria-pressed에서 data-active로 바꿨다. 개수 버튼이 "고르기"에서
+   "더하기"로 바뀌면서 눌린 상태(aria-pressed)가 아니라 실행하는 동작이 됐고, 동작 버튼에
+   aria-pressed를 달면 스크린리더가 토글로 잘못 읽는다. 색은 그대로다 */
+/* 2026-08-22: 고른 알약에도 광택을 얹었다. 안 고른 알약(종이색 면)에는 얹지 않는다 —
+   광택은 흰색 투명도라 이미 밝은 면에서는 보이지 않고, 위쪽 흰 띠가 글자만 흐리게 만든다.
+   덕분에 "고른 알약 = 색 + 광택"이 되어 차이가 전보다 커진다 */
+.pet-preset[data-active="true"] {
   border-color: var(--tribe-cta);
-  background: linear-gradient(135deg, var(--tribe-face), var(--tribe));
-  box-shadow: 0 2px 0 var(--tribe-cta);
+  background: var(--pet-gloss), linear-gradient(135deg, var(--tribe-face), var(--tribe));
+  box-shadow: var(--pet-gloss-edge), 0 3px 8px color-mix(in oklch, var(--tribe) 34%, transparent);
   color: var(--color-ink);
 }
 
+/* 단계 그림자가 없으니 1px만 눌린다. box-shadow: none을 쓰지 않는다 — 안 고른 알약은
+   원래 그림자가 없고, 고른 알약은 눌렸다고 떠 있던 것이 바닥에 붙으면 안 된다 */
 .pet-preset:active {
-  transform: translateY(2px);
-  box-shadow: none;
+  transform: translateY(1px);
 }
 
 .pet-preset:disabled {
@@ -1023,11 +1569,44 @@
   line-height: 1;
 }
 
-/* 실루엣. 이미지가 오면 같은 filter가 그 <img>에도 걸린다 (새 색 값을 만들지 않는다) */
-.pet-item--locked .pet-item__face,
-.pet-item--locked .pet-item__img {
+/* 배경 미리보기 (2026-08-22). 비율은 실제 그림 6장의 크기(810×324)를 그대로 쓴다 —
+   여기서 자르지 않고 장면 전체를 보여 준다. 방은 세로로 길어서(.pet-room 27rem) 같은
+   그림의 가운데만 잘라 쓰지만, 상점에서까지 가운데만 보이면 6칸이 다 비슷한
+   "하늘 + 바닥"이 되어 무엇을 사는지 고를 수 없다. 상점은 고르는 화면이라 전체를 보인다.
+   비율을 방과 맞추려면(본 대로 들어오게) 이 값만 4/3으로 바꾸면 된다.
+   불투명 배경(--color-paper-2)을 깔아 두면 투명 PNG가 와도 타일이 비어 보이지 않는다 */
+.pet-item__thumb {
+  overflow: hidden; /* 아래 scale(1.2)로 삐져나온 부분을 자르는 쪽 */
+  width: 100%;
+  aspect-ratio: 810 / 324;
+  border-radius: var(--radius-input);
+  background: var(--color-paper-2);
+}
+
+.pet-item__img {
+  display: block;
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+
+  /* 흰 액자 테두리 잘라내기. 방(.pet-room__bg--img)과 같은 값이어야 상점에서 본 것과
+     방에 들어온 것이 같은 크롭이다 — 한쪽만 고치면 조용히 어긋난다 */
+  transform: scale(1.2);
+}
+
+/* 실루엣 (SPEC.md 5절 "미획득 실루엣") */
+.pet-item--locked .pet-item__face {
   filter: grayscale(1);
   opacity: 0.35;
+}
+
+/* 미획득 배경은 실루엣을 약하게 준다 (2026-08-22). 위 값(grayscale 1 / opacity .35)을
+   그림에 그대로 걸면 6칸이 똑같은 회색 판이 되어 무엇을 사는지 구분되지 않는다.
+   이 화면은 도감이면서 상점이고, 아직 안 산 칸이 곧 파는 칸이다.
+   "안 가진 티"는 점선 테두리와 죽인 이름이 이미 내고 있으므로 그림은 알아볼 정도로 남긴다 */
+.pet-item--locked .pet-item__img {
+  filter: grayscale(0.45);
+  opacity: 0.72;
 }
 
 .pet-item__name {
@@ -1159,6 +1738,10 @@
   }
 }
 
+/* petBounceBadge — 2026-08-23 삭제. 쓰던 유일한 요소(.pet-char__badge)가 걷혔다.
+   위 petBounce의 -50% 붙은 사본이었다(가운데 정렬과 움직임이 같은 transform을 쓰므로
+   사본이 필요했다). 배지를 되살리면 이 키프레임도 같이 되살려야 한다 */
+
 @keyframes petFloatSeed {
   0%,
   100% {
@@ -1199,7 +1782,8 @@
   .pet-char__body,
   .pet-char__sparkle,
   .pet-room__seed,
-  .pet-toast {
+  .pet-toast,
+  .pet-welcome {
     animation: none;
   }
   .pet-gauge__fill {
@@ -1214,7 +1798,9 @@
     padding: var(--space-sm);
   }
 
-  /* 2단을 1단으로. 방 → 재화·상점 → 경험치 → 수확 → 투입 → 진화 순으로 흐른다 */
+  /* 2단을 1단으로. 방 → 재화·상점 → 경험치 → 수확 → 투입 → 오늘의 활동 → 진화 순으로
+     흐른다(오늘의 활동은 2026-08-24에 투입 아래로 내려왔다. .pet__col--side 주석 참고 —
+     한 열이 되면 남는 공간이 없어 그 열의 margin-top: auto는 0으로 풀린다) */
   .pet__grid {
     grid-template-columns: 1fr;
   }
@@ -1229,7 +1815,28 @@
   }
 
   .pet-room {
-    min-height: 15rem;
+    min-height: 19.5rem;
+  }
+
+  /* 좁은 화면은 방이 19.5rem(312px)이고 성체 그림이 11.5rem(184px)이라 위 여백이 128px다.
+     2026-08-23에 방을 16.5 → 19.5rem으로 키우면서 말풍선이 두세 줄이 되어도 머리 위
+     Lv. 배지까지 내려오지 않게 됐다 — 그전에는 264px뿐이라 겹칠 여지가 있었고, 겹쳐도
+     가려지는 것이 레벨 숫자 하나뿐이라 그대로 뒀다.
+     여백을 줄여 붙여 두는 이 규칙 자체는 남긴다. 대사가 길어지거나 글꼴이 커지면
+     여전히 여기가 완충이다 (방을 대사 때문에 키우는 쪽은 쓰지 않는다 — 닫는 순간
+     방 높이가 튄다) */
+  /* 13 × 6.5rem → 12.5 × 6.25rem. 둘 다 정확히 2:1이라 blob이 0.96배로 축소만 되고
+     늘어나지 않는다. 더 줄이지 않은 이유: 곡선은 같이 작아지는데 padding은 px 고정이라,
+     12rem까지 내리면 세 줄짜리 문장의 첫 줄 왼쪽이 위쪽 굴곡과 1.5px까지 붙는다.
+     안쪽 여백도 줄이지 않는다 — 위아래를 0.5rem으로 내리면 첫 줄이 곡선에 닿는다.
+     폭이 고정이라 옛 max-width 규칙은 필요 없어졌다(200px은 320px 화면에서도 남는다) */
+  /* 자리 규칙(bottom + --pet-bubble-lift)은 넓은 화면과 같다. Lv 배지가 걷히면서 머리 위
+     20px이 비어 4단도 방 안에 들어오게 됐다 — 전에는 좁은 화면만 top 기준으로 따로 뒀다.
+     --pet-bubble-min-h를 같이 내리는 이유는 위 min() 상한 계산이 이 값을 읽기 때문이다.
+     이 화면의 4단이 가장 빡빡하다: lift 12.25rem, 상한 12.75rem, 말풍선 위 여백 16px */
+  .pet-welcome {
+    width: 12.5rem;
+    --pet-bubble-min-h: 6.25rem;
   }
 
   .pet-presets {
