@@ -116,22 +116,43 @@ export function middleware(request: NextRequest) {
   if (hasSession) return pass()
 
   // 로그인 후 원래 가려던 곳으로 돌아갈 수 있게 남겨둔다.
-  // 열린 리다이렉트를 막기 위해 경로만 싣는다 — 절대 URL은 싣지 않는다
+  // 열린 리다이렉트를 막기 위해 next에는 경로만 싣는다 — 외부 절대 URL은 싣지 않는다.
   // "/"는 위에서 이미 통과했으므로 여기 오는 경로는 항상 홈이 아니다
   //
-  // 2026-08-24: Location에 절대 URL을 싣지 않는다. Amplify SSR은 Lambda 안에서 Next를
-  // localhost:3000으로 띄우고 그 앞에 CloudFront가 붙으므로 request.url의 host가
-  // 공개 도메인이 아니다 — `new URL("/login", request.url)`이면 배포 환경에서
-  // `https://localhost:3000/login`이 나가고 브라우저는 사용자 PC의 3000번을 찾는다.
-  // `main`의 `fd8c21f`가 로그아웃·로그인 콜백 2곳에서 이 함정을 고쳤는데
-  // 미인증 리다이렉트인 여기가 빠져 있었다(실측은 `lib/oauth.ts` appRedirect 주석).
-  // 상대 경로는 브라우저가 자기가 실제로 요청한 주소를 기준으로 푼다(RFC 7231 §7.1.2).
+  // ★ 여기서는 상대 경로를 쓸 수 없다(2026-08-24 장애). Route Handler는 plain Response를
+  //   그대로 내보내므로 `Location: "/login"`이 통하지만(`lib/oauth.ts` appRedirect),
+  //   미들웨어는 Edge 런타임이고 Next의 어댑터가 Location 값을 `new URL()`로 파싱한다.
+  //   base 없는 상대 경로는 거기서 터진다 — 배포본이 보호된 페이지 전부 500이었다:
+  //     TypeError: Invalid URL { code: 'ERR_INVALID_URL', input: '/login?next=%2Fpet' }
+  //   즉 fd8c21f의 "절대 URL을 만들지 않는다" 규칙은 Route Handler 한정이고
+  //   미들웨어에는 그대로 옮길 수 없다.
+  //
+  //   그래서 절대 URL을 만들되 host를 request.url에서 가져오지 않는다. Amplify SSR은
+  //   Lambda 안에서 Next를 localhost:3000으로 띄우고 앞에 CloudFront가 붙으므로
+  //   request.url의 host는 공개 도메인이 아니다. 공개 도메인은 프록시가 넣어주는
+  //   x-forwarded-host에 있다. 로컬 개발에는 그 헤더가 없어 host로 떨어진다.
+  const forwardedHost = request.headers.get("x-forwarded-host")
+  const host = forwardedHost || request.headers.get("host") || request.nextUrl.host
+  // 프록시가 프로토콜도 알려준다. 없으면 로컬(http)과 그 외(https)를 host로 가른다
+  const proto =
+    request.headers.get("x-forwarded-proto") ||
+    (host.startsWith("localhost") || host.startsWith("127.0.0.1") ? "http" : "https")
+
+  // x-forwarded-host가 없으면 host가 localhost:3000일 수 있고, 그때 브라우저는
+  // 사용자 PC의 3000번을 찾아간다(fd8c21f가 고친 그 증상). 조용히 틀리면 또 못 찾으므로
+  // 그 경우에만 로그를 남긴다 — 배포본에서 이 줄이 보이면 헤더 이름을 다시 확인할 것
+  if (!forwardedHost && process.env.NODE_ENV === "production") {
+    console.error(`[middleware] x-forwarded-host 없음 — host="${host}"로 리다이렉트한다`)
+  }
+
   const nextParam = encodeURIComponent(`${pathname}${search}`)
+  const location = new URL(`/login?next=${nextParam}`, `${proto}://${host}`)
+
   return new NextResponse(null, {
     // 307을 유지한다. NextResponse.redirect의 기본값이 307이었고 여기서 메서드를
     // 바꾸면 보호된 API에 POST하던 요청의 실패 모양이 달라진다
     status: 307,
-    headers: { Location: `/login?next=${nextParam}`, "Content-Security-Policy": csp },
+    headers: { Location: location.toString(), "Content-Security-Policy": csp },
   })
 }
 
