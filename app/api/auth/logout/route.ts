@@ -1,9 +1,10 @@
 // 소유자: E. 로그아웃 — 세션 쿠키만 지운다.
 
-import { NextResponse } from "next/server"
 import { clearSessionCookie } from "@/lib/auth"
+import { appRedirect } from "@/lib/cognito"
 
-export async function POST(request: Request) {
+export async function POST() {
   await clearSessionCookie()
-  return NextResponse.redirect(new URL("/login", request.url))
+  // request.url로 절대 URL을 만들면 배포 환경에서 localhost:3000으로 튄다. appRedirect 주석 참고
+  return appRedirect("/login")
 }
