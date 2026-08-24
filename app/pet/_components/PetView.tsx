@@ -567,64 +567,62 @@ export default function PetView({ initial }: { initial: PetState }) {
             </p>
           </div>
 
-          {/* 방치형 수확 카드가 여기 있었다. **2026-08-24 사용자 요청(시안 이미지 한 장)으로
-              씨앗 투입 카드에 통합했다** — "이 이미지처럼 그동안 쌓인 씨앗 카드와 씨앗투입
-              카드를 통합해줘". 카드 세 장(경험치 · 쌓인 씨앗 · 씨앗 투입)에서 두 장이 됐다.
-              옛 골격은 `.pet-card > .pet-idle(제목+개수 | 정사각형 버튼) + 조건부 각주`였고,
-              통합된 자리는 아래 씨앗 투입 카드의 첫 줄이다. 두 카드가 같은 재화(씨앗)를 두 칸에
-              나눠 보여 주고 있었으므로 정보는 하나도 줄지 않았다 — 옮긴 것뿐이다.
-              되살릴 일이 생기면 `.pet-idle`·`.pet-btn--square` 규칙이 pet.css에 그대로 있다 */}
+          {/* 방치형 수확. 2026-08-21 사용자 결정으로 아이콘 칸 + 숫자를 왼쪽에 두던 한 줄을
+              걷고 경험치·씨앗 투입 카드와 같은 골격(제목 줄 → 주 버튼 → 각주)으로 맞췄다.
+              씨앗 이모지는 다른 카드처럼 제목 앞에 글자로만 붙는다 — 색 면을 두지 않는다.
 
-          {/* 씨앗 투입. --feed는 이 카드 안의 글씨체를 한 벌로 묶는 변형이다
-              (2026-08-21 사용자 결정)
+              2026-08-24 사용자 요청("하단에 긴 버튼으로 두지 말고 오른쪽에 정사각형 버튼으로")
+              으로 그 골격에서 버튼만 빠져나왔다. 버튼이 오른쪽으로 가면 제목 줄의 오른쪽
+              자리가 버튼 것이 되므로 __head를 쓸 수 없고, 개수("N개")가 제목 아래로 내려간다.
+              그래서 제목 + 개수를 .pet-idle__body로 묶고 .pet-idle이 그 상자와 버튼을
+              한 줄에 세운다. 개수는 클래스를 바꾸지 않았다 — .pet-card__meta 그대로다.
 
-              2026-08-24: 위 방치형 카드를 이 카드로 통합했다(시안 이미지 한 장). 첫 줄이
-              `.pet-card__head`에서 `.pet-idle`로 바뀌었다 — 시안의 첫 줄이 왼쪽 두 줄
-              (제목 + "그동안 쌓인 씨앗 N개")과 오른쪽 두 조각("보유 N개" + 줍기 버튼)이라
-              한 줄에 넣을 수 있는 조각이 4개다. __head는 좌우 한 짝씩만 세우는 규칙이므로
-              이미 그 모양을 갖고 있던 .pet-idle(왼쪽 상자 + 오른쪽)을 그대로 쓴다 */}
-          <div className="pet-card pet-card--feed">
+              각주("가득 찼어요")는 .pet-idle 밖에 남긴다. 안에 넣으면 버튼과 같은 줄을
+              다투게 되고, 각주는 카드 전체에 붙는 말이라 자리가 카드 맨 아래가 맞다 */}
+          <div className="pet-card">
             <div className="pet-idle">
               <div className="pet-idle__body">
-                {/* 제목 앞 이모지가 🌿 → 🌱이다. 시안이 그렇고, 통합으로 사라질 자리에 있던
-                    방치형 카드 제목의 이모지가 🌱이었다 — 이 카드가 그 일까지 맡으므로
-                    씨앗 이모지가 남는 것이 맞다 */}
                 <p className="pet-card__title">
-                  <span aria-hidden="true">🌱</span> 씨앗 투입
+                  <span aria-hidden="true">🌱</span> 그동안 쌓인 씨앗
                 </p>
-                {/* 옛 방치형 카드의 제목 + 개수 두 줄("그동안 쌓인 씨앗" / "N개")이 여기
-                    한 줄로 합쳐졌다. 시안의 문구가 그것이고, 카드 제목 자리를 "씨앗 투입"이
-                    가져갔으므로 이 값은 제목이 아니라 부제로 내려온다.
-                    "가득 찼어요"는 옛 카드에서 각주였다. 카드가 합쳐지면서 각주 자리는 아래
-                    "씨앗 1개는 경험치 N이 돼요"가 갖고 있으므로, 그 말이 설명하는 값
-                    (쌓인 개수) 바로 옆으로 옮겼다 — 각주에 두 문장을 나란히 두면 서로
-                    다른 것을 설명하는 말이 한 줄에 붙는다 */}
-                <span className="pet-card__meta">
-                  그동안 쌓인 씨앗 {ko(pet.idleSeeds)}개
-                  {pet.idleCapped ? <em> · 가득 찼어요</em> : null}
-                </span>
+                <span className="pet-card__meta">{ko(pet.idleSeeds)}개</span>
               </div>
 
-              {/* 오른쪽 두 조각. "보유 N개"는 통합 전 이 카드의 __head 오른쪽에 있던 그
-                  __meta이고, 버튼은 옛 방치형 카드에서 온 것이다 */}
-              <div className="pet-idle__aside">
-                <span className="pet-card__meta">보유 {ko(pet.seeds)}개</span>
+              <button
+                type="button"
+                className="pet-btn pet-btn--seed pet-btn--square"
+                onClick={claim}
+                disabled={pending || pet.idleSeeds < 1}
+                aria-disabled={pending || pet.idleSeeds < 1}
+              >
+                {/* 2026-08-21 사용자 결정: "씨앗 N개 받기 🌱" → "씨앗 받기" → "씨앗 줍기".
+                    개수는 왼쪽 __meta("N개")가 이미 갖고 있어 사라진 정보가 없다.
+                    2026-08-24에 버튼이 정사각형이 됐지만 라벨은 그대로다 — 4.5rem 안에
+                    한 줄로 들어간다(pet.css의 .pet-btn--square 주석이 그 계산을 갖고 있다) */}
+                씨앗 줍기
+              </button>
+            </div>
 
-                <button
-                  type="button"
-                  className="pet-btn pet-btn--seed"
-                  onClick={claim}
-                  disabled={pending || pet.idleSeeds < 1}
-                  aria-disabled={pending || pet.idleSeeds < 1}
-                >
-                  {/* 2026-08-21 사용자 결정: "씨앗 N개 받기 🌱" → "씨앗 받기" → "씨앗 줍기".
-                      개수는 왼쪽 부제가 갖고 있어 사라진 정보가 없다.
-                      2026-08-24에 4.5rem 정사각형(.pet-btn--square)이 됐다가 같은 날 통합
-                      시안에서 다시 가로 버튼이 됐다 — 제목 줄에 "보유 N개"와 나란히 앉으므로
-                      정사각형이 들어갈 자리가 없다 */}
-                  씨앗 줍기
-                </button>
-              </div>
+            {/* 2026-08-21 사용자 결정으로 각주가 "가득 찼어요" 하나로 줄었다. 지운 두 문구는
+                "시간당 N개, 최대 N시간분까지 모여요"와 "다음 씨앗까지 N분"이다.
+                msLeft는 화면에서 사라졌을 뿐 계속 돌아간다 — 아래 useEffect가 그 타이머로
+                쌓인 개수를 1씩 올리므로 지우면 개수가 새로고침 전까지 멈춘다.
+                가득 찼을 때만 각주를 그린다. 빈 <p>를 남기면 gap만큼 카드가 길어진다 */}
+            {pet.idleCapped ? (
+              <p className="pet-card__foot">
+                <em>가득 찼어요</em>
+              </p>
+            ) : null}
+          </div>
+
+          {/* 씨앗 투입. --feed는 이 카드 안의 글씨체를 한 벌로 묶는 변형이다
+              (2026-08-21 사용자 결정) */}
+          <div className="pet-card pet-card--feed">
+            <div className="pet-card__head">
+              <p className="pet-card__title">
+                <span aria-hidden="true">🌿</span> 씨앗 투입
+              </p>
+              <span className="pet-card__meta">보유 {ko(pet.seeds)}개</span>
             </div>
 
             <div className="pet-step">
