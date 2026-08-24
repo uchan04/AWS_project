@@ -7,6 +7,7 @@
 - 완료: Next.js 프로젝트, Prisma 6 + 스키마, `lib/auth.ts`(실 Cognito 검증, 쿠키 기반), `lib/prisma.ts`, `lib/api.ts`, `.env.example`, RDS, Cognito, S3+CloudFront, CloudWatch+SNS, Bedrock 확인, Amplify 앱 생성(환경변수 포함), 로그인·가입 화면(이메일+비밀번호), `amplify.yml`(2026-08-20). 내비게이션은 B의 사이드바로 교체됨(하단 탭은 폐기, 아래 "삭제한 파일" 참고)
 - 2026-08-23 완료: **Google 로그인 Cognito 측 설정 전부 끝.** Google IdP 생성됨(scopes `profile email openid`, mapping `email→email` `username→sub`), App Client `welli-web-client`에 OAuth 활성화(`AllowedOAuthFlowsUserPoolClient=true`, flow `code`, scopes `openid email profile`, IdP `Google`+`COGNITO`), 콜백·로그아웃 URL 등록. `/oauth2/authorize`가 Google로 302하는 것까지 확인
 - 2026-08-24 완료: **배포 환경에서 리다이렉트가 `localhost:3000`으로 튀던 문제 수정**(`fd8c21f`). 아래 "배포 환경에서 절대 URL을 만들지 않는다" 절 참고. Google IdP는 AWS CLI로 실제 연결 상태를 재확인했다 — User Pool에 `Google`(type `Google`)이 있고 App Client `idps`가 `["COGNITO","Google"]`, 콜백·로그아웃 URL은 로컬·배포 양쪽 다 등록돼 있다. `.env` 주석의 "Google IdP는 아직 연결 전"은 오래된 내용이다
+- 2026-08-24 완료: **모꼬지 Figma 시안 에셋 41장을 `public/images/`에 추가**(`feat/infra` `cea04c9`). 아래 "정적 UI 에셋은 DB도 S3도 아니다" 절 참고
 - 진행 중: Amplify GitHub 연동은 완료(아래 앱 ID 참고). Google 로그인 전 구간 실사용 검증(브라우저로 실제 계정 로그인)은 아직 안 했다 — OAuth 동의 화면이 "테스트" 상태면 등록된 테스트 사용자만 된다(아래 "막힌 것" 참고)
 - 미착수: 희망 문구 배너, 발표 자료
 
@@ -78,6 +79,34 @@ Amplify 콘솔 환경변수는 빌드 컨테이너에만 주입되고 SSR 컴퓨
 **`APP_ORIGIN` 같은 환경변수로 풀지 않은 이유**: 위 절의 이중 등록(콘솔 + `amplify.yml` grep 목록)이 또 필요해지고, 빠뜨리면 런타임 `undefined`다. 프리뷰 브랜치 배포는 도메인이 달라 아예 깨진다. 상대 경로는 환경변수가 0개다.
 
 **곁들여 고친 것**: 로그아웃이 307이라 브라우저가 `/login`으로 **다시 POST**해 405가 될 수 있었다. 303으로 바꿔 다음 요청이 GET이 된다.
+
+## 정적 UI 에셋은 DB도 S3도 아니다
+
+2026-08-24, 모꼬지 Figma 시안에서 분리한 PNG 41장을 `public/images/`에 넣었다. 요청은 "DB에 올려 달라"였는데 **이미지 바이트가 DB에 들어가는 구조가 아니다.** 스키마의 이미지 필드는 전부 S3 키 문자열이다.
+
+| 필드 | 값의 형태 |
+|---|---|
+| `PetSkin.imageKeyBase` | `pets/fox` → 코드가 `-{1..4}.png`를 붙인다 |
+| `CosmeticItem.imageKey` | `cosmetics/bg-1.png` (확장자 포함) |
+| `UserMission.photoKey` | `mission-photos/<userId>/<ts>.png` |
+| `Post.imageKey` | 커뮤니티 첨부 |
+
+그림 자체는 `welli-uploads-185236887369` → CloudFront `diros91hbap9v.cloudfront.net`로 나가고, 코드는 `CLOUDFRONT_DOMAIN`과 키를 이어 붙인다(`app/api/pet/route.ts:23`, `lib/profile.ts:33` 등).
+
+**41장은 이 중 어디에도 해당하지 않는다.** 아이콘·로고·장식·말풍선에 대응하는 모델이 스키마에 없고, 펫·치장은 아래처럼 이미 채워졌거나 다른 그림이 필요하다. 그래서 DB 행을 만들지 않고 `public/images/`에 뒀다 — `/images/home_icon.png`로 바로 참조되고, Amplify가 CloudFront로 서빙하며, **`CLOUDFRONT_DOMAIN`이 빈 값인 현재 상태에 영향받지 않는다**(펫 그림이 이모지로 떨어지는 원인이 그 빈 값이다).
+
+**판단 근거 (2026-08-24 CloudFront 실측)**
+
+| 키 | 상태 |
+|---|---|
+| `pets/fox-1.png` · `pets/fox-4.png` · `pets/bear-arctic-4.png` | 200 — 펫 24장은 이미 다 있다 |
+| `cosmetics/bg-1.png` | **403 — 아직 없다(E 담당, `docs/STATUS.md` 19번)** |
+| `backgrounds/forest-autumn-0-0.png` | 200 |
+
+- **캐릭터 아트를 `PetSkin`에 끼우면 안 된다.** `fox_avatar`·`fox_standing`·`fox_laptop`은 포즈 3종이고, `PetSkin`은 성장 4단계를 요구한다(`prisma/seed/items.ts`의 `stageCount: 4`). 북극 변종 그림도 없다. 억지로 넣으면 종당 4장 규칙이 깨져 펫 화면이 폴백된다
+- **`cosmetics/bg-1..6.png` 공백은 41장으로 막을 수 없다** — 배경 이미지가 없다. 다만 `backgrounds/forest-autumn-{0,1,2}-{0,1}.png` 6장이 이미 S3에 200으로 있고 개수가 정확히 맞는다. 복사로 닫힐 가능성이 있으나 **어느 파일이 `배경1`인지는 눈으로 확인해야 한다**
+
+원본은 `~/Downloads/mokkoji_components/`(사용자 로컬)이고 `public/images/`와 바이트 동일하다(md5 41건 일치).
 
 ## GitHub 레포·브랜치
 
