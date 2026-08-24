@@ -2,7 +2,9 @@
 
 **모든 세션은 이 문서부터 읽는다.** 그다음 아래 "지금 읽어야 할 문서"만 읽고 시작한다.
 
-최종 갱신: **2026-08-24 — D의 오프라인 모임을 `develop`에 머지했다(`0ccc6be`).** API 6종 + 화면 + 결성·무산 알림 + "내가 신청한 모임" 구역. `SPEC.md` 12절에서 제외였던 "관리자 파티원 모집 글"이 8절로 들어왔다(정기 모임 자동 갱신·사용자 건의함은 여전히 제외). **`develop`을 받는 사람은 `npx prisma migrate deploy && npx prisma generate`를 실행한다** — 마이그레이션 2개(`20260824120000_meetup`, `20260824150000_meetup_participant_notice_reason`)가 새로 들어왔다. 공유 파일 예외 2건: `prisma/schema.prisma`를 기능 브랜치에서 수정(`CLAUDE.md` 1절, 8/21 C의 `lib/types.ts` 건과 같은 처리이며 팀 승인을 받았다)과 `app/components/Sidebar.tsx` +2/−1줄(B 소유, 사전 협의함). 관리자 계정은 DB에서 직접 켠다(`UPDATE "User" SET "isAdmin" = true WHERE id = '...'`).
+최종 갱신: **2026-08-24 — `develop`에 화면 결함 3건을 고쳐 올렸고(`9079a61`), 그 과정에서 **`develop`이 지금 전면 500이라는 것을 찾았다(차단 29번, D 담당)** — 공유 DB에 모임 마이그레이션이 적용되지 않아 `prisma.user.findUnique()`가 `User.isAdmin` 없음으로 죽는다. 모임 화면만이 아니라 로그인과 다섯 화면 전부다. `migrate deploy` 한 번이면 풀리고, 공유 DB에 쓰지 않기로 한 지시가 있어 실행하지 않았다.** 고친 3건: (1) **진단 전 화면에 사이드바가 떴다** — `hiddenPaths`가 `/login`·`/diagnosis`는 막지만 진단 시작 대기 화면은 `"/"`라서 경로로는 진단 후 홈과 구분할 수 없다. `profile.diagnosed` 하나로 막았다(`page.tsx`와 같은 값을 쓴다 — 조건을 두 벌로 만들지 않는다). (2) **"계정 설정"을 눌러 `/settings`로 가도 내 계정 모달이 남았다** — 사이드바가 루트 레이아웃에 있어 클라이언트 이동으로 언마운트되지 않는다. 열린 상태를 boolean이 아니라 **열었던 경로**로 들어 이동이 곧 닫힘이 되게 했다(버튼마다 닫기를 붙이지 않으므로 링크가 늘어도 재발하지 않는다). (3) **단계 미션 3칸이 4칸 배치에 놓여 오른쪽이 비었다** — `auto-fill`이 개수와 무관하게 트랙을 다 만든다. `auto-fit`으로 바꿔 `191px×4`(빈칸 1)에서 `258.663px×3`(우단까지)로 갔다. 개수를 3으로 못 박지 않은 이유는 같은 컴포넌트를 일일 미션도 쓰고 그쪽은 0~5개로 변하기 때문이다. 덤으로 **펫을 쓰다듬을 때 나오던 내 5문구를 사용자가 쓴 평상시 10문구로 갈았다**(사용자 제보). 어투가 존댓말/반말로 갈렸고 말풍선 갈색 테두리(`data-tone="touch"`)가 그 경계를 눈에 보이게 드러내고 있었다 — 그 테두리도 걷었고, `check:pet`에 "터치 문구는 `PET_IDLE_LINES` 안에 있어야 한다"를 못 박아 지운 5문구가 되살아나는 것을 막았다.**
+
+이전 갱신: **2026-08-24 — D의 오프라인 모임을 `develop`에 머지했다(`0ccc6be`).** API 6종 + 화면 + 결성·무산 알림 + "내가 신청한 모임" 구역. `SPEC.md` 12절에서 제외였던 "관리자 파티원 모집 글"이 8절로 들어왔다(정기 모임 자동 갱신·사용자 건의함은 여전히 제외). **`develop`을 받는 사람은 `npx prisma migrate deploy && npx prisma generate`를 실행한다** — 마이그레이션 2개(`20260824120000_meetup`, `20260824150000_meetup_participant_notice_reason`)가 새로 들어왔다. 공유 파일 예외 2건: `prisma/schema.prisma`를 기능 브랜치에서 수정(`CLAUDE.md` 1절, 8/21 C의 `lib/types.ts` 건과 같은 처리이며 팀 승인을 받았다)과 `app/components/Sidebar.tsx` +2/−1줄(B 소유, 사전 협의함). 관리자 계정은 DB에서 직접 켠다(`UPDATE "User" SET "isAdmin" = true WHERE id = '...'`).
 
 이전 갱신: **2026-08-24 — `origin/main`까지 머지해 팀 3브랜치(`develop`·`feat/missions`·`main`)를 전부 흡수했다(`7d6da84`).** 충돌 5곳. 세션 수명 충돌은 **내 쪽을 지켰다** — `main`의 `setSessionCookie(access_token, expires_in ?? 3600)`은 Cognito 토큰 수명(1시간)을 그대로 세션 수명으로 쓰므로 Google로 들어온 사용자만 한 시간 뒤 조용히 로그아웃된다. 8/22에 통일한 "모든 로그인 세션 7일"이 그 한 줄로 깨진다. **머지하면서 `main`이 못 고친 같은 버그 1곳을 찾아 고쳤다** — `fd8c21f`가 로그아웃·로그인 콜백 2곳의 `localhost:3000` 함정을 고쳤는데 **미인증 리다이렉트인 `middleware.ts`가 빠져 있었다**(로그인 안 한 사람이 `/pet`을 열면 배포 환경에서 자기 PC의 3000번으로 튄다 — 첫 방문자가 만나는 경로다). `lib/cognito.ts`는 지웠다(`appRedirect()`는 `lib/oauth.ts`에 있고 `redirectUri(origin)` 방식은 `appOrigin(request)`로 대체됐다). `prisma/schema.prisma`는 **주석 3곳만** 정정했다(`stage 1~3` → `1~100` 등. 스키마 무변경·마이그레이션 없음). `scripts/prune-orphan-stage-missions.ts`는 조회 전용으로 바꿨다 — 공유 DB를 손대지 않기로 했고 그 행들은 이미 코드에서 배제되는데 `--apply` 한 번이 팀 완료기록을 되돌릴 수 없게 지울 수 있었다. `tsc`·`lint`·`build`·`check:*` 9종 전부 통과.
 
@@ -83,6 +85,32 @@
 ## 전체 차단 사항
 
 지금 프로젝트를 멈춰 세우는 것만 적는다. 해결되면 즉시 지운다.
+
+**29. 공유 DB에 D의 모임 마이그레이션이 적용되지 않아 `develop`이 전면 500이다 (D 담당, 2026-08-24 A 확인)** — `npx prisma migrate deploy` 한 번이면 풀린다. **지금 `develop`을 받은 사람은 로그인부터 안 된다.**
+
+원인은 스키마와 실제 DB가 갈라진 것이다. D가 `35d8f51`·`73f7cf3`으로 `prisma/schema.prisma`에 `MeetupStatus` enum · `User.isAdmin` · `Meetup` · `MeetupParticipant`를 더하고 마이그레이션 2개(`20260824120000_meetup`, `20260824150000_meetup_participant_notice_reason`)를 커밋했는데, **공유 DB에는 그것이 적용되지 않았다.** 읽기 전용으로 확인한 값:
+
+```
+Meetup, MeetupParticipant 테이블 : 없음
+User.isAdmin 컬럼               : 없음
+_prisma_migrations 최신          : 20260821090000_pet_last_fed_at  ← 8/21에 멈춰 있다
+```
+
+증상이 모임 화면에 그치지 않는 이유가 중요하다. `getCurrentUser()`와 `getSidebarProfile()`이 `prisma.user.findUnique()`를 쓰고, 그러면 Prisma가 **스키마에 적힌 `User` 스칼라 컬럼 전부**를 SELECT에 싣는다. 그래서 인증을 하는 모든 요청이 죽는다.
+
+```
+PrismaClientKnownRequestError  code: P2022
+Invalid `prisma.user.findUnique()` invocation:
+The column `User.isAdmin` does not exist in the current database.
+```
+
+로컬 실측(prod 빌드, 실 DB): `POST /api/auth/login` **500**, 그리고 `/` · `/missions` · `/pet` · `/community` · `/community/meetups` **다섯 화면 전부** 같은 P2022. 모임 기능만 막힌 것이 아니라 앱 전체다.
+
+- **조치: 마이그레이션을 작성한 D가 `npx prisma migrate deploy`를 한 번 돌린다.** `CLAUDE.md` 5절대로 스키마 담당 1인이 실행한다. A는 공유 DB에 쓰지 않기로 한 지시가 있어 실행하지 않았다
+- **`migrate dev`도 `migrate reset`도 쓰지 않는다.** `deploy`는 이미 커밋된 마이그레이션 파일을 적용만 한다 — 새로 만들지도, 데이터를 지우지도 않는다
+- **`main`으로 머지하기 전에 반드시 먼저 적용한다.** Amplify가 `main`에서 자동 배포하므로(`docs/dev/infra.md`), 적용 없이 머지하면 배포본 로그인이 전부 500이 된다. 지금 `main`은 이 변경 전이라 살아 있다
+- `User.isAdmin`은 기본값이 `false`이고 부여는 DB에서 직접 한다(D의 스키마 주석). 적용 후 관리자 계정 지정이 별도로 필요하다
+
 
 인프라 차단은 해소됐다(RDS·Cognito·S3·Bedrock 완료). 단 **AWS 리소스 생성이 끝난 것과 `.env`에 값이 온 것은 다르다** — 2026-08-20 로컬 `.env` 확인 결과 채워진 값은 `DATABASE_URL`(+`AWS_REGION`·`BEDROCK_REGION`·`DEV_AUTH_BYPASS=true`)뿐이고 `COGNITO_USER_POOL_ID`·`COGNITO_CLIENT_ID`·`BEDROCK_MODEL_ID`·`BEDROCK_VISION_MODEL_ID`·`S3_BUCKET`·`CLOUDFRONT_DOMAIN`은 **전부 빈 문자열**이다. E에게 개별 공유받아야 한다. 코드가 실제로 읽는 키는 9개이고 `.env`에 다 있다(키 누락은 없다 — 값만 없다). 영향:
 - **빌드·DB·펫·미션·진단은 막히지 않는다.** `DEV_AUTH_BYPASS=true` + `lib/auth.ts` 지연 생성(차단 3) 덕이다
