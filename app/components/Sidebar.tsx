@@ -2,7 +2,7 @@
 
 import { useState, useEffect } from "react"
 import Link from "next/link"
-import { usePathname, useRouter } from "next/navigation"
+import { usePathname, useRouter, useSearchParams } from "next/navigation"
 import { TRIBE } from "@/lib/types"
 import type { SidebarProfile } from "@/lib/profile"
 import type { TypeCode } from "@prisma/client"
@@ -87,6 +87,10 @@ function Avatar({
 export function Sidebar({ profile }: { profile: SidebarProfile | null }) {
   const pathname = usePathname()
   const router = useRouter()
+  // `/diagnosis/result`의 `?new=1`을 보기 위해 읽는다. 아래 inDiagnosisFlow 주석 참고.
+  // 루트 레이아웃이 cookies()를 읽어 이미 동적 렌더라(lib/profile.ts) 여기서
+  // useSearchParams를 써도 정적 프리렌더를 깨지 않는다 — 그 제약은 정적 페이지 쪽이다.
+  const searchParams = useSearchParams()
   // 내 계정 모달. 열린 상태를 boolean이 아니라 **열었던 경로**로 들고 있다 (2026-08-24 제보).
   //
   // 전에는 boolean이라 "계정 설정"을 눌러 /settings로 가도 모달이 그 위에 그대로 떠 있었다 —
@@ -134,8 +138,19 @@ export function Sidebar({ profile }: { profile: SidebarProfile | null }) {
   }, [])
 
   // 진단/로그인/회원가입 화면에서 숨김
-  const hiddenPaths = ["/diagnosis", "/diagnosis/result", "/login", "/signup"]
-  if (hiddenPaths.includes(pathname)) {
+  const hiddenPaths = ["/diagnosis", "/login", "/signup"]
+
+  // `/diagnosis/result`는 목록에 넣지 않고 따로 가른다 (2026-08-24 제보).
+  // 이 경로가 **두 용도를 공유**하기 때문이다.
+  //   · 진단 직후 — AskFlow가 `?new=1`을 붙여 보낸다. 진단 흐름의 마지막 단계이므로
+  //     사이드바를 숨긴다(`STATUS.md` 차단 21번이 여기 사이드바가 뜨는 것을 결함으로 올렸다).
+  //   · 이름 바꾸기 — 내 계정 모달에서 들어온다. 그때는 이미 진단을 마치고 앱을 쓰는
+  //     중이므로 사이드바가 있어야 하고, 없으면 **돌아갈 입구가 브라우저 뒤로가기뿐이다.**
+  // 같은 값을 결과 화면도 이미 쓴다(`app/diagnosis/result/page.tsx` justDiagnosed) —
+  // 버튼 문구를 "이 이름으로 시작하기"와 "이름 저장하기"로 가르는 그 값이다.
+  const inDiagnosisFlow = pathname === "/diagnosis/result" && searchParams.get("new") === "1"
+
+  if (hiddenPaths.includes(pathname) || inDiagnosisFlow) {
     return null
   }
 
