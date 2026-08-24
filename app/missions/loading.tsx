@@ -79,10 +79,12 @@ export default function MissionsLoading() {
               <div className="h-5 w-24 rounded bg-neutral-200" />
               <div className="mt-1.5 h-3 w-40 rounded bg-neutral-200" />
             </div>
+            {/* MissionDashboard의 StepSection과 같은 격자여야 한다. 다르면 스켈레톤에서
+                실제 화면으로 넘어갈 때 칸 폭이 튄다. auto-fit인 이유는 그 파일 주석 참고 */}
             <div
               style={{
                 display: "grid",
-                gridTemplateColumns: "repeat(auto-fill, minmax(160px, 1fr))",
+                gridTemplateColumns: "repeat(auto-fit, minmax(160px, 1fr))",
                 gap: 12,
               }}
             >
