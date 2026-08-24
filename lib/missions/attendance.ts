@@ -2,6 +2,32 @@ import type { User, PetSkin } from "@prisma/client"
 import { prisma } from "@/lib/prisma"
 import { calculateReward, capAffinity, type RewardInput } from "@/lib/reward"
 import { getToday } from "./reset"
+import { dateKey, parseMonthKey, type DateKey, type MonthKey } from "./calendar"
+
+/**
+ * 그 달의 출석 완료 날짜 키 목록. 캘린더의 완료 표시는 이 값만 쓴다 —
+ * attendanceTotal이나 streak로 추정하면 중간에 빠진 날이 완료로 보인다.
+ *
+ * claimDate는 @db.Date이고 claimAttendance()가 getToday()(KST 날짜의 UTC 자정)로 넣는다.
+ * 즉 컬럼 자체가 이미 KST 날짜다. 그래서 월 범위도 UTC 자정 경계로 자르면 되고,
+ * 읽을 때는 getUTC*로 키를 만든다(로컬 시간대로 읽으면 하루 밀린다).
+ */
+export async function listClaimedDates(userId: string, month: MonthKey): Promise<DateKey[]> {
+  const { year, month: m } = parseMonthKey(month)
+  const from = new Date(Date.UTC(year, m - 1, 1))
+  const to = new Date(Date.UTC(m === 12 ? year + 1 : year, m === 12 ? 0 : m, 1))
+
+  const rows = await prisma.attendanceClaim.findMany({
+    // userId 조건이 빠지면 남의 출석이 보인다. 호출부는 getCurrentUser()의 id만 넘긴다
+    where: { userId, claimDate: { gte: from, lt: to } },
+    select: { claimDate: true },
+    orderBy: { claimDate: "asc" },
+  })
+
+  return rows.map((row) =>
+    dateKey(row.claimDate.getUTCFullYear(), row.claimDate.getUTCMonth() + 1, row.claimDate.getUTCDate())
+  )
+}
 
 export type AttendanceResult = {
   alreadyClaimed: boolean

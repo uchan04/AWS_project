@@ -21,7 +21,10 @@ export function Intro({ authed }: { authed: boolean }) {
       <div className="hm__col hm-intro">
         <div className="hm-intro__side">
           <div>
-            <p className="hm__note">함께 걷는 하루</p>
+            {/* 서비스명을 첫 화면에 박는다(2026-08-24 사용자 확정: 모꼬지).
+                전에는 "함께 걷는 하루"라는 표어였는데, 랜딩에서 이름을 못 읽으면
+                방문자가 무엇을 쓰는지 모른 채 시작하기를 누른다 */}
+            <p className="hm__note">모꼬지</p>
             <h1 className="hm-home__name">나는 어떤 존재일까요?</h1>
           </div>
           <p className="hm__lede">

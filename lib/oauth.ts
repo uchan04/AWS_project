@@ -42,3 +42,20 @@ export function appOrigin(request: Request): string {
 
   return new URL(request.url).origin
 }
+
+/**
+ * 우리 화면으로 되돌리는 리다이렉트. Location에 **상대 경로만** 넣는다.
+ *
+ * appOrigin()은 Cognito에 보낼 redirect_uri처럼 절대 URL이 **필수**인 자리에만 쓴다.
+ * 브라우저에 돌려주는 Location은 상대 경로가 항상 옳다 — RFC 7231 §7.1.2에 따라
+ * 브라우저가 실제로 요청한 URL을 기준으로 풀기 때문에 localhost·Amplify main·프리뷰
+ * 브랜치에서 환경변수 없이 동시에 맞는다. `new URL(path, request.url)`을 쓰면
+ * Amplify SSR에서 host가 localhost:3000이라 `https://localhost:3000/login`이 나간다
+ * (2026-08-24 프로덕션 실측: POST /api/auth/logout → location: https://localhost:3000/login).
+ *
+ * 기본 303인 이유: NextResponse.redirect의 기본값 307은 메서드를 보존해서
+ * POST /api/auth/logout이 POST /login으로 다시 나가고 405가 된다. 303은 GET으로 바꾼다.
+ */
+export function appRedirect(path: string, status = 303): Response {
+  return new Response(null, { status, headers: { Location: path } })
+}

@@ -1,4 +1,4 @@
-import { redirect } from "next/navigation"
+import { redirect, unstable_rethrow } from "next/navigation"
 import { UnauthorizedError, getCurrentUser } from "@/lib/auth"
 import { buildDashboard } from "@/lib/missions/dashboard"
 import type { DashboardDTO } from "@/lib/missions/dashboard"
@@ -42,6 +42,10 @@ export default async function MissionsPage() {
       initial = await buildDashboard(await ensureMissionReset(user))
     }
   } catch (error) {
+    // cookies()는 정적 렌더 시도 중에 Next 내부 에러를 던진다. 삼키면 Next가 정적 렌더를
+    // 포기하지 못한다(B, 2026-08-24. lib/profile.ts의 같은 처리를 따른다).
+    // 아래 redirect()도 내부 에러로 동작하므로 이 줄이 먼저 와야 순서가 안전하다
+    unstable_rethrow(error)
     // 미인증이면 안내가 아니라 로그인이다. 미들웨어는 쿠키 존재만 보므로
     // 만료·위조 쿠키를 든 사람이 여기까지 온다(app/pet/page.tsx와 같은 처리)
     if (error instanceof UnauthorizedError) redirect("/login?next=%2Fmissions")

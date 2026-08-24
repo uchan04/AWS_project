@@ -40,6 +40,7 @@ export async function GET(request: Request) {
     identity_provider: "Google",
     response_type: "code",
     client_id: process.env.COGNITO_CLIENT_ID ?? "",
+    // 콜백이 토큰 교환에서 보내는 값과 **문자 단위로** 같아야 한다. 양쪽 다 appOrigin()만 쓴다
     redirect_uri: `${appOrigin(request)}/api/auth/callback`,
     scope: "openid email profile",
     state,

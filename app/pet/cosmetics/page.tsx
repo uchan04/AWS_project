@@ -1,9 +1,9 @@
 import Link from "next/link"
 import { redirect } from "next/navigation"
 import type { TypeCode } from "@prisma/client"
-import { assetUrl } from "@/lib/assets"
+import { cdnUrl } from "@/lib/assets"
 import { UnauthorizedError, getCurrentUser } from "@/lib/auth"
-import { compareCosmetics, SHIPPED_COSMETIC } from "@/lib/pet"
+import { compareCosmetics, cosmeticLabel } from "@/lib/pet"
 import { prisma } from "@/lib/prisma"
 import CosmeticList, { type CosmeticRow } from "../_components/CosmeticList"
 import "@/styles/tokens.css"
@@ -27,9 +27,10 @@ export default async function CosmeticsPage() {
     typeCode = user.typeCode
 
     const [all, owned] = await Promise.all([
-      // 낡은 치장 행을 배제한다(lib/pet.ts SHIPPED_COSMETIC). 이 화면이 첫 그림을 그리므로
-      // 빼지 않으면 뜨지 않는 칸 5개가 그대로 보인다
-      prisma.cosmeticItem.findMany({ where: SHIPPED_COSMETIC }),
+      // 필터를 두지 않는다. 전에는 imageKey가 "cosmetics/"로 시작하는 행만 골랐는데
+      // (SHIPPED_COSMETIC), C가 배경 6종을 "backgrounds/" 키로 다시 심어서 6행 중
+      // **0행**이 걸렸다 — 상점이 빈 화면이었다. 지금 DB의 6행이 곧 판매 목록 전체다
+      prisma.cosmeticItem.findMany(),
       prisma.userCosmetic.findMany({
         where: { userId: user.id },
         select: { itemId: true, equipped: true },
@@ -38,21 +39,31 @@ export default async function CosmeticsPage() {
 
     const ownedById = new Map(owned.map((row) => [row.itemId, row]))
 
-    items = all
+    // 2026-08-22: 타일에 배경 그림을 띄운다. 그 전까지는 이름과 가격만 있어서 친밀도
+    // 600을 무엇인지 모르고 내야 했다. 조립은 lib/assets.ts cdnUrl() 한 곳에서만 한다 —
+    // imageKey에 확장자가 이미 붙어 있으므로 여기서 .png를 덧붙이지 않는다.
+    // 도메인이 비면 null이고 타일은 이름만 보인다
+
+    // 정렬을 map보다 **먼저** 한다. compareCosmetics는 name이 코드일 때 진열 순서를 알고,
+    // map이 name을 표시명으로 바꾼 뒤에 정렬하면 코드를 못 찾아 한글 가나다순으로 떨어진다
+    // (노을빛 → 눈꽃 → 봄날 → …). 사용자가 정한 계절 순서가 조용히 깨지는 자리다
+    items = [...all]
+      .sort(compareCosmetics)
       .map((item) => ({
         id: item.id,
-        name: item.name,
+        // DB의 name은 코드("autumn_path")다. 화면에는 표시명("노을빛 단풍길")만 보낸다
+        name: cosmeticLabel(item.name),
         slot: item.slot,
         rarity: item.rarity,
         affinityOnly: item.affinityOnly,
         priceAffinity: item.priceAffinity,
+        imageUrl: cdnUrl(item.imageKey),
         owned: ownedById.has(item.id),
         equipped: ownedById.get(item.id)?.equipped ?? false,
-        // imageKey에 확장자가 이미 붙어 있다(prisma/seed/items.ts: "cosmetics/bg-1.png")
-        imageUrl: assetUrl(item.imageKey),
       }))
-      .sort(compareCosmetics)
-    // 분자를 items에서 센다 — 이유는 app/api/pet/cosmetics/route.ts 주석과 같다
+
+    // 분자를 items에서 센다 — owned.length를 쓰면 목록에서 빠진 행을 가진 계정이
+    // 6/6을 넘는 진행률을 본다
     progress = { owned: items.filter((item) => item.owned).length, total: all.length }
   } catch (error) {
     // 미인증이면 로그인으로 보낸다. 아래 카드는 DB 장애용이다(app/pet/page.tsx와 같은 이유)

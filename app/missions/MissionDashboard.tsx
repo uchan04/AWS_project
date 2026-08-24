@@ -2,6 +2,7 @@
 
 import { useState, useRef, useEffect, useCallback } from "react"
 import styles from "./mission-ui.module.css"
+import { AttendanceCalendar } from "./AttendanceCalendar"
 import { useModalA11y } from "@/app/components/useModalA11y"
 import type { TypeCode } from "@prisma/client"
 import type { DashboardDTO, MissionDTO } from "@/lib/missions/dashboard"
@@ -123,6 +124,8 @@ interface MissionModalProps {
   color: string
   bg: string
   mascotEmoji: string
+  /** 종족 이모지 대신 띄울 내 펫 그림. 없거나 안 뜨면 이모지로 떨어진다 */
+  petImageUrl: string | null
   onClose: () => void
   /** 사진 미션 완료 후 재조회. 사진 판정은 결과를 미리 알 수 없어 낙관적으로 처리할 수 없다 */
   onComplete: () => void
@@ -138,12 +141,14 @@ function MissionModal({
   color,
   bg,
   mascotEmoji,
+  petImageUrl,
   onClose,
   onComplete,
   onButtonComplete,
 }: MissionModalProps) {
   // Escape로 닫기 · 초점 가두기 · 닫을 때 초점 되돌리기 (app/components/useModalA11y.ts)
   const boxRef = useModalA11y(onClose)
+  const [petImageFailed, setPetImageFailed] = useState(false)
   const [proofMode, setProofMode] = useState(false)
   const [proofImage, setProofImage] = useState<string | null>(null)
   const [uploadedFile, setUploadedFile] = useState<File | null>(null)
@@ -332,7 +337,19 @@ function MissionModal({
               display: "inline-block",
             }}
           >
-            {mascotEmoji}
+            {petImageUrl && !petImageFailed ? (
+              // CloudFront 원본을 그대로 쓴다. ArtImage(next/image)를 쓰지 않는 이유는
+              // 그 파일 주석 참고 — 설정에 없는 hostname이면 렌더 중에 throw한다
+              // eslint-disable-next-line @next/next/no-img-element
+              <img
+                src={petImageUrl}
+                alt="내 펫"
+                style={{ height: 120, maxWidth: "100%", objectFit: "contain", display: "block" }}
+                onError={() => setPetImageFailed(true)}
+              />
+            ) : (
+              mascotEmoji
+            )}
           </div>
           <p style={{ margin: "12px 0 0", fontSize: 12, color: "#7A6B58", fontWeight: 500 }}>{caption}</p>
           <div style={{ marginTop: 20, paddingTop: 20, borderTop: `1px solid ${color}33` }}>
@@ -767,119 +784,6 @@ function ProgressCard({ title, value, color, bg }: ProgressCardProps) {
   )
 }
 
-// ─── Attendance calendar ───────────────────────────────────────────────────
-
-interface AttendanceCalendarProps {
-  cycleDay: number
-  claimedToday: boolean
-  attendanceTotal: number
-  color: string
-  bg: string
-  onClaim: () => void
-}
-
-function AttendanceCalendar({ cycleDay, claimedToday, attendanceTotal, color, bg, onClaim }: AttendanceCalendarProps) {
-  const [claiming, setClaiming] = useState(false)
-
-  async function handleClaim() {
-    setClaiming(true)
-    try {
-      const res = await fetch("/api/missions/attendance/claim", { method: "POST" })
-      const json = await res.json()
-
-      if (res.ok && !json.data.alreadyClaimed) {
-        onClaim()
-        window.dispatchEvent(new CustomEvent("user-stats-changed"))
-      }
-    } catch {
-      // silent
-    } finally {
-      setClaiming(false)
-    }
-  }
-
-  return (
-    <div
-      style={{
-        background: bg,
-        border: `1.5px solid ${color}33`,
-        borderRadius: 16,
-        padding: "20px",
-      }}
-    >
-      <div
-        style={{
-          display: "flex",
-          alignItems: "baseline",
-          justifyContent: "space-between",
-          gap: 8,
-          margin: "0 0 12px",
-        }}
-      >
-        <h3
-          style={{
-            fontFamily: "var(--font-display)",
-            fontSize: 16,
-            color: "#2A1F14",
-            margin: 0,
-          }}
-        >
-          출석 캘린더
-        </h3>
-        {/* 격자는 이번 주기만 보여주므로 누적은 따로 적는다 — 안 적으면 7일마다
-            성과가 0으로 리셋된 것처럼 보인다 */}
-        <span style={{ fontSize: 12, color: "#7A6B58" }}>누적 {attendanceTotal}일</span>
-      </div>
-      <div style={{ display: "flex", gap: 8, marginBottom: 14 }}>
-        {[1, 2, 3, 4, 5, 6, 7].map((day) => {
-          // 7일 주기 격자다. attendanceTotal >= day로 판정하면 8일차 이후로는
-          // 7칸이 영구히 다 채워져서 주기가 사라진다 — 이번 주기 안에서만 본다
-          const done = day < cycleDay || (day === cycleDay && claimedToday)
-          return (
-            <div
-              key={day}
-              style={{
-                flex: 1,
-                background: done ? color : "#F5F0E8",
-                color: done ? "white" : "#9A8A76",
-                borderRadius: 10,
-                padding: "10px 4px",
-                textAlign: "center",
-                fontSize: 12,
-                fontWeight: 700,
-              }}
-            >
-              {day}일
-            </div>
-          )
-        })}
-      </div>
-      {claimedToday ? (
-        <p style={{ fontSize: 13, color, textAlign: "center", margin: 0 }}>✓ 오늘 출석은 이미 받았어요</p>
-      ) : (
-        <button
-          onClick={handleClaim}
-          disabled={claiming}
-          style={{
-            width: "100%",
-            background: color,
-            color: "white",
-            border: "none",
-            borderRadius: 12,
-            padding: "12px",
-            fontSize: 14,
-            fontWeight: 700,
-            cursor: claiming ? "not-allowed" : "pointer",
-            opacity: claiming ? 0.5 : 1,
-          }}
-        >
-          {claiming ? "수령 중..." : "오늘 출석 받기"}
-        </button>
-      )}
-    </div>
-  )
-}
-
 // ─── Main dashboard ────────────────────────────────────────────────────────
 
 /**
@@ -1119,9 +1023,13 @@ export default function MissionDashboard({
           cycleDay={dashboard.attendance.cycleDay}
           claimedToday={dashboard.attendance.claimedToday}
           attendanceTotal={dashboard.attendance.attendanceTotal}
+          streak={dashboard.progress.streak}
+          todayKey={dashboard.attendance.todayKey}
+          month={dashboard.attendance.month}
+          claimedDates={dashboard.attendance.claimedDates}
           color={color}
           bg={bg}
-          onClaim={handleComplete}
+          onRefresh={loadDashboard}
         />
       </div>
 
@@ -1287,6 +1195,7 @@ export default function MissionDashboard({
           color={color}
           bg={bg}
           mascotEmoji={mascotEmoji}
+          petImageUrl={dashboard.petImageUrl}
           onClose={() => setSelected(null)}
           onComplete={handleComplete}
           onButtonComplete={handleButtonComplete}

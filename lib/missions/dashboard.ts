@@ -1,5 +1,8 @@
 import type { TypeCode, User } from "@prisma/client"
 import { prisma } from "@/lib/prisma"
+import { petImageUrl } from "@/lib/assets"
+import { cappedStage } from "@/lib/pet"
+import { listClaimedDates } from "./attendance"
 import { getTodayKey, getToday } from "./reset"
 import { computeStageProgress, currentStageOf, isGraduated } from "./stages"
 import { getDailyMissionCatalog, getStageMissionCatalog } from "./catalog"
@@ -46,6 +49,12 @@ export type DashboardDTO = {
     cycleDay: number
     claimedToday: boolean
     attendanceTotal: number
+    /** KST 기준 오늘(YYYY-MM-DD). 화면은 브라우저 시간대로 오늘을 정하지 않는다 */
+    todayKey: string
+    /** todayKey가 속한 달(YYYY-MM). claimedDates가 어느 달인지 알려준다 */
+    month: string
+    /** 그 달의 실제 출석 완료 날짜. 다른 달은 GET /api/missions/attendance?month=로 읽는다 */
+    claimedDates: string[]
   }
   /**
    * 단계 진행 요약. stageMissions는 현재 단계 주변만 담고 있으므로
@@ -60,6 +69,8 @@ export type DashboardDTO = {
   // typeCode.includes("...")로 종족을 세게 되고, 시드·픽스처에 존재하지 않는
   // 값("INDEPENDENT_LOW_INCOME_A" 같은 것)이 들어가도 컴파일이 통과한다
   userTypeCode: TypeCode | null
+  /** 미션 모달의 캐릭터 칸에 쓰는 펫 이미지. 스킨이 없거나 CDN 미설정이면 null(이모지로 떨어진다) */
+  petImageUrl: string | null
 }
 
 /**
@@ -96,8 +107,16 @@ export async function buildDashboard(user: User): Promise<DashboardDTO> {
   //
   // 2026-08-23: 미션 카탈로그 2개를 여기서 뺐다. 시드로만 바뀌는 불변 데이터인데
   // 그 둘이 이 묶음 페이로드 76.7KB 중 75.3KB였다. 이유와 계측은 ./catalog.ts 주석에.
-  const [dailyMissionsRaw, allStageMissions, dailyCompletions, allStageCompletions, weeklyCount, claimedToday] =
-    await Promise.all([
+  const [
+    dailyMissionsRaw,
+    allStageMissions,
+    dailyCompletions,
+    allStageCompletions,
+    weeklyCount,
+    claimedToday,
+    claimedDatesThisMonth,
+    activeSkin,
+  ] = await Promise.all([
       getDailyMissionCatalog(),
       getStageMissionCatalog(typeCode),
       prisma.userMission.findMany({
@@ -122,6 +141,16 @@ export async function buildDashboard(user: User): Promise<DashboardDTO> {
       prisma.attendanceClaim.count({
         where: { userId: user.id, claimDate: todayDate },
       }),
+      // 이번 달 출석 날짜. 첫 화면이 추가 요청 없이 캘린더를 그리도록 여기서 같이 읽는다
+      listClaimedDates(user.id, today.slice(0, 7)),
+      // 펫 이미지 키. getCurrentUser()는 스킨 관계를 붙이지 않으므로 여기서 따로 읽는다 —
+      // 라우트를 getCurrentUserWithSkin()으로 바꾸면 사이드바 프로필과 같은 조회가 두 번 난다.
+      user.activePetSkinId
+        ? prisma.petSkin.findUnique({
+            where: { id: user.activePetSkinId },
+            select: { imageKeyBase: true, stageCount: true },
+          })
+        : Promise.resolve(null),
     ])
 
   const dailyCompletedIds = new Set(dailyCompletions.map((c) => c.missionId))
@@ -196,6 +225,14 @@ export async function buildDashboard(user: User): Promise<DashboardDTO> {
       ? ((Math.max(1, user.attendanceTotal) - 1) % 7) + 1
       : (user.attendanceTotal % 7) + 1
 
+  // 사이드바(lib/profile.ts:44)와 같은 규칙으로 만든다. 규칙이 갈라지면 두 화면의 펫이 달라진다.
+  // 직접 `${CLOUDFRONT_DOMAIN}/...`로 조립하지 않는다 — 그 환경변수에는 스킴이 없어서
+  // (2026-08-24 실측) 상대 경로가 나가고 브라우저가 /missions/d….cloudfront.net/…을 찾는다.
+  // 스킴 보정은 lib/assets.ts의 petImageUrl() 한 곳에만 둔다
+  const petImage = activeSkin
+    ? petImageUrl(activeSkin.imageKeyBase, cappedStage(user.level, activeSkin.stageCount))
+    : null
+
   return {
     dailyMissions,
     stageMissions,
@@ -210,6 +247,9 @@ export async function buildDashboard(user: User): Promise<DashboardDTO> {
       cycleDay,
       claimedToday: claimedToday > 0,
       attendanceTotal: user.attendanceTotal,
+      todayKey: today,
+      month: today.slice(0, 7),
+      claimedDates: claimedDatesThisMonth,
     },
     stages: {
       current: currentStage,
@@ -217,6 +257,7 @@ export async function buildDashboard(user: User): Promise<DashboardDTO> {
       graduated: isGraduated(stageProgress),
     },
     userTypeCode: user.typeCode,
+    petImageUrl: petImage,
   }
 }
 

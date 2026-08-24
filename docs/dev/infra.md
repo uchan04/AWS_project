@@ -5,7 +5,8 @@
 
 ## 현재 상태
 - 완료: Next.js 프로젝트, Prisma 6 + 스키마, `lib/auth.ts`(실 Cognito 검증, 쿠키 기반), `lib/prisma.ts`, `lib/api.ts`, `.env.example`, RDS, Cognito, S3+CloudFront, CloudWatch+SNS, Bedrock 확인, Amplify 앱 생성(환경변수 포함), 로그인·가입 화면(이메일+비밀번호), `amplify.yml`(2026-08-20). 내비게이션은 B의 사이드바로 교체됨(하단 탭은 폐기, 아래 "삭제한 파일" 참고)
-- 진행 중: Amplify GitHub 연동 (브라우저 OAuth 필요 — 아래 참고), Google 로그인(Cognito Domain은 생성됨, Google Cloud OAuth 자격증명 대기)
+- 2026-08-23 완료: **Google 로그인 Cognito 측 설정 전부 끝.** Google IdP 생성됨(scopes `profile email openid`, mapping `email→email` `username→sub`), App Client `welli-web-client`에 OAuth 활성화(`AllowedOAuthFlowsUserPoolClient=true`, flow `code`, scopes `openid email profile`, IdP `Google`+`COGNITO`), 콜백·로그아웃 URL 등록. `/oauth2/authorize`가 Google로 302하는 것까지 확인
+- 진행 중: Amplify GitHub 연동은 완료(아래 앱 ID 참고). 남은 것은 Google Cloud Console 쪽 승인된 리디렉션 URI 확인뿐
 - 미착수: 발표 자료
 - 2026-08-22 A가 넘긴 것: 희망 문구 배너 구현(`app/community/_lib/banner.ts`), `middleware.ts` 미인증 리다이렉트, `lib/ratelimit.ts` 로그인·가입 시도 제한, `/settings`(비밀번호 변경·회원 탈퇴). 아래 "다음 할 일" 3·4번이 이걸로 해소됐다
 
@@ -36,7 +37,7 @@
 
 ## 막힌 것
 - **Amplify ↔ GitHub 연동은 CLI로 끝까지 할 수 없다.** GitHub App 설치는 브라우저 OAuth 동의가 필요해 계정 소유자가 직접 눌러야 한다. 아래 "Amplify GitHub 연동" 절차대로 진행하면 5분 내 끝난다
-- **Google 로그인도 사용자가 직접 해야 하는 단계가 남았다.** Google Cloud Console에서 OAuth 2.0 클라이언트(Client ID/Secret)를 발급받아야 하는데, 이건 계정 소유자의 Google 계정으로만 가능하다. 리디렉션 URI는 `https://welli-auth-185236887369.auth.us-east-1.amazoncognito.com/oauth2/idpresponse`. 발급받으면 `aws cognito-idp create-identity-provider` + `update-user-pool-client`로 마무리한다
+- ~~**Google 로그인도 사용자가 직접 해야 하는 단계가 남았다.**~~ **2026-08-23 해결.** Google Cloud OAuth 클라이언트 발급 완료, `create-identity-provider` + `update-user-pool-client` 실행 완료. Google Cloud Console 쪽 승인된 리디렉션 URI가 `https://welli-auth-185236887369.auth.us-east-1.amazoncognito.com/oauth2/idpresponse`와 정확히 일치해야 한다(스킴·경로 문자열 완전 일치). OAuth 동의 화면이 "테스트" 상태면 테스트 사용자로 등록된 Google 계정만 로그인된다 — 발표 전 확인할 것
 
 ## 다음 할 일
 1. **(사용자 직접) Amplify GitHub 연동** — 아래 절차 참고. 끝나면 `main` push 시 자동 배포된다
@@ -45,20 +46,19 @@
 4. ~~희망 문구 배너~~ → 해소 (`app/community/_lib/banner.ts`)
 5. 8/20부터 발표 자료 착수
 
-## Amplify GitHub 연동 (사용자가 직접 해야 하는 단계)
+## Amplify 배포 (연동 완료)
 
-> **이 절은 끝났다 (2026-08-22 확인).** 실제로 배포가 도는 앱은 아래 적힌 `d36bhb2dnkr0oj`가 아니라
-> **`d2ynoyp44lt46h`**다 — 라이브 URL이 `https://main.d2ynoyp44lt46h.amplifyapp.com`이고
-> `app/layout.tsx:40`의 폴백 도메인도 같은 값이다. `d36bhb2dnkr0oj`는 CLI로 먼저 만들었다가
-> GitHub를 연결하지 않은 앱이다. 아래 절차는 그 앱을 기준으로 쓰인 옛 기록이므로 그대로 따르지 않는다.
+**앱 이름은 `mokoji`, appId `d2ynoyp44lt46h`, 리전 us-east-1.** 문서에 오래 적혀 있던 `d36bhb2dnkr0oj`는 존재하지 않는 앱이다(2026-08-23 정정). GitHub 연동은 끝났고 `main` push 시 자동 배포된다.
 
-CLI로 앱(`welli`, appId `d36bhb2dnkr0oj`)과 환경변수까지는 이미 만들어 놓았다. GitHub 저장소 연결만 남았다.
+- 콘솔: https://us-east-1.console.aws.amazon.com/amplify/apps/d2ynoyp44lt46h
+- 라이브 URL: `https://main.d2ynoyp44lt46h.amplifyapp.com` (커스텀 도메인 없음)
+- 빌드 설정은 레포 루트의 `amplify.yml`을 쓴다(2026-08-20부터 자동 감지 대신 명시적 스펙)
+- 앱 레벨 환경변수 11개 등록됨. `DEV_AUTH_BYPASS=false` 확인됨(2026-08-23)
+- **`BEDROCK_VISION_MODEL_ID`가 콘솔에 등록되어 있지 않다** — 사진 미션에서 터질 자리. C·B 담당분 확인 필요
 
-1. [AWS Amplify 콘솔](https://us-east-1.console.aws.amazon.com/amplify/apps/d36bhb2dnkr0oj)에서 `welli` 앱을 연다
-2. "Hosting" → "Connect branch" (또는 "Deploy without Git provider"가 아니라 GitHub 선택)
-3. GitHub로 로그인 → "AWS Amplify" GitHub App 설치를 승인 → 저장소 `uchan04/AWS_project`, 브랜치 `main` 선택
-4. 빌드 설정은 레포 루트의 `amplify.yml`을 그대로 쓴다(2026-08-20부터 자동 감지 대신 명시적 스펙 사용)
-5. 첫 배포가 끝나면 `https://main.d36bhb2dnkr0oj.amplifyapp.com` (또는 표시되는 도메인)이 라이브 URL이다
+### 환경변수를 추가할 때 반드시 두 곳을 고친다
+
+Amplify 콘솔 환경변수는 빌드 컨테이너에만 주입되고 SSR 컴퓨트(Lambda)에는 전달되지 않는다. 그래서 `amplify.yml`의 `env | grep -e ...` 목록에 키를 **직접 추가**해야 런타임에 실린다. 콘솔에만 등록하면 런타임에서 `undefined`다. `COGNITO_REDIRECT_URI`가 콘솔에는 있는데 grep 목록에 없어서 코드에서 쓸 수 없던 상태였다(2026-08-23 수정).
 
 ## GitHub 레포·브랜치
 

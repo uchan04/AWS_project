@@ -48,12 +48,20 @@ function fixture(): DashboardDTO {
       },
     ],
     progress: { dailyCompleted: 1, dailyTotal: 2, weeklyCompleted: 5, weeklyTotal: 14, streak: 3 },
-    attendance: { cycleDay: 3, claimedToday: true, attendanceTotal: 10 },
+    attendance: {
+      cycleDay: 3,
+      claimedToday: true,
+      attendanceTotal: 10,
+      todayKey: "2026-08-24",
+      month: "2026-08",
+      claimedDates: ["2026-08-22", "2026-08-23", "2026-08-24"],
+    },
     stages: { current: 1, total: 100, graduated: false },
     // 전에는 "INDEPENDENT_LOW_INCOME_A"였다. `_A` 접미사가 붙은 코드는 스키마에
     // 없다(TypeCode 3개 · SubTypeCode 8개 어디에도) — DTO 타입이 `string`이라
     // 컴파일이 통과했던 것이다. DTO를 TypeCode로 좁혀서 이제 잡힌다
     userTypeCode: "INDEPENDENT_LOW_INCOME",
+    petImageUrl: null,
   }
 }
 

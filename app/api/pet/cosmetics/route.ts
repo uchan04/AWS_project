@@ -1,7 +1,7 @@
 import { fail, ok } from "@/lib/api"
-import { assetUrl } from "@/lib/assets"
+import { cdnUrl } from "@/lib/assets"
 import { UnauthorizedError, getCurrentUser } from "@/lib/auth"
-import { compareCosmetics, SHIPPED_COSMETIC } from "@/lib/pet"
+import { compareCosmetics, cosmeticLabel } from "@/lib/pet"
 import { prisma } from "@/lib/prisma"
 
 // 소유자: C. 치장 목록 조회 + 착용·해제. (SPEC.md 5절)
@@ -20,7 +20,8 @@ export async function GET() {
     const user = await getCurrentUser()
 
     const [items, owned] = await Promise.all([
-      prisma.cosmeticItem.findMany({ where: SHIPPED_COSMETIC }),
+      // 필터 없음. 사유는 app/pet/cosmetics/page.tsx의 같은 자리 주석 참고
+      prisma.cosmeticItem.findMany(),
       prisma.userCosmetic.findMany({
         where: { userId: user.id },
         select: { itemId: true, equipped: true },
@@ -29,25 +30,34 @@ export async function GET() {
 
     const ownedById = new Map(owned.map((row) => [row.itemId, row]))
 
-    const list = items
+    // imageKey 그대로가 아니라 완성된 URL을 내린다. 키만 내리면 화면마다 도메인을 붙이게 되고
+    // 그러면 CLOUDFRONT_DOMAIN이 클라이언트로 새어 나가야 한다. 조립은 lib/assets.ts의
+    // cdnUrl() 한 곳에서만 한다 — 이 라우트와 cosmetics/page.tsx가 갈라지면 목록과 방
+    // 배경이 다른 그림이 된다
+    //
+    // 2026-08-22: name은 DB에 코드로 들어 있다("autumn_path"). 응답에는 표시명만 내린다 —
+    // 코드를 내리면 화면마다 이름표를 다시 붙이게 되고 한 곳을 빼먹으면 코드가 그대로 보인다.
+    // 정렬은 map보다 **먼저** 한다. compareCosmetics는 코드로 진열 순서를 찾으므로
+    // 표시명으로 바꾼 뒤에 정렬하면 사용자가 정한 계절 순서가 한글 가나다순으로 무너진다
+    const list = [...items]
+      .sort(compareCosmetics)
       .map((item) => ({
         id: item.id,
-        name: item.name,
+        name: cosmeticLabel(item.name),
         slot: item.slot,
         rarity: item.rarity,
         affinityOnly: item.affinityOnly,
         priceAffinity: item.priceAffinity,
+        // imageKey에 확장자가 이미 붙어 있다(lib/pet.ts BACKGROUNDS: "backgrounds/….png")
+        imageUrl: cdnUrl(item.imageKey),
         owned: ownedById.has(item.id),
         equipped: ownedById.get(item.id)?.equipped ?? false,
-        // imageKey에 확장자가 이미 붙어 있다(prisma/seed/items.ts: "cosmetics/bg-1.png")
-        imageUrl: assetUrl(item.imageKey),
       }))
-      .sort(compareCosmetics)
 
     // 별도 도감 화면을 만들지 않고 이 진행률로 겸용한다 (SPEC.md 5절 "제외한 것").
     // 분모는 하드코딩하지 않는다 — 시드가 늘면 자동으로 따라간다.
-    // 분자는 owned.length가 아니라 list에서 센다 — 낡은 치장을 이미 가진 계정이 있어서
-    // (pruneCosmetics가 "보유자가 있으면 남긴다") 그대로 쓰면 6분의 7이 나온다
+    // 분자는 owned.length가 아니라 list에서 센다 — 목록에서 빠진 행을 가진 계정이
+    // 6분의 7 같은 진행률을 보지 않게 한다
     //
     // affinity는 상점 잔액이다. GET /api/pet/skins가 starShards를 내려주는 것과 같은 형태다
     return ok({
@@ -118,7 +128,8 @@ export async function POST(request: Request) {
         slot: mine.item.slot,
         equipped: equippedNow.map((row) => ({
           itemId: row.itemId,
-          name: row.item.name,
+          // GET과 같은 이유로 표시명을 내린다. 화면이 "○○을 착용했어요"에 그대로 쓴다
+          name: cosmeticLabel(row.item.name),
           slot: row.item.slot,
         })),
       }

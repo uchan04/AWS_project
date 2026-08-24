@@ -44,17 +44,17 @@ const origin = process.env.APP_ORIGIN || "https://main.d2ynoyp44lt46h.amplifyapp
 export const metadata: Metadata = {
   metadataBase: new URL(origin),
   title: {
-    default: "함께 걷는 하루",
-    template: "%s · 함께 걷는 하루",
+    default: "모꼬지",
+    template: "%s · 모꼬지",
   },
-  description: "오늘 하루의 작은 걸음을 함께 걷습니다. 나에게 맞는 미션과 함께 자라는 펫.",
-  applicationName: "함께 걷는 하루",
+  description: "고립은둔청년 맞춤형 사회 복귀 서비스. 나에게 맞는 미션과 함께 자라는 펫.",
+  applicationName: "모꼬지",
   manifest: "/manifest.webmanifest",
   openGraph: {
     type: "website",
     locale: "ko_KR",
-    siteName: "함께 걷는 하루",
-    title: "함께 걷는 하루",
+    siteName: "모꼬지",
+    title: "모꼬지",
     description: "오늘 하루의 작은 걸음을 함께 걷습니다.",
     url: origin,
   },
@@ -65,7 +65,7 @@ export const metadata: Metadata = {
   robots: { index: false, follow: false },
   appleWebApp: {
     capable: true,
-    title: "함께 걷는 하루",
+    title: "모꼬지",
     statusBarStyle: "default",
   },
 };
