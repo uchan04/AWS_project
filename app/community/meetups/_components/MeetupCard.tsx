@@ -196,7 +196,7 @@ export function MeetupCard({
         )}
 
         <div className="flex flex-wrap gap-2">
-          {meetup.joined ? (
+          {meetup.joined && (
             <button
               type="button"
               onClick={() => setChoosingReason(true)}
@@ -204,10 +204,14 @@ export function MeetupCard({
               className={QUIET_BUTTON}
             >
               {pending === "leave" && <Spinner />}
-              {/* key를 함께 바꿔야 신청↔취소 교체 때 다시 마운트되어 opacity 전환이 보인다. */}
+              {/* key를 함께 바꿔야 다시 마운트되어 opacity 전환이 보인다. */}
               <FadeIn key="leave">신청 취소</FadeIn>
             </button>
-          ) : (
+          )}
+
+          {/* 관리자는 신청 대상이 아니다. "신청하기"도 "정원 마감" 비활성 표시도 렌더하지 않는다.
+              이 변경 전에 이미 신청해둔 관리자는 위 "신청 취소"로 빠질 수 있다. */}
+          {!meetup.joined && !isAdmin && (
             <button
               type="button"
               onClick={() => setConfirmingJoin(true)}
@@ -247,50 +251,53 @@ export function MeetupCard({
 
         {isAdmin && shortBy > 0 && <p className="text-xs text-neutral-400">{shortBy}명 더 모이면 결성돼요</p>}
 
-        {/* 신청 확인. 무게는 전하되 압박하지 않는다 — 오실 수 있는지 되묻거나 책임을 말하지 않는다. */}
-        <div
-          aria-hidden={!confirmingJoin}
-          className={EXPAND_BASE + " " + (confirmingJoin ? "max-h-96 opacity-100" : EXPAND_CLOSED)}
-        >
-          <div className={EXPAND_PANEL}>
-            <p className="text-sm font-semibold text-neutral-900">오프라인에서 만나는 약속이에요</p>
-            <p className="text-xs leading-relaxed text-neutral-600">
-              서로 시간을 내어 같은 자리에 모이는 일이에요.
-              <br />
-              지금 정하지 않아도 괜찮으니, 갈 수 있을 때 신청해 주세요.
-            </p>
+        {/* 신청 확인. 무게는 전하되 압박하지 않는다 — 오실 수 있는지 되묻거나 책임을 말하지 않는다.
+            관리자에게는 여는 버튼이 없으므로 영역 자체를 렌더 트리에 넣지 않는다. */}
+        {!isAdmin && (
+          <div
+            aria-hidden={!confirmingJoin}
+            className={EXPAND_BASE + " " + (confirmingJoin ? "max-h-96 opacity-100" : EXPAND_CLOSED)}
+          >
+            <div className={EXPAND_PANEL}>
+              <p className="text-sm font-semibold text-neutral-900">오프라인에서 만나는 약속이에요</p>
+              <p className="text-xs leading-relaxed text-neutral-600">
+                서로 시간을 내어 같은 자리에 모이는 일이에요.
+                <br />
+                지금 정하지 않아도 괜찮으니, 갈 수 있을 때 신청해 주세요.
+              </p>
 
-            <div className="flex flex-col gap-0.5 text-xs text-neutral-500">
-              <span>{meetupDateTime(meetup.startsAt)}</span>
-              <span>{meetup.place}</span>
-            </div>
+              <div className="flex flex-col gap-0.5 text-xs text-neutral-500">
+                <span>{meetupDateTime(meetup.startsAt)}</span>
+                <span>{meetup.place}</span>
+              </div>
 
-            <p className="text-xs text-neutral-400">신청한 뒤에도 언제든 취소할 수 있어요.</p>
+              <p className="text-xs text-neutral-400">신청한 뒤에도 언제든 취소할 수 있어요.</p>
 
-            <div className="flex gap-2">
-              <button
-                type="button"
-                onClick={() =>
-                  run("join", `/api/community/meetups/${meetup.id}/join`, "POST", { grantsAffinity: true })
-                }
-                disabled={!confirmingJoin || pending !== null}
-                className={BUTTON_BASE + " text-white"}
-                style={{ backgroundColor: MEETUP_ACCENT }}
-              >
-                {pending === "join" && <Spinner />}
-                신청할게요
-              </button>
-              <button
-                type="button"
-                onClick={closePanels}
-                disabled={!confirmingJoin || pending !== null}
-                className={QUIET_BUTTON}
-              >
-                조금 더 생각해볼게요
-              </button>
+              <div className="flex gap-2">
+                <button
+                  type="button"
+                  onClick={() =>
+                    run("join", `/api/community/meetups/${meetup.id}/join`, "POST", { grantsAffinity: true })
+                  }
+                  disabled={!confirmingJoin || pending !== null}
+                  className={BUTTON_BASE + " text-white"}
+                  style={{ backgroundColor: MEETUP_ACCENT }}
+                >
+                  {pending === "join" && <Spinner />}
+                  신청할게요
+                </button>
+                <button
+                  type="button"
+                  onClick={closePanels}
+                  disabled={!confirmingJoin || pending !== null}
+                  className={QUIET_BUTTON}
+                >
+                  조금 더 생각해볼게요
+                </button>
+              </div>
             </div>
           </div>
-        </div>
+        )}
 
         {/* 취소 사유. 고르지 않아도 취소된다 — 위 CANCEL_REASONS 주석 참고. */}
         <div

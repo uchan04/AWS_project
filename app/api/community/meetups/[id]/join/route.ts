@@ -41,6 +41,12 @@ export async function POST(_request: NextRequest, ctx: RouteContext<"/api/commun
       return fail("MEETUP_PASSED", "이미 지난 모임입니다", 400)
     }
 
+    // 관리자의 역할은 개설·결성확인·무산뿐이다. 관리자가 신청하면 최소 인원을 스스로 채워
+    // 결성확인할 수 있고 정원도 한 자리 줄어든다.
+    // DELETE에는 넣지 않는다 — 이 검사가 생기기 전에 신청해둔 관리자 행이 남아 있을 수 있고,
+    // 취소까지 막으면 joinCount만 부풀린 채 빠져나갈 길이 없다.
+    if (user.isAdmin) return fail("FORBIDDEN", "관리자는 모임에 신청할 수 없어요", 400)
+
     let result: { joinCount: number; isNewJoin: boolean }
     try {
       result = await prisma.$transaction(async (tx) => {
