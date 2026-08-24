@@ -616,10 +616,17 @@ function StepSection({ title, subtitle, missions, color, bg, unlocked = true, pr
         )}
       </div>
 
+      {/* auto-fit이다. auto-fill이 아니다 (2026-08-24 제보).
+          auto-fill은 컨테이너에 들어가는 트랙을 **개수와 무관하게** 다 만들어 둔다 —
+          800px / minmax(160px) = 4트랙인데 단계 미션은 3개라 4번째 칸이 빈 채로 남고
+          카드 3장이 191px로 쪼그라들었다(단계당 미션이 4개였던 시절의 배치다).
+          auto-fit은 빈 트랙을 접어서 3장이 258px씩 한 줄을 채운다.
+          개수를 3으로 못 박지 않는 이유는 이 컴포넌트를 일일 미션도 쓰기 때문이다 —
+          그쪽은 완료·집중 카드 선정에 따라 0~5개로 변한다. */}
       <div
         style={{
           display: "grid",
-          gridTemplateColumns: "repeat(auto-fill, minmax(160px, 1fr))",
+          gridTemplateColumns: "repeat(auto-fit, minmax(160px, 1fr))",
           gap: 12,
         }}
       >
