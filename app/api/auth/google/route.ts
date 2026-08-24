@@ -2,6 +2,7 @@
 // COGNITO_DOMAIN이 비어 있으면(Google Cloud 자격증명 연결 전) 503을 돌려준다.
 
 import { NextResponse } from "next/server"
+import { redirectUri } from "@/lib/cognito"
 
 export async function GET(request: Request) {
   const { origin } = new URL(request.url)
@@ -22,7 +23,7 @@ export async function GET(request: Request) {
     identity_provider: "Google",
     response_type: "code",
     client_id: process.env.COGNITO_CLIENT_ID ?? "",
-    redirect_uri: `${origin}/api/auth/callback`,
+    redirect_uri: redirectUri(origin),
     scope: "openid email profile",
   })
 

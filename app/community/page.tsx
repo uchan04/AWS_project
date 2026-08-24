@@ -2,6 +2,7 @@ import type { TypeCode } from "@prisma/client"
 import { getCurrentUser } from "@/lib/auth"
 import { TRIBE } from "@/lib/types"
 import { GalleryTabs } from "./_components/GalleryTabs"
+import { HopeBanner } from "./_components/HopeBanner"
 import { PostList } from "./_components/PostList"
 import { WriteModal } from "./_components/WriteModal"
 import { resolveGallery, listGalleryPosts, type GalleryTab, type GalleryPost } from "./_lib/gallery"
@@ -54,6 +55,8 @@ export default async function CommunityPage(props: PageProps<"/community">) {
       </div>
 
       <GalleryTabs active={gallery} myTypeCode={myTypeCode} />
+
+      <HopeBanner gallery={gallery} />
 
       {posts.length === 0 ? (
         <p className="py-24 text-center text-sm leading-relaxed text-neutral-500">
