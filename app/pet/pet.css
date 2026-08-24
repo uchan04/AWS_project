@@ -570,9 +570,9 @@
 .pet-welcome[data-tone="eat"] .pet-welcome__shape path {
   stroke: var(--pet-seed);
 }
-.pet-welcome[data-tone="touch"] .pet-welcome__shape path {
-  stroke: var(--tribe-cta);
-}
+/* [data-tone="touch"] 규칙은 2026-08-24에 지웠다. 쓰다듬기 문구를 C의 평상시
+   10문구로 갈면서(lib/pet.ts petTouchReply) 테두리를 달리 할 이유가 없어졌다 —
+   PetView가 이제 먹이기에만 data-tone을 준다 */
 
 /* ── 펫 캐릭터 ───────────────────────────────────────────────────────────── */
 

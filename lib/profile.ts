@@ -1,6 +1,6 @@
 import type { TypeCode } from "@prisma/client"
 import { unstable_rethrow } from "next/navigation"
-import { petImageUrl } from "@/lib/assets"
+import { avatarUrl, petImageUrl } from "@/lib/assets"
 import { UnauthorizedError, getCurrentUserWithSkin } from "@/lib/auth"
 import { cappedStage } from "@/lib/pet"
 
@@ -21,7 +21,18 @@ export type SidebarProfile = {
   starShards: number
   level: number
   createdAt: string
+  /** 펫 그림(성장 단계 반영). 쉼 화면 `/pet/rest`이 이 값으로 펫을 그린다 */
   imageUrl: string | null
+  /**
+   * 프로필 원형 전용 종족 아바타 (2026-08-24 추가).
+   *
+   * imageUrl과 따로 두는 이유: 같은 profile을 쉼 화면(`app/pet/rest/page.tsx`)도 받아
+   * 방 안의 **펫**을 그린다. imageUrl을 아바타로 바꿔 버리면 그 화면의 펫이 프로필
+   * 사진으로 뒤바뀐다. 바꾸기로 정한 것은 원형 아바타 3곳뿐이다(사이드바 펼침·접힘·모달).
+   *
+   * 값이 없는 스킨이면 null이고, 사이드바가 imageUrl로 되돌아간다.
+   */
+  avatarUrl: string | null
   /** 진단을 마쳤는지. 챗봇 버튼은 진단 전에 뜨면 안 된다 */
   diagnosed: boolean
 }
@@ -43,6 +54,7 @@ export async function getSidebarProfile(): Promise<SidebarProfile | null> {
       level: user.level,
       createdAt: user.createdAt.toISOString(),
       imageUrl: skin ? petImageUrl(skin.imageKeyBase, stage) : null,
+      avatarUrl: avatarUrl(skin?.avatarKey),
       diagnosed: Boolean(user.typeCode && user.adjective),
     }
   } catch (error) {

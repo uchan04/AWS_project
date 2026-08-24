@@ -475,17 +475,18 @@ export function levelUpReply(gainedLevels: number, level: number): string | null
  * 쓰다듬었을 때의 반응. 누른 횟수를 넘기면 같은 말이 연속으로 나오지 않는다.
  * 재화도 저장값도 움직이지 않는다 — 누르는 것 자체가 보상인 상호작용이다
  * (My Talking Tom·다마고치가 같은 구조다).
+ *
+ * 2026-08-24: **문구를 PET_IDLE_LINES로 갈았다(사용자 결정).** 전에는 여기 따로
+ * 5문구("헤헤, 간지러워요" 등)를 두고 있었는데, 그 5개는 내가 쓴 것이고 C의 20문구와
+ * 어투가 달랐다 — 존댓말 대 반말이고, 갈색 테두리 말풍선(data-tone="touch")으로
+ * 눈에도 구분됐다. 한 펫이 만질 때만 다른 사람처럼 말하는 셈이었다.
+ * 이제 펫이 하는 말은 전부 사용자가 쓴 20문구뿐이다.
+ *
+ * 접속 인사(PET_GREETINGS)가 아니라 평상시(PET_IDLE_LINES)를 쓴다 — 이미 방에 있는
+ * 펫을 만졌는데 "왔네! 기다리고 있었어."가 나오면 맥락이 어긋난다.
  */
-export const PET_TOUCH_REPLIES = [
-  "헤헤, 간지러워요",
-  "좋아요. 조금 더요",
-  "손이 따뜻하네요",
-  "여기 있어 줘서 고마워요",
-  "오늘 하루는 어땠어요?",
-]
-
 export function petTouchReply(count: number): string {
-  return PET_TOUCH_REPLIES[Math.abs(Math.floor(count)) % PET_TOUCH_REPLIES.length]
+  return PET_IDLE_LINES[Math.abs(Math.floor(count)) % PET_IDLE_LINES.length]
 }
 
 // ── 시간대 인사 (2026-08-23 추가) ─────────────────────────────────────────────
