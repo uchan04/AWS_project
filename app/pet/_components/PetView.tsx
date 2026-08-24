@@ -12,7 +12,6 @@ import {
   applySeeds,
   expProgress,
   levelUpReply,
-  petTouchReply,
   seedsToNextStage,
 } from "@/lib/pet"
 import { EVOLUTION_LEVEL, SEED_TO_EXP, expToNextLevel } from "@/lib/types"
@@ -175,20 +174,30 @@ export default function PetView({ initial }: { initial: PetState }) {
   // 평상시 대사 순환 위치. null이면 아직 접속 인사를 보여 주는 중이다.
   // 시작 위치는 서버가 정한다 — 여기서 고르면 하이드레이션에서 어긋난다
   const [lineAt, setLineAt] = useState<number | null>(null)
-  // 쓰다듬기·먹이기 반응. 3초 동안 말풍선 자리를 덮고 그 뒤 원래 대사로 돌아간다.
+  // 쓰다듬기·먹이기 반응. 3초 동안 파티클을 띄우고, `text`가 있으면 그동안 말풍선까지 덮는다.
+  //
+  // **`text: null`은 "파티클만"이다 (2026-08-24 사용자 요청 "클릭할 때마다 문구 변하게
+  // 하지말고, 5분마다 멘트 바꾸도록 조정해").** 쓰다듬기가 그 경우다 — 누르면 💗만 오르고
+  // 말풍선 문장은 그대로 있는다. 같은 날 20초 → 5분으로 올린 순환(IDLE_LINE_MS)이
+  // 쓰다듬기 때문에 무의미해지고 있었다: 5분을 기다리는 문장이 클릭 한 번에 바뀌었다.
+  // 문장이 바뀌는 유일한 경로는 이제 5분 타이머다(먹이기 답만 예외 — 아래 react 주석).
+  //
   // burst는 파티클 span의 key다 — 값이 바뀌면 remount되어 CSS 애니메이션이 처음부터 다시 돈다
   // (같은 요소의 class만 갈면 연속 클릭에서 두 번째부터 애니메이션이 재생되지 않는다)
-  const [reaction, setReaction] = useState<{ text: string; eat: boolean } | null>(null)
+  const [reaction, setReaction] = useState<{ text: string | null; eat: boolean } | null>(null)
   const [burst, setBurst] = useState(0)
-  const [touches, setTouches] = useState(0)
   // 다음 방치형 씨앗이 쌓이는 목표 시각(epoch ms). 0은 "아직 안 심었다"는 뜻이다
   const nextSeedAt = useRef(0)
+
+  // 말풍선을 덮는 반응 대사. 지금은 먹이기만 여기 온다 — 쓰다듬기는 text가 null이라
+  // 파티클만 띄우고 이 값은 계속 null이다(위 reaction 주석)
+  const replyLine = reaction?.text ?? null
 
   // 말풍선에 지금 들어갈 문장. 반응 대사가 있으면 그것이 이기고, 없으면 닫힘 → 접속 인사 →
   // 평상시 대사 순이다. 반응은 닫아 둔 말풍선도 되살린다 — 내가 누른 것에 대한 답이라
   // "닫아 뒀으니 조용히 있어라"의 대상이 아니다
-  const bubble = reaction
-    ? reaction.text
+  const bubble = replyLine
+    ? replyLine
     : bubbleClosed
       ? null
       : lineAt === null
@@ -336,7 +345,11 @@ export default function PetView({ initial }: { initial: PetState }) {
     return () => clearTimeout(t)
   }, [reaction, burst])
 
-  function react(text: string, eat = false) {
+  /**
+   * 반응 한 번. `text`가 null이면 파티클만 띄우고 말풍선 문장은 건드리지 않는다.
+   * 말풍선을 덮어도 되는 것은 **결과를 알리는 답**뿐이다 — 지금은 먹이기 하나다.
+   */
+  function react(text: string | null, eat = false) {
     setReaction({ text, eat })
     setBurst((n) => n + 1)
   }
@@ -345,10 +358,16 @@ export default function PetView({ initial }: { initial: PetState }) {
    * 쓰다듬기. 재화도 저장값도 움직이지 않는다 — 서버를 부르지 않는 순수 상호작용이다.
    * 벤치마크(My Talking Tom·다마고치)에서 펫을 만지는 것은 이 장르의 기본 동작이고,
    * 우리 화면은 그동안 펫을 눌러도 아무 일이 없었다.
+   *
+   * **2026-08-24 사용자 요청으로 문구를 걷었다** — 누르면 💗 파티클만 오른다. 전에는
+   * `petTouchReply(touches)`로 평상시 10문구 중 다음 문장을 말풍선에 꽂았는데, 그게 곧
+   * "클릭할 때마다 문구가 변한다"였다. 같은 날 순환을 20초 → 5분으로 올린 뜻(방에 붙어
+   * 있는 한 줄로 읽히게)이 클릭 한 번에 무너졌다.
+   * `petTouchReply()`는 lib/pet.ts에 남아 있다(check:pet이 "터치 문구는 사용자가 쓴
+   * PET_IDLE_LINES 안에 있어야 한다"를 못 박고 있고, 문구를 되살리려면 그 함수가 필요하다).
    */
   function pat() {
-    react(petTouchReply(touches))
-    setTouches((n) => n + 1)
+    react(null)
   }
 
   async function feed(seeds: number) {
@@ -505,7 +524,9 @@ export default function PetView({ initial }: { initial: PetState }) {
 
             {/* 펫 대사 (2026-08-23 사용자 요청). 20문장 전부 사용자가 직접 쓴 것이다.
                 들어오면 접속 인사(서버가 고른다), 5분마다 평상시 대사로 넘어간다.
-                쓰다듬거나 먹이면 3초 동안 그 반응이 이 자리를 덮는다(위 bubble 주석).
+                **문장을 바꾸는 것은 그 5분 타이머뿐이다** (2026-08-24 사용자 요청) —
+                펫을 눌러도 이 자리는 그대로고 파티클만 오른다. 먹이면 3초 동안 그 답이
+                이 자리를 덮는다(위 bubble·react 주석).
                 문장 목록과 규칙은 lib/pet.ts "펫 대사" 절에 있다.
 
                 말풍선을 캐릭터 **위**에 두고 꼬리를 아래로 내려 펫이 말하는 것으로 읽히게
@@ -516,9 +537,9 @@ export default function PetView({ initial }: { initial: PetState }) {
                 글자로 충분하다. 대신 문장이 바뀔 때 DOM에 그대로 남으므로 훑어 읽을 수 있다 */}
             {/* 아래 data-tone은 먹이기에만 준다 (2026-08-24 사용자 결정). 쓰다듬기에도
                 "touch" 톤(갈색 테두리)을 줬는데, 그게 "이 문구는 사용자가 쓴 20문구가
-                아니다"를 눈으로 알려 주는 표시가 되어 있었다. 이제 쓰다듬기 문구도
-                평상시 10문구라 테두리를 달리 할 이유가 없다 — 같은 펫이 같은 어투로 말한다.
-                먹이기는 남긴다. 레벨업 알림처럼 결과를 알리는 자리라 성격이 다르다 */}
+                아니다"를 눈으로 알려 주는 표시가 되어 있었다. 같은 날 쓰다듬기 문구 자체가
+                걷혀서(위 pat 주석) 이제 이 말풍선에 오는 문장은 사용자가 쓴 20문구 아니면
+                먹이기 답 둘뿐이다. 먹이기 톤은 남긴다 — 레벨업 알림처럼 결과를 알리는 자리다 */}
             {bubble ? (
               <div className="pet-welcome" data-tone={reaction?.eat ? "eat" : undefined}>
                 {/* 말풍선 모양은 사용자가 준 그림(손그림 blob + 갈고리 꼬리)을 그대로 옮긴
@@ -549,8 +570,10 @@ export default function PetView({ initial }: { initial: PetState }) {
                 </svg>
                 <p className="pet-welcome__text">{bubble}</p>
                 {/* 반응 대사일 때는 닫기를 그리지 않는다. 3초면 스스로 사라지고, 그때 닫으면
-                    반응이 끝난 뒤 평상시 대사까지 같이 사라져 이유를 알 수 없다 */}
-                {reaction ? null : (
+                    반응이 끝난 뒤 평상시 대사까지 같이 사라져 이유를 알 수 없다.
+                    reaction이 아니라 replyLine으로 보는 이유: 쓰다듬기는 문장을 덮지 않으므로
+                    누른 뒤 3초 동안 닫기 버튼이 사라질 이유가 없다 */}
+                {replyLine ? null : (
                   <button
                     type="button"
                     className="pet-welcome__close"
