@@ -1140,20 +1140,12 @@
   font-variant-numeric: tabular-nums;
 }
 
-/* 오늘 들어온 재화의 출처 줄 (2026-08-22). 잔액 목록 아래에 붙는다.
-   .pet-card__meta와 같은 값(라벨 크기 + muted)이다 — 카드 안의 보조 설명은 이 화면 전체가
-   그 규칙을 쓰고, 여기만 다르면 새 위계가 생긴다.
-   줄 배경도 테두리도 주지 않는다. 위 재화 줄(.pet-wallet__row)이 유일하게 면을 갖는 요소여야
-   목록과 설명이 구분된다. padding-inline만 재화 줄과 맞춰 왼쪽 끝을 정렬한다 */
-.pet-wallet__source {
-  display: grid;
-  gap: var(--space-3xs);
-  margin: var(--space-2xs) 0 0;
-  padding: 0 var(--space-2xs);
-  list-style: none;
-  color: var(--color-muted);
-  font-size: var(--text-label);
-}
+/* 오늘 들어온 재화의 출처 줄(.pet-wallet__source, 2026-08-22) — 2026-08-24 사용자 요청으로
+   **삭제했다.** "오늘 미션으로 씨앗 +45" / "오늘 대화·커뮤니티로 친밀도 +N" 두 줄이
+   잔액 목록 아래에 붙어 있었다.
+   규칙은 .pet-card__meta와 같은 값(라벨 크기 + --color-muted)이었고, 면도 테두리도 없이
+   padding-inline만 재화 줄과 맞춰 왼쪽 끝을 정렬했다 — 되살리면 그 값이 다시 맞다.
+   빈 자리는 아래 상점 입구 두 개가 받았다(.pet-wallet__shop의 5rem 계산) */
 
 /* 상점 입구 2개. auto-fit이라 좁아지면 두 줄로 갈린다 — 라벨이 nowrap이어서 억지로 한 줄에
    두면 320px에서 글자가 칸을 넘어간다 */
@@ -1208,11 +1200,27 @@
    광택은 맨 앞이다(8/24 첫 요청 "눈에 잘 안 보여서"): 결 → 면 순으로 아래에 깔고 광택을
    그 위에 둔다. 순서를 바꾸면 불투명한 면이 둘을 덮는다.
    번짐 색만 종족색에서 --pet-wood-1로 옮겼다 — 나무 면 밑에 종족색 후광이 남으면 면 색을
-   갈아 놓은 의미가 없다. 밝은 면을 딛는 그림자이므로 진한 첫 단을 쓴다 */
+   갈아 놓은 의미가 없다. 밝은 면을 딛는 그림자이므로 진한 첫 단을 쓴다
+
+   **높이 44px(--control-h) → 5rem(80px). 2026-08-24 세 번째 요청**("…문구 지워주고 그 빈
+   여백에 외형상점과 배경상점을 세로로 더 두껍게 만들어서 꽉차게 만들어줘").
+   5rem은 눈대중이 아니라 지운 문구가 쓰던 높이다:
+     카드 격자 간격 --space-2xs 8px + 문구 목록의 margin-top 8px
+     + 한 줄 높이(--text-label 0.8rem × line-height 1.6 = 20.48px) = 36.48px
+     44 + 36.48 = 80.48 → 5rem(80px)
+   그래서 지갑 카드의 총 높이는 0.5px 차이로 전과 같다. 이게 중요한 이유는 왼쪽 열이
+   grid-template-rows: 1fr auto라서(.pet__col--room) 카드가 짧아지면 그 높이가 **방**으로
+   가 버리는 것이다 — 문구만 지우면 방이 36px 늘고 버튼은 그대로여서 요청한 "꽉차게"가
+   되지 않는다. 두 값을 한 쌍으로 바꿔야 빈 자리가 버튼으로 간다.
+
+   높이를 늘려도 규칙은 그대로다: 라벨 한 줄이 place-items로 가운데에 있고, 결
+   (repeating-linear-gradient 12/14px)이 44px에 3줄에서 80px에 5줄로 늘어난다 — 주기가
+   고정이라 밀도가 유지된다. 카드 높이가 문구 줄 수(1줄/2줄/0줄)에 따라 흔들리던 것도
+   함께 없어졌다 */
 .pet-wallet__shop {
   display: grid;
   place-items: center;
-  min-height: var(--control-h);
+  min-height: 5rem;
   padding: var(--space-2xs) var(--space-xs);
   border-radius: var(--radius-card);
   background:
