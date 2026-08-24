@@ -220,10 +220,15 @@ export default function PetView({ initial }: { initial: PetState }) {
 
   // 재화 3종. 2026-08-21 사용자 결정으로 셋이 같은 칸을 쓴다 — 전에는 씨앗만 초록, 나머지
   // 둘은 나무색이었다. 색은 종족색 하나로 끝내고 구분은 이모지가 한다
+  //
+  // 2026-08-24 사용자 요청으로 **순서가 씨앗 → 친밀도 → 별조각**이 됐다(전에는 씨앗 →
+  // 별조각 → 친밀도). 이 배열이 화면 순서다 — 아래 렌더가 map만 한다.
+  // 친밀도 이모지도 같은 요청으로 💛 → ❤️다("페이지 내의 모든 친밀도"). 노란 하트는
+  // 이 카드에서 ⭐·🌱과 같은 노란·연두 계열이라 세 줄이 한 색으로 뭉쳐 보였다
   const wallet = [
     { name: "씨앗", icon: "🌱", value: pet.seeds },
+    { name: "친밀도", icon: "❤️", value: pet.affinity },
     { name: "별조각", icon: "⭐", value: pet.starShards },
-    { name: "친밀도", icon: "💛", value: pet.affinity },
   ]
 
   // 여기서 오늘 들어온 재화의 출처 문장(sourceLines)을 만들었다 — "오늘 미션으로 씨앗 +45",
@@ -273,7 +278,9 @@ export default function PetView({ initial }: { initial: PetState }) {
   const todayTiles = [
     { name: "받은 씨앗", icon: "🌱", text: `+${ko(pet.today.seeds)}`, seed: true },
     { name: "받은 별조각", icon: "⭐", text: `+${ko(pet.today.starShards)}`, seed: false },
-    { name: "받은 친밀도", icon: "💛", text: `+${ko(pet.today.affinity)}`, seed: false },
+    // 친밀도 이모지는 2026-08-24 사용자 요청으로 💛 → ❤️다. 지갑 줄과 같은 값을 쓴다 —
+    // 같은 재화가 두 카드에서 다른 그림이면 같은 것인지 알 수 없다
+    { name: "받은 친밀도", icon: "❤️", text: `+${ko(pet.today.affinity)}`, seed: false },
     { name: "출석일수", icon: "📅", text: `${ko(pet.attendanceDays)}일`, seed: false },
   ]
 
@@ -661,10 +668,12 @@ export default function PetView({ initial }: { initial: PetState }) {
           <div className="pet-card pet-card--wallet">
             <div className="pet-card__head">
               {/* 2026-08-24 이 카드만 이모지를 뺐다가 같은 날 사용자 요청으로 붙였다.
-                  안의 재화 아이콘 3개(🌱⭐💛)와 겹치지 않는 것을 골라야 해서 지갑이다 —
-                  세 재화 중 하나를 쓰면 제목이 그 줄의 제목처럼 읽힌다 */}
+                  안의 재화 아이콘 3개(🌱❤️⭐)와 겹치지 않는 것을 골라야 해서 처음에는
+                  지갑(👛)이었다 — 세 재화 중 하나를 쓰면 제목이 그 줄의 제목처럼 읽힌다.
+                  같은 날 사용자 요청으로 **노란 코인(🪙)**이 됐다. 코인도 세 재화 아이콘과
+                  겹치지 않으므로 그 이유는 그대로 지켜진다 */}
               <p className="pet-card__title">
-                <span aria-hidden="true">👛</span> 보유 재화
+                <span aria-hidden="true">🪙</span> 보유 재화
               </p>
             </div>
 
@@ -716,8 +725,9 @@ export default function PetView({ initial }: { initial: PetState }) {
             <div className="pet-card__head">
               {/* 제목 앞 이모지는 2026-08-24 사용자 요청으로 되살린 것이다("예전에 있던대로").
                   836cd2b(Figma 이관)에 ⭐ 경험치 · 🌿 씨앗 투입 · 🌟 진화 단계가 있었고
-                  d56d813에서 걷혔다. 보유 재화 카드는 안에 이미 🌱⭐💛 아이콘 3개가 있어서
-                  처음에는 제외했는데, 같은 날 사용자 요청으로 👛을 붙여 다섯 장 전부가 됐다.
+                  d56d813에서 걷혔다. 보유 재화 카드는 안에 이미 🌱❤️⭐ 아이콘 3개가 있어서
+                  처음에는 제외했는데, 같은 날 사용자 요청으로 👛(→ 같은 날 🪙)을 붙여
+                  다섯 장 전부가 됐다.
                   design.md의 "이모지는 마스코트 자리에만"에서 벗어나는 자리다. 새 예외가
                   아니라 이 화면이 원래 갖고 있던 예외로 돌아온 것이고, 전부 aria-hidden이라
                   스크린리더가 읽는 카드 이름은 글자 그대로 남는다 */}
@@ -781,21 +791,30 @@ export default function PetView({ initial }: { initial: PetState }) {
           <div className="pet-card">
             <div className="pet-idle">
               <div className="pet-idle__body">
-                <p className="pet-card__title">
-                  <span aria-hidden="true">🌱</span> 그동안 쌓인 씨앗
-                </p>
-                {/* "N개"에서 "N / 100개"로 늘렸다. 경험치 카드가 게이지 위에 같은 형태로
-                    현재/최대를 적는다 — 분모가 없으면 막대가 어디서 끝나는지 알 수 없다 */}
-                <span className="pet-card__meta">
-                  {ko(pet.idleSeeds)} / {ko(IDLE_MAX_SEEDS)}개
-                </span>
-                {/* 경험치 게이지와 **같은 클래스**를 쓴다. 방치형용 변형을 만들지 않는 이유는
-                    두 게이지가 같은 열에 나란히 서 있어서다 — 굵기나 색이 갈리면 같은 카드
-                    묶음이 아닌 것처럼 읽힌다. 채움률만 다른 값으로 계산한다.
-                    게이지 안에 숫자를 겹쳐 쓰지 않는다(.pet-gauge__value) — 바로 위
+                {/* 2026-08-24 사용자 요청("3/100 개 문구를 그동안 쌓인 씨앗 옆으로 옮겨")으로
+                    제목과 개수가 한 줄이 됐다. 새 규칙을 만들지 않고 **옆 카드들과 같은
+                    .pet-card__head**를 쓴다 — 경험치·씨앗 투입 카드가 이미 "제목 왼쪽 /
+                    현재·최대 오른쪽"이고, 이 카드만 개수를 제목 아래에 두던 것이 8/24에
+                    버튼이 오른쪽으로 나가며 생긴 예외였다. 그 예외가 이 요청으로 닫혔다.
+                    카드 높이는 그대로다 — 줄 높이를 정하는 쪽이 여전히 4.5rem 버튼이다 */}
+                <div className="pet-card__head">
+                  <p className="pet-card__title">
+                    <span aria-hidden="true">🌱</span> 그동안 쌓인 씨앗
+                  </p>
+                  {/* "N개"에서 "N / 100개"로 늘렸다. 경험치 카드가 게이지 위에 같은 형태로
+                      현재/최대를 적는다 — 분모가 없으면 막대가 어디서 끝나는지 알 수 없다 */}
+                  <span className="pet-card__meta">
+                    {ko(pet.idleSeeds)} / {ko(IDLE_MAX_SEEDS)}개
+                  </span>
+                </div>
+                {/* 골격은 경험치 게이지와 **같은 클래스**다(높이·테두리·홈 그림자·전환).
+                    2026-08-24 사용자 요청("게이지 색을 씨앗줍기버튼과 같은 초록색으로")으로
+                    채움색만 --pet-gauge--seed 변형으로 갈린다. 오른쪽 버튼이 초록이므로
+                    한 줄 안에서 막대와 버튼이 같은 재화를 가리키는 것으로 읽힌다.
+                    게이지 안에 숫자를 겹쳐 쓰지 않는다(.pet-gauge__value) — 위 __head의
                     __meta가 같은 문자열을 이미 갖고 있다(경험치 카드와 같은 사정) */}
                 <div
-                  className="pet-gauge"
+                  className="pet-gauge pet-gauge--seed"
                   role="progressbar"
                   aria-label="그동안 쌓인 씨앗"
                   aria-valuemin={0}

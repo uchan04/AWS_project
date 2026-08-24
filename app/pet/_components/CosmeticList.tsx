@@ -216,9 +216,11 @@ export default function CosmeticList({
           <div className="pet-banner__acts">
             {/* 잔액이 이 화면에만 있으므로 홈의 씨앗 HUD처럼 aria-hidden으로 묻지 않는다 */}
             <p className="pet-hud" aria-label={`친밀도 ${ko(affinity)}`}>
-              {/* --wood 변형은 2026-08-21에 지웠다. 아이콘 칸이 종족색 하나로 통일됐다 */}
+              {/* --wood 변형은 2026-08-21에 지웠다. 아이콘 칸이 종족색 하나로 통일됐다.
+                  2026-08-24 사용자 요청("페이지 내의 모든 친밀도의 이모티콘은 빨간색 하트")으로
+                  💛 → ❤️다. 홈 지갑·오늘의 활동과 같은 값이어야 같은 재화로 읽힌다 */}
               <span className="pet-hud__icon" aria-hidden="true">
-                💛
+                ❤️
               </span>
               <span className="pet-hud__value" aria-hidden="true">
                 {ko(affinity)}
