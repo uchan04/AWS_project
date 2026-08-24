@@ -209,6 +209,9 @@ export default function PetView({ initial }: { initial: PetState }) {
   // 방치형 게이지 채움률 (2026-08-24 사용자 요청). 0~1로 자른다 — 서버가 상한을 넘긴 값을
   // 보내는 경우(상한을 나중에 내리면 이미 쌓인 행이 그렇다) 막대가 카드 밖으로 자란다
   const idleProgress = Math.min(1, Math.max(0, pet.idleSeeds / IDLE_MAX_SEEDS))
+  // 게이지 밑 각주에 쓰는 "N분마다 1개" (2026-08-24 사용자 요청). 30을 글자로 박지 않고
+  // 실제 간격에서 계산한다 — IDLE_SEEDS_PER_HOUR를 만지면 이 문구가 조용히 거짓이 된다
+  const idleSeedMinutes = Math.round(MS_PER_IDLE_SEED / 60_000)
   const emoji = animalEmoji(pet.animal)
   // 단일 형태(친밀도 캐릭터)는 단계 크기를 쓰지 않는다. 중간 크기로 고정한다
   const stage = pet.stageCount > 1 ? Math.min(pet.evolutionStage, MAX_STAGE) : 2
@@ -844,12 +847,26 @@ export default function PetView({ initial }: { initial: PetState }) {
                 "시간당 N개, 최대 N시간분까지 모여요"와 "다음 씨앗까지 N분"이다.
                 타이머 자체는 계속 돌아간다 — 위 useEffect가 그것으로 쌓인 개수를 1씩
                 올리므로 지우면 개수가 새로고침 전까지 멈춘다.
-                가득 찼을 때만 각주를 그린다. 빈 <p>를 남기면 gap만큼 카드가 길어진다 */}
-            {pet.idleCapped ? (
-              <p className="pet-card__foot">
-                <em>가득 찼어요</em>
-              </p>
-            ) : null}
+
+                2026-08-24 사용자 요청("경험치 카드칸의 게이지 밑에 레벨 문구를 적었듯이
+                그동안 쌓인 씨앗 게이지 바로 밑에 30분마다 1개의 씨앗이 생성돼요 라는 문구"):
+                **8/21에 지운 속도 문구가 사용자 결정으로 돌아왔다.** 그때 지운 이유는
+                각주 세 줄이 카드를 무겁게 만든 것이었고, 지금은 한 줄이다.
+                문장은 사용자가 쓴 그대로 두고 30만 상수에서 계산한다(위 idleSeedMinutes).
+
+                골격은 경험치 카드의 각주와 **같은 .pet-card__foot**이다 — 요청이 "경험치
+                카드처럼"이고, 그 카드도 게이지 아래 이 클래스에 span 2개를 space-between으로
+                둔다(현재 Lv.N / 다음 단계까지 씨앗 N개). 그래서 자리는 .pet-idle 밖,
+                카드 맨 아래다. 안(왼쪽 상자)에 넣으면 버튼과 같은 줄을 다투고, 각주는
+                카드 전체에 붙는 말이다.
+                "가득 찼어요"는 지우지 않고 같은 줄의 오른쪽으로 옮겼다 — 두 문장이 각각
+                "얼마나 빨리 차는지"와 "지금 더 안 찬다"라서 함께 있을 때 뜻이 이어진다.
+                이제 각주가 항상 있으므로 8/21에 조건부로 만든 이유(빈 <p>가 gap만큼
+                카드를 늘린다)는 해당하지 않는다 */}
+            <p className="pet-card__foot">
+              <span>{idleSeedMinutes}분마다 1개의 씨앗이 생성돼요</span>
+              {pet.idleCapped ? <em>가득 찼어요</em> : null}
+            </p>
           </div>
 
           {/* 씨앗 투입. --feed는 이 카드 안의 글씨체를 한 벌로 묶는 변형이다
