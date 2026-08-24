@@ -45,6 +45,13 @@ export type PetState = {
   affinity: number
   /** 오늘 들어온 재화. 지갑에 잔액만 있으면 이 재화가 어디서 왔는지가 화면에서 끊긴다 */
   today: { seeds: number; starShards: number; affinity: number }
+  /**
+   * 누적 출석일(User.attendanceTotal). "오늘의 활동" 카드의 네 번째 칸이 쓴다
+   * (2026-08-24 사용자 요청). today 안에 넣지 않은 이유는 오늘 값이 아니기 때문이다 —
+   * 오늘 하루의 증감을 모아 둔 today에 누계를 섞으면 다음 사람이 today.seeds도
+   * 누계로 읽는다
+   */
+  attendanceDays: number
   /** 방치형으로 모여 있는(아직 안 받은) 씨앗. 배율까지 적용된 값이다 */
   idleSeeds: number
   /** 상한(12시간분)에 닿아 누적이 멈춘 상태인지 */
@@ -203,14 +210,31 @@ export default function PetView({ initial }: { initial: PetState }) {
   // 오늘 값 3종**을 넣었다 — 칸 모양과 배치는 시안 그대로다.
   // 컬럼이 생기면 이 배열만 갈아 끼우면 된다.
   //
-  // 0인 칸은 그리지 않고, 셋 다 0이면 카드 자체가 없다. sourceLines와 같은 규칙이다 —
-  // "받은 씨앗 +0"은 성취가 아니라 미달 표시로 읽힌다(위 sourceLines 주석).
-  // 칸이 1~3개로 줄어도 격자가 깨지지 않게 CSS를 auto-fit으로 뒀다.
+  // **2026-08-24: 3칸 → 4칸, 그리고 값이 0이어도 칸을 그린다.**
+  // 사용자 요청이 "오늘의 활동 칸에 오늘 받은 별조각칸, 출석일수 칸도 안에 따로 만들어줘"다.
+  // 별조각 칸은 이미 배열에 있었지만 화면에 안 나왔다 — 일일 미션의 rewardShards가 전부 0이고
+  // (별조각은 3단 단계 미션 5개와 일일 전체 완료 보너스에서만 나온다) 그날 그 미션을 깨지
+  // 않은 사람은 값이 0이라 아래 filter가 칸을 빼 버렸다. 그래서 filter를 걷었다.
+  //
+  // 그 filter의 근거였던 "+0은 미달 표시로 읽힌다"(위 sourceLines 주석)는 **문장에만 남긴다.**
+  // 문장은 "오늘 미션으로 별조각 +0"처럼 없는 성과를 서술하지만, 칸은 자리이고 그 자리가
+  // 항상 있으면 "여기에 별조각이 들어온다"는 안내로 읽힌다 — 요청이 칸을 만들어 달라는
+  // 것이었으므로 이 카드에서는 그쪽을 택했다. 부수 효과로 카드 높이가 하루 종일 고정되고
+  // (칸 수가 안 변한다) 오른쪽 열 바닥 맞춤(pet.css .pet__col--side)이 흔들리지 않는다.
+  //
+  // 출석일수는 누계(User.attendanceTotal)다. 연속(streakCount)이 아니다 — 요청한 이름이
+  // "출석일수"이고, 연속을 세면 하루 빠진 사람의 칸이 1로 떨어져 이 서비스가 안 하는
+  // 벌점 표시가 된다(SPEC.md 5절 랭킹·경쟁 배제와 같은 이유). 연속으로 바꿀 일이 생기면
+  // page.tsx의 attendanceDays 한 줄만 갈면 된다.
+  //
+  // text를 미리 만드는 이유: 재화 셋은 "+N"이고 출석은 "N일"이라 접두사·단위가 다르다.
+  // 렌더에서 분기하면 칸마다 다른 서식이 JSX에 흩어진다.
   const todayTiles = [
-    { name: "받은 씨앗", icon: "🌱", value: pet.today.seeds, seed: true },
-    { name: "받은 별조각", icon: "⭐", value: pet.today.starShards, seed: false },
-    { name: "받은 친밀도", icon: "💛", value: pet.today.affinity, seed: false },
-  ].filter((tile) => tile.value > 0)
+    { name: "받은 씨앗", icon: "🌱", text: `+${ko(pet.today.seeds)}`, seed: true },
+    { name: "받은 별조각", icon: "⭐", text: `+${ko(pet.today.starShards)}`, seed: false },
+    { name: "받은 친밀도", icon: "💛", text: `+${ko(pet.today.affinity)}`, seed: false },
+    { name: "출석일수", icon: "📅", text: `${ko(pet.attendanceDays)}일`, seed: false },
+  ]
 
   // 토스트 2.5초 후 사라짐
   useEffect(() => {
@@ -718,40 +742,38 @@ export default function PetView({ initial }: { initial: PetState }) {
               제목은 처음엔 알약 배지였다(시안이 그 모양이다). 2026-08-24 사용자 요청으로
               걷었다 — 고양이 종족색이 파랑이라 알약이 "제목에 씌워진 파란 동그라미"로
               읽혔다. 이제 다른 카드들과 같은 .pet-card__title 한 줄이다.
-              __head로 감싸지 않은 이유는 오른쪽에 넣을 __meta가 없어서다 — 타일 3칸이
+              __head로 감싸지 않은 이유는 오른쪽에 넣을 __meta가 없어서다 — 타일 네 칸이
               이미 그 정보를 다 갖고 있다. 감싸도 space-between이 혼자 남은 제목을
-              그대로 왼쪽에 두므로 보이는 차이는 없고, 쓰지 않는 래퍼만 늘어난다 */}
-          {todayTiles.length > 0 ? (
-            <div className="pet-card pet-card--today">
-              <p className="pet-card__title">
-                <span aria-hidden="true">📊</span> 오늘의 활동
-              </p>
+              그대로 왼쪽에 두므로 보이는 차이는 없고, 쓰지 않는 래퍼만 늘어난다.
 
-              {/* 칸 안의 읽는 순서는 "+275 받은 씨앗"이다. 이모지만 aria-hidden이므로
-                  스크린리더에는 숫자와 이름만 남는다. 값을 이름보다 앞에 둔 것은 DOM 순서를
-                  보이는 순서와 같게 유지하려는 것이다 — CSS order로 뒤집으면 눈에 보이는
-                  순서와 읽히는 순서가 갈려 나중에 고칠 때 한쪽만 맞추게 된다 */}
-              <ul className="pet-today">
-                {todayTiles.map((tile) => (
-                  <li className="pet-today__tile" key={tile.name}>
-                    <span className="pet-today__icon" aria-hidden="true">
-                      {tile.icon}
-                    </span>
-                    {/* 씨앗 칸만 초록이다. pet.css의 "채도 높은 색은 종족색 하나뿐" 규칙에서
-                        씨앗 초록이 유일하게 남은 예외라(--pet-seed 주석) 새 색이 아니다.
-                        별조각·친밀도는 이 화면이 강조 숫자에 쓰는 --tribe-cta로 묶는다 */}
-                    <span
-                      className="pet-today__value"
-                      data-seed={tile.seed ? "true" : undefined}
-                    >
-                      +{ko(tile.value)}
-                    </span>
-                    <span className="pet-today__name">{tile.name}</span>
-                  </li>
-                ))}
-              </ul>
-            </div>
-          ) : null}
+              카드를 감싸던 `todayTiles.length > 0 ?` 조건은 2026-08-24에 걷었다 —
+              네 칸이 값과 무관하게 항상 있으므로(위 todayTiles 주석) 조건이 늘 참이다 */}
+          <div className="pet-card pet-card--today">
+            <p className="pet-card__title">
+              <span aria-hidden="true">📊</span> 오늘의 활동
+            </p>
+
+            {/* 칸 안의 읽는 순서는 "+275 받은 씨앗"이다. 이모지만 aria-hidden이므로
+                스크린리더에는 숫자와 이름만 남는다. 값을 이름보다 앞에 둔 것은 DOM 순서를
+                보이는 순서와 같게 유지하려는 것이다 — CSS order로 뒤집으면 눈에 보이는
+                순서와 읽히는 순서가 갈려 나중에 고칠 때 한쪽만 맞추게 된다 */}
+            <ul className="pet-today">
+              {todayTiles.map((tile) => (
+                <li className="pet-today__tile" key={tile.name}>
+                  <span className="pet-today__icon" aria-hidden="true">
+                    {tile.icon}
+                  </span>
+                  {/* 씨앗 칸만 초록이다. pet.css의 "채도 높은 색은 종족색 하나뿐" 규칙에서
+                      씨앗 초록이 유일하게 남은 예외라(--pet-seed 주석) 새 색이 아니다.
+                      별조각·친밀도·출석일수는 이 화면이 강조 숫자에 쓰는 --tribe-cta로 묶는다 */}
+                  <span className="pet-today__value" data-seed={tile.seed ? "true" : undefined}>
+                    {tile.text}
+                  </span>
+                  <span className="pet-today__name">{tile.name}</span>
+                </li>
+              ))}
+            </ul>
+          </div>
         </div>
       </div>
 
