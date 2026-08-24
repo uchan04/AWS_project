@@ -117,30 +117,48 @@ export function middleware(request: NextRequest) {
   if (hasSession) return pass()
 
   // 로그인 후 원래 가려던 곳으로 돌아갈 수 있게 남겨둔다.
-  // 열린 리다이렉트를 막기 위해 경로만 싣는다 — 절대 URL은 싣지 않는다
+  // 열린 리다이렉트를 막기 위해 next에는 경로만 싣는다 — 외부 절대 URL은 싣지 않는다.
   // "/"는 위에서 이미 통과했으므로 여기 오는 경로는 항상 홈이 아니다
   //
-  // **여기는 절대 URL이어야 한다. 라우트 핸들러와 규칙이 다르다.**
+  // ★ 여기는 절대 URL이어야 한다. 라우트 핸들러와 규칙이 다르다 (2026-08-24 장애).
   //
-  // 2026-08-24에 이 자리를 상대 경로 Location으로 바꿨다가 되돌렸다. 이유는 Next가
-  // 미들웨어 응답의 Location을 자기가 `new URL(location)`으로 파싱하기 때문이다 —
-  // 상대 경로면 그 자리에서 던진다:
-  //   TypeError: Invalid URL  code: ERR_INVALID_URL  input: '/login?next=%2Fpet'
-  // 그래서 로그인 안 한 사람이 /pet을 열면 로그인 화면이 아니라 **500**을 받았다.
-  // `npm run e2e`의 "/pet은 /login으로 보낸다"가 이것을 잡았다(check:* 9종은 못 잡는다 —
-  // 미인증 리다이렉트를 검사하는 것은 e2e뿐이다).
-  // `lib/oauth.ts`의 appRedirect()가 상대 경로로 되는 것은 그쪽이 라우트 핸들러라
-  // 응답이 Next의 미들웨어 검증을 지나지 않기 때문이다.
+  //   Route Handler는 plain Response를 그대로 내보내므로 `Location: "/login"`이 통하지만
+  //   (`lib/oauth.ts` appRedirect), 미들웨어는 Edge 런타임이고 Next의 어댑터가 Location
+  //   값을 `new URL()`로 파싱한다. base 없는 상대 경로는 거기서 터진다 — 배포본과
+  //   로컬 양쪽에서 보호된 페이지가 전부 500이었다:
+  //     TypeError: Invalid URL { code: 'ERR_INVALID_URL', input: '/login?next=%2Fpet' }
+  //   즉 fd8c21f의 "절대 URL을 만들지 않는다" 규칙은 Route Handler 한정이고
+  //   미들웨어에는 그대로 옮길 수 없다.
   //
-  // 그러면 원래 함정(request.url의 host가 Amplify SSR에서 localhost:3000이다)이 돌아오므로
-  // origin을 request.url이 아니라 appOrigin()에서 얻는다 — APP_ORIGIN 환경변수가 먼저고,
-  // 없으면 x-forwarded-host(localhost는 건너뛴다), 최후에 request.url이다.
-  // 로컬에서는 마지막 갈래로 떨어져 http://localhost:3000이 되고 그게 맞는 값이다.
-  const login = new URL("/login", appOrigin(request))
+  //   그래서 절대 URL을 만들되 host를 request.url에서 가져오지 않는다. Amplify SSR은
+  //   Lambda 안에서 Next를 localhost:3000으로 띄우고 앞에 CloudFront가 붙으므로
+  //   request.url의 host는 공개 도메인이 아니다.
+  //
+  //   origin 계산은 `lib/oauth.ts`의 appOrigin()에 맡긴다 — 그 함수를 Cognito에 보내는
+  //   redirect_uri가 이미 쓰고 있어서, 여기에 같은 규칙을 다시 적으면 두 벌이 되어
+  //   한쪽만 고쳐지는 날이 온다. 순서는 APP_ORIGIN 환경변수 → x-forwarded-host(localhost는
+  //   건너뛴다) → request.url이고, APP_ORIGIN은 `amplify.yml`의 env 목록에 이미 있다.
+  //   로컬에는 두 앞 갈래가 없어 마지막으로 떨어지고 http://localhost:3000이 맞는 값이다.
+  //
+  //   ※ 이 버그를 아무도 로컬에서 못 밟은 이유가 위 105행에 있다 — DEV_AUTH_BYPASS=true면
+  //     첫 줄에서 통과한다. 팀 .env가 전부 true라 이 경로를 지난 사람이 없었다.
+  //     검출한 것은 `npm run e2e`의 "/pet은 /login으로 보낸다"뿐이다. check:* 9종은
+  //     전부 순수 함수 단정이라 이 경로를 지나지 않는다.
+  const origin = appOrigin(request)
+
+  // origin이 그래도 localhost로 떨어졌는데 프로덕션이면, 브라우저가 사용자 PC의 3000번을
+  // 찾아간다(fd8c21f가 고친 그 증상). 조용히 틀리면 또 못 찾으므로 그때만 로그를 남긴다 —
+  // 배포본에서 이 줄이 보이면 APP_ORIGIN 환경변수와 x-forwarded-host를 확인할 것
+  if (process.env.NODE_ENV === "production" && /\/\/(localhost|127\.0\.0\.1)/.test(origin)) {
+    console.error(`[middleware] 공개 origin을 못 찾았다 — "${origin}"으로 리다이렉트한다`)
+  }
+
+  const login = new URL("/login", origin)
   // 로그인 후 원래 가려던 곳으로 돌아갈 수 있게 남긴다. 열린 리다이렉트를 막기 위해
-  // 경로만 싣는다 — 절대 URL은 싣지 않는다
+  // next에는 경로만 싣는다 — 외부 절대 URL은 싣지 않는다
   login.searchParams.set("next", `${pathname}${search}`)
-  // 307을 유지한다. 보호된 API에 POST하던 요청의 실패 모양을 바꾸지 않는다
+  // 307을 유지한다. NextResponse.redirect의 기본값이 307이었고 여기서 메서드를 바꾸면
+  // 보호된 API에 POST하던 요청의 실패 모양이 달라진다
   const redirect = NextResponse.redirect(login, 307)
   redirect.headers.set("Content-Security-Policy", csp)
   return redirect
