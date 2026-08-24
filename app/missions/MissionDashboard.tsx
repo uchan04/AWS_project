@@ -680,56 +680,64 @@ function ProgressCard({ title, value, color, bg }: ProgressCardProps) {
 
 // ─── Main dashboard ────────────────────────────────────────────────────────
 
-export default function MissionDashboard() {
-  const [dashboard, setDashboard] = useState<DashboardDTO | null>(null)
-  const [loading, setLoading] = useState(true)
+// initial: page.tsx가 서버에서 읽어 넘긴 첫 화면 데이터.
+// 이게 있으면 마운트 시 fetch를 내지 않는다 — 서버가 이미 같은 값을 담아 보냈다.
+// 서버 조회가 실패했으면(진단 미완료 등) null로 오고, 그때만 클라이언트에서 읽어
+// 에러 문구를 화면에 띄운다.
+export default function MissionDashboard({ initial }: { initial: DashboardDTO | null }) {
+  const [dashboard, setDashboard] = useState<DashboardDTO | null>(initial)
+  const [loading, setLoading] = useState(initial === null)
   const [error, setError] = useState<string | null>(null)
   const [selected, setSelected] = useState<MissionDTO | null>(null)
   const [currentStageIndex, setCurrentStageIndex] = useState(0)
   const [dailyIndex, setDailyIndex] = useState(0)
 
-  const loadDashboard = useCallback(async () => {
-    try {
-      const res = await fetch("/api/missions")
-      const json = await res.json()
-      if (!res.ok) {
-        setError(json.error?.message || "미션을 불러올 수 없습니다")
-        setLoading(false)
-        return
-      }
-      setDashboard(json.data)
-      setLoading(false)
-    } catch {
-      setError("네트워크 오류가 발생했습니다")
-      setLoading(false)
-    }
-  }, [])
+  // 화면이 살아있는지. 언마운트 후 setState를 막는다
+  const aliveRef = useRef(true)
+  // 진행 중인 GET /api/missions. 같은 요청이 겹치면 새로 내지 않고 이걸 기다린다.
+  // GET /api/missions는 서버에서 DB 8쿼리를 병렬로 내는데, RDS가 us-east-1이라
+  // 한 번에 약 800ms다. 커넥션 풀이 9개뿐이라 같은 요청 2건이 겹치면 16쿼리가 서로를
+  // 기다려 응답이 배가 된다. 마운트 effect와 완료 후 재조회가 겹치는 실제 경로가 있고,
+  // dev의 React Strict Mode는 마운트 effect를 두 번 호출한다.
+  const inFlightRef = useRef<Promise<void> | null>(null)
 
-  useEffect(() => {
-    let mounted = true
-    async function load() {
+  const loadDashboard = useCallback(async () => {
+    if (inFlightRef.current) return inFlightRef.current
+
+    const run = (async () => {
       try {
         const res = await fetch("/api/missions")
         const json = await res.json()
-        if (!mounted) return
+        if (!aliveRef.current) return
         if (!res.ok) {
           setError(json.error?.message || "미션을 불러올 수 없습니다")
           setLoading(false)
           return
         }
         setDashboard(json.data)
+        setError(null)
         setLoading(false)
       } catch {
-        if (!mounted) return
+        if (!aliveRef.current) return
         setError("네트워크 오류가 발생했습니다")
         setLoading(false)
+      } finally {
+        inFlightRef.current = null
       }
-    }
-    void load()
-    return () => {
-      mounted = false
-    }
+    })()
+
+    inFlightRef.current = run
+    return run
   }, [])
+
+  useEffect(() => {
+    aliveRef.current = true
+    // 서버가 이미 넘겨준 데이터가 있으면 같은 것을 다시 읽지 않는다
+    if (initial === null) void loadDashboard()
+    return () => {
+      aliveRef.current = false
+    }
+  }, [loadDashboard, initial])
 
   if (loading) {
     return (
