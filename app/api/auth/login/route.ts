@@ -55,6 +55,11 @@ export async function POST(request: Request) {
     if (error instanceof NotAuthorizedException || error instanceof UserNotFoundException) {
       return fail("INVALID_CREDENTIALS", "이메일 또는 비밀번호가 올바르지 않습니다", 401)
     }
-    throw error
+    // InvalidParameterException(App Client에 USER_PASSWORD_AUTH 미허용),
+    // ResourceNotFoundException(잘못된 ClientId·리전) 등은 자격증명 문제가 아니라 설정 문제다.
+    // 그냥 throw하면 화면에 안내가 없는 500이 되고 로그도 안 남았다(2026-08-23).
+    // 상태 코드는 CLAUDE.md 7절이 정한 5종만 쓴다
+    console.error("[auth/login] Cognito InitiateAuth 실패", error)
+    return fail("LOGIN_UNAVAILABLE", "로그인 처리 중 문제가 발생했습니다. 잠시 후 다시 시도해 주세요", 500)
   }
 }
