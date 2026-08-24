@@ -29,12 +29,19 @@ export function ChatLauncher({ diagnosed }: { diagnosed: boolean }) {
 
   if (open) return <ChatPanel onClose={() => setOpen(false)} />
 
+  // 크기: 2026-08-24 사용자 요청("챗봇 아이콘의 크기를 1.5배 더 키워줘", 펫 화면에서 봤다).
+  // 이 버튼은 전역 오버레이라 네 화면(홈·미션·펫·커뮤니티)에서 함께 커진다 — 펫 화면만
+  // 키우려면 펫 CSS에 예외를 두어야 하고, 그러면 화면을 옮길 때 아이콘 크기가 바뀌어
+  // 보인다. 사용자가 네 화면 다 키우는 쪽으로 결정했다.
+  // h-12/w-12(48px) → 4.5rem(72px), 이모지 text-xl(20px) → text-3xl(30px)로 둘 다 1.5배다
+  // (원만 키우면 여백만 늘고, 이모지만 키우면 원에 꽉 찬다).
+  // 챗봇은 D 담당이고 이 파일도 D의 것이다 — className 한 줄만 바꿨고 D에게 알린다.
   return (
     <button
       type="button"
       onClick={() => setOpen(true)}
       aria-label="마음 친구 열기"
-      className="fixed top-4 right-4 z-40 flex h-12 w-12 items-center justify-center rounded-full bg-white text-xl shadow-lg transition hover:bg-neutral-50"
+      className="fixed top-4 right-4 z-40 flex h-[4.5rem] w-[4.5rem] items-center justify-center rounded-full bg-white text-3xl shadow-lg transition hover:bg-neutral-50"
     >
       💬
     </button>
