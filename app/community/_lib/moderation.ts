@@ -200,6 +200,28 @@ export function containsChosungAbuse(text: string): boolean {
 }
 
 /* ────────────────────────────────────────────────────────────
+ * 모음 제스처
+ *
+ * "ㅗ" 는 가운뎃손가락을 본뜬 것이라 대상 없이 쓰이는 법이 없다.
+ * 그래서 2인칭을 요구하지 않고 그 자체로 차단한다.
+ *
+ * 반드시 조합되지 않은 원문에서만 찾아야 한다. 자모로 분해한 뒤 찾으면
+ * "오늘"(ㅇㅗㄴㅡㄹ)의 ㅗ 까지 걸린다.
+ *
+ * ㅠㅠ · ㅜㅜ · ㅡㅡ 는 절대 건드리지 않는다. 힘들다는 말을 막는 셈이 되고,
+ * 이 커뮤니티에서 가장 흔한 표현이다. 그래서 ㅗ 하나만 본다.
+ * ──────────────────────────────────────────────────────────── */
+
+/** "ㅗㅜㅑ"(감탄)는 제스처가 아니다. 이것만 예외로 뺀다. */
+const SURPRISE_RE = /ㅗ[\s._~]*ㅜ[\s._~]*ㅑ/gu;
+
+export function containsGestureAbuse(text: string): boolean {
+  const s = nfkc(text);
+  if (!s.includes("ㅗ")) return false;
+  return s.replace(SURPRISE_RE, "").includes("ㅗ");
+}
+
+/* ────────────────────────────────────────────────────────────
  * 사전
  *
  * TARGETED 정책에서는 차단하지 않는다. 욕설이 있다는 사실만 기록한다.
@@ -391,6 +413,7 @@ export async function moderate(
   for (const form of [normalized, squeezed]) {
     if (containsChosungAbuse(form)) return block("초성 축약", "rule", BLOCK_MESSAGE);
   }
+  if (containsGestureAbuse(text)) return block("모음 제스처", "rule", BLOCK_MESSAGE);
 
   const profanity = findProfanity(text);
   if (POLICY === "BLANKET" && profanity.length > 0) {
