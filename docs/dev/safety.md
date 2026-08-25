@@ -2,8 +2,43 @@
 
 챗봇과 커뮤니티에 걸친 기능이라 담당별 문서가 아니라 따로 둔다. 만지기 전에 이 문서를 읽는다.
 
+> ## ⚠️ 2026-08-25 정정 — 아래 본문은 `lib/safety.ts` 한 층만 설명한다
+>
+> 2026-08-24에 **커뮤니티 검열 층이 하나 더 생겼다**(`app/community/_lib/moderation.ts`, 469줄, D).
+> 이 문서의 본문은 그 층을 모른 채 쓰였고, **핵심 주장 셋이 현재 동작과 반대다.**
+> 본문을 지우지 않는 이유는 정규식 가드(`너(?!무)` 등)의 근거가 거기 있어서다 —
+> 그 부분은 지금도 유효하다.
+>
+> | 본문 주장 | 지금 실제 | 어디 |
+> |---|---|---|
+> | 21행 "**정규식이지 LLM이 아니다**" | 게시 경로에 **Bedrock 판정이 있다** (`MODEL_JUDGE = true`) | `moderation.ts:40` |
+> | 38행 "**욕설 자체는 막지 않는다**" — 2인칭 지시가 있을 때만 | **대상이 없어도 막는다** (`POLICY = "BLANKET"`) | `moderation.ts:33` |
+> | 44행 "**위기 글·댓글은 막지 않는다**" | **욕설이 섞이면 막힌다** — 상담 안내(109)에 도달하지 못한다 | `STATUS.md` 차단 30번 |
+>
+> **어디까지가 그대로인가 — 이게 중요하다.**
+> - **위기 감지(`isCrisis`)는 여전히 정규식 전용이다.** Bedrock에 종속되지 않는다. 21행의 설계 목표는 *위기 감지*에 대해서는 지켜졌다
+> - `moderation.ts`의 Bedrock 판정은 **실패 시 `passthrough`(fail-open)** 다. 모델이 죽어도 글이 막히지 않는다
+> - **뒤집힌 것은 "무엇을 차단하는가"이고, 위기 대응 경로의 가용성 원칙은 아니다**
+>
+> **BLANKET은 의도된 값이다** — 2026-08-24 사용자 결정("D의 변경대로 모두 따름").
+> `moderation.ts:28~30` 주석도 "기록된 팀 결정과 다르므로 팀에 공유된 상태를 유지해야 한다"고
+> 스스로 적어 두었다. 되돌리려면 `POLICY`를 `TARGETED`로 바꾸는 한 줄이면 된다.
+>
+> **차단 30번은 정책이 아니라 버그다.** 위기 글 예외 하나가 빠졌을 뿐이고,
+> 고칠 자리가 라우트 2곳이다(`docs/dev/community.md` ① 참고). 구조 처방은
+> `docs/모듈-재배치-계획.md` 1번 — **판정 우선순위를 한 모듈이 갖게 하는 것**이다.
+> 지금은 "위기가 욕설을 이긴다"는 규칙이 `lib/safety.ts`에도 `moderation.ts`에도 없고
+> 라우트의 줄 순서에만 있다.
+>
+> **정규식을 넓히려고 이 문서를 열었다면**: 아래 "오탐 방향이 더 위험하다"와
+> `check:safety`의 false 단정은 그대로 유효하다. 다만 이제 검출기가 두 벌이므로
+> (`lib/safety.ts`의 `containsAbuse` + `moderation.ts`의 `findProfanity`·초성·제스처)
+> **어느 쪽을 넓히는지 먼저 확인한다.**
+
 ## 현재 상태
 - 완료: 위기 신호 감지(`lib/safety.ts`), 챗봇 고정 응답, 커뮤니티 글·댓글 위기 안내, 타인 공격 차단, 안내 카드 공용 컴포넌트, `npm run check:safety` 단정 42건, E2E 5건
+- 완료(2026-08-24, D): **커뮤니티 검열 층** — `app/community/_lib/moderation.ts`. BLANKET 정책, 우회 표기 정규화(`씨 발`·`시1발`·`병@신`·자모 분리), 초성·제스처 검출, Bedrock 판정(3초·재시도 없음·fail-open). `app/api/community/posts/route.ts`와 `.../comments/route.ts`가 쓴다
+- **미수정(버그)**: 위기 글에 욕설이 섞이면 상담 안내 대신 400 — `STATUS.md` 차단 30번. 라우트 2곳
 - 미착수: 신고·차단(표가 필요해 공유 DB에 막혀 있음), 대화 기록 지우기(`ChatMessage.deletedAt` 마이그레이션 필요)
 
 ## 구현한 파일
@@ -12,7 +47,12 @@
 - `app/api/chat/stream/route.ts` — 이력 로드 → 위기 판정 → **그 다음** Bedrock 확인 순서
 - `app/chat/_components/ChatPanel.tsx` — 카드 표시, 스트림 실패 문구에 번호 포함
 - `app/chat/_lib/systemPrompt.ts` — `## 안전` 절(2차 방어)
-- `app/api/community/posts/route.ts`, `.../[id]/comments/route.ts` — 공격 차단 + 위기 안내 반환
+- `app/api/community/posts/route.ts`, `.../[id]/comments/route.ts` — 공격 차단 + 위기 안내 반환.
+  **2026-08-24부터 검열 층이 하나 더 끼어 있다** — `containsAbuse` → `moderate` → `isCrisis` 3층이고
+  순서가 이 두 파일에 각자 손으로 적혀 있다(차단 30번의 원인)
+- `app/community/_lib/moderation.ts` (2026-08-24, D) — BLANKET 검열. 정규화·사전·초성·제스처·Bedrock 판정
+- `app/community/_lib/bedrock.ts` — 검열 전용 Bedrock 호출. `lib/bedrock.ts`의 `bedrockClient()`를
+  3초·재시도 없음으로 감싼다(사용자를 기다리게 하는 경로라 공용 20초를 쓰지 않는다)
 - `app/community/_components/WriteModal.tsx`, `PostDetailModal.tsx` — 안내 표시
 - `scripts/check-safety.ts` — `npm run check:safety`
 
@@ -55,8 +95,11 @@
 ## 검증
 ```
 npm run check:safety   # 단정 42건 — 오탐 19건 포함
-npm run e2e            # 75건. 안전 5건(오탐 1·위기 2·공격 2)
+npm run e2e            # 76건 (2026-08-25 실측). 안전 5건(오탐 1·위기 2·공격 2) + BLANKET 1건
 ```
+
+**`e2e`는 차단 30번을 못 잡는다.** 위기 단정과 욕설 단정이 **각각 다른 글**을 쓰기 때문이다 —
+둘이 섞인 글을 아무도 보내지 않는다. 차단 30번을 고칠 때 그 단정을 함께 넣는다.
 `check:safety`의 절반은 "false여야 한다"는 단정이다. **그쪽을 지우지 말 것** — 없으면 다음 사람이 패턴을 넓히다가 자기 비하 글을 차단한다.
 
 ## 다음 할 일
