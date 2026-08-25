@@ -3295,22 +3295,39 @@ Prisma의 SELECT에 새 컬럼이 들어가는데 마이그레이션이 안 들�
 
 `npx tsx`는 타입을 보지 않으므로 `check:pet`은 항상 `tsc --noEmit`과 짝으로 돌린다.
 
-### 막힌 것
+### 공유 DB 적용 — 완료 (2026-08-25, 사용자 승인)
 
-**마이그레이션이 공유 DB에 아직 안 들어갔다.** `npx prisma migrate deploy`가 자동 승인에서
-막혔다 — 공유 프로덕션 표를 바꾸는데 `prisma/schema.prisma`가 "전원 합의" 파일이고 사용자
-지시는 결과("별조각으로 바꿔")만 말했다는 이유다. 사용자 승인 후 실행할 것:
+`migrate deploy`가 처음에는 자동 승인에서 막혔다(공유 프로덕션 표 변경 + `schema.prisma`가
+"전원 합의" 파일). 사용자에게 SQL 두 줄을 그대로 보이고 승인받아 실행했다.
 
 ```bash
-npx prisma migrate deploy && npx prisma generate
-npm run db:seed        # 6행에 priceShards = 500이 들어간다
+npx prisma migrate deploy && npx prisma generate   # 11개 중 1개 적용
+npm run db:seed                                    # 스킨 6종, 치장 6종 반영
 ```
 
-넣기 전까지 `/pet/cosmetics`는 P2022로 카드 하나로 degrade한다(죽지는 않는다).
+**`CosmeticItem` 6행 실측:** `priceShards = 500` · `priceAffinity = 600`(보존됨) ·
+`affinityOnly = true`. 되돌리기 경로가 살아 있다는 것을 값으로 확인했다.
+
+**런타임 실측** (`next dev` + `DEV_AUTH_BYPASS`, 주 테스트 계정 Lv.26 / 별조각 190):
+
+- `/pet` · `/pet/skins` · `/pet/cosmetics` 전부 200, **`P2022` 0건 · `P2021` 0건**
+- `GET /api/pet/cosmetics` — 6종 전부 `priceShards: 500`, 수집 진행률 `6 / 6`
+- 화면 — HUD가 `⭐ 별조각 190`, 각 타일 메타가 `· 별조각 500`, 전환 고지 한 줄 렌더 확인
+- `POST /api/pet/cosmetics/buy` — 보유 아이템 `ALREADY_OWNED` 400 / 없는 id `ITEM_NOT_FOUND` 404
+
+**차감 자체는 런타임으로 못 봤다.** 이 계정이 배경 6종을 이미 다 갖고 있어 구매 경로가
+`ALREADY_OWNED`에서 끊긴다. 보유 행을 지우고 잔액을 더해 재현하려 했지만 **공유 DB의 실데이터를
+지우고 되돌리는 것은 사용자 승인 범위(마이그레이션·시드) 밖이라 하지 않았다.** 차감 문장은
+`app/api/pet/skins/buy/route.ts`와 같은 낙관적 락 패턴이고 그쪽은 8/21에 실 DB로 확인했다.
+
+로그에 `Can't reach database server` 2건이 남았다 — 새 컬럼과 무관한 **RDS 커넥션 문제**다
+(`docs/dev/infra.md` "RDS 커넥션 고갈이 재발한다"). 재시도하면 통과한다. 확인 후 `next dev`를
+껐다 — 로컬 dev 서버가 대당 10~22개를 물고 있는 것이 그 고갈의 원인으로 실측돼 있다.
 
 ### 다음 할 일
 
-- 위 마이그레이션·시드 실행 (사용자 승인 대기) → 화면에서 배경 500 표시·별조각 차감 확인
+- 별조각이 500 이상이고 배경을 덜 가진 계정에서 **실제 차감**을 한 번 볼 것
+  (또는 `scripts/seed-demo-currency.ts`를 8/26 녹화 계정에 돌릴 때 함께 확인)
 - 실제 화면에서 4시간 외출 사이클을 한 번 돌려 보기. 주 테스트 계정(Lv.59)은 친밀도 96,499라
   막히지 않는다. **다른 계정 15개는 전부 200 미만이라 `NOT_ENOUGH_AFFINITY`가 뜬다** —
   잘못이 아니라 설계대로다(2일에 1회 페이싱). 그 계정으로 볼 때는 "친밀도 N 더 필요해요"
