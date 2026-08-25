@@ -10,6 +10,8 @@ import { grantAffinity, POST_AFFINITY } from "@/app/community/_lib/affinity"
 import { completeMissionByCode } from "@/lib/missions/completion"
 import { recordAttempt, retryAfter } from "@/lib/ratelimit"
 import { containsAbuse, isCrisis, CRISIS_POST_NOTICE } from "@/lib/safety"
+import { moderate, BLOCK_CODE } from "@/app/community/_lib/moderation"
+import { invokeBedrock } from "@/app/community/_lib/bedrock"
 
 // 도배 방어. 로그인 라우트는 IP로 세지만(clientKey) 여기는 인증된 뒤라 userId로 센다 —
 // IP는 위조되고 공유 회선이면 남까지 막힌다. 글은 한 번 쓰는 데 몇 분이 걸리는 행동이라
@@ -107,6 +109,23 @@ export async function POST(request: NextRequest) {
     // 것을 막는 장치이고, 사용자가 자기 상태를 스스로 말하는 것은 막을 이유가 없다.
     if (containsAbuse(`${title} ${body}`)) {
       return fail("ABUSIVE_CONTENT", "다른 사람을 향한 말이 담겨 있어요. 표현을 고쳐서 다시 올려주세요", 400)
+    }
+
+    // 2단 검열(_lib/moderation.ts). 1단계는 사전 정규식(동기), 2단계는 Bedrock 문맥 판정이다.
+    // 위 containsAbuse()가 2인칭 지시가 붙은 말만 잡는 데 비해, 이쪽은 우회 표기(ㅄ·시1발)와
+    // 욕설이 하나도 없는 모욕("너 임마 청년임?")까지 본다. 둘은 겹치지 않으므로 함께 둔다.
+    //
+    // 제목과 본문을 합쳐 **한 번만** 부른다. 따로 부르면 Bedrock 왕복이 2회가 되고,
+    // 제목에서 시작해 본문으로 이어지는 문장을 반쪽씩만 보게 된다.
+    //
+    // moderate()는 던지지 않는다 — Bedrock 실패·타임아웃(3초)·모델 ID 미설정을 전부 내부에서
+    // 삼키고 1단계 결과를 돌려준다(fail-open). 모델 장애로 글쓰기가 멈추지 않는다.
+    //
+    // BLOCK만 막는다. WARN은 통과, **SELF는 반드시 통과시킨다** — "나 진짜 병신 같아"는
+    // 남을 향한 말이 아니라 이 서비스가 받아내야 할 말이다(moderation.ts JUDGE_SYSTEM 주석).
+    const mod = await moderate(`${title}\n\n${body}`, invokeBedrock)
+    if (mod.verdict === "BLOCK") {
+      return fail(BLOCK_CODE, mod.message, 400)
     }
 
     const post = await prisma.post.create({

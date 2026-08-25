@@ -7,6 +7,8 @@ import { COMMENT_MAX } from "@/app/community/_lib/limits"
 import { grantAffinity, COMMENT_AFFINITY } from "@/app/community/_lib/affinity"
 import { recordAttempt, retryAfter } from "@/lib/ratelimit"
 import { containsAbuse, isCrisis, CRISIS_POST_NOTICE } from "@/lib/safety"
+import { moderate, BLOCK_CODE } from "@/app/community/_lib/moderation"
+import { invokeBedrock } from "@/app/community/_lib/bedrock"
 
 // 도배 방어. IP가 아니라 userId로 센다(app/api/community/posts/route.ts와 같은 이유).
 // 댓글은 글보다 가볍게 여러 개 달아도 정상이라 상한을 넉넉히 둔다.
@@ -51,6 +53,13 @@ export async function POST(request: NextRequest, ctx: RouteContext<"/api/communi
     // 판정 기준과 이유는 lib/safety.ts와 posts/route.ts의 같은 블록 주석에 있다.
     if (containsAbuse(body)) {
       return fail("ABUSIVE_CONTENT", "다른 사람을 향한 말이 담겨 있어요. 표현을 고쳐서 다시 올려주세요", 400)
+    }
+
+    // 글과 같은 2단 검열이다. 근거는 app/api/community/posts/route.ts의 같은 블록 주석에 있다.
+    // 던지지 않으므로(fail-open) 따로 감싸지 않는다. BLOCK만 막고 WARN·SELF는 통과시킨다.
+    const mod = await moderate(body, invokeBedrock)
+    if (mod.verdict === "BLOCK") {
+      return fail(BLOCK_CODE, mod.message, 400)
     }
 
     const [comment] = await prisma.$transaction([
