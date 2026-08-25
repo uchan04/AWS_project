@@ -4,6 +4,7 @@ import { UnauthorizedError, getCurrentUserWithSkin } from "@/lib/auth"
 // 오늘 날짜 기준은 B의 미션 초기화와 같은 함수를 쓴다(Asia/Seoul). 여기서 따로 계산하면
 // 자정 전후에 지갑의 "오늘"과 미션 화면의 "오늘"이 다른 날을 가리킨다
 import { getToday, getTodayKey } from "@/lib/missions/reset"
+import { loadOutingView } from "@/lib/outing"
 import {
   PET_IDLE_LINES,
   cappedStage,
@@ -66,7 +67,7 @@ export default async function PetPage() {
 
     // 두 질의를 **동시에** 보낸다. RDS가 us-east-1이라 순서대로 await하면 왕복이
     // 하나씩 쌓인다(약 175ms/회 실측 — docs/dev/perf.md). 서로 의존하지 않는 읽기다
-    const [worn, missionsDone] = await Promise.all([
+    const [worn, missionsDone, outing] = await Promise.all([
       // 착용 중인 치장 (SPEC.md 5절)
       prisma.userCosmetic.findMany({
         where: { userId: user.id, equipped: true },
@@ -76,6 +77,11 @@ export default async function PetPage() {
       // (completedAt이 not null인 스키마다) 일일 미션은 resetKey가 날짜별로 갈려
       // 같은 미션을 다른 날 한 것도 각각 센다 — "지금까지 몇 번 해냈나"가 맞다
       prisma.userMission.count({ where: { userId: user.id } }),
+      // 펫 외출 (SPEC.md 5절). 세 상태(IDLE·AWAY·RETURNED)를 한 덩어리로 받는다.
+      // **읽기만 한다** — 복귀 지급은 유저가 "이야기 듣기"를 눌렀을 때
+      // POST /api/pet/outing/claim이 한다(이유는 lib/outing.ts claimOuting 주석).
+      // 마이그레이션이 아직 안 들어간 DB에서도 죽지 않고 available: false로 온다
+      loadOutingView(user.id, skin, now),
     ])
 
     // ── 오늘 들어온 재화 ──────────────────────────────────────────────────────
@@ -180,6 +186,7 @@ export default async function PetPage() {
       daysTogether: daysTogether(user.createdAt, now),
       missionsDone,
       attendanceTotal: user.attendanceTotal,
+      outing,
     }
   } catch (error) {
     // 미인증이면 "불러오지 못했어요"가 아니라 로그인이다. 미들웨어가 쿠키 "존재"만 보므로
