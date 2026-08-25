@@ -321,6 +321,51 @@ E2E 70건 통과 · 실패 0건(기준선과 같음). 새 의존성 없음. 공�
 
 4번은 새 파일 하나(`lib/missions/catalog.ts`)와 그 호출부 2곳만 고쳤다 — 공유 파일은 건드리지 않았다. E2E는 4번 이후 **75건 통과**. **보고만 하고 바꾸지 않은 것**: `DATABASE_URL`에 `connection_limit`이 없어 Prisma가 클라이언트당 25개를 연다(인스턴스 사용 가능 76개). 5인 × 25 + Amplify면 고갈 위험이지만 값을 낮추면 그만큼 느려진다 — **E 소유 공유 인프라라 팀 결정 사항이다**.
 
+## 2026-08-25 구조·문서 정합성 감사 (A, `improve/service-quality`)
+
+레포 전체 구조를 문서와 대조했다. **코드는 한 줄도 안 고쳤다** — 문서 4곳만 고쳤고 나머지는 아래에 담당별로 남긴다.
+
+검사 방법과 결과:
+
+| 검사 | 방법 | 결과 |
+|---|---|---|
+| 문서가 가리키는 파일 경로 | 문서 15개에서 백틱 경로를 추출해 존재 확인 | **깨진 참조 0건.** 처음 33건이 나왔지만 전부 (a) 산문 약칭(`_lib/gallery.ts`) 또는 (b) **삭제를 이미 기록한 이력**(`BottomNav.tsx`·`app/chat/page.tsx`)이었다 |
+| `.env.example` ↔ 코드가 읽는 env | `process.env.*` 전수 추출 후 대조 | **완전 일치.** 코드 14개 중 13개가 문서에 있고 나머지 1개는 내장 `NODE_ENV`다 |
+| 마이그레이션 ↔ 공유 DB | `_prisma_migrations` 직접 읽기 | **9개 전부 적용·완료.** 아래 ① |
+| `SPEC.md` 11절 ↔ `schema.prisma` | 모델 15개 대조 | 스키마 본문은 SPEC이 의도적으로 복사하지 않는다(맞는 설계). **누락 2건 발견 → 고쳤다.** 아래 ② |
+| API 경로 접두사 ↔ 담당 표 | 라우트 39개 대조 | **일치.** `/api/upload/*`도 B 몫대로 2개뿐 |
+| 빌드·타입·검사 | `build` / `tsc` / `check:*` 9종 | **build 0, tsc 0오류, 9종 전부 통과.** 라우트 39 + 페이지 12 |
+| `lint` | `npm run lint` | **실패 1건.** 아래 ④ |
+| 실제 요청 경로 | `npm run e2e` (서버 띄우고) | **76건 통과 · 실패 0건.** 8/24 이후 회귀 없음. 확인 후 서버를 끄고 커넥션을 반납했다 |
+
+**① `PetSkin.avatarKey`는 이미 공유 DB에 들어가 있다 — 차단 조건 하나가 사라졌다.**
+`_prisma_migrations` 9행의 `finished_at`이 전부 채워져 있고 `PetSkin` 6행의 `avatarKey`가 `fox_avatar`·`cat_avatar`·`bear_avatar`로 실제 값이다. 그래서 **"`main` 머지 전에 `avatarKey`를 적용해야 한다"는 조건은 이미 충족됐다.** `docs/dev/infra.md`가 아직 이걸 "진행 중 — DB 적용만 남았다"(15행)와 "(사용자 승인 필요) 마이그레이션 적용"(57행 8번)으로 적고 있다 — **E가 지울 항목이다.** 위쪽 8/24 갱신 줄 끝의 "아직 공유 DB에 안 들어갔다"도 이 실측으로 무효다.
+
+**② `SPEC.md` 11절이 마이그레이션 하나만큼 뒤처져 있었다 → 채웠다.**
+`PetSkin.avatarKey` 설계 의도 행과 `20260824170000_petskin_avatar_key` 항목이 없었다(`CLAUDE.md` 1절은 스키마 변경 시 11절을 함께 갱신하라고 정한다). 이미 머지·문서화된 변경의 **기록만** 채운 것이고 새 결정은 없다. 앞으로 어긋남을 잡을 수 있게 "마이그레이션 9개 전부 적용" 실측값도 함께 적었다.
+
+**③ `docs/dev/infra.md` 87행의 규칙이 지워진 파일을 가리킨다 (E 담당).**
+> "앱 내부 경로로 보낼 때는 `lib/cognito.ts`의 `appRedirect(path)`를 쓴다. … `NextResponse.redirect()`는 절대 URL을 요구하므로 이 용도에는 쓸 수 없다."
+
+`lib/cognito.ts`는 8/24 머지에서 지웠다(`appRedirect()`는 `lib/oauth.ts`에 있다). 그리고 **뒷문장이 내가 500을 낸 원인과 같은 오해다** — 미들웨어는 `Location`을 `new URL()`로 파싱하므로 **절대 URL이 필수**이고 상대 경로가 금지다. 라우트 핸들러는 반대다. 위 8/24 갱신 줄 ③에 "STATUS에서는 정정했다"고 적혀 있지만 **`infra.md` 본문은 옛 문장 그대로다.** 두 규칙이 파일 위치에 따라 갈린다는 것을 그 자리에 적어야 다음 사람이 같은 곳에서 넘어지지 않는다.
+
+**④ `npm run lint`가 레포 전체에서 실패한다 (담당 미정).**
+`glowinn/src/components/Hero.jsx:24`의 `react-hooks/set-state-in-effect` 1건이다. Next 앱 밖의 별도 Vite 랜딩 페이지이고, **에러 자체는 실제 문제다**(효과 안에서 `setState`를 동기 호출). 지금 상태의 문제는 **`lint`를 통과 기준으로 쓸 수 없다는 것**이다 — `CLAUDE.md` 3절이 커밋 전 확인으로 정한 것은 `build`뿐이라 규칙 위반은 아니지만, 아무 문서에도 안 적혀 있어서 각자 "내가 깼나" 하고 시간을 쓴다. 앱만 보려면 `npx eslint app lib scripts middleware.ts`로 좁힌다(그건 0건이다). **`glowinn`을 lint 대상에서 빼는 것은 권하지 않는다** — 에러를 숨기는 것이 된다.
+
+**⑤ `middleware` → `proxy` 이름 변경 경고가 매 빌드에 뜬다 (E 담당).**
+```
+⚠ The "middleware" file convention is deprecated. Please use "proxy" instead.
+   npx @next/codemod@canary middleware-to-proxy .
+```
+Next 16.3.1이 `middleware.ts`를 `proxy.ts`로 바꾸라고 한다. 빌드 표에도 `ƒ Proxy (Middleware)`로 나온다. **지금은 정상 동작하므로 급하지 않고, 8/26 발표 전에 건드릴 이유가 없다**(미들웨어는 모든 요청이 지나는 자리라 깨지면 전부 깨진다). 발표 후 처리 항목으로만 남긴다.
+
+**⑥ 공유 DB에 테스트 계정이 남아 있다.** `test@welli.local` 1행(`e2e-*`는 0행). `User` 16행 중 `isAdmin` 1명. **심사·배포 전에 이 행을 지운다** — 기존 결정 그대로이고 아직 안 됐다는 것만 확인한 것이다.
+
+**⑦ 상점에 모자·목도리가 없다는 것을 내 문서가 잘못 적고 있었다 → 고쳤다.**
+`CosmeticItem`은 **6행, 전부 `BACKGROUND`**다. `Slot` enum의 `HAT`·`SCARF`와 `PRICE_BY_RARITY`의 RARE 이상은 8/20 컷 이후 쓰이지 않는다(의도된 상태이고 `prisma/seed/items.ts` 주석이 이유를 적고 있다). 내가 8/25에 쓴 `docs/eli5/재화-경제-쉬운-설명.md`가 그 가격을 구매 가능한 것처럼 적어서 고쳤다.
+
+고친 파일 4개: `SPEC.md`(11절 2곳), `docs/dev/diagnosis.md`(낡은 페이지 목록에 정정 주석), `docs/eli5/재화-경제-쉬운-설명.md`(치장 표), `docs/eli5/왜-재사회화에-도움이-되는가.md`(900 슬롯 ↔ DB 909행 관계).
+
 ## origin 브랜치 상태 (2026-08-20 재확인)
 
 통합 지점은 **`develop`**이다. `main`은 `develop`에 전부 포함돼 있고(E가 `152dbae`로 되돌려 머지했다), Amplify는 `main`에서 빌드한다.

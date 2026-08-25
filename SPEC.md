@@ -451,6 +451,7 @@ Cognito 기반 인증, Amplify 관리형 HTTPS 강제, Prisma parameterized quer
 | `User.lastFedAt` | 마지막 급여 시각. 배고픔 게이지를 삭제한 뒤(5절) **읽는 곳이 없다.** `POST /api/pet/feed`가 계속 기록만 한다 — 되살릴 때 공백 구간이 생기지 않게 남겨 둔 컬럼이다. 드롭하려면 5인 합의가 필요하다(`CLAUDE.md` 1절) |
 | `PetSkin.stageCount` | 전부 4다(2026-08-21에 3에서 올렸다). 외형 스킨도 기본 외형과 같이 진화하므로 이미지 키에 `-1 -2 -3 -4` suffix가 붙는다 |
 | `PetSkin.priceShards` | 별조각 구매가. 기본 외형은 `null`(구매 불가). 스킨은 별조각 전용이다 |
+| `PetSkin.avatarKey` (2026-08-24 추가, E) | 프로필 원형(사이드바 접힘·펼침, 내 계정 모달)에만 쓰는 아바타 키. 종족당 1장이라 북극 변종도 같은 값을 쓴다(`fox_avatar`·`cat_avatar`·`bear_avatar`). `imageKeyBase`를 덮어쓰지 않는 이유: 그 값 하나가 8곳을 먹이는데 아바타는 포즈 1장이라 성장 4단계가 깨진다. nullable이고 `null`이면 호출부가 `imageKeyBase` 그림으로 되돌아간다 |
 | `CosmeticItem.rarity` | 추첨 확률이 아니라 **가격 기준**이다. 가격은 시드의 `PRICE_BY_RARITY`에서 파생된다 |
 | `CosmeticItem.affinityOnly` | 치장은 전부 친밀도 전용이라 항상 `true`다 |
 | `Post.galleryType` | 작성 시점 갤러리를 글에 박아둔다. 재진단으로 유형이 바뀌어도 글은 이동하지 않는다 |
@@ -463,10 +464,13 @@ Cognito 기반 인증, Amplify 관리형 HTTPS 강제, Prisma parameterized quer
 | `MeetupParticipant.notifiedCancelAt` (2026-08-24 추가) | **이름과 달리 무산·결성 알림을 모두 다룬다.** 실제 의미는 "이 신청 건의 상태 변경 알림을 보여준 시각"이다. 결성 알림을 붙일 때 이름을 바꾸면 마이그레이션이 또 나가 5인이 전부 받아야 하므로 그대로 뒀다 |
 | `MeetupParticipant.cancelReason` (2026-08-24 추가) | 취소할 때 고른 사유. 선택 입력이라 `null`이 정상이다 — 필수로 만들면 취소를 회피하고 말없이 안 나타나는 쪽으로 흐른다 |
 
-2026-08-24 마이그레이션 2개를 손으로 썼다. 받는 쪽은 `npx prisma migrate deploy && npx prisma generate`만 실행한다(`CLAUDE.md` 5절).
+2026-08-24 마이그레이션 3개를 손으로 썼다. 받는 쪽은 `npx prisma migrate deploy && npx prisma generate`만 실행한다(`CLAUDE.md` 5절).
 
 - `20260824120000_meetup` — `Meetup`·`MeetupParticipant` 테이블, `MeetupStatus` 타입, `User.isAdmin` 컬럼
 - `20260824150000_meetup_participant_notice_reason` — `MeetupParticipant.notifiedCancelAt`·`cancelReason` 컬럼
+- `20260824170000_petskin_avatar_key` — `PetSkin.avatarKey` 컬럼 + 6행 값 채우기(마이그레이션 안에서 `UPDATE`한다. 시드로 넣으면 미션 카탈로그·치장까지 함께 upsert되므로 한 컬럼 때문에 돌릴 것이 아니다)
+
+**마이그레이션 9개 전부 공유 DB에 적용 완료다** — `_prisma_migrations`를 직접 읽어 9행 `finished_at` 전부 채워진 것을 확인했다(2026-08-25, A). 이 목록과 `prisma/migrations/` 디렉터리 수가 어긋나면 누군가 `migrate dev`를 공유 DB에 돌린 것이므로 즉시 팀에 알린다.
 
 ### API 경로 규칙
 

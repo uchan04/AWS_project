@@ -1014,6 +1014,8 @@ B가 `feat/missions`를 `develop`에 머지해(`3adbea5`) 5인 중 4인이 통�
 
 서버에서 `getCurrentUser()`를 부르는 페이지가 5개다: `app/chat/page.tsx`, `app/community/page.tsx`, `app/pet/page.tsx`, `app/pet/cosmetics/page.tsx`, `app/pet/skins/page.tsx`. 이 5개는 헤더 방식으로는 원리적으로 인증되지 않는다. 토큰을 `httpOnly` 쿠키에 담고 `cookies()`를 읽는 쪽으로 가야 페이지와 API가 같은 경로로 인증된다. STATUS의 차단 4번을 이 내용으로 고쳤다.
 
+> **2026-08-25 정정(위 목록만).** 결론(쿠키 방식)은 그대로 채택돼 지금 코드가 그렇게 돈다. **목록은 낡았다** — `app/chat/page.tsx`는 8/20에 삭제됐고(챗봇이 전역 오버레이로 옮겨갔다), 지금 `getCurrentUser()`를 부르는 페이지는 9개다: `app/page.tsx`·`app/diagnosis/page.tsx`·`app/missions/page.tsx`·`app/settings/page.tsx`·`app/community/page.tsx`·`app/community/meetups/page.tsx`·`app/pet/page.tsx`·`app/pet/cosmetics/page.tsx`·`app/pet/skins/page.tsx`. 위 문단은 당시 계측 기록이라 숫자를 고치지 않고 여기 남긴다.
+
 ### 모바일이 부서진다
 
 375px 폭에서 측정했다.
