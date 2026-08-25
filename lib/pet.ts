@@ -671,23 +671,23 @@ export function rollOutingReward(rand: () => number): { seeds: number; starShard
  * 옛 문장으로 굳는다 — PET_IDLE_LINES를 상수로 둔 것과 같은 판단이다.
  */
 export const OUTING_PLACES = [
-  { key: "window", stage: 1, text: "창가에 한참 앉아 있었어." },
-  { key: "kitchen", stage: 1, text: "부엌 쪽을 탐험했어." },
-  { key: "doorstep", stage: 2, text: "문 앞 계단까지 나가 봤어." },
-  { key: "alley", stage: 2, text: "골목 담벼락을 따라 걸었어." },
-  { key: "park", stage: 3, text: "동네 공원에 갔어." },
-  { key: "busstop", stage: 3, text: "버스 정류장 앞에 서 있었어." },
-  { key: "river", stage: 4, text: "강가까지 갔다 왔어." },
-  { key: "downtown", stage: 4, text: "사람 많은 길을 지나왔어." },
+  { key: "window", stage: 1, where: "창가", text: "창가에 한참 앉아 있었어." },
+  { key: "kitchen", stage: 1, where: "부엌", text: "부엌 쪽을 탐험했어." },
+  { key: "doorstep", stage: 2, where: "문 앞", text: "문 앞 계단까지 나가 봤어." },
+  { key: "alley", stage: 2, where: "골목", text: "골목 담벼락을 따라 걸었어." },
+  { key: "park", stage: 3, where: "공원", text: "동네 공원에 갔어." },
+  { key: "busstop", stage: 3, where: "정류장", text: "버스 정류장 앞에 서 있었어." },
+  { key: "river", stage: 4, where: "강가", text: "강가까지 갔다 왔어." },
+  { key: "downtown", stage: 4, where: "큰길", text: "사람 많은 길을 지나왔어." },
 ] as const
 
 /** 거기서 만난 것. 전부 나에게 아무것도 요구하지 않는 것들이다 */
 export const OUTING_MET = [
   { key: "cat", text: "고양이 한 마리가 나를 쳐다봤어." },
-  { key: "dog", text: "낮잠 자는 강아지를 봤어." },
+  { key: "dog", text: "낮잠 자는 강아지 옆을 조용히 지나갔어." },
   { key: "granny", text: "빨래 걷는 할머니가 계셨어." },
   { key: "flower", text: "이름 모를 꽃이 피어 있었어." },
-  { key: "tree", text: "엄청 큰 나무가 있었어." },
+  { key: "tree", text: "나보다 훨씬 큰 나무가 있었어." },
   { key: "stranger", text: "종이봉투를 든 사람이 지나갔어." },
 ] as const
 
@@ -702,7 +702,26 @@ export const OUTING_MOODS = [
   { key: "scared", text: "조금 무서웠는데 괜찮았어." },
   { key: "blank", text: "아무 생각도 안 났어." },
   { key: "long", text: "오래 보고 있었어." },
-  { key: "missyou", text: "네 생각이 났어." },
+  { key: "missyou", text: "돌아오는 길에 네 생각이 났어." },
+] as const
+
+/**
+ * 나가 있는 동안 방에 남는 쪽지 3막. **4시간을 죽은 대기로 두지 않기 위한 장치다.**
+ *
+ * 4시간 동안 화면이 "3시간 12분 남음"만 보여 주면 그 사이의 방문은 전부 빈손이 된다.
+ * 경과 비율로 문장이 두 번 바뀌므로 들어올 때마다 새 줄이 있다 —
+ * Finch가 여정을 단계로 쪼개 보여 주는 것과 Pikmin Bloom의 엽서에서 가져왔다.
+ *
+ * `{where}`는 OUTING_PLACES.where로 채운다. 뒤에 "쯤"이 붙으므로 받침에 관계없이
+ * 조사 문제가 없다 — 여기 문장을 고칠 때 조사를 새로 넣지 않는다.
+ *
+ * **3막을 저장하지 않는다.** startedAt·returnsAt·placeKey만 있으면 계산되므로 컬럼이
+ * 늘지 않고, 새로고침해도 같은 값이 나온다.
+ */
+export const OUTING_AWAY_LINES = [
+  { key: "left", text: "방금 나갔어. 잘 다녀올게." },
+  { key: "midway", text: "지금 {where}쯤이야." },
+  { key: "back", text: "이제 돌아가는 중이야." },
 ] as const
 
 export type OutingPlaceKey = (typeof OUTING_PLACES)[number]["key"]
@@ -759,4 +778,51 @@ export function outingState(o: OutingLike | null, now: Date): OutingState {
 export function outingRemainingMs(o: OutingLike | null, now: Date): number {
   if (!o || o.claimedAt) return 0
   return Math.max(0, o.returnsAt.getTime() - now.getTime())
+}
+
+/**
+ * 남은 시간을 사람이 읽는 한 줄로 만든다. 화면 두 곳(카드 제목·진행 게이지)이 같은
+ * 문자열을 써야 하므로 순수 함수로 둔다 — 컴포넌트마다 따로 만들면 표기가 갈린다.
+ *
+ * 분 단위로 올림한다. 남은 30초를 "0분"으로 쓰면 다 됐는데 안 온 것처럼 읽힌다.
+ */
+export function outingRemainingLabel(ms: number): string {
+  if (ms <= 0) return "곧 도착"
+  const totalMin = Math.ceil(ms / 60_000)
+  const h = Math.floor(totalMin / 60)
+  const m = totalMin % 60
+  if (h > 0 && m > 0) return `${h}시간 ${m}분`
+  if (h > 0) return `${h}시간`
+  return `${m}분`
+}
+
+/** 진행 비율 계산에는 시작 시각이 더 필요하다. outingState는 이 필드를 요구하지 않는다 */
+export type OutingProgressLike = OutingLike & { startedAt: Date }
+
+/**
+ * 0~1 사이의 경과 비율. 게이지와 3막 판정이 같은 값을 쓴다.
+ *
+ * OUTING_MS로 나누지 않고 **행의 startedAt~returnsAt 폭으로 나눈다** — 나중에
+ * OUTING_HOURS를 바꿔도 이미 나가 있는 외출의 게이지가 어긋나지 않는다.
+ */
+export function outingProgress(o: OutingProgressLike | null, now: Date): number {
+  if (!o) return 0
+  if (o.claimedAt) return 1
+  const span = o.returnsAt.getTime() - o.startedAt.getTime()
+  if (span <= 0) return 1
+  const elapsed = now.getTime() - o.startedAt.getTime()
+  return Math.min(1, Math.max(0, elapsed / span))
+}
+
+/**
+ * 나가 있는 동안 방에 남는 한 줄. 경과 3분의 1마다 바뀐다.
+ *
+ * 알 수 없는 placeKey면 `{where}` 자리를 "밖"으로 둔다 — 옛 기록이나 손으로 고친 행에서
+ * 치환되지 않은 `{where}`가 화면에 그대로 나오는 것을 막는다.
+ */
+export function outingAwayLine(placeKey: string, progress: number): string {
+  const p = Number.isFinite(progress) ? Math.min(1, Math.max(0, progress)) : 0
+  const act = p < 1 / 3 ? 0 : p < 2 / 3 ? 1 : 2
+  const where = OUTING_PLACES.find((x) => x.key === placeKey)?.where ?? "밖"
+  return OUTING_AWAY_LINES[act].text.replace("{where}", where)
 }
