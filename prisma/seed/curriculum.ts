@@ -427,6 +427,8 @@ export function planCurriculum(typeCode: TypeCode): Placement[] {
 
   /** key → 마지막으로 배치된 단계. 복습 대상을 고를 때 이 값이 가장 작은 것을 쓴다 */
   const lastSeen = new Map<string, number>()
+  /** key → 지금까지 배치된 횟수. pickReview의 1순위다(그 주석 참고) */
+  const seenCount = new Map<string, number>()
   /** key → 처음 나온 단계 */
   const introducedAt = new Map<string, number>()
   const byKey = new Map<string, PoolMission>()
@@ -444,6 +446,7 @@ export function planCurriculum(typeCode: TypeCode): Placement[] {
         byKey.set(mm.key, mm)
         introducedAt.set(mm.key, stage)
         lastSeen.set(mm.key, stage)
+        seenCount.set(mm.key, (seenCount.get(mm.key) ?? 0) + 1)
         placements.push({ stage, slot: i + 1, mission: mm })
       })
       continue
@@ -468,16 +471,50 @@ export function planCurriculum(typeCode: TypeCode): Placement[] {
     }
 
     // ── 2·3. 복습
+    /**
+     * 복습 대상 고르기. **적게 나온 것 먼저, 같으면 오래된 것 먼저** (2026-08-24 계측 후).
+     *
+     * 원래는 `lastSeen`만 보는 순수 LRU였다. 그런데 `lastSeen`은 도입 순서와 강하게
+     * 상관되므로 가장 먼저 도입된 구간이 복습 슬롯을 독점한다 — 1구간 미션이 5.5회 나오는
+     * 동안 8·9구간 미션은 1.6회였고 13개는 딱 한 번만 나왔다. `커튼 열기` 7회 대
+     * `카페에서 주문하기` 2회다. 습관이 필요한 쪽이 거꾸로였다.
+     *
+     * ── 확장 간격을 잃는 것을 어떻게 판단했는가 ──────────────────────────────
+     *
+     * 이 변경은 대가가 있다. 전에는 `이불 정리하기`가 1·2·4·7·12·24·50단계에 놓여
+     * 간격이 배로 늘어나는 확장 간격(Leitner·SM-2 계열) 형태였는데, 이제 3회로 균등해진다.
+     * 습관 형성은 균등한 반복이 아니라 간격이 벌어지는 재노출로 생기므로 손실이 맞다.
+     *
+     * 그래도 이쪽을 고른 이유는 **일상 리듬 습관이 DAILY 미션에서 이미 매일 반복된다**는
+     * 것이다. 원본에서 가장 많이 재등장하던 1구간 미션 셋이 DAILY와 같은 행동이다:
+     *     STAGE `커튼 열기`(7회)      ↔ DAILY `커튼 열고 햇빛 보기`(매일)
+     *     STAGE `물 한 컵 마시기`(7회) ↔ DAILY `물 한 잔 마시기`(매일)
+     *     STAGE `기지개 한 번`(6회)    ↔ DAILY `기지개 켜기`(매일)
+     * 매일 나오는 것을 STAGE에서 7회 더 끼우는 것은 습관 형성이 아니라 중복이다.
+     * 반대로 `먼저 말 걸어보기`·`고맙다고 말하기`는 DAILY에 대응이 없어서 STAGE가
+     * 유일한 노출 경로인데 한 번뿐이었다. 복습 슬롯은 177개로 고정이라 한쪽을 늘리면
+     * 다른 쪽이 줄어든다 — 늘릴 곳은 대응이 없는 쪽이다.
+     *
+     * 중간에 "바닥 3회를 세우고 나머지는 LRU" 안도 시험했다. 바닥을 못 채운 미션이
+     * 항상 남아서 LRU 꼬리로 넘어가지 못하고, 사회 미션 위반이 0개에서 7개로 되돌아갔다.
+     * 두 성질을 동시에 지킬 슬롯이 없다는 것이 그때 확인됐다.
+     *
+     * `lastSeen`을 2순위로 남기는 이유: 횟수가 같은 후보들 사이에서 방금 나온 것이
+     * 연달아 다시 나오면 습관 형성이 아니라 반복 피로가 된다.
+     */
     const pickReview = (candidates: PoolMission[]): PoolMission | null => {
       const used = new Set(chosen.map((c) => c.key))
       let best: PoolMission | null = null
+      let bestCount = Number.POSITIVE_INFINITY
       let bestSeen = Number.POSITIVE_INFINITY
       for (const c of candidates) {
         if (used.has(c.key)) continue
+        const count = seenCount.get(c.key) ?? 0
         const seen = lastSeen.get(c.key) ?? 0
         // 같은 값이면 먼저 나온 것을 고른다 — 순서가 유형·실행에 따라 흔들리지 않게
-        if (seen < bestSeen) {
+        if (count < bestCount || (count === bestCount && seen < bestSeen)) {
           best = c
+          bestCount = count
           bestSeen = seen
         }
       }
@@ -485,6 +522,30 @@ export function planCurriculum(typeCode: TypeCode): Placement[] {
     }
 
     const allIntroduced = [...byKey.values()]
+
+    /**
+     * 다지기 복습의 후보를 **현재 구간에서 NEAR_BANDS 안쪽**으로 좁힌다 (2026-08-24 계측 후).
+     *
+     * 전에는 전체 LRU였다. `lastSeen`이 가장 오래된 것을 고르는데 1구간 미션이 가장 먼저
+     * 도입되므로 항상 우선 선택됐고, 그 결과 세 가지가 동시에 어긋나 있었다
+     * (수치는 `docs/dev/missions.md` "복습 배치 계측"):
+     *   · 복습 189슬롯의 **31%가 1구간 출신** — 면접을 다녀오는 94단계에 `기지개 한 번`,
+     *     98단계에 `양치하기`가 들어갔다. 사다리 최상단에 최하단 난이도가 33%였다
+     *   · 반복이 거꾸로였다 — `커튼 열기` 7회 대 `카페에서 주문하기` 2회.
+     *     `먼저 말 걸어보기`·`고맙다고 말하기` 같은 7~9구간 미션 13개는 딱 한 번만 나왔다
+     *   · **10구간 복습에 7~9구간 출신이 0개** — "사회로 한 걸음"을 걷는 구간에서
+     *     복습하는 것이 전부 혼자 하는 일이었다
+     *
+     * 3으로 둔 근거: 1구간 미션의 확장 간격이 1·2·4·7·12·24단계에서 이미 6회를 채운다.
+     * 그 창이 전부 1~3구간 안에 들어오므로 습관 형성에 필요한 재노출을 잃지 않는다.
+     * 반대로 값을 2로 좁히면 `물 한 컵 마시기`의 17·34단계 재노출이 끊긴다.
+     *
+     * 후보가 비면 전체로 되돌아간다 — 좁히기가 슬롯을 비우는 일은 없어야 한다.
+     */
+    const NEAR_BANDS = 3
+    const nearIntroduced = allIntroduced.filter(
+      (mm) => band - bandOf(introducedAt.get(mm.key) ?? stage) <= NEAR_BANDS,
+    )
 
     while (chosen.length < MISSIONS_PER_STAGE) {
       const remaining = MISSIONS_PER_STAGE - chosen.length
@@ -499,8 +560,8 @@ export function planCurriculum(typeCode: TypeCode): Placement[] {
         picked = pickReview(recent)
       }
 
-      // 다지기 복습: 전체 LRU. 1구간 미션도 90단계에서 다시 돌아온다
-      if (!picked) picked = pickReview(allIntroduced)
+      // 다지기 복습: 가까운 구간 안에서 LRU. 비면 전체로 되돌아간다(위 NEAR_BANDS 주석)
+      if (!picked) picked = pickReview(nearIntroduced) ?? pickReview(allIntroduced)
 
       // 후보가 정말 없을 때(1단계 등)는 다음 구간 대기열에서 당겨 쓴다
       if (!picked) {
@@ -517,6 +578,7 @@ export function planCurriculum(typeCode: TypeCode): Placement[] {
 
     chosen.forEach((mm, i) => {
       lastSeen.set(mm.key, stage)
+      seenCount.set(mm.key, (seenCount.get(mm.key) ?? 0) + 1)
       placements.push({ stage, slot: i + 1, mission: mm })
     })
   }
