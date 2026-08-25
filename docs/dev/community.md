@@ -19,6 +19,20 @@ D 쪽 기능 구현은 끝났고, 외부 대기 항목도 없다. AWS 계정·`B
   켠 뒤에는 그 계정으로 모임에 **신청할 수 없다**(관리자의 역할은 개설·결성확인·무산뿐이다). 신청 흐름을 확인하려면 일반 계정이 따로 필요하다
 - **모임은 전체 갤러리 하나로만 운영한다.** `Meetup.galleryType` 컬럼과 API의 검증은 그대로 살아 있고 개설 화면에서만 `ALL`로 고정한다. 종족 모임을 열기로 하면 `MeetupCreateModal`의 선택지를 되살리고 **소속 검사(`canAccessGallery`)를 신청 라우트와 목록 조회에 다시 넣어야 한다** — 한 번 넣었다가 "전체 모임 하나로 통합" 결정으로 되돌렸다
 
+### 0. 글 사진 첨부 — 표시·저장만 완료, 업로드 화면은 **보류** (2026-08-25)
+
+`Post.imageKey`를 저장하고 목록·상세에 그리는 데까지 했다. **글쓰기 화면의 첨부 UI는 만들지 않았다** — 올릴 곳이 없기 때문이다. 재개할 때 이 항목부터 본다.
+
+- **커뮤니티용 presign이 레포에 없다.** 지시서가 가리킨 `lib/uploads.ts`·`app/api/upload/community/presign/route.ts`·`isOwnCommunityKey()`는 **어느 브랜치에도, 히스토리에도 없다**(2026-08-25 확인). 존재하는 presign은 `app/api/upload/presign` 하나뿐이고 `missionId` + `requiresPhoto` 미션 + 진단 완료를 강제하므로 커뮤니티에 쓸 수 없다. E가 그 파일을 올리기 전에는 `WriteModal`을 만들어도 404다 (사용자 결정으로 [1] 보류)
+- **`S3_BUCKET`이 빈 값이다**(`docs/STATUS.md`). presign이 생겨도 실제 업로드는 그다음 문제다
+- `CLOUDFRONT_DOMAIN`이 비면 `cdnUrl()`이 null을 주고 `postImageUrl()`도 null이라 **사진 영역 자체가 안 그려진다.** 글은 정상이다 — 첨부가 안 보이면 먼저 이 환경변수를 본다
+
+**소유 검증은 커뮤니티 쪽에 뒀다** — `app/community/_lib/imageKey.ts`의 `isOwnCommunityKey(key, userId)`. E의 `lib/uploads.ts`가 없고 `app/api/upload/`는 수정 금지 영역이라 판정만 이쪽에 만들었다. **E의 파일이 생기면 이 파일을 지우고 그쪽으로 갈아탄다**(규칙이 두 벌이면 갈라진다).
+
+이 검사를 빼면 안 되는 이유는 구멍이 실재하기 때문이다. `POST /api/community/posts`는 본문의 `imageKey`를 그대로 저장하고 목록·상세가 그 값을 `cdnUrl()`에 넣어 그린다. 검사가 없으면 본문에 `missions/<남의 userId>/….jpg`를 직접 넣는 것만으로 **남이 올린 미션 사진이 자기 글 이미지로 커뮤니티에 걸린다.** 글쓰기 권한 말고는 아무것도 필요 없다. 통과 조건은 `community/<본인 userId>/<파일명>` 정확히 세 조각이고, 확장자는 jpg·jpeg·png·webp뿐이다(CloudFront가 `.html`·`.svg`를 원본으로 내려주면 그 도메인에서 스크립트가 도는 XSS가 된다). `verifyCommunityObject()`류의 HeadObject 확인은 붙이지 않았다 — 키 소유 검증만으로 노출 문제는 막힌다.
+
+`_lib/limits.ts`에 있던 "키 형식은 검사하지 않는다(presign이 만든 값이므로)"는 주석은 **틀려서 걷었다.** 이 값은 presign이 아니라 요청 본문에서 온다.
+
 ### 1. Bedrock 스트리밍 응답 — 완료 (2026-08-19)
 `POST /api/chat/stream`을 새로 만들어 `ConverseStreamCommand`로 응답을 스트리밍하고, 스트림이 `messageStop`까지 정상 종료된 경우에만 `ChatRole.ASSISTANT`로 저장한다. 기존 `app/api/chat/messages/route.ts`(사용자 발화 저장 + 친밀도 지급)는 건드리지 않았다. 자세한 내용은 아래 "구현한 파일"·"결정한 것과 이유" 참고.
 

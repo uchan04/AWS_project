@@ -2,7 +2,7 @@ import type { NextRequest } from "next/server"
 import { getCurrentUser, UnauthorizedError } from "@/lib/auth"
 import { prisma } from "@/lib/prisma"
 import { ok, fail } from "@/lib/api"
-import { canAccessGallery } from "@/app/community/_lib/gallery"
+import { canAccessGallery, postImageUrl } from "@/app/community/_lib/gallery"
 
 export async function GET(_request: NextRequest, ctx: RouteContext<"/api/community/posts/[id]">) {
   try {
@@ -34,6 +34,9 @@ export async function GET(_request: NextRequest, ctx: RouteContext<"/api/communi
         title: post.title,
         body: post.body,
         createdAt: post.createdAt,
+        // 사진은 선택이라 대개 null이다. URL은 서버에서 붙인다(postImageUrl 주석 참고).
+        imageKey: post.imageKey,
+        imageUrl: postImageUrl(post.imageKey),
         likeCount: post.likeCount,
         commentCount: post.commentCount,
         user: post.user,

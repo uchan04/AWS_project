@@ -4,7 +4,8 @@ import { prisma } from "@/lib/prisma"
 import { ok, fail } from "@/lib/api"
 import { GalleryType } from "@prisma/client"
 import { resolveGallery, canAccessGallery, listGalleryPosts } from "@/app/community/_lib/gallery"
-import { TITLE_MAX, BODY_MAX } from "@/app/community/_lib/limits"
+import { TITLE_MAX, BODY_MAX, IMAGE_KEY_MAX } from "@/app/community/_lib/limits"
+import { isOwnCommunityKey } from "@/app/community/_lib/imageKey"
 import { grantAffinity, POST_AFFINITY } from "@/app/community/_lib/affinity"
 import { completeMissionByCode } from "@/lib/missions/completion"
 import { recordAttempt, retryAfter } from "@/lib/ratelimit"
@@ -63,6 +64,28 @@ export async function POST(request: NextRequest) {
       return fail("BODY_TOO_LONG", `본문은 ${BODY_MAX}자까지 쓸 수 있어요`, 400)
     }
 
+    /*
+     * 첨부 사진(Post.imageKey). 선택이라 없으면 null 그대로 둔다.
+     *
+     * **키가 본인 것인지 반드시 확인한다.** presign이 발급한 값이라고 가정하지 않는다 —
+     * 이 값은 요청 본문에서 오고, 저장되면 목록·상세가 그대로 cdnUrl()에 넣어 그린다.
+     * 검사를 빼면 본문에 `missions/<남의 userId>/….jpg`를 직접 넣는 것만으로 남의 미션
+     * 사진이 자기 글 이미지로 커뮤니티에 걸린다. 판정 근거는 _lib/imageKey.ts 주석에 있다.
+     */
+    const rawImageKey = payload?.imageKey
+    let imageKey: string | null = null
+    if (rawImageKey !== undefined && rawImageKey !== null) {
+      if (typeof rawImageKey !== "string" || rawImageKey.length > IMAGE_KEY_MAX) {
+        return fail("INVALID_BODY", "사진 정보를 다시 확인해주세요", 400)
+      }
+      // 빈 문자열은 "첨부 안 함"과 같게 본다. 화면이 제거 버튼으로 비운 경우다.
+      const trimmed = rawImageKey.trim()
+      if (trimmed && !isOwnCommunityKey(trimmed, user.id)) {
+        return fail("INVALID_IMAGE", "잘못된 이미지예요", 400)
+      }
+      imageKey = trimmed || null
+    }
+
     // 스키마의 GalleryType enum에 있는 값만 받는다(ALL 포함).
     const galleryType = (Object.values(GalleryType) as string[]).includes(requested)
       ? (requested as GalleryType)
@@ -87,7 +110,7 @@ export async function POST(request: NextRequest) {
     }
 
     const post = await prisma.post.create({
-      data: { userId: user.id, galleryType, title, body },
+      data: { userId: user.id, galleryType, title, body, imageKey },
       include: { user: { select: { nickname: true, typeCode: true } } },
     })
 
