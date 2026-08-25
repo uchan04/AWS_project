@@ -114,7 +114,8 @@ for (const gallery of GALLERIES) {
  * 그 값을 `{ crisis }`로 넘긴다. 여기서 재는 것은 그 계약이다 —
  * 위기 신호가 있으면 사전 차단만 풀리고, 대상 있는 욕설은 그대로 막혀야 한다.
  *
- * `invokeModel`을 넘기지 않는다. Bedrock 없이 도는 1단계(사전·규칙)만 고정한다.
+ * Bedrock은 부르지 않는다. 1~3번은 `invokeModel`을 아예 넘기지 않고, 2단계까지 재는
+ * 4번은 고정 JSON을 돌려주는 스텁을 넘긴다.
  */
 async function checkCrisisModeration() {
   // 1. 위기 신호 + 대상 없는 욕설 → 통과해야 한다. 막으면 상담 안내가 닿지 못한다
@@ -153,12 +154,42 @@ async function checkCrisisModeration() {
     "BLOCK",
     "위기 신호를 붙여도 대상 있는 욕설은 막는다",
   )
+
+  /*
+   * 4. 2단계(Bedrock 문맥 판정)까지 갔을 때의 계약.
+   *
+   * 스텁을 넘겨 Bedrock 없이 잰다 — moderate()의 invokeModel 인자가 그 자리다.
+   * 위기 신호가 사전 차단을 열어주므로 이 문장은 실제로 모델 단계까지 온다.
+   *
+   * **모델이 BLOCK을 줄 때는 위기 신호가 있어도 막는다. 의도한 동작이다.**
+   * JUDGE_SYSTEM의 BLOCK 정의가 "다른 사람이나 집단을 향한 욕설·비하 호칭·조롱·위협·차별"
+   * 이라, BLOCK 자체가 곧 "남을 향한 공격"이다. 자기를 향한 말은 그 taxonomy에서 SELF로
+   * 갈라져 나오고 SELF·WARN·OK는 아래처럼 이미 통과한다. 응답에는 verdict와 자유 문장
+   * reason뿐이라 BLOCK 안을 더 가를 필드가 없다 — 그래서 BLOCK은 열지 않는다.
+   */
+  const crisisSelfBlame = "죽고 싶다. 나 진짜 병신 같아"
+  const judge = (verdict: string) => async () => JSON.stringify({ verdict, reason: "검사" })
+  assert.equal(isCrisis(crisisSelfBlame), true, "위기 신호가 있어야 하는 문장이다")
+
+  for (const verdict of ["SELF", "WARN", "OK"]) {
+    assert.notEqual(
+      (await moderate(crisisSelfBlame, judge(verdict), { crisis: true })).verdict,
+      "BLOCK",
+      `위기 신호 글을 모델이 ${verdict}로 봤는데 막혔다`,
+    )
+  }
+
+  assert.equal(
+    (await moderate(crisisSelfBlame, judge("BLOCK"), { crisis: true })).verdict,
+    "BLOCK",
+    "모델 BLOCK은 위기 신호가 있어도 막는다(BLOCK = 남을 향한 공격)",
+  )
 }
 
 checkCrisisModeration()
   .then(() => {
     console.log(
-      `community 체크 통과 (제목 ${titleChecked}개 × 갤러리 ${TOPIC_GALLERIES.length}, 희망 문구 ${hopeChecked}개 × 갤러리 ${GALLERIES.length}, 위기 신호 검열 3케이스) — 주제 추천은 제목만 주며 LLM을 쓰지 않는다`,
+      `community 체크 통과 (제목 ${titleChecked}개 × 갤러리 ${TOPIC_GALLERIES.length}, 희망 문구 ${hopeChecked}개 × 갤러리 ${GALLERIES.length}, 위기 신호 검열 3케이스 + 모델 판정 4케이스) — 주제 추천은 제목만 주며 LLM을 쓰지 않는다`,
     )
   })
   .catch((error) => {
