@@ -43,6 +43,16 @@ export function PostCard({
         <p className="line-clamp-3 text-sm leading-relaxed text-neutral-600">{post.body}</p>
       </div>
 
+      {/* 썸네일. 사진 비율이 제각각이라 16:9로 잘라 고정한다 — 원본 비율로 두면 세로로 긴 사진
+          하나가 격자 한 칸을 몇 배로 늘려 옆 카드와 높이가 어긋난다. 원본 비율은 상세에서 본다.
+          next/image를 쓰지 않는 이유는 미션 화면과 같다 — 설정에 없는 hostname이면 렌더 중에 throw한다. */}
+      {post.imageUrl && (
+        <div className="aspect-[16/9] w-full overflow-hidden rounded-xl bg-neutral-100">
+          {/* eslint-disable-next-line @next/next/no-img-element */}
+          <img src={post.imageUrl} alt="" className="h-full w-full object-cover" />
+        </div>
+      )}
+
       <div className="flex gap-4 text-xs text-neutral-400">
         <span>좋아요 {post.likeCount}</span>
         <span>댓글 {post.commentCount}</span>
