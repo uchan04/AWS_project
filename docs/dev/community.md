@@ -101,7 +101,7 @@ D 쪽 기능 구현은 끝났고, 외부 대기 항목도 없다. AWS 계정·`B
 
 - `app/community/_components/WriteModal.tsx` — 글쓰기 버튼 + 모달을 한 컴포넌트로 통합(트리거가 이번 세션에 새로 생기는 것이라 지시된 파일 목록에도 이 컴포넌트만 있고 별도 트리거 컴포넌트는 없었음). `gallery` prop이 `"ALL"`이면 버튼을 비활성화하고 "전체 커뮤니티 글쓰기는 준비 중이에요" 안내만 노출, 종족 갤러리일 때만 모달이 동작. `_lib/gallery.ts`의 `canWriteToGallery()`로 판단(클라이언트 쪽은 UX용 차단이고, 실제 차단은 서버가 함)
 
-- `app/community/_lib/moderation.ts` — **2026-08-22 추가, 2026-08-25 위기 신호 예외.** 글·댓글 2단 검열. 우회 표기 정규화(`normalizeForPolicy`·`squeeze`) + 초성 축약(`containsChosungAbuse`) + 모음 제스처(`containsGestureAbuse`) + 사전(`findProfanity`, `POLICY = "BLANKET"`) + Bedrock 문맥 판정(`MODEL_JUDGE`). `moderate(text, invokeModel?, opts?)`가 유일한 진입점이고 **throw하지 않는다**(fail-open). `opts.crisis`면 사전 차단 한 단계만 건너뛴다 — 이유는 아래 "검열과 위기 신호의 순서" 참고. 외부 라이브러리 없음
+- `app/community/_lib/moderation.ts` — **2026-08-22 추가, 2026-08-25 위기 신호 예외.** 글·댓글 2단 검열. 우회 표기 정규화(`normalizeForPolicy`·`squeeze`) + 초성 축약(`containsChosungAbuse`) + 모음 제스처(`containsGestureAbuse`) + 사전(`findProfanity`, `POLICY = "BLANKET"`) + Bedrock 문맥 판정(`MODEL_JUDGE`). `moderate(text, invokeModel?, opts?)`가 유일한 진입점이고 **throw하지 않는다**(fail-open). `opts.crisis`면 사전 차단 한 단계만 건너뛴다 — 이유는 아래 "검열과 위기 신호의 순서" 참고. **2026-08-25 결정 변경 이후 두 라우트는 이 인자를 넘기지 않는다**(위기 신호 글이 검열 전에 돌아간다. 아래 "위기 신호 글을 저장하지 않는다" 참고). 외부 라이브러리 없음
 - `app/community/_lib/bedrock.ts` — **2026-08-22 추가.** `moderate()`가 쓰는 단발 Bedrock 호출. 3초를 넘기면 던지고 `moderate()`가 그것을 삼킨다
 
 ### 오프라인 모임 (2026-08-24 추가, SPEC.md 8절)
@@ -298,6 +298,27 @@ D 쪽 기능 구현은 끝났고, 외부 대기 항목도 없다. AWS 계정·`B
 - **취소 사유는 어떤 경우에도 필수가 아니다.** 취소를 어렵게 만들면 취소 자체를 회피하고 말없이 안 나타나는 쪽으로 흐른다. 그래서 "취소하기"는 아무것도 고르지 않아도 눌리고(`disabled`로 막지 않는다), 사유를 남기지 않는 "말하지 않고 취소"가 따로 있다. `MeetupCard`의 `CANCEL_REASONS` 위에 같은 내용을 적어 뒀다
 - **`NEUTRAL_COLOR`는 "종족색 없음"을 뜻하는 부재 표시라 주 CTA 배경으로 쓰지 않는다.** 모든 모임이 `ALL`이 되면서 `galleryColor`가 항상 `#9CA3AF`로 풀려 신청 버튼이 비활성처럼 보였다. 신청 계열 버튼은 `MEETUP_ACCENT`(`#0F766E`)를 쓴다. 값은 `lib/types.ts`·`app/globals.css`가 아니라 `MeetupCard.tsx`에 둔다 — 둘 다 공유 파일이고(`CLAUDE.md` 1절) 화면 하나 때문에 공유 색 토큰을 늘릴 이유가 없다. `WriteModal`이 `NEUTRAL_COLOR`를 자기 파일에 둔 것과 같은 방식
 - **`notifiedCancelAt`은 이름을 바꾸지 않고 의미만 넓혔다.** 결성 알림을 붙이면서 "이 신청 건의 상태 변경 알림을 보여준 시각"이 됐다. 이름을 고치면 마이그레이션이 또 나가 5인이 전부 받아야 하므로 `_lib/notice.ts` 주석과 `SPEC.md` 11절에 의미만 적었다
+
+### 위기 신호 글을 저장하지 않는다 (2026-08-25) — **팀 결정 변경**
+
+**이전 결정(2026-08-23)**: 위기 신호 글·댓글은 **막지 않는다.** 그대로 저장하고 작성자에게만 상담 안내(`CRISIS_POST_NOTICE`)를 돌려줬다. 근거는 라우트 주석에 이렇게 적혀 있었다 — *"막으면 도움이 가장 필요한 사람의 입을 막는 것이 된다."* 바로 위 "검열과 위기 신호의 순서"(차단 30번)도 그 결정을 지키려고 만든 것이다.
+
+**바뀐 결정(2026-08-25, 사용자)**: **저장하지 않는다.** 대신 작성자에게 도움 경로를 안내한다. 커뮤니티에 글로 남기는 대신 도움으로 연결하는 쪽을 택했다.
+
+두 결정은 *"이 사람을 거절하지 않는다"* 는 같은 목적을 갖는다. 그래서 구현에 조건이 붙는다(`app/community/_lib/crisis.ts` 주석이 정본).
+
+- **실패가 아니라 안내다.** `400`이 아니라 `200` + `{ crisisBlocked: true, notice }`로 준다. 400은 화면에서 빨간 오류로 읽히고, 지금 이 사람에게 필요한 것은 거절 통보가 아니다
+- **쓴 글을 지우지 않는다.** `WriteModal`·`PostDetailModal` 모두 입력을 그대로 두고 안내만 위에 얹는다. 창도 닫지 않는다. 어렵게 쓴 글이 사라지면 안내가 벌처럼 읽힌다
+- **비난하는 말을 쓰지 않는다.** "차단"·"부적절"·"규정"·"위반"·"금지"를 쓰지 않는다. `check:community`가 안내 문구에서 이 단어들을 검사한다
+- **저장되지 않았으므로 `router.refresh()`도 재화 이벤트도 쏘지 않는다.** 쏘면 목록이 새로 그려지고 사용자는 자기 글을 찾다가 없는 것을 확인하게 된다
+
+**`CRISIS_POST_NOTICE`를 쓰지 않았다.** 그 문구는 *"올라갔어요"* 로 시작한다 — 저장하던 시절의 문장이라 그대로 쓰면 올리지 않은 글을 올렸다고 알리는 셈이 된다. `lib/safety.ts`는 E 소유라 고치지 않고 `app/community/_lib/crisis.ts`에 `CRISIS_BLOCKED_NOTICE`를 새로 뒀다. `check:community`가 이 문구에 "올라갔어요"가 들어가지 않는지 검사한다.
+
+**챗봇 이동 경로는 넣지 못했다.** 지시에 "(2) 챗봇에게 이야기하기 — 쓴 본문을 들고 챗봇으로 이동"이 있었으나 **`ChatLauncher`에 초기 메시지를 넘기는 인터페이스가 없다.** `ChatPanel({ onClose })`이 전부이고, 열림 상태는 `ChatLauncher` 내부 `useState`이며 `app/layout.tsx`에 전역 마운트돼 있어 `WriteModal`이 잡을 손잡이가 없다. 새 인터페이스를 임의로 만들지 말라는 지시에 따라 **(1) 전화 안내만 넣었다.** 넣으려면 `ChatLauncher`에 외부에서 여는 경로(전역 이벤트 또는 context)와 `ChatPanel`의 초안 프리필이 함께 필요하다 — D 담당이지만 `layout.tsx`(E 소유)도 건드릴 가능성이 있어 별도 건으로 남긴다.
+
+**`moderate()`의 `opts.crisis`는 두 라우트에서 더 이상 쓰지 않는다.** 위기 신호 글이 검열에 닿기 전에 돌아가기 때문이다. `moderation.ts`의 기능과 `check:community`의 3케이스는 **지우지 않고 남겼다** — `moderate()`가 가진 보장이고, 저장하는 쪽으로 되돌릴 때 그대로 필요하다.
+
+**남은 위험**: `isCrisis()`는 주석이 밝히듯 *"오탐을 허용하는 쪽으로 판정한다"*. 막지 않던 시절에는 오탐의 대가가 "안내가 한 번 더 뜬다"였지만, 이제는 **오탐이 곧 글이 저장되지 않는 것**이다. 정규식을 넓힐 때 이 비용이 달라졌다는 것을 먼저 본다(`docs/dev/safety.md`).
 
 ### 검열과 위기 신호의 순서 (2026-08-25) — 차단 30번 해소
 
