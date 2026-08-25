@@ -11,6 +11,15 @@ import {
   IDLE_MAX_SEEDS,
   IDLE_SEEDS_PER_HOUR,
   MS_PER_IDLE_SEED,
+  OUTING_COMBINATIONS,
+  OUTING_COST_AFFINITY,
+  OUTING_HOURS,
+  OUTING_MET,
+  OUTING_MOODS,
+  OUTING_MS,
+  OUTING_PLACES,
+  OUTING_REWARD_MAX,
+  OUTING_REWARD_MIN,
   PET_GREETINGS,
   PET_IDLE_LINES,
   animalEmoji,
@@ -24,10 +33,16 @@ import {
   idleAccrual,
   levelUpReply,
   lineIndex,
+  outingEpisode,
+  outingPlacesForStage,
+  outingRemainingMs,
+  outingState,
   petMood,
   petTouchReply,
+  rollOutingReward,
   seedsToNextStage,
 } from "../lib/pet"
+import { AFFINITY_DAILY_CAP } from "../lib/reward"
 import { EVOLUTION_LEVEL, SEED_TO_EXP, TRIBE, expToNextLevel, withSubject } from "../lib/types"
 
 // npm run check:pet
@@ -665,5 +680,162 @@ for (const tribe of Object.values(TRIBE)) {
 // 빈 문자열·한글 아닌 글자에서 죽지 않는다
 assert.equal(withSubject(""), "")
 assert.equal(withSubject("Welli"), "Welli가")
+
+// ── 펫 외출 ───────────────────────────────────────────────────────────────────
+//
+// 계획 전문은 docs/dev/pet.md "펫 외출 시스템". 여기서 값을 코드로 못 박아 두면
+// 스키마·API·화면이 그것을 읽는다 (반대로 하면 값이 세 군데로 갈라진다).
+
+// ★ 페이싱의 핵심. 200 / 100 = 2 → "최소 2일에 1회"다.
+// 어느 한쪽을 바꾸면 페이싱이 조용히 무너지므로 여기서 걸리게 한다.
+assert.equal(AFFINITY_DAILY_CAP, 100)
+assert.equal(OUTING_COST_AFFINITY, 200)
+assert.equal(OUTING_COST_AFFINITY / AFFINITY_DAILY_CAP, 2)
+
+// 방치형 씨앗(30분/개)과 구분되는 시간이어야 한다
+assert.equal(OUTING_HOURS, 4)
+assert.equal(OUTING_MS, OUTING_HOURS * 60 * 60 * 1000)
+assert.ok(OUTING_MS > MS_PER_IDLE_SEED, "외출이 방치형 1개보다 짧으면 두 장치가 구분되지 않는다")
+
+// ── 보상 경계 — rand를 고정해 확인한다 ────────────────────────────────────────
+assert.equal(OUTING_REWARD_MIN, 30)
+assert.equal(OUTING_REWARD_MAX, 50)
+
+assert.deepEqual(rollOutingReward(() => 0), { seeds: 30, starShards: 30 })
+assert.deepEqual(rollOutingReward(() => 0.5), { seeds: 40, starShards: 40 })
+// rand()가 1을 주면 산식이 51이 된다 — 잘라 내는지 본다
+assert.deepEqual(rollOutingReward(() => 1), { seeds: 50, starShards: 50 })
+assert.deepEqual(rollOutingReward(() => 0.999999), { seeds: 50, starShards: 50 })
+
+// 범위를 벗어나는 값이 하나도 없어야 한다. 그리고 **꽝이 없다** —
+// 2일에 한 번뿐인 이벤트에서 0이 나오면 사용자는 그것을 실패로 읽는다
+for (let i = 0; i <= 100; i += 1) {
+  const r = rollOutingReward(() => i / 100)
+  for (const [name, v] of [["seeds", r.seeds], ["starShards", r.starShards]] as const) {
+    assert.ok(
+      v >= OUTING_REWARD_MIN && v <= OUTING_REWARD_MAX,
+      `${name}가 범위를 벗어났다: rand=${i / 100} → ${v}`,
+    )
+  }
+}
+
+// ── 에피소드 풀 — 개수·원문·중복 ──────────────────────────────────────────────
+//
+// 문구는 **사용자가 쓴다.** 지금 들어 있는 19줄은 C의 초안이다.
+// PET_GREETINGS·PET_IDLE_LINES가 그랬듯 사용자 문장으로 갈리면 아래 원문도 함께 고친다 —
+// 그것이 이 단정의 목적이다(문장이 조용히 다듬어지는 것을 막는다).
+assert.equal(OUTING_PLACES.length, 8)
+assert.equal(OUTING_MET.length, 6)
+assert.equal(OUTING_MOODS.length, 5)
+assert.equal(OUTING_COMBINATIONS, 240)
+
+assert.deepEqual(
+  OUTING_PLACES.map((p) => p.text),
+  [
+    "창가에 한참 앉아 있었어.",
+    "부엌 쪽을 탐험했어.",
+    "문 앞 계단까지 나가 봤어.",
+    "골목 담벼락을 따라 걸었어.",
+    "동네 공원에 갔어.",
+    "버스 정류장 앞에 서 있었어.",
+    "강가까지 갔다 왔어.",
+    "사람 많은 길을 지나왔어.",
+  ],
+)
+assert.deepEqual(
+  OUTING_MET.map((m) => m.text),
+  [
+    "고양이 한 마리가 나를 쳐다봤어.",
+    "낮잠 자는 강아지를 봤어.",
+    "빨래 걷는 할머니가 계셨어.",
+    "이름 모를 꽃이 피어 있었어.",
+    "엄청 큰 나무가 있었어.",
+    "종이봉투를 든 사람이 지나갔어.",
+  ],
+)
+assert.deepEqual(
+  OUTING_MOODS.map((m) => m.text),
+  [
+    "그냥 좋았어.",
+    "조금 무서웠는데 괜찮았어.",
+    "아무 생각도 안 났어.",
+    "오래 보고 있었어.",
+    "네 생각이 났어.",
+  ],
+)
+
+// 키가 겹치면 find()가 앞의 것만 잡아 뒤의 문장이 영구히 안 나온다
+for (const [label, keys] of [
+  ["OUTING_PLACES", OUTING_PLACES.map((p) => p.key)],
+  ["OUTING_MET", OUTING_MET.map((m) => m.key)],
+  ["OUTING_MOODS", OUTING_MOODS.map((m) => m.key)],
+] as const) {
+  assert.equal(new Set(keys).size, keys.length, `${label}: 키가 중복이다`)
+}
+
+// 장소의 stage는 진화 단계(1~4) 안에 있어야 한다. 5가 들어가면 영원히 안 나온다
+for (const p of OUTING_PLACES) {
+  assert.ok(p.stage >= 1 && p.stage <= 4, `${p.key}: stage가 1~4를 벗어났다 (${p.stage})`)
+}
+
+// **톤 규칙을 기계로 지킨다.** 펫은 자기 얘기만 하고 사용자를 평가하거나 격려하지 않는다 —
+// 격려는 사용자를 격려받아야 하는 위치에 세운다 (docs/dev/pet.md 참고)
+const BANNED_TONE = ["할 수 있", "잘했", "대단해", "힘내", "노력"]
+for (const line of [...OUTING_PLACES, ...OUTING_MET, ...OUTING_MOODS].map((x) => x.text)) {
+  for (const bad of BANNED_TONE) {
+    assert.ok(!line.includes(bad), `외출 문구에 격려·평가가 들어갔다: "${line}" (${bad})`)
+  }
+}
+
+// ── 단계별 장소 범위 ──────────────────────────────────────────────────────────
+assert.equal(outingPlacesForStage(1).length, 2)
+assert.equal(outingPlacesForStage(2).length, 4)
+assert.equal(outingPlacesForStage(3).length, 6)
+assert.equal(outingPlacesForStage(4).length, 8)
+// 1단계도 갈 곳이 있어야 하고, 잘못된 단계에서도 빈 배열을 주지 않는다
+assert.ok(outingPlacesForStage(0).length >= 1)
+assert.ok(outingPlacesForStage(-3).length >= 1)
+// 단계를 넘겨도 전체보다 많아지지 않는다
+assert.equal(outingPlacesForStage(99).length, OUTING_PLACES.length)
+
+// ── 에피소드 조립 ─────────────────────────────────────────────────────────────
+assert.deepEqual(outingEpisode("window", "cat", "good"), [
+  "창가에 한참 앉아 있었어.",
+  "고양이 한 마리가 나를 쳐다봤어.",
+  "그냥 좋았어.",
+])
+// 알 수 없는 키는 그 줄만 빠지고 죽지 않는다 (옛 기록·수동 수정)
+assert.deepEqual(outingEpisode("없는곳", "cat", "good"), [
+  "고양이 한 마리가 나를 쳐다봤어.",
+  "그냥 좋았어.",
+])
+assert.deepEqual(outingEpisode("없는곳", "없는것", "없는기분"), [])
+
+// ── 외출 상태 — returnsAt 직전/직후 × claimedAt 유무 4조합 ────────────────────
+const outNow = new Date("2026-08-25T12:00:00Z")
+const before = { returnsAt: new Date("2026-08-25T12:00:01Z"), claimedAt: null }
+const after = { returnsAt: new Date("2026-08-25T11:59:59Z"), claimedAt: null }
+const claimed = new Date("2026-08-25T11:00:00Z")
+
+assert.equal(outingState(null, outNow), "IDLE")
+assert.equal(outingState(before, outNow), "AWAY")
+assert.equal(outingState(after, outNow), "RETURNED")
+// 수령이 끝났으면 시각과 무관하게 IDLE이다 — 두 번 지급되는 자리를 막는다
+assert.equal(outingState({ ...before, claimedAt: claimed }, outNow), "IDLE")
+assert.equal(outingState({ ...after, claimedAt: claimed }, outNow), "IDLE")
+// returnsAt과 now가 정확히 같은 순간은 복귀로 본다 (기다림이 1ms 늘어나지 않는다)
+assert.equal(outingState({ returnsAt: outNow, claimedAt: null }, outNow), "RETURNED")
+
+// ── 남은 시간 ─────────────────────────────────────────────────────────────────
+assert.equal(outingRemainingMs(null, outNow), 0)
+assert.equal(outingRemainingMs(before, outNow), 1000)
+// 이미 지났으면 음수가 아니라 0이다 (화면에 "-3분 뒤"가 나오지 않는다)
+assert.equal(outingRemainingMs(after, outNow), 0)
+assert.equal(outingRemainingMs({ ...before, claimedAt: claimed }, outNow), 0)
+// 보낸 직후는 꼬박 OUTING_MS가 남는다
+assert.equal(
+  outingRemainingMs({ returnsAt: new Date(outNow.getTime() + OUTING_MS), claimedAt: null }, outNow),
+  OUTING_MS,
+)
 
 console.log("pet 체크 통과")
