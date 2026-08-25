@@ -9,7 +9,8 @@ import { isOwnCommunityKey } from "@/app/community/_lib/imageKey"
 import { grantAffinity, POST_AFFINITY } from "@/app/community/_lib/affinity"
 import { completeMissionByCode } from "@/lib/missions/completion"
 import { recordAttempt, retryAfter } from "@/lib/ratelimit"
-import { containsAbuse, isCrisis, CRISIS_POST_NOTICE } from "@/lib/safety"
+import { containsAbuse, isCrisis } from "@/lib/safety"
+import { crisisBlockedPayload } from "@/app/community/_lib/crisis"
 import { moderate, BLOCK_CODE } from "@/app/community/_lib/moderation"
 import { invokeBedrock } from "@/app/community/_lib/bedrock"
 
@@ -124,14 +125,23 @@ export async function POST(request: NextRequest) {
     // BLOCK만 막는다. WARN은 통과, **SELF는 반드시 통과시킨다** — "나 진짜 병신 같아"는
     // 남을 향한 말이 아니라 이 서비스가 받아내야 할 말이다(moderation.ts JUDGE_SYSTEM 주석).
     //
-    // **isCrisis()를 여기보다 먼저 부른다.** 아래 crisisNotice 자리에 두면 순서가 뒤집혀,
-    // 위기 신호 글에 욕설이 섞인 순간 상담 안내 대신 400이 나간다 — POLICY가 BLANKET이라
-    // 대상 없는 욕설까지 막는데 절박한 글에는 자기를 향한 욕이 섞이기 쉽다. 그러면 이 라우트가
-    // 아래에 적어둔 "위기 신호는 막지 않는다"가 가장 필요한 사람에게만 지켜지지 않는다.
-    // moderate()는 이 값을 받아 사전 차단 한 단계만 건너뛴다(대상 있는 욕설은 그대로 막는다).
-    const crisis = isCrisis(`${title} ${body}`)
+    // **위기 신호를 검열보다 먼저 본다.** 순서가 뒤집히면 위기 신호 글에 욕설이 섞인 순간
+    // 상담 안내 대신 400이 나간다 — POLICY가 BLANKET이라 대상 없는 욕설까지 막는데,
+    // 절박한 글에는 자기를 향한 욕이 섞이기 쉽다. 그러면 도움 안내가 가장 필요한 사람에게만
+    // 닿지 않는다.
+    //
+    // **저장하지 않는다(2026-08-25 팀 결정 변경).** 그전에는 글을 그대로 올리고 작성자에게만
+    // 안내를 돌려줬다 — "막으면 도움이 가장 필요한 사람의 입을 막는 것이 된다"가 근거였다.
+    // 이제는 커뮤니티에 남기는 대신 도움으로 연결한다. 두 결정의 관계와 조건은
+    // app/community/_lib/crisis.ts 주석에 있다.
+    //
+    // **400을 쓰지 않는다.** 사용자가 받는 것은 실패가 아니라 안내여야 한다. 화면(WriteModal)은
+    // 이 응답을 받으면 창을 닫지 않고 입력도 지우지 않는다.
+    if (isCrisis(`${title} ${body}`)) {
+      return ok(crisisBlockedPayload())
+    }
 
-    const mod = await moderate(`${title}\n\n${body}`, invokeBedrock, { crisis })
+    const mod = await moderate(`${title}\n\n${body}`, invokeBedrock)
     if (mod.verdict === "BLOCK") {
       return fail(BLOCK_CODE, mod.message, 400)
     }
@@ -157,13 +167,9 @@ export async function POST(request: NextRequest) {
       console.error("[DAILY_COMMUNITY_POST] 미션 완료 처리 실패", error)
     }
 
-    // 위기 신호는 **막지 않는다.** 글은 그대로 올라가고, 작성자에게만 안내를 돌려준다.
-    // 막으면 도움이 가장 필요한 사람의 입을 막는 것이 된다.
-    // 다른 사람에게는 보이지 않는다 — 이 응답은 작성자만 받는다.
-    // 판정은 검열보다 앞에서 이미 했다(위 crisis). 같은 텍스트를 두 번 재지 않는다.
-    const crisisNotice = crisis ? CRISIS_POST_NOTICE : null
-
-    return ok({ post, granted, crisisNotice })
+    // crisisNotice를 더 이상 돌려주지 않는다. 위기 신호 글은 위에서 저장 없이 돌아가므로
+    // 여기까지 온 글은 정의상 위기 신호가 아니다(2026-08-25 결정 변경, _lib/crisis.ts).
+    return ok({ post, granted })
   } catch (error) {
     if (error instanceof UnauthorizedError) return fail("UNAUTHORIZED", error.message, 401)
     throw error

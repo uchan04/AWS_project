@@ -190,11 +190,18 @@ export function PostDetailModal({
         setActionError(json.error.message)
         return
       }
+      // 위기 신호면 댓글이 **저장되지 않았다**(2026-08-25 결정 변경, _lib/crisis.ts).
+      // 목록에 밀어 넣지 않는다 — 응답에 comment가 없어 undefined가 들어가고 렌더가 깨진다.
+      // 입력도 지우지 않는다. 쓴 말이 사라지면 안내가 벌처럼 읽힌다.
+      if (json.data.crisisBlocked) {
+        setCrisisNotice(json.data.notice)
+        return
+      }
+
       setComments((prev) => [...prev, json.data.comment])
       setCommentBody("")
       setPost((prev) => (prev ? { ...prev, commentCount: prev.commentCount + 1 } : prev))
       setAffinityNotice(json.data.granted > 0 ? `친밀도 +${json.data.granted}` : "오늘 친밀도를 이미 다 받았어요")
-      if (json.data.crisisNotice) setCrisisNotice(json.data.crisisNotice)
       window.dispatchEvent(new CustomEvent("user-stats-changed"))
     } finally {
       setCommentPending(false)

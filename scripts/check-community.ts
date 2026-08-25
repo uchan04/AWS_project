@@ -3,6 +3,7 @@ import { TOPICS, TOPIC_COUNT, TOPIC_TITLE_MAX, resolveTopicKey, pickTopics } fro
 import { pickHopeMessage, HOPE_MESSAGES } from "@/app/community/_lib/banner"
 import { BANNED } from "@/lib/diagnosis/reason"
 import { isCrisis } from "@/lib/safety"
+import { crisisBlockedPayload, CRISIS_BLOCKED_NOTICE, BLAMING_WORDS } from "@/app/community/_lib/crisis"
 import { moderate } from "@/app/community/_lib/moderation"
 import type { GalleryType, TypeCode } from "@prisma/client"
 
@@ -62,6 +63,65 @@ for (const gallery of TOPIC_GALLERIES) {
   assert.equal(new Set(picked).size, TOPIC_COUNT, `${gallery}: 뽑은 제목이 겹친다`)
 }
 
+/* ────────────────────────────────────────────────────────────
+ * 위기 신호 글·댓글 (2026-08-25 팀 결정 변경)
+ *
+ * 이전: 저장하고 작성자에게 안내만 돌려줬다.
+ * 지금: 저장하지 않고 안내만 돌려준다. 응답은 400이 아니라 200 + crisisBlocked 다.
+ *
+ * 라우트를 직접 부르지는 않는다 — 이 스크립트는 서버도 DB도 없이 도는 순수 함수 검사다.
+ * 대신 두 라우트가 공유하는 판정(isCrisis)과 응답 본문(crisisBlockedPayload)을 여기서 고정한다.
+ * ──────────────────────────────────────────────────────────── */
+
+const CRISIS_SAMPLES = [
+  "모든 걸 끝내고 싶다",
+  "이제 다 살기 싫다",
+  "그냥 죽고 싶다는 생각만 든다",
+  "사라지고 싶어",
+  "태어나지 않았으면 좋았을 텐데",
+]
+
+const ORDINARY_SAMPLES = [
+  "오늘 창밖이 밝았다",
+  "요즘 잠이 잘 안 온다",
+  "밥을 늦게 먹었다",
+]
+
+for (const text of CRISIS_SAMPLES) {
+  assert.ok(isCrisis(text), `위기 신호로 잡혀야 한다 — "${text}"`)
+}
+for (const text of ORDINARY_SAMPLES) {
+  assert.ok(!isCrisis(text), `평범한 글까지 잡으면 안 된다 — "${text}"`)
+}
+
+const payload = crisisBlockedPayload()
+
+// 저장된 것이 없다는 사실이 응답 모양으로 드러나야 한다.
+// post·comment가 실려 나가면 화면이 목록에 밀어 넣는다(PostDetailModal이 그렇게 깨졌었다)
+assert.equal(payload.crisisBlocked, true, "응답에 crisisBlocked: true 가 있다")
+assert.ok(!("post" in payload), "저장하지 않았으므로 post를 담지 않는다")
+assert.ok(!("comment" in payload), "저장하지 않았으므로 comment를 담지 않는다")
+assert.ok(payload.notice.trim().length > 0, "안내 문구가 비어 있지 않다")
+
+// 톤. 거절이 아니라 다른 길을 알려주는 자리다(_lib/crisis.ts 조건 3)
+for (const word of BLAMING_WORDS) {
+  assert.ok(
+    !payload.notice.includes(word),
+    `안내 문구가 거절로 읽힌다 — "${word}"가 들어 있다: "${payload.notice}"`,
+  )
+}
+assert.ok(
+  !/해\s?보세요|하세요|해야/.test(payload.notice),
+  `안내 문구가 조언이다 — "${payload.notice}"`,
+)
+
+// lib/safety.ts의 CRISIS_POST_NOTICE는 "올라갔어요"로 시작한다 — 저장하던 시절의 문장이다.
+// 그걸 그대로 쓰면 올리지 않은 글을 올렸다고 알리게 된다
+assert.ok(
+  !CRISIS_BLOCKED_NOTICE.includes("올라갔어요"),
+  "안내가 글이 올라갔다고 말하면 안 된다 — 저장하지 않았다",
+)
+
 // 희망 문구 배너(SPEC 9절). 갤러리 4개가 각자 배열을 갖는다(app/community/_lib/banner.ts).
 // 한 주 안에서는 같은 문구가 나오고, 주가 넘어가면 바뀐다.
 const WEEK_MS = 7 * 24 * 60 * 60 * 1000
@@ -110,9 +170,12 @@ for (const gallery of GALLERIES) {
  * 위기 신호 글이 검열에 걸리지 않는지 본다(2026-08-25, 차단 30번).
  *
  * `moderate()`의 사전 차단(POLICY = BLANKET)은 대상이 없는 욕설까지 막는데, 절박한 글에는
- * 자기를 향한 욕이 섞이기 쉽다. 그래서 라우트가 `isCrisis()`를 검열보다 **먼저** 재고
- * 그 값을 `{ crisis }`로 넘긴다. 여기서 재는 것은 그 계약이다 —
- * 위기 신호가 있으면 사전 차단만 풀리고, 대상 있는 욕설은 그대로 막혀야 한다.
+ * 자기를 향한 욕이 섞이기 쉽다. `{ crisis }`를 주면 사전 차단만 풀리고 대상 있는 욕설은
+ * 그대로 막힌다 — 여기서 재는 것은 `moderate()`의 그 계약이다.
+ *
+ * **2026-08-25 이후 두 라우트는 이 인자를 넘기지 않는다.** 위기 신호 글은 검열에 닿기 전에
+ * 저장 없이 돌아가기 때문이다(위 "위기 신호 글·댓글" 절). 그래도 이 검사는 남겨둔다 —
+ * `moderate()`가 가진 보장이고, 위기 신호를 다시 저장하는 쪽으로 되돌릴 때 필요하다.
  *
  * Bedrock은 부르지 않는다. 1~3번은 `invokeModel`을 아예 넘기지 않고, 2단계까지 재는
  * 4번은 고정 JSON을 돌려주는 스텁을 넘긴다.
@@ -189,7 +252,7 @@ async function checkCrisisModeration() {
 checkCrisisModeration()
   .then(() => {
     console.log(
-      `community 체크 통과 (제목 ${titleChecked}개 × 갤러리 ${TOPIC_GALLERIES.length}, 희망 문구 ${hopeChecked}개 × 갤러리 ${GALLERIES.length}, 위기 신호 검열 3케이스 + 모델 판정 4케이스) — 주제 추천은 제목만 주며 LLM을 쓰지 않는다`,
+      `community 체크 통과 (제목 ${titleChecked}개 × 갤러리 ${TOPIC_GALLERIES.length}, 희망 문구 ${hopeChecked}개 × 갤러리 ${GALLERIES.length}, 위기 신호 검열 3케이스 + 모델 판정 4케이스, 위기 신호 판정 ${CRISIS_SAMPLES.length + ORDINARY_SAMPLES.length}건) — 위기 신호 글은 저장하지 않고 200 + crisisBlocked로 안내한다`,
     )
   })
   .catch((error) => {

@@ -6,7 +6,8 @@ import { canAccessGallery } from "@/app/community/_lib/gallery"
 import { COMMENT_MAX } from "@/app/community/_lib/limits"
 import { grantAffinity, COMMENT_AFFINITY } from "@/app/community/_lib/affinity"
 import { recordAttempt, retryAfter } from "@/lib/ratelimit"
-import { containsAbuse, isCrisis, CRISIS_POST_NOTICE } from "@/lib/safety"
+import { containsAbuse, isCrisis } from "@/lib/safety"
+import { crisisBlockedPayload } from "@/app/community/_lib/crisis"
 import { moderate, BLOCK_CODE } from "@/app/community/_lib/moderation"
 import { invokeBedrock } from "@/app/community/_lib/bedrock"
 
@@ -58,11 +59,13 @@ export async function POST(request: NextRequest, ctx: RouteContext<"/api/communi
     // 글과 같은 2단 검열이다. 근거는 app/api/community/posts/route.ts의 같은 블록 주석에 있다.
     // 던지지 않으므로(fail-open) 따로 감싸지 않는다. BLOCK만 막고 WARN·SELF는 통과시킨다.
     //
-    // **isCrisis()를 검열보다 먼저 부른다.** 아래 crisisNotice 자리에 두면 위기 신호 댓글에
-    // 욕설이 섞였을 때 상담 안내 대신 400이 나간다. 글 라우트와 같은 사안이며 이유도 같다.
-    const crisis = isCrisis(body)
+    // 위기 신호는 저장하지 않고 안내만 돌려준다. 검열보다 먼저 본다(글 라우트와 같은 사안).
+    // 결정 변경의 근거와 톤 규칙은 app/community/_lib/crisis.ts 주석에 있다.
+    if (isCrisis(body)) {
+      return ok(crisisBlockedPayload())
+    }
 
-    const mod = await moderate(body, invokeBedrock, { crisis })
+    const mod = await moderate(body, invokeBedrock)
     if (mod.verdict === "BLOCK") {
       return fail(BLOCK_CODE, mod.message, 400)
     }
@@ -87,9 +90,6 @@ export async function POST(request: NextRequest, ctx: RouteContext<"/api/communi
         isOwn: true,
       },
       granted,
-      // 위기 신호는 막지 않고 작성자에게만 안내한다(posts/route.ts와 같은 판단).
-      // 판정은 검열보다 앞에서 이미 했다(위 crisis).
-      crisisNotice: crisis ? CRISIS_POST_NOTICE : null,
     })
   } catch (error) {
     if (error instanceof UnauthorizedError) return fail("UNAUTHORIZED", error.message, 401)
