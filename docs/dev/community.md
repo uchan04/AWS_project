@@ -101,6 +101,9 @@ D 쪽 기능 구현은 끝났고, 외부 대기 항목도 없다. AWS 계정·`B
 
 - `app/community/_components/WriteModal.tsx` — 글쓰기 버튼 + 모달을 한 컴포넌트로 통합(트리거가 이번 세션에 새로 생기는 것이라 지시된 파일 목록에도 이 컴포넌트만 있고 별도 트리거 컴포넌트는 없었음). `gallery` prop이 `"ALL"`이면 버튼을 비활성화하고 "전체 커뮤니티 글쓰기는 준비 중이에요" 안내만 노출, 종족 갤러리일 때만 모달이 동작. `_lib/gallery.ts`의 `canWriteToGallery()`로 판단(클라이언트 쪽은 UX용 차단이고, 실제 차단은 서버가 함)
 
+- `app/community/_lib/moderation.ts` — **2026-08-22 추가, 2026-08-25 위기 신호 예외.** 글·댓글 2단 검열. 우회 표기 정규화(`normalizeForPolicy`·`squeeze`) + 초성 축약(`containsChosungAbuse`) + 모음 제스처(`containsGestureAbuse`) + 사전(`findProfanity`, `POLICY = "BLANKET"`) + Bedrock 문맥 판정(`MODEL_JUDGE`). `moderate(text, invokeModel?, opts?)`가 유일한 진입점이고 **throw하지 않는다**(fail-open). `opts.crisis`면 사전 차단 한 단계만 건너뛴다 — 이유는 아래 "검열과 위기 신호의 순서" 참고. 외부 라이브러리 없음
+- `app/community/_lib/bedrock.ts` — **2026-08-22 추가.** `moderate()`가 쓰는 단발 Bedrock 호출. 3초를 넘기면 던지고 `moderate()`가 그것을 삼킨다
+
 ### 오프라인 모임 (2026-08-24 추가, SPEC.md 8절)
 
 - `app/api/community/meetups/route.ts` — **2026-08-24 추가.** GET(목록) + POST(개설). GET은 `gallery`(없으면 전체)·`status`(기본 `OPEN`) 쿼리로 거르고 `startsAt` 오름차순. `OPEN`을 볼 때만 `startsAt >= now`를 더한다 — 이미 시작한 모임은 상태가 `OPEN`으로 남아 있어도 신청받을 수 없다. 각 항목의 `joined`는 `participants`를 본인 행(`userId` + `canceledAt: null`)만 골라 와 접은 값이라 **응답에 남의 신청 정보가 실리지 않는다.** POST는 `user.isAdmin`이 false면 401, title 1~80·place 1~120·body 1~2000·`capacity >= 1`·`1 <= minCount <= capacity`·`startsAt` 파싱 가능 + 미래를 검증한다
@@ -295,6 +298,17 @@ D 쪽 기능 구현은 끝났고, 외부 대기 항목도 없다. AWS 계정·`B
 - **취소 사유는 어떤 경우에도 필수가 아니다.** 취소를 어렵게 만들면 취소 자체를 회피하고 말없이 안 나타나는 쪽으로 흐른다. 그래서 "취소하기"는 아무것도 고르지 않아도 눌리고(`disabled`로 막지 않는다), 사유를 남기지 않는 "말하지 않고 취소"가 따로 있다. `MeetupCard`의 `CANCEL_REASONS` 위에 같은 내용을 적어 뒀다
 - **`NEUTRAL_COLOR`는 "종족색 없음"을 뜻하는 부재 표시라 주 CTA 배경으로 쓰지 않는다.** 모든 모임이 `ALL`이 되면서 `galleryColor`가 항상 `#9CA3AF`로 풀려 신청 버튼이 비활성처럼 보였다. 신청 계열 버튼은 `MEETUP_ACCENT`(`#0F766E`)를 쓴다. 값은 `lib/types.ts`·`app/globals.css`가 아니라 `MeetupCard.tsx`에 둔다 — 둘 다 공유 파일이고(`CLAUDE.md` 1절) 화면 하나 때문에 공유 색 토큰을 늘릴 이유가 없다. `WriteModal`이 `NEUTRAL_COLOR`를 자기 파일에 둔 것과 같은 방식
 - **`notifiedCancelAt`은 이름을 바꾸지 않고 의미만 넓혔다.** 결성 알림을 붙이면서 "이 신청 건의 상태 변경 알림을 보여준 시각"이 됐다. 이름을 고치면 마이그레이션이 또 나가 5인이 전부 받아야 하므로 `_lib/notice.ts` 주석과 `SPEC.md` 11절에 의미만 적었다
+
+### 검열과 위기 신호의 순서 (2026-08-25) — 차단 30번 해소
+
+`app/community/_lib/moderation.ts`가 글·댓글의 2단 검열을 한다(1단계 사전·규칙 동기 판정, 2단계 Bedrock 문맥 판정). `lib/safety.ts`의 `containsAbuse()`가 2인칭 지시가 붙은 말만 잡는 데 비해, 이쪽은 우회 표기(`ㅄ`·`시1발`·`병@신`)와 욕설이 하나도 없는 모욕("너 임마 청년임?")까지 본다. `POLICY = "BLANKET"`이라 **대상이 없는 욕설도 막는다** — 기록된 팀 결정(TARGETED)과 다른 값이고 D가 의도적으로 고른 것이다.
+
+- **버그**: 두 라우트 모두 `moderate()`의 BLOCK 반환이 `isCrisis()` 계산보다 앞에 있었다. 그래서 **위기 신호 글에 욕설이 섞이면 상담 안내(`CRISIS_POST_NOTICE`) 대신 400 차단이 나갔다.** 절박한 글에는 자기를 향한 욕이 섞이기 쉽고 `BLANKET`은 그것까지 막으므로, 이 순서는 **도움이 가장 필요한 사람만 정확히 걸러냈다.** 같은 라우트가 아래쪽에 "위기 신호는 막지 않는다 — 막으면 도움이 가장 필요한 사람의 입을 막는 것이 된다"고 스스로 적어둔 자리다
+- **고침**: `moderate()`에 세 번째 인자 `opts?: { crisis?: boolean }`를 뒀다. `opts.crisis`면 **`POLICY === "BLANKET"`의 사전 hit 분기 한 곳만** 건너뛴다. 두 라우트는 `isCrisis()`를 `moderate()` **앞으로** 올려 `const crisis`에 담고 `{ crisis }`로 넘기며, 아래 `crisisNotice`는 같은 값을 재사용한다(같은 텍스트를 두 번 재지 않는다)
+- **일부러 함께 풀지 않은 것**: `containsAbuse` · `containsChosungAbuse` · `containsGestureAbuse`는 위기 여부와 무관하게 그대로 막는다. 그쪽은 대상이 있는 욕설·모욕이고, 여기서 함께 풀면 **"죽고싶다"를 덧붙여 남을 공격하는 우회**가 열린다. 기준은 "자기를 향한 말은 통과, 남을 향한 말은 위기 신호가 있어도 차단"이다
+- **챗봇 경로에는 같은 구조가 없다.** `app/api/chat/stream/route.ts`는 `isCrisis()`가 이미 맨 앞이고(`BEDROCK_MODEL_ID` 검사보다도 위다) `moderate()`를 부르지 않는다. `app/api/chat/messages/route.ts`에는 검열 자체가 없다
+- **남은 구멍 하나**: 2단계 Bedrock 판정은 위기 신호와 무관하게 그대로 돈다. 모델이 위기 신호 글을 `BLOCK`으로 보면 여전히 400이 나간다. 지금은 자기 표현을 `SELF`로 판정하도록 `JUDGE_SYSTEM`에 적혀 있어 실측상 걸리지 않았고, 모델 판정까지 위기 신호로 푸는 것은 이번 범위 밖으로 뒀다
+- `scripts/check-community.ts`가 3케이스를 고정한다 — 위기+욕설 통과 / 욕설만 400 / 위기+대상 있는 욕설("너 죽어") 400. 같은 문장을 `crisis: false`로도 재서 통과 이유가 그 플래그임을 못박는다. `invokeModel`은 넘기지 않으므로 Bedrock 없이 돈다
 
 ## 알려진 한계 (2026-08-24)
 
