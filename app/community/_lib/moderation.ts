@@ -394,15 +394,19 @@ const block = (
  *   1. 기존 정책(containsAbuse)을 원문과 정규화 형태 양쪽에 적용한다.
  *      정규화 덕분에 병@신아 / 시1발 / 병 신아 / ㅂㅕㅇㅅㅣㄴ아 가 잡힌다.
  *   2. 초성 축약을 같은 구조로 본다.
- *   3. BLANKET 정책일 때만 사전으로 차단한다.
+ *   3. BLANKET 정책일 때만 사전으로 차단한다. **위기 신호 글에서는 이 단계만 건너뛴다.**
  *   4. 남은 것은 Bedrock 이 문맥으로 본다.
  *
  * Bedrock 이 실패하면 통과시킨다(fail-open). 1~3 이 바닥으로 남아 있고,
  * 모델 장애로 글쓰기가 통째로 멈추는 쪽이 더 나쁘다. 이 함수는 throw 하지 않는다.
+ *
+ * @param opts.crisis 호출부가 판정한 위기 신호 여부(lib/safety.ts isCrisis).
+ *   true 면 3단계(BLANKET 사전 차단)만 건너뛴다. 이유는 그 분기 주석에 있다.
  */
 export async function moderate(
   text: string,
   invokeModel?: (system: string, user: string) => Promise<string>,
+  opts?: { crisis?: boolean },
 ): Promise<ModerationResult> {
   const normalized = normalizeForPolicy(text);
   const squeezed = squeeze(text);
@@ -416,7 +420,21 @@ export async function moderate(
   if (containsGestureAbuse(text)) return block("모음 제스처", "rule", BLOCK_MESSAGE);
 
   const profanity = findProfanity(text);
-  if (POLICY === "BLANKET" && profanity.length > 0) {
+
+  /*
+   * 위기 신호 글에서는 사전 차단을 건너뛴다.
+   *
+   * POLICY 가 BLANKET 이라 대상 없는 욕설까지 막는데, 절박한 글에는 자기를 향한 욕이
+   * 섞이기 쉽다. 그대로 두면 400 이 나가서 상담 안내(CRISIS_POST_NOTICE)가 닿지 못한다 —
+   * 도움이 가장 필요한 사람만 정확히 걸러내는 셈이다. 라우트가 "위기 신호는 막지 않는다"고
+   * 적어둔 약속도 이 한 줄 때문에 깨진다.
+   *
+   * **건너뛰는 것은 이 사전 분기뿐이다.** 위의 containsAbuse · containsChosungAbuse ·
+   * containsGestureAbuse 는 위기 여부와 무관하게 그대로 막는다 — 그쪽은 대상이 있는
+   * 욕설·모욕이고, 여기서 함께 풀어주면 "죽고싶다"를 덧붙여 남을 공격하는 우회가 열린다.
+   * 자기를 향한 말은 통과시키되 남을 향한 말은 위기 신호가 있어도 통과시키지 않는다.
+   */
+  if (POLICY === "BLANKET" && profanity.length > 0 && !opts?.crisis) {
     return {
       verdict: "BLOCK",
       message: blockMessageFor(text),

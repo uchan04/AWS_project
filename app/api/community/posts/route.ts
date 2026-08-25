@@ -123,7 +123,15 @@ export async function POST(request: NextRequest) {
     //
     // BLOCK만 막는다. WARN은 통과, **SELF는 반드시 통과시킨다** — "나 진짜 병신 같아"는
     // 남을 향한 말이 아니라 이 서비스가 받아내야 할 말이다(moderation.ts JUDGE_SYSTEM 주석).
-    const mod = await moderate(`${title}\n\n${body}`, invokeBedrock)
+    //
+    // **isCrisis()를 여기보다 먼저 부른다.** 아래 crisisNotice 자리에 두면 순서가 뒤집혀,
+    // 위기 신호 글에 욕설이 섞인 순간 상담 안내 대신 400이 나간다 — POLICY가 BLANKET이라
+    // 대상 없는 욕설까지 막는데 절박한 글에는 자기를 향한 욕이 섞이기 쉽다. 그러면 이 라우트가
+    // 아래에 적어둔 "위기 신호는 막지 않는다"가 가장 필요한 사람에게만 지켜지지 않는다.
+    // moderate()는 이 값을 받아 사전 차단 한 단계만 건너뛴다(대상 있는 욕설은 그대로 막는다).
+    const crisis = isCrisis(`${title} ${body}`)
+
+    const mod = await moderate(`${title}\n\n${body}`, invokeBedrock, { crisis })
     if (mod.verdict === "BLOCK") {
       return fail(BLOCK_CODE, mod.message, 400)
     }
@@ -152,7 +160,8 @@ export async function POST(request: NextRequest) {
     // 위기 신호는 **막지 않는다.** 글은 그대로 올라가고, 작성자에게만 안내를 돌려준다.
     // 막으면 도움이 가장 필요한 사람의 입을 막는 것이 된다.
     // 다른 사람에게는 보이지 않는다 — 이 응답은 작성자만 받는다.
-    const crisisNotice = isCrisis(`${title} ${body}`) ? CRISIS_POST_NOTICE : null
+    // 판정은 검열보다 앞에서 이미 했다(위 crisis). 같은 텍스트를 두 번 재지 않는다.
+    const crisisNotice = crisis ? CRISIS_POST_NOTICE : null
 
     return ok({ post, granted, crisisNotice })
   } catch (error) {

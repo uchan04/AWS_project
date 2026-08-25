@@ -2,6 +2,8 @@ import assert from "node:assert/strict"
 import { TOPICS, TOPIC_COUNT, TOPIC_TITLE_MAX, resolveTopicKey, pickTopics } from "@/app/community/_lib/topics"
 import { pickHopeMessage, HOPE_MESSAGES } from "@/app/community/_lib/banner"
 import { BANNED } from "@/lib/diagnosis/reason"
+import { isCrisis } from "@/lib/safety"
+import { moderate } from "@/app/community/_lib/moderation"
 import type { GalleryType, TypeCode } from "@prisma/client"
 
 // 주제 추천은 2026-08-25부터 **제목만** 준다. 초안(draft)이 없어졌고 LLM 추천도 껐다.
@@ -104,6 +106,62 @@ for (const gallery of GALLERIES) {
   }
 }
 
-console.log(
-  `community 체크 통과 (제목 ${titleChecked}개 × 갤러리 ${TOPIC_GALLERIES.length}, 희망 문구 ${hopeChecked}개 × 갤러리 ${GALLERIES.length}) — 주제 추천은 제목만 주며 LLM을 쓰지 않는다`,
-)
+/*
+ * 위기 신호 글이 검열에 걸리지 않는지 본다(2026-08-25, 차단 30번).
+ *
+ * `moderate()`의 사전 차단(POLICY = BLANKET)은 대상이 없는 욕설까지 막는데, 절박한 글에는
+ * 자기를 향한 욕이 섞이기 쉽다. 그래서 라우트가 `isCrisis()`를 검열보다 **먼저** 재고
+ * 그 값을 `{ crisis }`로 넘긴다. 여기서 재는 것은 그 계약이다 —
+ * 위기 신호가 있으면 사전 차단만 풀리고, 대상 있는 욕설은 그대로 막혀야 한다.
+ *
+ * `invokeModel`을 넘기지 않는다. Bedrock 없이 도는 1단계(사전·규칙)만 고정한다.
+ */
+async function checkCrisisModeration() {
+  // 1. 위기 신호 + 대상 없는 욕설 → 통과해야 한다. 막으면 상담 안내가 닿지 못한다
+  const crisisWithProfanity = "죽고 싶다. 시발 진짜 다 싫다"
+  assert.equal(isCrisis(crisisWithProfanity), true, "위기 신호를 못 읽으면 이 검사가 무의미하다")
+  const passed = await moderate(crisisWithProfanity, undefined, { crisis: true })
+  assert.notEqual(
+    passed.verdict,
+    "BLOCK",
+    `위기 신호 글이 욕설 때문에 막혔다 — 상담 안내 대신 400이 나간다 (hits: ${passed.hits.join(",")})`,
+  )
+
+  // 2. 위기 신호가 없으면 종전대로 막는다. 1번이 정책을 통째로 푼 것이 아님을 못박는다
+  const profanityOnly = "시발 진짜 다 싫다"
+  assert.equal(isCrisis(profanityOnly), false, "위기 신호가 없어야 하는 문장이다")
+  assert.equal(
+    (await moderate(profanityOnly, undefined, { crisis: false })).verdict,
+    "BLOCK",
+    "위기 신호 없는 욕설은 종전대로 막는다",
+  )
+  // 같은 문장을 crisis 없이 부른 경우(기본값)도 같다 — 세 번째 인자는 선택이다
+  assert.equal((await moderate(profanityOnly)).verdict, "BLOCK", "opts 없이 불러도 종전과 같다")
+  // 1번 문장도 crisis=false로 부르면 막힌다. 통과시킨 것이 위기 신호임을 확인한다
+  assert.equal(
+    (await moderate(crisisWithProfanity, undefined, { crisis: false })).verdict,
+    "BLOCK",
+    "1번이 통과한 이유는 crisis 플래그다",
+  )
+
+  // 3. 위기 신호가 있어도 대상 있는 욕설은 막는다.
+  //    "죽고싶다"를 덧붙여 남을 공격하는 우회를 열어주지 않는다
+  const crisisWithTargetedAbuse = "죽고 싶다. 너 죽어"
+  assert.equal(isCrisis(crisisWithTargetedAbuse), true, "위기 신호가 있어야 하는 문장이다")
+  assert.equal(
+    (await moderate(crisisWithTargetedAbuse, undefined, { crisis: true })).verdict,
+    "BLOCK",
+    "위기 신호를 붙여도 대상 있는 욕설은 막는다",
+  )
+}
+
+checkCrisisModeration()
+  .then(() => {
+    console.log(
+      `community 체크 통과 (제목 ${titleChecked}개 × 갤러리 ${TOPIC_GALLERIES.length}, 희망 문구 ${hopeChecked}개 × 갤러리 ${GALLERIES.length}, 위기 신호 검열 3케이스) — 주제 추천은 제목만 주며 LLM을 쓰지 않는다`,
+    )
+  })
+  .catch((error) => {
+    console.error(error)
+    process.exit(1)
+  })
