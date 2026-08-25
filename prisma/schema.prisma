@@ -214,6 +214,19 @@ model PetSkin {
   priceShards  Int? // 별조각 구매가. 스킨은 별조각 전용이다. 기본 외형은 null
   imageKeyBase String // S3 prefix. stageCount가 4면 뒤에 -1 -2 -3 -4를 붙인다
 
+  // 프로필 원형(사이드바·내 계정 모달)에만 쓰는 아바타. imageKeyBase와 **출처가 다르다**
+  // (2026-08-24 사용자 결정). 값은 Figma 시안 파일명 그대로 `fox_avatar` 같은 것이고
+  // `/images/`와 `.png`는 lib/assets.ts의 avatarUrl()이 붙인다 — public/images에 커밋된
+  // Amplify 정적 자산이라 CloudFront가 아니다(CloudFront에는 이 3장이 없다, 전부 403).
+  //
+  // 왜 imageKeyBase를 덮어쓰지 않았는가: 그 값 하나가 홈 마스코트·미션 카드·펫 성장
+  // 4단계·스킨 상점까지 8곳을 먹인다. 아바타는 포즈 1장이라 -1~-4가 없어서 덮어쓰면
+  // 성장 단계가 전부 같은 그림이 되거나 404로 이모지 폴백이 된다.
+  //
+  // null이면 호출부가 imageKeyBase 쪽 그림으로 되돌아간다 — 북극 변종은 아바타 그림이
+  // 따로 없어 같은 종족 아바타를 쓴다(고양잇과 3종이 아니라 종족당 1장뿐이다).
+  avatarKey String?
+
   owners      UserPetSkin[]
   activeUsers User[]        @relation("ActiveSkin")
 }

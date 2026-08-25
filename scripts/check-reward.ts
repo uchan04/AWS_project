@@ -16,6 +16,9 @@ function skin(effectType: PetSkin["effectType"], effectPct: number): PetSkin {
     effectPct,
     priceShards: null,
     imageKeyBase: "pets/test",
+    // PetSkin 전체를 만드는 리터럴이라 컬럼이 늘면 여기도 늘어야 한다(2026-08-24 avatarKey).
+    // calculateReward는 effectType·effectPct만 보므로 값은 검사에 영향이 없다.
+    avatarKey: null,
   }
 }
 

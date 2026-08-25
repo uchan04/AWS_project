@@ -1,0 +1,3 @@
+# 루트 .gitignore의 /node_modules는 루트 고정이라 여기까지 오지 않는다
+node_modules
+dist

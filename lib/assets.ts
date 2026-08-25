@@ -46,3 +46,25 @@ export function cdnOrigin(): string | null {
 export function petImageUrl(imageKeyBase: string, stage: number): string | null {
   return cdnUrl(`${imageKeyBase}-${stage}.png`)
 }
+
+/**
+ * 프로필 원형(사이드바·내 계정 모달)에 쓰는 종족 아바타. `PetSkin.avatarKey`를 받는다.
+ *
+ * **CloudFront가 아니다.** 이 3장은 모꼬지 Figma 시안에서 나와 `public/images/`에
+ * 커밋돼 있고 Amplify가 정적으로 내려준다. CloudFront에는 올라간 적이 없다
+ * (2026-08-24 실측: `cat_avatar.png`·`pets/cat_avatar.png`·`cat_avatar-1.png` 전부 403,
+ * 같은 시각 `pets/cat-1.png`는 200). 그래서 cdnUrl()을 타지 않는다 —
+ * 태우면 도메인만 붙고 파일이 없어 이모지 폴백이 된다.
+ *
+ * 앞의 `/images/`와 뒤의 `.png`를 여기서 붙인다. DB에는 `fox_avatar`처럼 시안 파일명만
+ * 들어 있다(petImageUrl이 `-{단계}.png`를 붙이는 것과 같은 규칙이다).
+ *
+ * 같은 출처(self)라 CSP는 손댈 것이 없다. CloudFront로 옮기면 middleware.ts의
+ * img-src를 함께 봐야 한다 — cdnOrigin() 주석의 그 함정이다.
+ *
+ * null(값이 없는 스킨)이면 null을 돌려주고, 호출부는 imageKeyBase 쪽 그림으로 되돌아간다.
+ */
+export function avatarUrl(avatarKey: string | null | undefined): string | null {
+  if (!avatarKey) return null
+  return `/images/${avatarKey.replace(/^\/+/, "")}.png`
+}

@@ -12,7 +12,6 @@ import {
   applySeeds,
   expProgress,
   levelUpReply,
-  petTouchReply,
   seedsToNextStage,
 } from "@/lib/pet"
 import { EVOLUTION_LEVEL, SEED_TO_EXP, expToNextLevel } from "@/lib/types"
@@ -63,9 +62,16 @@ export type PetState = {
   affinity: number
   /** 오늘 들어온 재화. 지갑에 잔액만 있으면 이 재화가 어디서 왔는지가 화면에서 끊긴다 */
   today: { seeds: number; starShards: number; affinity: number }
+  /**
+   * 누적 출석일(User.attendanceTotal). "오늘의 활동" 카드의 네 번째 칸이 쓴다
+   * (2026-08-24 사용자 요청). today 안에 넣지 않은 이유는 오늘 값이 아니기 때문이다 —
+   * 오늘 하루의 증감을 모아 둔 today에 누계를 섞으면 다음 사람이 today.seeds도
+   * 누계로 읽는다
+   */
+  attendanceDays: number
   /** 방치형으로 모여 있는(아직 안 받은) 씨앗. 배율까지 적용된 값이다 */
   idleSeeds: number
-  /** 상한(12시간분)에 닿아 누적이 멈춘 상태인지 */
+  /** 상한(IDLE_MAX_SEEDS)에 닿아 누적이 멈춘 상태인지 */
   idleCapped: boolean
   /** 다음 1개가 쌓이기까지 남은 밀리초. 상단 카운트다운에 쓴다 */
   msToNextSeed: number
@@ -168,20 +174,30 @@ export default function PetView({ initial }: { initial: PetState }) {
   // 평상시 대사 순환 위치. null이면 아직 접속 인사를 보여 주는 중이다.
   // 시작 위치는 서버가 정한다 — 여기서 고르면 하이드레이션에서 어긋난다
   const [lineAt, setLineAt] = useState<number | null>(null)
-  // 쓰다듬기·먹이기 반응. 3초 동안 말풍선 자리를 덮고 그 뒤 원래 대사로 돌아간다.
+  // 쓰다듬기·먹이기 반응. 3초 동안 파티클을 띄우고, `text`가 있으면 그동안 말풍선까지 덮는다.
+  //
+  // **`text: null`은 "파티클만"이다 (2026-08-24 사용자 요청 "클릭할 때마다 문구 변하게
+  // 하지말고, 5분마다 멘트 바꾸도록 조정해").** 쓰다듬기가 그 경우다 — 누르면 💗만 오르고
+  // 말풍선 문장은 그대로 있는다. 같은 날 20초 → 5분으로 올린 순환(IDLE_LINE_MS)이
+  // 쓰다듬기 때문에 무의미해지고 있었다: 5분을 기다리는 문장이 클릭 한 번에 바뀌었다.
+  // 문장이 바뀌는 유일한 경로는 이제 5분 타이머다(먹이기 답만 예외 — 아래 react 주석).
+  //
   // burst는 파티클 span의 key다 — 값이 바뀌면 remount되어 CSS 애니메이션이 처음부터 다시 돈다
   // (같은 요소의 class만 갈면 연속 클릭에서 두 번째부터 애니메이션이 재생되지 않는다)
-  const [reaction, setReaction] = useState<{ text: string; eat: boolean } | null>(null)
+  const [reaction, setReaction] = useState<{ text: string | null; eat: boolean } | null>(null)
   const [burst, setBurst] = useState(0)
-  const [touches, setTouches] = useState(0)
   // 다음 방치형 씨앗이 쌓이는 목표 시각(epoch ms). 0은 "아직 안 심었다"는 뜻이다
   const nextSeedAt = useRef(0)
+
+  // 말풍선을 덮는 반응 대사. 지금은 먹이기만 여기 온다 — 쓰다듬기는 text가 null이라
+  // 파티클만 띄우고 이 값은 계속 null이다(위 reaction 주석)
+  const replyLine = reaction?.text ?? null
 
   // 말풍선에 지금 들어갈 문장. 반응 대사가 있으면 그것이 이기고, 없으면 닫힘 → 접속 인사 →
   // 평상시 대사 순이다. 반응은 닫아 둔 말풍선도 되살린다 — 내가 누른 것에 대한 답이라
   // "닫아 뒀으니 조용히 있어라"의 대상이 아니다
-  const bubble = reaction
-    ? reaction.text
+  const bubble = replyLine
+    ? replyLine
     : bubbleClosed
       ? null
       : lineAt === null
@@ -190,6 +206,12 @@ export default function PetView({ initial }: { initial: PetState }) {
 
   const need = expToNextLevel(pet.level)
   const progress = expProgress(pet.level, pet.exp)
+  // 방치형 게이지 채움률 (2026-08-24 사용자 요청). 0~1로 자른다 — 서버가 상한을 넘긴 값을
+  // 보내는 경우(상한을 나중에 내리면 이미 쌓인 행이 그렇다) 막대가 카드 밖으로 자란다
+  const idleProgress = Math.min(1, Math.max(0, pet.idleSeeds / IDLE_MAX_SEEDS))
+  // 게이지 밑 각주에 쓰는 "N분마다 1개" (2026-08-24 사용자 요청). 30을 글자로 박지 않고
+  // 실제 간격에서 계산한다 — IDLE_SEEDS_PER_HOUR를 만지면 이 문구가 조용히 거짓이 된다
+  const idleSeedMinutes = Math.round(MS_PER_IDLE_SEED / 60_000)
   const emoji = animalEmoji(pet.animal)
   // 단일 형태(친밀도 캐릭터)는 단계 크기를 쓰지 않는다. 중간 크기로 고정한다
   const stage = pet.stageCount > 1 ? Math.min(pet.evolutionStage, MAX_STAGE) : 2
@@ -201,38 +223,31 @@ export default function PetView({ initial }: { initial: PetState }) {
 
   // 재화 3종. 2026-08-21 사용자 결정으로 셋이 같은 칸을 쓴다 — 전에는 씨앗만 초록, 나머지
   // 둘은 나무색이었다. 색은 종족색 하나로 끝내고 구분은 이모지가 한다
+  //
+  // 2026-08-24 사용자 요청으로 **순서가 씨앗 → 친밀도 → 별조각**이 됐다(전에는 씨앗 →
+  // 별조각 → 친밀도). 이 배열이 화면 순서다 — 아래 렌더가 map만 한다.
+  // 친밀도 이모지도 같은 요청으로 💛 → ❤️다("페이지 내의 모든 친밀도"). 노란 하트는
+  // 이 카드에서 ⭐·🌱과 같은 노란·연두 계열이라 세 줄이 한 색으로 뭉쳐 보였다
   const wallet = [
     { name: "씨앗", icon: "🌱", value: pet.seeds },
+    { name: "친밀도", icon: "❤️", value: pet.affinity },
     { name: "별조각", icon: "⭐", value: pet.starShards },
-    { name: "친밀도", icon: "💛", value: pet.affinity },
   ]
 
-  // 오늘 들어온 재화의 출처. 잔액 아래 한 줄로 붙는다.
+  // 여기서 오늘 들어온 재화의 출처 문장(sourceLines)을 만들었다 — "오늘 미션으로 씨앗 +45",
+  // "오늘 대화·커뮤니티로 친밀도 +N" 두 줄이 지갑 카드 아래에 붙었다.
+  // **2026-08-24 사용자 요청으로 지웠다**("보유 재화 칸 밑에 오늘 미션으로 씨앗 얼마나 얻었는지
+  // 알려주는 문구 지워주고 그 빈 여백에 …상점을 세로로 더 두껍게").
   //
-  // 0인 재화는 문장에서 빼고, 셋 다 0이면 줄 자체를 그리지 않는다. "오늘 미션으로 씨앗 +0"은
-  // 성취가 아니라 미달 표시로 읽히고, 이 서비스는 못 한 것을 화면에 세지 않는다
-  // (랭킹 배제·배고픔 게이지 삭제와 같은 이유. SPEC.md 5절).
+  // 지워도 정보가 사라지지 않는 이유: 같은 날 만든 오른쪽 열 "오늘의 활동" 4칸이 같은
+  // pet.today를 쓴다(아래 todayTiles). 문장과 칸이 같은 값을 두 번 말하고 있었고, 요청은
+  // 그중 문장 쪽을 걷어 그 높이를 상점 입구 두 개에 준 것이다.
+  // 출처("미션에서 왔다"·"대화에서 왔다")는 문장에만 있던 것이라 이 삭제로 함께 없어진다 —
+  // 되살릴 일이 생기면 pet.css의 .pet-wallet__source 주석과 docs/dev/pet.md에 규칙이 남아 있다.
   //
-  // 미션과 친밀도를 한 문장에 섞지 않는 이유: 친밀도는 미션에서 나오지 않는다.
-  // 출처가 다른 값을 "오늘 미션으로"에 묶으면 유저에게 틀린 인과를 가르친다
-  const missionGains = [
-    { name: "씨앗", value: pet.today.seeds },
-    { name: "별조각", value: pet.today.starShards },
-  ].filter((row) => row.value > 0)
-
-  const sourceLines: string[] = []
-  if (missionGains.length > 0) {
-    sourceLines.push(
-      `오늘 미션으로 ${missionGains.map((row) => `${row.name} +${ko(row.value)}`).join(" · ")}`,
-    )
-  }
-  if (pet.today.affinity > 0) {
-    sourceLines.push(`오늘 대화·커뮤니티로 친밀도 +${ko(pet.today.affinity)}`)
-  }
-
   // 오늘의 활동 3칸 (2026-08-24 사용자 요청, 시안 이미지 한 장).
   //
-  // 값은 위 sourceLines와 **같은 pet.today**다 — 새로 받아 오는 것이 없고 API도 안 늘었다.
+  // 값은 지운 그 문장과 **같은 pet.today**다 — 새로 받아 오는 것이 없고 API도 안 늘었다.
   // 시안의 세 칸은 "먹인 씨앗 / 획득 EXP / 친밀도"였는데 앞의 둘을 그대로 만들 수 없었다:
   // POST /api/pet/feed는 씨앗을 차감하고 level·exp만 갱신하고 **오늘 먹인 양을 남기지 않는다**
   // (lastFedAt에 마지막 시각만 있고 읽는 곳도 없다). 누적 exp는 있지만 "오늘 오른 exp"는
@@ -241,14 +256,36 @@ export default function PetView({ initial }: { initial: PetState }) {
   // 오늘 값 3종**을 넣었다 — 칸 모양과 배치는 시안 그대로다.
   // 컬럼이 생기면 이 배열만 갈아 끼우면 된다.
   //
-  // 0인 칸은 그리지 않고, 셋 다 0이면 카드 자체가 없다. sourceLines와 같은 규칙이다 —
-  // "받은 씨앗 +0"은 성취가 아니라 미달 표시로 읽힌다(위 sourceLines 주석).
-  // 칸이 1~3개로 줄어도 격자가 깨지지 않게 CSS를 auto-fit으로 뒀다.
+  // **2026-08-24: 3칸 → 4칸, 그리고 값이 0이어도 칸을 그린다.**
+  // 사용자 요청이 "오늘의 활동 칸에 오늘 받은 별조각칸, 출석일수 칸도 안에 따로 만들어줘"다.
+  // 별조각 칸은 이미 배열에 있었지만 화면에 안 나왔다 — 일일 미션의 rewardShards가 전부 0이고
+  // (별조각은 3단 단계 미션 5개와 일일 전체 완료 보너스에서만 나온다) 그날 그 미션을 깨지
+  // 않은 사람은 값이 0이라 아래 filter가 칸을 빼 버렸다. 그래서 filter를 걷었다.
+  //
+  // 그 filter의 근거는 "+0은 성취가 아니라 미달 표시로 읽힌다"였고(이 서비스는 못 한 것을
+  // 화면에 세지 않는다 — 랭킹 배제·배고픔 게이지 삭제와 같은 이유. SPEC.md 5절),
+  // 그 근거는 **문장 형태에만** 해당한다. "오늘 미션으로 별조각 +0"은 없는 성과를 서술하지만,
+  // 칸은 자리이고 그 자리가 항상 있으면 "여기에 별조각이 들어온다"는 안내로 읽힌다 — 요청이
+  // 칸을 만들어 달라는 것이었으므로 이 카드에서는 그쪽을 택했다.
+  // (그 문장 자체는 같은 날 사용자 요청으로 지갑 카드에서 걷혔다. 위 주석 참고)
+  // 부수 효과로 카드 높이가 하루 종일 고정되고
+  // (칸 수가 안 변한다) 오른쪽 열 바닥 맞춤(pet.css .pet__col--side)이 흔들리지 않는다.
+  //
+  // 출석일수는 누계(User.attendanceTotal)다. 연속(streakCount)이 아니다 — 요청한 이름이
+  // "출석일수"이고, 연속을 세면 하루 빠진 사람의 칸이 1로 떨어져 이 서비스가 안 하는
+  // 벌점 표시가 된다(SPEC.md 5절 랭킹·경쟁 배제와 같은 이유). 연속으로 바꿀 일이 생기면
+  // page.tsx의 attendanceDays 한 줄만 갈면 된다.
+  //
+  // text를 미리 만드는 이유: 재화 셋은 "+N"이고 출석은 "N일"이라 접두사·단위가 다르다.
+  // 렌더에서 분기하면 칸마다 다른 서식이 JSX에 흩어진다.
   const todayTiles = [
-    { name: "받은 씨앗", icon: "🌱", value: pet.today.seeds, seed: true },
-    { name: "받은 별조각", icon: "⭐", value: pet.today.starShards, seed: false },
-    { name: "받은 친밀도", icon: "💛", value: pet.today.affinity, seed: false },
-  ].filter((tile) => tile.value > 0)
+    { name: "받은 씨앗", icon: "🌱", text: `+${ko(pet.today.seeds)}`, seed: true },
+    { name: "받은 별조각", icon: "⭐", text: `+${ko(pet.today.starShards)}`, seed: false },
+    // 친밀도 이모지는 2026-08-24 사용자 요청으로 💛 → ❤️다. 지갑 줄과 같은 값을 쓴다 —
+    // 같은 재화가 두 카드에서 다른 그림이면 같은 것인지 알 수 없다
+    { name: "받은 친밀도", icon: "❤️", text: `+${ko(pet.today.affinity)}`, seed: false },
+    { name: "출석일수", icon: "📅", text: `${ko(pet.attendanceDays)}일`, seed: false },
+  ]
 
   // 토스트 2.5초 후 사라짐
   useEffect(() => {
@@ -321,7 +358,11 @@ export default function PetView({ initial }: { initial: PetState }) {
     return () => clearTimeout(t)
   }, [reaction, burst])
 
-  function react(text: string, eat = false) {
+  /**
+   * 반응 한 번. `text`가 null이면 파티클만 띄우고 말풍선 문장은 건드리지 않는다.
+   * 말풍선을 덮어도 되는 것은 **결과를 알리는 답**뿐이다 — 지금은 먹이기 하나다.
+   */
+  function react(text: string | null, eat = false) {
     setReaction({ text, eat })
     setBurst((n) => n + 1)
   }
@@ -330,10 +371,16 @@ export default function PetView({ initial }: { initial: PetState }) {
    * 쓰다듬기. 재화도 저장값도 움직이지 않는다 — 서버를 부르지 않는 순수 상호작용이다.
    * 벤치마크(My Talking Tom·다마고치)에서 펫을 만지는 것은 이 장르의 기본 동작이고,
    * 우리 화면은 그동안 펫을 눌러도 아무 일이 없었다.
+   *
+   * **2026-08-24 사용자 요청으로 문구를 걷었다** — 누르면 💗 파티클만 오른다. 전에는
+   * `petTouchReply(touches)`로 평상시 10문구 중 다음 문장을 말풍선에 꽂았는데, 그게 곧
+   * "클릭할 때마다 문구가 변한다"였다. 같은 날 순환을 20초 → 5분으로 올린 뜻(방에 붙어
+   * 있는 한 줄로 읽히게)이 클릭 한 번에 무너졌다.
+   * `petTouchReply()`는 lib/pet.ts에 남아 있다(check:pet이 "터치 문구는 사용자가 쓴
+   * PET_IDLE_LINES 안에 있어야 한다"를 못 박고 있고, 문구를 되살리려면 그 함수가 필요하다).
    */
   function pat() {
-    react(petTouchReply(touches))
-    setTouches((n) => n + 1)
+    react(null)
   }
 
   async function feed(seeds: number) {
@@ -481,15 +528,18 @@ export default function PetView({ initial }: { initial: PetState }) {
         <div className="pet__col pet__col--room">
           <div className="pet-room">
             <PetRoom imageUrl={pet.roomImageUrl} />
-            <div className="pet-room__seeds" aria-hidden="true">
-              <span className="pet-room__seed">🌱</span>
-              <span className="pet-room__seed">🌿</span>
-              <span className="pet-room__seed">🍃</span>
-            </div>
+
+            {/* 여기 떠다니는 씨앗 장식 3개(🌱🌿🍃)가 있었다 — 2026-08-24 사용자 요청
+                ("주위에 둥둥 떠다니는 이모티콘들 지워줘")으로 걷었다. 펫 주위의 반짝임
+                3개(✨⭐✨)도 같은 요청으로 함께 걷었다(아래 .pet-char 주석).
+                CSS(.pet-room__seeds·.pet-room__seed)와 petFloatSeed 키프레임도 함께 지웠다.
+                방을 채우는 것은 배경 그림과 펫뿐이다 */}
 
             {/* 펫 대사 (2026-08-23 사용자 요청). 20문장 전부 사용자가 직접 쓴 것이다.
                 들어오면 접속 인사(서버가 고른다), 5분마다 평상시 대사로 넘어간다.
-                쓰다듬거나 먹이면 3초 동안 그 반응이 이 자리를 덮는다(위 bubble 주석).
+                **문장을 바꾸는 것은 그 5분 타이머뿐이다** (2026-08-24 사용자 요청) —
+                펫을 눌러도 이 자리는 그대로고 파티클만 오른다. 먹이면 3초 동안 그 답이
+                이 자리를 덮는다(위 bubble·react 주석).
                 문장 목록과 규칙은 lib/pet.ts "펫 대사" 절에 있다.
 
                 말풍선을 캐릭터 **위**에 두고 꼬리를 아래로 내려 펫이 말하는 것으로 읽히게
@@ -500,9 +550,9 @@ export default function PetView({ initial }: { initial: PetState }) {
                 글자로 충분하다. 대신 문장이 바뀔 때 DOM에 그대로 남으므로 훑어 읽을 수 있다 */}
             {/* 아래 data-tone은 먹이기에만 준다 (2026-08-24 사용자 결정). 쓰다듬기에도
                 "touch" 톤(갈색 테두리)을 줬는데, 그게 "이 문구는 사용자가 쓴 20문구가
-                아니다"를 눈으로 알려 주는 표시가 되어 있었다. 이제 쓰다듬기 문구도
-                평상시 10문구라 테두리를 달리 할 이유가 없다 — 같은 펫이 같은 어투로 말한다.
-                먹이기는 남긴다. 레벨업 알림처럼 결과를 알리는 자리라 성격이 다르다 */}
+                아니다"를 눈으로 알려 주는 표시가 되어 있었다. 같은 날 쓰다듬기 문구 자체가
+                걷혀서(위 pat 주석) 이제 이 말풍선에 오는 문장은 사용자가 쓴 20문구 아니면
+                먹이기 답 둘뿐이다. 먹이기 톤은 남긴다 — 레벨업 알림처럼 결과를 알리는 자리다 */}
             {bubble ? (
               <div className="pet-welcome" data-tone={reaction?.eat ? "eat" : undefined}>
                 {/* 말풍선 모양은 사용자가 준 그림(손그림 blob + 갈고리 꼬리)을 그대로 옮긴
@@ -533,8 +583,10 @@ export default function PetView({ initial }: { initial: PetState }) {
                 </svg>
                 <p className="pet-welcome__text">{bubble}</p>
                 {/* 반응 대사일 때는 닫기를 그리지 않는다. 3초면 스스로 사라지고, 그때 닫으면
-                    반응이 끝난 뒤 평상시 대사까지 같이 사라져 이유를 알 수 없다 */}
-                {reaction ? null : (
+                    반응이 끝난 뒤 평상시 대사까지 같이 사라져 이유를 알 수 없다.
+                    reaction이 아니라 replyLine으로 보는 이유: 쓰다듬기는 문장을 덮지 않으므로
+                    누른 뒤 3초 동안 닫기 버튼이 사라질 이유가 없다 */}
+                {replyLine ? null : (
                   <button
                     type="button"
                     className="pet-welcome__close"
@@ -552,6 +604,13 @@ export default function PetView({ initial }: { initial: PetState }) {
                 좁은 화면에서는 말풍선과 배지가 겹쳤다(위 .pet-welcome 주석의 계산).
                 레벨은 아래 진화 카드의 "현재 Lv.N"에 그대로 있으므로 정보가 사라지지 않는다.
                 배지 CSS(.pet-char__badge)와 petBounceBadge 키프레임도 함께 걷었다 */}
+            {/* 반짝임 3개(✨⭐✨)를 2026-08-24 사용자 요청("주위에 둥둥 떠다니는 이모티콘들
+                지워줘")으로 걷었다가 **같은 날 develop 병합에서 사용자 결정으로 되살렸다.**
+                develop이 이 상자에 쓰다듬기 버튼과 반응 파티클을 붙여 놓았고, 셋을 한 벌로
+                가져오는 쪽을 골랐다. 방의 떠다니는 씨앗(.pet-room__seeds)은 되살리지 않았다 —
+                그쪽은 develop에도 새 기능이 붙지 않아 지운 상태 그대로다.
+                CSS(.pet-char__sparkle[data-i])와 petSparkle 키프레임, prefers-reduced-motion
+                목록의 항목도 pet.css에서 함께 되살렸다 */}
             <div className="pet-char" data-stage={stage}>
               {/* 반짝임 3개. 위치·타이밍이 각각 달라 pet.css가 data-i로 구분한다 */}
               <span className="pet-char__sparkle" data-i="1" aria-hidden="true">
@@ -612,10 +671,12 @@ export default function PetView({ initial }: { initial: PetState }) {
           <div className="pet-card pet-card--wallet">
             <div className="pet-card__head">
               {/* 2026-08-24 이 카드만 이모지를 뺐다가 같은 날 사용자 요청으로 붙였다.
-                  안의 재화 아이콘 3개(🌱⭐💛)와 겹치지 않는 것을 골라야 해서 지갑이다 —
-                  세 재화 중 하나를 쓰면 제목이 그 줄의 제목처럼 읽힌다 */}
+                  안의 재화 아이콘 3개(🌱❤️⭐)와 겹치지 않는 것을 골라야 해서 처음에는
+                  지갑(👛)이었다 — 세 재화 중 하나를 쓰면 제목이 그 줄의 제목처럼 읽힌다.
+                  같은 날 사용자 요청으로 **노란 코인(🪙)**이 됐다. 코인도 세 재화 아이콘과
+                  겹치지 않으므로 그 이유는 그대로 지켜진다 */}
               <p className="pet-card__title">
-                <span aria-hidden="true">👛</span> 보유 재화
+                <span aria-hidden="true">🪙</span> 보유 재화
               </p>
             </div>
 
@@ -631,25 +692,30 @@ export default function PetView({ initial }: { initial: PetState }) {
               ))}
             </ul>
 
-            {/* 오늘 들어온 재화와 그 출처. 위 목록은 잔액이라 "왜 이만큼인지"를 말해 주지 않는다.
-                미션 → 재화 → 펫이 이 앱의 중심 배선인데(SPEC.md 5절) 지갑에는 결과만 있었다.
-                셋 다 0이면 렌더하지 않는다 — 위 sourceLines 주석 참고 */}
-            {sourceLines.length > 0 ? (
-              <ul className="pet-wallet__source">
-                {sourceLines.map((line) => (
-                  <li key={line}>{line}</li>
-                ))}
-              </ul>
-            ) : null}
+            {/* 잔액 목록과 상점 입구 사이에 오늘 들어온 재화의 출처 두 줄
+                (.pet-wallet__source)이 있었다. 2026-08-24 사용자 요청으로 걷었고, 그 높이(36px)를
+                아래 상점 입구 두 개가 5rem으로 두꺼워지며 받았다. 같은 날 마지막 요청으로 그
+                두께가 먹이기 버튼과 같은 44px로 돌아갔으므로 **지금 이 카드는 그만큼 짧다** —
+                남는 높이는 위 방(.pet__col--room의 1fr)이 가진다. 자세한 사정은 pet.css의
+                .pet-wallet__shop 주석, 삭제 이유는 위 sourceLines 자리의 주석에 있다 */}
 
             {/* 상단 바에서 내려온 상점 입구 2개 (2026-08-21 사용자 결정).
                 나무판(.pet-plank)이었다. 같은 날 결정으로 미션 화면의 "오늘 달성률" 카드처럼
-                테두리 없는 종족색 면에 가운데 정렬이고, 아이콘 없이 라벨만 둔다 */}
+                테두리 없는 종족색 면에 가운데 정렬이고, 아이콘 없이 라벨만 둔다.
+
+                2026-08-24 사용자 요청("그냥 외형 상점이랑 배경 상점 버튼을 씨앗 먹이기 버튼
+                객체랑 똑같은 걸로 바꿔줘. 크기도 비슷했으면 좋겠어"): 먹이기 버튼이 쓰는
+                **그 클래스를 그대로 붙인다**(.pet-btn.pet-btn--block). 값을 베껴 쓰지 않는
+                이유는 그러면 다음에 먹이기 버튼만 바뀌었을 때 둘이 갈리는 것이다.
+                단, 먹이기 버튼의 실제 크기·글자·그림자는 .pet-btn 본체가 아니라
+                `.pet-card--feed .pet-btn`에 있어서 이것만으로는 겉보기가 달랐다(같은 날
+                사용자 지적 "…동일한 폰트, 동일한 굵기"). 그래서 pet.css에서 그 규칙의
+                선택자에 .pet-wallet__shop을 함께 넣었다 — 자세한 사정은 그 두 주석 */}
             <div className="pet-wallet__shops">
-              <Link className="pet-wallet__shop" href="/pet/skins">
+              <Link className="pet-btn pet-btn--block pet-wallet__shop" href="/pet/skins">
                 외형 상점
               </Link>
-              <Link className="pet-wallet__shop" href="/pet/cosmetics">
+              <Link className="pet-btn pet-btn--block pet-wallet__shop" href="/pet/cosmetics">
                 배경 상점
               </Link>
             </div>
@@ -662,8 +728,9 @@ export default function PetView({ initial }: { initial: PetState }) {
             <div className="pet-card__head">
               {/* 제목 앞 이모지는 2026-08-24 사용자 요청으로 되살린 것이다("예전에 있던대로").
                   836cd2b(Figma 이관)에 ⭐ 경험치 · 🌿 씨앗 투입 · 🌟 진화 단계가 있었고
-                  d56d813에서 걷혔다. 보유 재화 카드는 안에 이미 🌱⭐💛 아이콘 3개가 있어서
-                  처음에는 제외했는데, 같은 날 사용자 요청으로 👛을 붙여 다섯 장 전부가 됐다.
+                  d56d813에서 걷혔다. 보유 재화 카드는 안에 이미 🌱❤️⭐ 아이콘 3개가 있어서
+                  처음에는 제외했는데, 같은 날 사용자 요청으로 👛(→ 같은 날 🪙)을 붙여
+                  다섯 장 전부가 됐다.
                   design.md의 "이모지는 마스코트 자리에만"에서 벗어나는 자리다. 새 예외가
                   아니라 이 화면이 원래 갖고 있던 예외로 돌아온 것이고, 전부 aria-hidden이라
                   스크린리더가 읽는 카드 이름은 글자 그대로 남는다 */}
@@ -716,14 +783,49 @@ export default function PetView({ initial }: { initial: PetState }) {
               2026-08-24 사용자 결정으로 걷었다. 수확 입구는 이 버튼 하나다.
 
               각주("가득 찼어요")는 .pet-idle 밖에 남긴다. 안에 넣으면 버튼과 같은 줄을
-              다투게 되고, 각주는 카드 전체에 붙는 말이라 자리가 카드 맨 아래가 맞다 */}
+              다투게 되고, 각주는 카드 전체에 붙는 말이라 자리가 카드 맨 아래가 맞다
+
+              2026-08-24 사용자 요청("그동안 쌓인 씨앗도 게이지 요소를 씨앗줍기버튼 왼쪽에
+              놔줘. 게이지의 최대치인 맥시멈을 200으로 둘 거야" → 같은 대화에서 **100으로
+              확정**)으로 왼쪽 상자에 게이지가 붙었다. 최대치는 화면에 적는 숫자가 아니라
+              **실제 상한**(IDLE_MAX_SEEDS)이다 — 게이지가 100에서 끝나는데 씨앗이 24에서
+              멈추면 막대가 12%를 넘지 못한다. 그래서 상한을 100개(50시간분)로 함께 올렸다
+              (lib/pet.ts IDLE_CAP_HOURS 주석에 그 결정과 수급 영향이 있다) */}
           <div className="pet-card">
             <div className="pet-idle">
               <div className="pet-idle__body">
-                <p className="pet-card__title">
-                  <span aria-hidden="true">🌱</span> 그동안 쌓인 씨앗
-                </p>
-                <span className="pet-card__meta">{ko(pet.idleSeeds)}개</span>
+                {/* 2026-08-24 사용자 요청("3/100 개 문구를 그동안 쌓인 씨앗 옆으로 옮겨")으로
+                    제목과 개수가 한 줄이 됐다. 새 규칙을 만들지 않고 **옆 카드들과 같은
+                    .pet-card__head**를 쓴다 — 경험치·씨앗 투입 카드가 이미 "제목 왼쪽 /
+                    현재·최대 오른쪽"이고, 이 카드만 개수를 제목 아래에 두던 것이 8/24에
+                    버튼이 오른쪽으로 나가며 생긴 예외였다. 그 예외가 이 요청으로 닫혔다.
+                    카드 높이는 그대로다 — 줄 높이를 정하는 쪽이 여전히 4.5rem 버튼이다 */}
+                <div className="pet-card__head">
+                  <p className="pet-card__title">
+                    <span aria-hidden="true">🌱</span> 그동안 쌓인 씨앗
+                  </p>
+                  {/* "N개"에서 "N / 100개"로 늘렸다. 경험치 카드가 게이지 위에 같은 형태로
+                      현재/최대를 적는다 — 분모가 없으면 막대가 어디서 끝나는지 알 수 없다 */}
+                  <span className="pet-card__meta">
+                    {ko(pet.idleSeeds)} / {ko(IDLE_MAX_SEEDS)}개
+                  </span>
+                </div>
+                {/* 골격은 경험치 게이지와 **같은 클래스**다(높이·테두리·홈 그림자·전환).
+                    2026-08-24 사용자 요청("게이지 색을 씨앗줍기버튼과 같은 초록색으로")으로
+                    채움색만 --pet-gauge--seed 변형으로 갈린다. 오른쪽 버튼이 초록이므로
+                    한 줄 안에서 막대와 버튼이 같은 재화를 가리키는 것으로 읽힌다.
+                    게이지 안에 숫자를 겹쳐 쓰지 않는다(.pet-gauge__value) — 위 __head의
+                    __meta가 같은 문자열을 이미 갖고 있다(경험치 카드와 같은 사정) */}
+                <div
+                  className="pet-gauge pet-gauge--seed"
+                  role="progressbar"
+                  aria-label="그동안 쌓인 씨앗"
+                  aria-valuemin={0}
+                  aria-valuemax={IDLE_MAX_SEEDS}
+                  aria-valuenow={pet.idleSeeds}
+                >
+                  <div className="pet-gauge__fill" style={{ width: `${idleProgress * 100}%` }} />
+                </div>
               </div>
 
               <button
@@ -745,12 +847,26 @@ export default function PetView({ initial }: { initial: PetState }) {
                 "시간당 N개, 최대 N시간분까지 모여요"와 "다음 씨앗까지 N분"이다.
                 타이머 자체는 계속 돌아간다 — 위 useEffect가 그것으로 쌓인 개수를 1씩
                 올리므로 지우면 개수가 새로고침 전까지 멈춘다.
-                가득 찼을 때만 각주를 그린다. 빈 <p>를 남기면 gap만큼 카드가 길어진다 */}
-            {pet.idleCapped ? (
-              <p className="pet-card__foot">
-                <em>가득 찼어요</em>
-              </p>
-            ) : null}
+
+                2026-08-24 사용자 요청("경험치 카드칸의 게이지 밑에 레벨 문구를 적었듯이
+                그동안 쌓인 씨앗 게이지 바로 밑에 30분마다 1개의 씨앗이 생성돼요 라는 문구"):
+                **8/21에 지운 속도 문구가 사용자 결정으로 돌아왔다.** 그때 지운 이유는
+                각주 세 줄이 카드를 무겁게 만든 것이었고, 지금은 한 줄이다.
+                문장은 사용자가 쓴 그대로 두고 30만 상수에서 계산한다(위 idleSeedMinutes).
+
+                골격은 경험치 카드의 각주와 **같은 .pet-card__foot**이다 — 요청이 "경험치
+                카드처럼"이고, 그 카드도 게이지 아래 이 클래스에 span 2개를 space-between으로
+                둔다(현재 Lv.N / 다음 단계까지 씨앗 N개). 그래서 자리는 .pet-idle 밖,
+                카드 맨 아래다. 안(왼쪽 상자)에 넣으면 버튼과 같은 줄을 다투고, 각주는
+                카드 전체에 붙는 말이다.
+                "가득 찼어요"는 지우지 않고 같은 줄의 오른쪽으로 옮겼다 — 두 문장이 각각
+                "얼마나 빨리 차는지"와 "지금 더 안 찬다"라서 함께 있을 때 뜻이 이어진다.
+                이제 각주가 항상 있으므로 8/21에 조건부로 만든 이유(빈 <p>가 gap만큼
+                카드를 늘린다)는 해당하지 않는다 */}
+            <p className="pet-card__foot">
+              <span>{idleSeedMinutes}분마다 1개의 씨앗이 생성돼요</span>
+              {pet.idleCapped ? <em>가득 찼어요</em> : null}
+            </p>
           </div>
 
           {/* 씨앗 투입. --feed는 이 카드 안의 글씨체를 한 벌로 묶는 변형이다
@@ -862,9 +978,12 @@ export default function PetView({ initial }: { initial: PetState }) {
                   disabled={pending || amount > pet.seeds}
                   aria-disabled={pending || amount > pet.seeds}
                 >
-                  {/* 시안대로 아이콘이 글자 앞이다. aria-hidden으로 빼 두면 버튼 이름이
-                      "씨앗 1개 먹이기"로 읽힌다 — 뒤에 있을 때는 이름 끝에 "새싹"이 붙었다 */}
-                  <span aria-hidden="true">🌱</span> 씨앗 {ko(amount)}개 먹이기
+                  {/* 글자 앞에 🌱이 있었다(시안대로). 2026-08-24 사용자 요청("씨앗 먹이기
+                      버튼 속 문구에서 새싹 이모티콘 삭제해줘")으로 걷었다. 스크린리더가 읽는
+                      이름은 전부터 aria-hidden 덕에 "씨앗 1개 먹이기"였으므로 이 삭제로
+                      바뀌지 않는다. 같은 카드의 제목(🌱 씨앗 투입)과 위 지갑 줄의 🌱은
+                      그대로다 — 요청이 버튼 문구 하나였다 */}
+                  씨앗 {ko(amount)}개 먹이기
                 </button>
 
                 {/* 투입할 개수가 정해지면 그것이 무엇이 되는지 바로 옆에서 말한다.
@@ -877,38 +996,14 @@ export default function PetView({ initial }: { initial: PetState }) {
             )}
           </div>
 
-          {/* 함께한 기록. 벤치마크 5종은 전부 누적된 것을 보여 준다(다마고치 나이,
-              Finch 여정, ねこあつめ 수집, 포켓캠프 앨범). 우리 화면에는 "지금 상태"만
-              있어서 6주째 매일 온 사람과 오늘 처음 온 사람의 화면이 레벨 말고는 같았다.
-              남과 비교하는 랭킹은 여전히 넣지 않는다(SPEC.md 5절) — 비교 대상은 과거의 자신뿐이다 */}
-          <div className="pet-card">
-            <div className="pet-card__head">
-              <p className="pet-card__title">
-                <span aria-hidden="true">📖</span> 함께한 기록
-              </p>
-            </div>
-            <dl className="pet-log">
-              <div className="pet-log__item">
-                <dt className="pet-log__label">함께한 날</dt>
-                <dd className="pet-log__value">{ko(pet.daysTogether)}일</dd>
-              </div>
-              <div className="pet-log__item">
-                <dt className="pet-log__label">해낸 미션</dt>
-                <dd className="pet-log__value">{ko(pet.missionsDone)}개</dd>
-              </div>
-              <div className="pet-log__item">
-                <dt className="pet-log__label">출석</dt>
-                <dd className="pet-log__value">{ko(pet.attendanceTotal)}일</dd>
-              </div>
-            </dl>
-            <p className="pet-card__foot">
-              <span>
-                {pet.missionsDone > 0
-                  ? `여기까지 오는 데 ${ko(pet.daysTogether)}일이 걸렸어요`
-                  : "첫 미션을 해내면 여기에 남아요"}
-              </span>
-            </p>
-          </div>
+          {/* develop의 "📖 함께한 기록" 카드(함께한 날 · 해낸 미션 · 출석)가 여기 있었다.
+              **2026-08-24 병합에서 사용자 결정으로 가져오지 않았다.** 그 카드의 출석 칸이
+              아래 "오늘의 활동" 네 번째 칸(같은 user.attendanceTotal)과 같은 수를 한 화면에
+              두 번 보여 주게 되고, 두 카드 중 하나를 고르는 자리에서 오늘의 활동 쪽이
+              같은 날 사용자 요청으로 만들어진 것이다.
+              데이터는 그대로 내려온다 — PetState의 daysTogether·missionsDone·attendanceTotal은
+              app/pet/page.tsx가 계속 채우고, pet.css의 .pet-log 규칙도 남아 있다.
+              되살릴 일이 생기면 그 두 벌이 이미 있으므로 이 자리에 카드만 다시 세우면 된다 */}
 
           {/* 오늘의 활동 (2026-08-24 사용자 요청). 값의 출처와 시안에서 달라진 점은 위
               todayTiles 주석에 있다.
@@ -926,37 +1021,38 @@ export default function PetView({ initial }: { initial: PetState }) {
               제목은 처음엔 알약 배지였다(시안이 그 모양이다). 2026-08-24 사용자 요청으로
               걷었다 — 고양이 종족색이 파랑이라 알약이 "제목에 씌워진 파란 동그라미"로
               읽혔다. 이제 다른 카드들과 같은 .pet-card__title 한 줄이다.
-              __head로 감싸지 않은 이유는 오른쪽에 넣을 __meta가 없어서다 — 타일 3칸이
+              __head로 감싸지 않은 이유는 오른쪽에 넣을 __meta가 없어서다 — 타일 네 칸이
               이미 그 정보를 다 갖고 있다. 감싸도 space-between이 혼자 남은 제목을
-              그대로 왼쪽에 두므로 보이는 차이는 없고, 쓰지 않는 래퍼만 늘어난다 */}
-          {todayTiles.length > 0 ? (
-            <div className="pet-card pet-card--today">
-              <p className="pet-card__title">
-                <span aria-hidden="true">📊</span> 오늘의 활동
-              </p>
+              그대로 왼쪽에 두므로 보이는 차이는 없고, 쓰지 않는 래퍼만 늘어난다.
 
-              {/* 칸 안의 읽는 순서는 "+275 받은 씨앗"이다. 이모지만 aria-hidden이므로
-                  스크린리더에는 숫자와 이름만 남는다. 값을 이름보다 앞에 둔 것은 DOM 순서를
-                  보이는 순서와 같게 유지하려는 것이다 — CSS order로 뒤집으면 눈에 보이는
-                  순서와 읽히는 순서가 갈려 나중에 고칠 때 한쪽만 맞추게 된다 */}
-              <ul className="pet-today">
-                {todayTiles.map((tile) => (
-                  <li className="pet-today__tile" key={tile.name}>
-                    <span className="pet-today__icon" aria-hidden="true">
-                      {tile.icon}
-                    </span>
-                    {/* 씨앗 칸만 초록이다. pet.css의 "채도 높은 색은 종족색 하나뿐" 규칙에서
-                        씨앗 초록이 유일하게 남은 예외라(--pet-seed 주석) 새 색이 아니다.
-                        별조각·친밀도는 이 화면이 강조 숫자에 쓰는 --tribe-cta로 묶는다 */}
-                    <span className="pet-today__value" data-seed={tile.seed ? "true" : undefined}>
-                      +{ko(tile.value)}
-                    </span>
-                    <span className="pet-today__name">{tile.name}</span>
-                  </li>
-                ))}
-              </ul>
-            </div>
-          ) : null}
+              카드를 감싸던 `todayTiles.length > 0 ?` 조건은 2026-08-24에 걷었다 —
+              네 칸이 값과 무관하게 항상 있으므로(위 todayTiles 주석) 조건이 늘 참이다 */}
+          <div className="pet-card pet-card--today">
+            <p className="pet-card__title">
+              <span aria-hidden="true">📊</span> 오늘의 활동
+            </p>
+
+            {/* 칸 안의 읽는 순서는 "+275 받은 씨앗"이다. 이모지만 aria-hidden이므로
+                스크린리더에는 숫자와 이름만 남는다. 값을 이름보다 앞에 둔 것은 DOM 순서를
+                보이는 순서와 같게 유지하려는 것이다 — CSS order로 뒤집으면 눈에 보이는
+                순서와 읽히는 순서가 갈려 나중에 고칠 때 한쪽만 맞추게 된다 */}
+            <ul className="pet-today">
+              {todayTiles.map((tile) => (
+                <li className="pet-today__tile" key={tile.name}>
+                  <span className="pet-today__icon" aria-hidden="true">
+                    {tile.icon}
+                  </span>
+                  {/* 씨앗 칸만 초록이다. pet.css의 "채도 높은 색은 종족색 하나뿐" 규칙에서
+                      씨앗 초록이 유일하게 남은 예외라(--pet-seed 주석) 새 색이 아니다.
+                      별조각·친밀도·출석일수는 이 화면이 강조 숫자에 쓰는 --tribe-cta로 묶는다 */}
+                  <span className="pet-today__value" data-seed={tile.seed ? "true" : undefined}>
+                    {tile.text}
+                  </span>
+                  <span className="pet-today__name">{tile.name}</span>
+                </li>
+              ))}
+            </ul>
+          </div>
         </div>
       </div>
 

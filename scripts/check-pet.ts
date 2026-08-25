@@ -213,10 +213,12 @@ assert.equal(animalEmoji(""), "🐾")
 
 // ── 방치형 자동 획득 (SPEC.md 5절) ────────────────────────────────────────────
 
-// 수치를 먼저 못 박는다. 상한 12시간분은 명세값, 2/시간은 C가 정한 값이다
-assert.equal(IDLE_CAP_HOURS, 12)
+// 수치를 먼저 못 박는다. 2/시간은 C가 정한 값이고, 상한 50시간분(= 100개)은
+// 2026-08-24 사용자 결정이다 — 방치형 카드의 게이지 최대치가 이 값이므로 조용히
+// 바뀌면 게이지가 다른 눈금으로 그려진다(lib/pet.ts IDLE_CAP_HOURS 주석)
+assert.equal(IDLE_CAP_HOURS, 50)
 assert.equal(IDLE_SEEDS_PER_HOUR, 2)
-assert.equal(IDLE_MAX_SEEDS, 24)
+assert.equal(IDLE_MAX_SEEDS, 100)
 assert.equal(MS_PER_IDLE_SEED, 30 * 60 * 1000) // 30분에 1개
 
 const T0 = new Date("2026-08-19T00:00:00.000Z")
@@ -245,22 +247,26 @@ assert.equal(partial.msToNextSeed, 15 * MIN)
 // 자투리를 넘긴 뒤 15분 더 지나면 1개가 더 쌓인다 (자투리가 버려지지 않는지)
 assert.equal(idleAccrual(partial.nextClaimAt, at(60 * MIN)).seeds, 1)
 
-// 상한: 12시간분 24개에서 멈춘다. 3일을 비워도 같다
-assert.equal(idleAccrual(T0, at(12 * HOUR)).seeds, IDLE_MAX_SEEDS)
+// 상한: 50시간분 100개에서 멈춘다. 3일을 비워도 같다
+assert.equal(idleAccrual(T0, at(50 * HOUR)).seeds, IDLE_MAX_SEEDS)
 assert.equal(idleAccrual(T0, at(72 * HOUR)).seeds, IDLE_MAX_SEEDS)
+// 상한 아래에서는 잘리지 않는다 — 하루를 비우면 24시간분 48개가 그대로 남는다
+// (전 상한 24개에서는 여기서 잘렸다. 2026-08-24 상한 변경이 실제로 바꾼 지점이다)
+assert.equal(idleAccrual(T0, at(24 * HOUR)).seeds, 48)
+assert.equal(idleAccrual(T0, at(24 * HOUR)).capped, false)
 
 // 상한을 넘긴 초과분은 버린다 — 기준 시각이 now로 밀린다.
-// 이게 아니면 24개를 받은 직후에 또 24개가 남아 무한 누적이 된다
+// 이게 아니면 100개를 받은 직후에 또 100개가 남아 무한 누적이 된다
 const over = idleAccrual(T0, at(72 * HOUR))
 assert.equal(over.capped, true)
 assert.equal(over.nextClaimAt.getTime(), at(72 * HOUR).getTime())
 assert.equal(idleAccrual(over.nextClaimAt, at(72 * HOUR)).seeds, 0)
 
 // 상한 직전은 capped가 아니고 자투리를 넘긴다
-const justUnder = idleAccrual(T0, at(12 * HOUR - MIN))
+const justUnder = idleAccrual(T0, at(50 * HOUR - MIN))
 assert.equal(justUnder.capped, false)
-assert.equal(justUnder.seeds, 23)
-assert.equal(justUnder.nextClaimAt.getTime(), at(11.5 * HOUR).getTime())
+assert.equal(justUnder.seeds, 99)
+assert.equal(justUnder.nextClaimAt.getTime(), at(49.5 * HOUR).getTime())
 
 // 기준 시각이 미래면(시계 오차) 지급하지 않고 기준을 그대로 둔다
 const skewed = idleAccrual(at(HOUR), T0)

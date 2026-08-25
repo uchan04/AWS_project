@@ -50,19 +50,39 @@ const VARIANT_PRICE_SHARDS = 2500
 // 이 파일은 순수 데이터라 체크 스크립트가 DB 없이 그대로 읽을 수 있다. 2026-08-22에
 // lib/pet.ts의 BACKGROUNDS 하나를 런타임 import하게 됐는데, 그쪽도 DB를 모르는 순수
 // 상수·함수뿐이라 이 성질은 그대로다 (check-pet.ts는 이미 두 파일을 함께 읽고 있었다).
+// avatarKey는 프로필 원형(사이드바·내 계정 모달) 전용이고 imageKeyBase와 출처가 다르다
+// (2026-08-24 사용자 결정). public/images에 커밋된 Amplify 정적 자산이라 CloudFront가 아니다.
+// 아바타는 종족당 1장뿐이어서 북극 변종도 같은 값을 쓴다 — 대체 그림이 없다.
+// 값과 URL 조립 규칙은 lib/assets.ts avatarUrl() 주석, DB 반영은
+// prisma/migrations/20260824170000_petskin_avatar_key 참고.
 export const PET_SKINS: Prisma.PetSkinCreateInput[] = [
   // 개과 — 건강·정서취약형
-  { name: "여우", typeCode: "HEALTH_EMOTION", isDefault: true, stageCount: 4, imageKeyBase: "pets/fox" },
+  {
+    name: "여우",
+    typeCode: "HEALTH_EMOTION",
+    isDefault: true,
+    stageCount: 4,
+    imageKeyBase: "pets/fox",
+    avatarKey: "fox_avatar",
+  },
   {
     name: "북극여우",
     typeCode: "HEALTH_EMOTION",
     stageCount: 4,
     priceShards: VARIANT_PRICE_SHARDS,
     imageKeyBase: "pets/fox-arctic",
+    avatarKey: "fox_avatar",
   },
 
   // 고양잇과 — 독립거주-저소득형
-  { name: "고양이", typeCode: "INDEPENDENT_LOW_INCOME", isDefault: true, stageCount: 4, imageKeyBase: "pets/cat" },
+  {
+    name: "고양이",
+    typeCode: "INDEPENDENT_LOW_INCOME",
+    isDefault: true,
+    stageCount: 4,
+    imageKeyBase: "pets/cat",
+    avatarKey: "cat_avatar",
+  },
   {
     // 2026-08-20: 샴고양이 → 북극고양이로 개명. 북극여우·북극곰과 어휘를 맞췄다.
     // 실 DB는 시드 재실행이 아니라 UPDATE로 제자리 변경했다(위 17~19줄 경고 참고) —
@@ -73,10 +93,18 @@ export const PET_SKINS: Prisma.PetSkinCreateInput[] = [
     stageCount: 4,
     priceShards: VARIANT_PRICE_SHARDS,
     imageKeyBase: "pets/cat-arctic",
+    avatarKey: "cat_avatar",
   },
 
   // 곰과 — 가족동거형
-  { name: "곰", typeCode: "FAMILY_LIVING", isDefault: true, stageCount: 4, imageKeyBase: "pets/bear" },
+  {
+    name: "곰",
+    typeCode: "FAMILY_LIVING",
+    isDefault: true,
+    stageCount: 4,
+    imageKeyBase: "pets/bear",
+    avatarKey: "bear_avatar",
+  },
   {
     // 2026-08-21: imageKeyBase를 pets/bear-polar → pets/bear-arctic으로 고쳤다(차단 19번).
     // S3 실제 파일명이 bear-arctic이고 -polar는 403이다. 여우·고양이도 -arctic이라
@@ -86,6 +114,7 @@ export const PET_SKINS: Prisma.PetSkinCreateInput[] = [
     stageCount: 4,
     priceShards: VARIANT_PRICE_SHARDS,
     imageKeyBase: "pets/bear-arctic",
+    avatarKey: "bear_avatar",
   },
 ]
 

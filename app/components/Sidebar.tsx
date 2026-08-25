@@ -172,6 +172,15 @@ export function Sidebar({ profile }: { profile: SidebarProfile | null }) {
     return null
   }
 
+  // 프로필 원형 3곳(접힘 카드·펼침 카드·내 계정 모달)이 쓰는 그림. 2026-08-24부터
+  // 종족 아바타(PetSkin.avatarKey → /images/fox_avatar.png 등)이고, 그 값이 없는
+  // 스킨이면 예전대로 펫 성장 그림으로 되돌아간다.
+  //
+  // profile.imageUrl을 아바타로 갈아 끼우지 않은 이유: 같은 프로필을 쉼 화면
+  // (app/pet/rest/page.tsx)도 받아 방 안의 **펫**을 그린다. 거기까지 바뀌면
+  // 쉬는 화면에 프로필 사진이 앉는다 — 바꾸기로 한 것은 원형 3곳뿐이다.
+  const avatar = profile.avatarUrl ?? profile.imageUrl
+
   const tribe = profile.typeCode ? TRIBE[profile.typeCode] : null
   const color = tribe?.colorHex || "#7A6B58"
   const bg = getBgColor(color)
@@ -220,12 +229,12 @@ export function Sidebar({ profile }: { profile: SidebarProfile | null }) {
               justifyContent: "center",
             }}
           >
-            <Avatar imageUrl={profile.imageUrl} emoji={getTribeEmoji(profile.typeCode)} size={40} />
+            <Avatar imageUrl={avatar} emoji={getTribeEmoji(profile.typeCode)} size={40} />
           </div>
         ) : (
           <div style={{ margin: "16px 16px 8px", background: bg, borderRadius: 16, padding: "16px" }}>
             <div style={{ display: "flex", alignItems: "center", gap: 10, marginBottom: 10 }}>
-              <Avatar imageUrl={profile.imageUrl} emoji={getTribeEmoji(profile.typeCode)} size={40} />
+              <Avatar imageUrl={avatar} emoji={getTribeEmoji(profile.typeCode)} size={40} />
               <div style={{ flex: 1, minWidth: 0 }}>
                 <div style={{ display: "flex", alignItems: "center", gap: 6, marginBottom: 2 }}>
                   <p
@@ -439,7 +448,7 @@ export function Sidebar({ profile }: { profile: SidebarProfile | null }) {
                 }}
               >
                 <Avatar
-                  imageUrl={profile.imageUrl}
+                  imageUrl={avatar}
                   emoji={getTribeEmoji(profile.typeCode)}
                   size={52}
                   fontSize={52}
