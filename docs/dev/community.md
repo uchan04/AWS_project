@@ -344,6 +344,22 @@ D 쪽 기능 구현은 끝났고, 외부 대기 항목도 없다. AWS 계정·`B
 - **`npm run e2e`는 이 구멍을 못 잡는다** — 위기 단정과 욕설 단정이 각각 다른 글이라 **둘이 섞인
   글**을 아무도 보내지 않는다. 고칠 때 단정 1건을 함께 넣는다
 
+**2026-08-25 추가 확인 — 같은 버그가 댓글 라우트에도 있다. 고칠 자리가 2곳이다.**
+
+```
+app/api/community/posts/route.ts        111행 containsAbuse → 400 │ 126행 moderate → 400 │ 155행 isCrisis
+app/api/community/posts/[id]/comments/route.ts  54행 containsAbuse → 400 │  60행 moderate → 400 │  86행 isCrisis
+```
+
+두 라우트가 **같은 3층 순서를 각자 손으로 적어 두었다.** 그래서 한쪽만 고치면 다른 쪽이 남고,
+세 번째 라우트가 생기면 또 난다. **원인은 순서가 아니라 판정 주체가 없는 것이다** —
+"위기가 욕설을 이긴다"는 규칙이 `lib/safety.ts`에도 `_lib/moderation.ts`에도 없고
+라우트 주석에만 있다. 구조 쪽 처방은 `docs/모듈-재배치-계획.md` 1번에 적었다(8/28 이후).
+
+**`origin/main`은 아직 이 구멍이 작다** — `moderate()`가 main에 없어서 `containsAbuse`(TARGETED,
+2인칭 지시가 붙은 말만) → `isCrisis` 순서뿐이다. **BLANKET 정책이 main에 올라가는 순간 커진다.**
+`develop → main` PR을 열기 전에 이 건을 닫는 것이 순서다.
+
 정규화 쪽은 그대로 살려 둘 값이 있다. 이전에 뚫려 있던 우회가 실제로 막힌다 —
 `씨 발`·`시1발`·`병@신`·`ㅂㅕㅇㅅㅣㄴ`(자모 분리)이 전부 사전에 걸리고,
 `containsAbuse`를 한 글자도 안 건드리며, Bedrock 판정은 실패 시 `passthrough`로 fail-open이다.
@@ -369,3 +385,39 @@ D 쪽 기능 구현은 끝났고, 외부 대기 항목도 없다. AWS 계정·`B
 
 같은 판단을 `/missions`에서 이미 했다(`docs/dev/perf.md` "고친 것 4번째") — 거기서도 손댈
 레버는 **직렬 단계의 개수**였다.
+
+### ③ 모임 신청이 진단 완료를 요구하지 않는다 (2026-08-25 추가, **미수정**)
+
+`app/api/community/meetups/[id]/join/route.ts`가 `typeCode`를 **한 번도 참조하지 않는다.**
+다른 쓰기·조회 라우트 10개는 전부 참조한다 — `posts` · `posts/[id]` · `posts/[id]/comments` ·
+`posts/[id]/like` · `topics` · `missions` · `missions/[missionId]/complete` · `pet` ·
+`pet/skins` · `pet/skins/buy`. **모임 신청만 빠져 있다.**
+
+`app/community/meetups/page.tsx`도 진단 여부를 안 본다(`app/community/page.tsx`는 본다).
+
+닿는 경로:
+
+```
+가입 → 진단 건너뛰고 /community/meetups 직접 입력 → 신청 → 오프라인에서 사람을 만난다
+                      ↑
+     사이드바는 안 뜨지만(profile.diagnosed로 막힌다) 미들웨어는 세션만 보고 통과시킨다
+     PUBLIC_PATHS = ["/login","/signup"] + "/" 외에는 전부 "로그인했으면 통과"다
+```
+
+**크래시가 안 난다.** 그래서 지금까지 안 보였다 — 조회하는 닉네임이 개설자 것이라
+신청자의 `nickname`·`typeCode`가 `null`이어도 화면이 그려진다.
+
+왜 이것이 다른 게이트보다 중요한가: 오프라인 모임은 **100단계 사다리의 8구간
+("대화와 모임")에 놓인 행동**이다. 사다리를 한 칸도 오르지 않은 사람이 서비스에서
+가장 위험도가 높은 행동에 바로 닿는다. 심사에서 "검증 없이 오프라인 만남이 되나요"를
+받으면 답할 것이 없다.
+
+- **조치:** `join` 라우트에 `if (!user.typeCode || !user.adjective) return fail(...)` 3줄.
+  메시지는 화면에 그대로 띄울 한국어로 — 예: `"먼저 진단을 마치면 모임에 신청할 수 있어요"`.
+  페이지 쪽도 `app/community/page.tsx`와 같은 방식으로 막는다
+- **왜 라우트가 먼저인가:** 페이지만 막으면 API는 그대로 열려 있다. 반대는 성립하지 않는다
+- `e2e`에 단정 1건을 함께 넣는다 — 진단 미완료 계정으로 신청해 400이 오는지
+
+**게이트가 라우트마다 손으로 반복되는 것이 근본 원인이다.** `lib/profile.ts`에 `diagnosed`
+기준이 있는데 API 쪽은 각자 `typeCode`를 본다. 공통화 처방은
+`docs/모듈-재배치-계획.md` 3번에 적었다(8/28 이후).
