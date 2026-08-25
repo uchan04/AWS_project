@@ -60,9 +60,9 @@ export type PetState = {
   exp: number
   evolutionStage: number
   seeds: number
-  /** 별조각. 외형 상점의 값이다 */
+  /** 별조각. **두 상점(외형·배경) 공통 값이다** (2026-08-25 전환) */
   starShards: number
-  /** 친밀도. 배경 상점의 값이다 */
+  /** 친밀도. 전환 이후 소모처는 펫 외출 하나다 (2026-08-25) */
   affinity: number
   /** 오늘 들어온 재화. 지갑에 잔액만 있으면 이 재화가 어디서 왔는지가 화면에서 끊긴다 */
   today: { seeds: number; starShards: number; affinity: number }

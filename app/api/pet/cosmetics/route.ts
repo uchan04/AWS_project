@@ -10,9 +10,9 @@ import { prisma } from "@/lib/prisma"
 //   POST — { itemId, equipped } 로 착용·해제. 슬롯당 1개만 착용된다
 //
 // 재화가 오가지 않으므로 calculateReward()와 무관하다. 구매는 이 라우트가 하지 않는다 —
-// POST /api/pet/cosmetics/buy 가 따로 한다. 치장은 친밀도 전용 상점에서 등급 가격으로 산다
-// (2026-08-20 확정). 가격을 여기에 다시 적지 않는다 — 유일한 출처는 prisma/seed/items.ts의
-// PRICE_BY_RARITY이고, 이 라우트는 DB 행의 priceAffinity를 그대로 내려준다.
+// POST /api/pet/cosmetics/buy 가 따로 한다. 치장은 **별조각**으로 등급 가격에 산다
+// (2026-08-25 전환. 그 전에는 친밀도였다). 가격을 여기에 다시 적지 않는다 — 유일한 출처는
+// prisma/seed/items.ts의 PRICE_BY_RARITY이고, 이 라우트는 DB 행의 priceShards를 그대로 내려준다.
 // 치장은 종족 구분이 없어 누구나 살 수 있다(tribeColor 삭제).
 
 export async function GET() {
@@ -46,8 +46,7 @@ export async function GET() {
         name: cosmeticLabel(item.name),
         slot: item.slot,
         rarity: item.rarity,
-        affinityOnly: item.affinityOnly,
-        priceAffinity: item.priceAffinity,
+        priceShards: item.priceShards,
         // imageKey에 확장자가 이미 붙어 있다(lib/pet.ts BACKGROUNDS: "backgrounds/….png")
         imageUrl: cdnUrl(item.imageKey),
         owned: ownedById.has(item.id),
@@ -59,9 +58,10 @@ export async function GET() {
     // 분자는 owned.length가 아니라 list에서 센다 — 목록에서 빠진 행을 가진 계정이
     // 6분의 7 같은 진행률을 보지 않게 한다
     //
-    // affinity는 상점 잔액이다. GET /api/pet/skins가 starShards를 내려주는 것과 같은 형태다
+    // starShards는 상점 잔액이다. GET /api/pet/skins와 **같은 이름의 같은 재화**가 됐다
+    // (2026-08-25 전환). 두 상점이 같은 잔액을 보므로 이름이 갈리면 화면이 헷갈린다
     return ok({
-      affinity: user.affinity,
+      starShards: user.starShards,
       items: list,
       progress: { owned: list.filter((item) => item.owned).length, total: items.length },
     })

@@ -33,8 +33,9 @@ import { BACKGROUNDS } from "../../lib/pet"
 // 구매 화폐는 별조각 전용이다. 가격 2500은 2026-08-20 팀 확정값이다(그 전 안은 300, 최초 안은 50).
 //
 // 이 값은 같은 날 확정된 수급량과 짝이다: 일일 미션 전체 완료 = 별조각 60.
-// 수급 = 60/일 + 출석 4·7일차 25(7일 주기 = 약 3.6/일) = 약 63.6/일이므로 2500은 약 39일이다.
-// 치장 6종 합계 3600 친밀도(상한 100/일 = 36일)와 비슷한 속도로 맞췄다.
+// 수급 = 60/일 + 출석 4·7일차 25(7일 주기 = 약 3.6/일) = 약 63.6/일이므로 2500은 약 39일이었다.
+// 2026-08-25에 외출이 별조각 약 20/일을 더해 약 83.6/일이 됐고 2500은 약 30일이다.
+// 치장 6종 합계(전환 후 3000 별조각 = 약 36일)와 비슷한 속도로 맞춘 값이다.
 //
 // 일일 전체 완료 60은 **구현됐다** (2026-08-24 확인, lib/missions/completion.ts:120 —
 // dailyCount >= dailyTotal이면 calculateReward(skin, { starShards: 60 }) 후 increment).
@@ -118,34 +119,44 @@ export const PET_SKINS: Prisma.PetSkinCreateInput[] = [
   },
 ]
 
-// 치장 6종. 종족 구분이 없어 누구나 쓸 수 있고, 전부 친밀도 전용이다.
+// 치장 6종. 종족 구분이 없어 누구나 쓸 수 있고, **전부 별조각 전용이다**
+// (2026-08-25 사용자 결정. 그 전에는 친밀도 전용이었다).
 // 등급은 추첨 확률이 아니라 가격 기준으로 쓴다 (2026-08-20 팀 확정값).
 //
 // 아이템을 추가할 때 가격을 손으로 적지 않는다. 등급만 정하면 아래 표에서 파생된다
-// (seedItems의 upsert가 priceAffinity를 매번 이 표로 덮어쓴다). 등급을 새로 만들려면
+// (seedItems의 upsert가 priceShards를 매번 이 표로 덮어쓴다). 등급을 새로 만들려면
 // schema.prisma의 Rarity enum을 먼저 늘려야 하고, 그건 전원 합의 사항이다.
-// scripts/check-pet.ts가 합계(600 × 6 = 3600)를 단정하려고 이 표를 읽는다.
+// scripts/check-pet.ts가 합계(500 × 6 = 3000)를 단정하려고 이 표를 읽는다.
 //
-// COMMON 600은 2026-08-20 팀 확정값이다(그 전 값은 60). RARE 이상도 함께 10배로 올렸다 —
-// COMMON만 올리면 RARE(100)가 COMMON(600)보다 싸져서 등급 순서가 뒤집힌다. 지금 치장 6종은
-// 전부 COMMON이라 RARE 이상은 쓰이지 않지만, 값이 뒤집힌 표를 남겨 두면 다음 사람이 등급만
-// 바꿨을 때 가격이 조용히 내려간다.
-export const PRICE_BY_RARITY: Record<Rarity, number> = { COMMON: 600, RARE: 1000, EPIC: 1800, LEGENDARY: 2800 }
+// **COMMON 600 → 500 (2026-08-25).** 재화만 바꾸고 값을 그대로 두면 체감이 함께 바뀐다:
+// 별조각 수급은 미션·출석 약 63.6/일 + 외출 약 20/일 = 약 83.6/일이라 600 × 6 = 3600이면
+// 약 43일이 걸려 옛 36일보다 느려진다. 500 × 6 = 3000이 약 36일로 **전환 전 체감을
+// 보존하는 값**이다.
+// 가격을 내린 근거가 "균형 조정"이 아니라 "체감 유지"인 것이 중요하다 — 근거가 없으면
+// 다음 사람이 값을 아무 쪽으로나 움직인다. 계산은 docs/dev/pet.md "상점 별조각 전환".
+//
+// RARE 이상은 2026-08-20 값(10배 인상분)을 그대로 둔다. 지금 치장 6종은 전부 COMMON이라
+// 쓰이지 않지만, 값이 뒤집힌 표를 남겨 두면 다음 사람이 등급만 바꿨을 때 가격이 조용히
+// 내려간다. COMMON을 500으로 내려도 RARE 1000보다 낮으므로 순서는 유지된다.
+export const PRICE_BY_RARITY: Record<Rarity, number> = { COMMON: 500, RARE: 1000, EPIC: 1800, LEGENDARY: 2800 }
 
-type CosmeticSeed = Omit<Prisma.CosmeticItemCreateInput, "affinityOnly" | "priceAffinity">
+type CosmeticSeed = Omit<
+  Prisma.CosmeticItemCreateInput,
+  "affinityOnly" | "priceAffinity" | "priceShards"
+>
 
 // 2026-08-20 변경: 모자·목도리를 컷하고 배경 6종만 남겼다 (이전 12종 = 모자·목도리·배경 각 4개).
 // 이미지를 12장 만들 시간이 없고, 슬롯이 하나면 "슬롯당 1개" 규칙이 곧 "배경 하나 고르기"가
 // 되어 화면도 단순해진다. Slot enum의 HAT·SCARF는 스키마에 그대로 둔다 — 시드에서 안 쓰면
 // 행이 생기지 않으므로 마이그레이션이 필요 없다(schema.prisma는 전원 합의 파일이다).
 //
-// 등급은 6종 전부 COMMON이다. 합계 3600 친밀도이고 친밀도 일 상한이 100이므로(SPEC.md 5절)
-// 배경 하나에 6일, 전부 모으는 데 최소 36일이다. 배경끼리 값 차이를 두면 "비싼 배경"이
+// 등급은 6종 전부 COMMON이다. 합계 3000 별조각이고 별조각 수급이 약 83.6/일이므로(SPEC.md 5절)
+// 배경 하나에 약 6일, 전부 모으는 데 약 36일이다. 배경끼리 값 차이를 두면 "비싼 배경"이
 // 생기는데, 6종이 서로 대체재라 등급을 갈라도 유저가 얻는 정보가 없다.
 // 값을 다시 갈라야 하면 rarity만 바꾼다 — 가격은 PRICE_BY_RARITY에서 따라온다.
 //
-// 36일은 8/26 녹화까지 실제로 모을 수 있는 기간이 아니다. 데모 계정에 친밀도와 보유 배경을
-// 시드로 넣어 수집 진행률이 채워진 화면을 찍는다(업무분담.md 5장).
+// 36일은 8/26 녹화까지 실제로 모을 수 있는 기간이 아니다. 데모 계정에 별조각과 보유 배경을
+// 시드로 넣어 수집 진행률이 채워진 화면을 찍는다(scripts/seed-demo-currency.ts, 업무분담.md 5장).
 //
 // scripts/check-pet.ts가 위 구성(6종·전부 BACKGROUND·이름 배경1~6)을 단정한다.
 // 2026-08-22: imageKey를 실제 S3 키로 고쳤다. 예상했던 cosmetics/bg-N.png는 없는 키였고
@@ -181,10 +192,15 @@ export async function seedItems(prisma: PrismaClient) {
 
   for (const item of COSMETICS) {
     // 가격은 등급에서 파생시킨다. 손으로 하나씩 적으면 등급과 값이 갈라진다.
+    //
+    // priceAffinity를 **쓰지 않는다** (2026-08-25 전환). 덮어쓰면 공유 DB에 남아 있는
+    // 옛 친밀도 가격 600이 사라져 되돌리기가 어려워진다 — 이 커밋을 revert하면
+    // 이 자리에 priceAffinity가 돌아오고, 그때까지 DB의 600은 그대로 남아 있어야 한다.
+    // affinityOnly는 죽은 값이지만 계속 true로 채운다. 같은 이유다(되돌리기용).
     const data: Prisma.CosmeticItemCreateInput = {
       ...item,
       affinityOnly: true,
-      priceAffinity: PRICE_BY_RARITY[item.rarity as Rarity],
+      priceShards: PRICE_BY_RARITY[item.rarity as Rarity],
     }
     await prisma.cosmeticItem.upsert({ where: { name: item.name }, update: data, create: data })
   }

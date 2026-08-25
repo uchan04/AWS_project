@@ -343,13 +343,26 @@ assert.ok(
   COSMETICS.every((item) => item.slot === "BACKGROUND"),
   "치장은 배경 슬롯만 쓴다 (모자·목도리 컷)",
 )
-// 6종 전부 COMMON 600 = 합계 3600. 친밀도 일 상한 100이므로 배경 하나에 6일, 전부 36일이다
+// 6종 전부 COMMON 500 = 합계 3000 (2026-08-25 전환. 그 전에는 친밀도 600 = 3600이었다).
+// 별조각 수급은 미션·출석 약 63.6/일 + 외출 약 20/일 = 약 83.6/일이므로 3000은 약 36일이고,
+// 전환 전 체감(친밀도 일 상한 100으로 36일)이 그대로 보존된다. 값의 근거는 이 "체감 유지"이며
+// 재화만 바꾸고 600을 그대로 뒀다면 약 43일로 느려졌다 — prisma/seed/items.ts 주석 참고
 assert.ok(
   COSMETICS.every((item) => item.rarity === "COMMON"),
   "배경 6종은 등급을 가르지 않는다 (서로 대체재라 값 차이에 정보가 없다)",
 )
-assert.equal(PRICE_BY_RARITY.COMMON, 600)
-assert.equal(PRICE_BY_RARITY.COMMON * COSMETICS.length, 3600)
+assert.equal(PRICE_BY_RARITY.COMMON, 500)
+assert.equal(PRICE_BY_RARITY.COMMON * COSMETICS.length, 3000)
+
+// 배경 하나가 스킨 한 벌보다 싸야 한다. 둘이 같은 재화가 된 뒤로는 이 순서가 화면에
+// 드러나지 않으므로(상점이 갈려 있다) 여기서 못 박는다 — 배경이 더 비싸지면 "외형을
+// 바꾸는 것"보다 "방을 꾸미는 것"이 더 큰 결정이 되고, 그건 이 화면의 위계와 어긋난다
+// 변종 스킨 값은 위에서 이미 2500으로 못 박았으므로 여기서 숫자를 다시 적지 않고 가져온다
+const variantShards = PET_SKINS.find((skin) => !skin.isDefault)?.priceShards ?? 0
+assert.ok(
+  PRICE_BY_RARITY.COMMON < variantShards,
+  `배경 1종(${PRICE_BY_RARITY.COMMON})이 변종 스킨(${variantShards})보다 비싸다 — 두 상점의 위계가 뒤집혔다`,
+)
 
 // 등급이 올라갈수록 비싸야 한다. COMMON만 올리고 나머지를 두면 순서가 뒤집혀도
 // 빌드·lint가 통과하고, 등급을 바꾼 사람은 값이 내려간 것을 모른다
