@@ -2986,3 +2986,86 @@ A의 `feat/diagnosis`에서 매핑이 맞바뀌었고 8/19 팀 확인으로 의�
 ### `lib/pet.ts`에 남긴 미사용 함수 3개
 
 `petMood()`, `timeOfDay()`/`timeGreeting()`, `PET_GREETINGS`는 화면에서 호출되지 않는다. 말풍선 한 자리를 `PET_IDLE_LINES`가 가져갔기 때문이다. `petMood()`가 하던 실행 가능한 말 두 줄은 다른 자리가 이미 한다 — `harvest`는 씨앗 카드의 `가득 찼어요`, `soon`은 경험치 카드의 `다음 단계까지 씨앗 N개`. 순수 함수이고 `check:pet`이 원문·경계를 못 박아 두어 유지 비용이 0이므로 남긴다.
+
+
+---
+
+## 펫 외출 시스템 — 1번(순수 함수 + check:pet) 구현 (2026-08-25, C)
+
+A가 `develop`에 정리한 "펫 외출 시스템 — 구현 계획"의 **1번 작업만** 했다. 계획이 적어 둔
+대로 **스키마·DB·화면과 완전히 독립**이라 마이그레이션 합의를 기다리지 않고 만들 수 있다.
+값이 여기서 코드로 고정되고 나머지(API·화면·상점)가 이것을 읽는다.
+
+**스키마·API·화면·상점 전환은 손대지 않았다.**
+
+### 구현한 파일
+
+- `lib/pet.ts` — 외출 절 추가 (파일 끝). 상수 5개 + 풀 3개 + 순수 함수 5개
+- `scripts/check-pet.ts` — 외출 단정 절 추가. `lib/reward.ts`에서 `AFFINITY_DAILY_CAP`을 함께 읽는다
+
+```ts
+OUTING_COST_AFFINITY = 200   OUTING_HOURS = 4   OUTING_MS
+OUTING_REWARD_MIN = 30       OUTING_REWARD_MAX = 50
+OUTING_PLACES(8) · OUTING_MET(6) · OUTING_MOODS(5) → OUTING_COMBINATIONS = 240
+
+rollOutingReward(rand)        // 배율 적용 전 기본 수량. 씨앗·별조각 둘 다
+outingPlacesForStage(stage)   // 진화 단계 이하만 후보 — 자라면 범위가 넓어진다
+outingEpisode(place, met, mood) → string[]   // 화면이 줄 단위로 순차 노출
+outingState(o, now) → "IDLE" | "AWAY" | "RETURNED"
+outingRemainingMs(o, now)     // AWAY 카드의 "N시간 M분 뒤"
+```
+
+### 결정한 것과 이유
+
+**`AFFINITY_DAILY_CAP`을 `lib/pet.ts`에서 import하지 않았다.** `lib/pet.ts`는 재화 규칙을
+모르는 쪽으로 유지한다(순수 성장 계산). 대신 `check:pet`이 두 파일을 함께 읽어
+`OUTING_COST_AFFINITY / AFFINITY_DAILY_CAP === 2`를 못 박는다 — 어느 한쪽을 바꾸면 "2일 1회"
+페이싱이 조용히 무너지는 대신 체크에서 걸린다. 계획이 지시한 단정이다.
+
+**`outingState()`가 Prisma 모델을 받지 않는다.** `PetOuting` 표가 아직 없으므로
+`OutingLike = { returnsAt; claimedAt }` 구조 타입만 받는다. **그래서 마이그레이션 전에도
+컴파일되고 검증된다.** 마이그레이션이 들어와도 `PetOuting` 행이 이 형태에 그대로 맞으므로
+호출부를 고칠 필요가 없다.
+
+**`rollOutingReward()`가 `rand`를 주입받는다.** `Math.random()`을 안에 박으면 경계(30·50)를
+검증할 수 없다. `idleAccrual()`이 `now`를 받는 것과 같은 이유다.
+
+**꽝을 만들지 않는다.** 씨앗·별조각을 **둘 다** 준다(계획의 시뮬레이션 근거). 2일에 한 번뿐인
+이벤트에서 「둘 중 하나만」이면 절반이 "씨앗만 나왔네"가 되고 사용자는 그것을 실패로 읽는다.
+`check:pet`이 `rand` 0~1을 101단계로 훑어 범위를 벗어나는 값이 하나도 없음을 확인한다.
+
+**문구 19줄은 C의 초안이다.** 계획이 "에피소드 문장은 A가 쓰지 않는다"고 남긴 자리다.
+`PET_GREETINGS`·`PET_IDLE_LINES`가 그랬듯 **사용자 문장으로 갈아야 한다.** `check:pet`이 원문을
+못 박아 두었으므로 문구를 바꾸면 그 단정도 함께 고친다 — 조용히 다듬어지는 것을 막는 장치다.
+
+**톤 규칙을 기계로 지킨다.** `BANNED_TONE = ["할 수 있", "잘했", "대단해", "힘내", "노력"]`이
+외출 문구 19줄에 들어가지 않는지 본다. 펫은 자기 얘기만 하고 사용자를 평가하지 않는다 —
+격려는 사용자를 격려받아야 하는 위치에 세운다. **원문 단정이 먼저 걸리므로 이 가드가 실제로
+일하는 경우는 "사용자가 문구를 정당하게 갈면서 격려문을 넣었을 때"다.** 그때가 진짜 위험한 때다.
+
+### 검증
+
+`tsc --noEmit` 0 · `eslint lib/pet.ts scripts/check-pet.ts` 0 · `check:pet` 통과.
+
+**체크가 실제로 걸리는지 역방향으로 확인했다**(A가 복습 배치에서 한 것과 같은 절차).
+`OUTING_COST_AFFINITY`를 150으로 바꾸면 `actual: 150, expected: 200`으로 걸리고, 문구에
+"너도 할 수 있어!"를 넣으면 원문 `deepEqual`이 걸린다. 둘 다 원복 후 재통과 확인.
+
+**`tsc`가 `check:pet`이 놓친 것을 잡았다.** `outingEpisode()`의 타입 술어(`t is string`)가
+`as const` 리터럴 유니온에 assignable하지 않아 tsc가 2건을 냈는데, `check:pet`은 `tsx`라
+타입을 보지 않아 통과했다. **규칙: 순수 함수를 추가하면 `check:*`만으로 끝내지 않고
+`tsc --noEmit`을 함께 돌린다.**
+
+### 다음 할 일 (계획의 2~5번)
+
+| # | 작업 | 막는 것 |
+|---|---|---|
+| 2 | 스키마 + 마이그레이션 (`PetOuting`, 부분 유니크 인덱스, `priceShards`) | **전원 합의** |
+| 3 | `POST /api/pet/outing` + `ensureOutingReturn()` | 2번 |
+| 4 | 화면 3상태 (`AWAY` 톤이 핵심) | 3번 |
+| 5 | 상점 별조각 전환 | 2번. 기존 친밀도 잔액 안내 문구 필요 |
+
+**아직 정해지지 않은 것 2건.**
+- **4시간 대기를 유지할지.** 계획은 4시간이고 `AWAY` 상태를 빈 방으로 두지 않는 조건을 달았다.
+  대기를 없애면 `outingState`의 `AWAY`가 사라지고 3번·4번이 크게 줄어든다
+- **에피소드 19줄 문구.** 사용자가 쓸 자리다
