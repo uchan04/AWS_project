@@ -1,28 +1,35 @@
+import type { NextRequest } from "next/server"
 import { getCurrentUser, UnauthorizedError } from "@/lib/auth"
 import { ok, fail } from "@/lib/api"
-import { suggestTopics } from "@/lib/community/topics"
+import { GalleryType } from "@prisma/client"
+import { canAccessGallery } from "@/app/community/_lib/gallery"
+import { pickTopics } from "@/app/community/_lib/topics"
 
-// GET /api/community/topics — 글쓰기 창의 주제 추천 3개(SPEC 8절).
+// GET /api/community/topics?gallery=ALL — 글쓰기 창의 주제 추천 3개(SPEC 8절).
 //
-// 종족은 세션에서 읽는다. 쿼리로 받지 않는다 — 갤러리 탭이 아니라 "사용자 성향"이 기준이고,
-// 클라이언트가 보낸 종족을 믿으면 남의 종족 문구를 뽑아볼 수 있다.
+// **제목만 준다.** 초안은 만들지 않는다(2026-08-25 사용자 결정, _lib/topics.ts 주석 참고).
 //
-// 실패해도 500을 내지 않는다. 추천은 글쓰기의 곁가지고, 없어도 글은 쓸 수 있다.
-// 화면은 이 응답이 실패하면 고정 문구(app/community/_lib/topics.ts)로 되돌아간다.
-export async function GET() {
+// **Bedrock을 부르지 않는다.** 같은 날 LLM 추천을 껐다 — 전에는 lib/community/topics.ts의
+// suggestTopics()가 만들었고 이 라우트가 유일한 호출부였다. 지금 문구의 출처는
+// app/community/_lib/topics.ts 하나뿐이라 이 응답은 실패할 일이 없다.
+//
+// 종족은 세션에서 읽는다. 쿼리로 받지 않는다 — 클라이언트가 보낸 종족을 믿으면
+// 남의 종족 문구를 뽑아볼 수 있다. 갤러리는 쿼리로 받되 소속을 검사한다(글 작성과 같은 규칙).
+export async function GET(request: NextRequest) {
   try {
     const user = await getCurrentUser()
 
-    // 진단 전이면 추천할 성향이 없다. 화면은 이때 추천 영역을 그리지 않는다
-    if (!user.typeCode) return ok({ topics: [] })
+    const requested = request.nextUrl.searchParams.get("gallery") ?? GalleryType.ALL
+    const gallery = (Object.values(GalleryType) as string[]).includes(requested)
+      ? (requested as GalleryType)
+      : null
+    if (!gallery) return fail("INVALID_BODY", "갤러리를 찾을 수 없어요", 400)
 
-    try {
-      return ok({ topics: await suggestTopics(user.typeCode) })
-    } catch (error) {
-      // Bedrock 호출 실패·검증 실패. 로그만 남기고 빈 목록을 준다
-      console.error("[/api/community/topics]", error)
-      return ok({ topics: [] })
+    if (!canAccessGallery(gallery, user.typeCode)) {
+      return fail("FORBIDDEN", "다른 종족의 갤러리는 볼 수 없어요", 400)
     }
+
+    return ok({ topics: pickTopics(gallery, user.typeCode) })
   } catch (error) {
     if (error instanceof UnauthorizedError) return fail("UNAUTHORIZED", error.message, 401)
     throw error

@@ -7,28 +7,16 @@ import { TRIBE } from "@/lib/types"
 import { useModalA11y } from "@/app/components/useModalA11y"
 import { CrisisNotice } from "@/app/components/CrisisNotice"
 import { type GalleryTab } from "../_lib/gallery"
-import { TOPICS, type WriteTopic } from "../_lib/topics"
+import { pickTopics } from "../_lib/topics"
 import { TITLE_MAX, BODY_MAX, remaining } from "../_lib/limits"
 
 // 전체 갤러리는 종족이 없어 TRIBE에 키가 없다. lib/types.ts는 A 소유 공유 파일이라
 // 건드리지 않고, ChatPanel이 NEUTRAL_COLOR를 자기 파일에 둔 것과 같은 방식으로 여기 둔다.
 const NEUTRAL_COLOR = "#9CA3AF"
 
-// 고정 문구 6개 중 3개를 무작위로 고른다. LLM 추천이 실패했을 때의 대비책이다 —
-// 추천이 없어도 글은 쓸 수 있어야 하므로 실패를 오류 문구로 만들지 않는다.
-// ChatPanel의 pickThreeStarters()와 같은 방식이며 외부 라이브러리를 쓰지 않는다.
-function pickThreeTopics(typeCode: TypeCode): WriteTopic[] {
-  const shuffled = [...TOPICS[typeCode]]
-  for (let i = shuffled.length - 1; i > 0; i--) {
-    const j = Math.floor(Math.random() * (i + 1))
-    ;[shuffled[i], shuffled[j]] = [shuffled[j], shuffled[i]]
-  }
-  return shuffled.slice(0, 3)
-}
-
 /**
  * @param myTypeCode 내 종족. 갤러리(gallery)와 다르다 — 전체 탭에서도 추천은 내 성향으로 뽑는다.
- *   진단 전이면 null이고, 그때는 추천 영역을 그리지 않는다.
+ *   진단 전이면 null이고, 그때는 종족을 타지 않는 ALL 문구로 떨어진다(resolveTopicKey).
  */
 export function WriteModal({ gallery, myTypeCode }: { gallery: GalleryTab; myTypeCode: TypeCode | null }) {
   const router = useRouter()
@@ -41,40 +29,19 @@ export function WriteModal({ gallery, myTypeCode }: { gallery: GalleryTab; myTyp
   // 성공 즉시 close()하지 않는다(handleSubmit 참고).
   const [crisisNotice, setCrisisNotice] = useState<string | null>(null)
   // 모달을 열 때 정한다. 입력 중에는 목록이 바뀌지 않는다.
-  const [topics, setTopics] = useState<WriteTopic[]>([])
-  const [topicsLoading, setTopicsLoading] = useState(false)
-  // LLM 추천을 한 번 받으면 이 페이지에 머무는 동안 다시 부르지 않는다.
-  // 열 때마다 Bedrock을 부르면 글 하나 쓰려고 창을 여닫는 것만으로 호출이 쌓인다.
-  const cachedRef = useRef<WriteTopic[] | null>(null)
+  const [topics, setTopics] = useState<string[]>([])
 
   const isAll = gallery === "ALL"
   const tribeColor = isAll ? NEUTRAL_COLOR : TRIBE[gallery].colorHex
 
-  // 주제 추천(SPEC 8절). 실패·빈 응답이면 고정 문구로 되돌아간다.
-  // 진단 전(myTypeCode === null)이면 추천할 성향이 없어 아무것도 부르지 않는다.
+  // 주제 추천(SPEC 8절). 제목만 고른다.
+  //
+  // **더 이상 서버를 부르지 않는다.** 2026-08-25에 LLM 추천을 끄면서
+  // GET /api/community/topics가 이 화면과 똑같은 상수(_lib/topics.ts)를 돌려주게 됐다.
+  // 상수를 받으려고 왕복을 돌면 창이 열린 뒤 목록이 한 번 바뀌어 제목 칸이 밀린다.
+  // 라우트는 그대로 둔다 — 같은 pickTopics()를 쓰므로 API로 받아도 결과는 같다.
   function loadTopics() {
-    if (!myTypeCode) return setTopics([])
-    if (cachedRef.current) return setTopics(cachedRef.current)
-
-    // 기다리는 동안에도 고정 문구를 먼저 보여준다. 빈 자리를 두면 창이 열린 뒤
-    // 추천 영역이 나중에 끼어들어 제목 칸이 아래로 밀린다(레이아웃 이동)
-    const fallback = pickThreeTopics(myTypeCode)
-    setTopics(fallback)
-    setTopicsLoading(true)
-
-    fetch("/api/community/topics")
-      .then((response) => (response.ok ? response.json() : null))
-      .then((json) => {
-        const next = json?.data?.topics
-        if (Array.isArray(next) && next.length > 0) {
-          cachedRef.current = next
-          setTopics(next)
-        }
-      })
-      .catch(() => {
-        // 고정 문구가 이미 떠 있다. 따로 알리지 않는다
-      })
-      .finally(() => setTopicsLoading(false))
+    setTopics(pickTopics(gallery, myTypeCode))
   }
 
   function close() {
@@ -185,30 +152,25 @@ export function WriteModal({ gallery, myTypeCode }: { gallery: GalleryTab; myTyp
               </>
             ) : (
               <>
-            {/* 주제 추천(SPEC 8절). GET /api/community/topics가 Bedrock으로 만든다.
-                실패하면 고정 문구(`_lib/topics.ts`)가 그대로 남는다.
-                진단 전이면 topics가 비어 있고, 그때는 영역 자체를 렌더하지 않는다. */}
+            {/* 주제 추천(SPEC 8절). 문구는 `_lib/topics.ts` 하나에서 온다.
+                **제목만 채운다** — 본문을 대신 써 주면 그 문장이 그 사람의 하루를 규정한다. */}
             {topics.length > 0 && (
               <div className="mb-4">
                 <p className="mb-2 text-xs text-neutral-400" role="status" aria-live="polite">
-                  {topicsLoading ? "오늘 쓸 만한 이야기를 찾고 있어요…" : "선택하면 제목과 본문이 채워져요"}
+                  선택하면 제목이 채워져요
                 </p>
                 <div className="flex flex-col gap-2">
                   {topics.map((topic) => (
                     <button
-                      key={topic.title}
+                      key={topic}
                       type="button"
-                      onClick={() => {
-                        setTitle(topic.title)
-                        setBody(topic.draft)
-                      }}
+                      onClick={() => setTitle(topic)}
                       // 세로로 나열되므로 이동 효과는 넣지 않는다. 테두리 색만 진해져 "고를 수 있는 것"임을 드러낸다.
                       className="rounded-xl border border-neutral-200 px-4 py-2.5 text-left transition duration-150 hover:border-neutral-400 hover:bg-neutral-50 focus-visible:border-neutral-400 focus-visible:bg-neutral-50 focus-visible:ring-2 focus-visible:ring-neutral-900 focus-visible:ring-offset-2 focus-visible:outline-none"
                     >
                       <span className="block text-sm font-semibold" style={{ color: tribeColor }}>
-                        {topic.title}
+                        {topic}
                       </span>
-                      <span className="mt-0.5 block text-xs leading-relaxed text-neutral-500">{topic.draft}</span>
                     </button>
                   ))}
                 </div>
