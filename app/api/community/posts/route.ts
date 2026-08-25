@@ -10,6 +10,7 @@ import { grantAffinity, POST_AFFINITY } from "@/app/community/_lib/affinity"
 import { completeMissionByCode } from "@/lib/missions/completion"
 import { recordAttempt, retryAfter } from "@/lib/ratelimit"
 import { containsAbuse, isCrisis, CRISIS_POST_NOTICE } from "@/lib/safety"
+import { blocksPosting, crisisBlockedPayload } from "@/app/community/_lib/crisis"
 import { moderate, BLOCK_CODE } from "@/app/community/_lib/moderation"
 import { invokeBedrock } from "@/app/community/_lib/bedrock"
 
@@ -123,6 +124,27 @@ export async function POST(request: NextRequest) {
     //
     // BLOCK만 막는다. WARN은 통과, **SELF는 반드시 통과시킨다** — "나 진짜 병신 같아"는
     // 남을 향한 말이 아니라 이 서비스가 받아내야 할 말이다(moderation.ts JUDGE_SYSTEM 주석).
+    //
+    // **위기 신호를 검열보다 먼저 본다.** 순서가 뒤집히면 위기 신호 글에 욕설이 섞인 순간
+    // 상담 안내 대신 400이 나간다 — POLICY가 BLANKET이라 대상 없는 욕설까지 막는데,
+    // 절박한 글에는 자기를 향한 욕이 섞이기 쉽다. 그러면 도움 안내가 가장 필요한 사람에게만
+    // 닿지 않는다.
+    //
+    // **저장하지 않는다(2026-08-25 팀 결정 변경).** 그전에는 글을 그대로 올리고 작성자에게만
+    // 안내를 돌려줬다 — "막으면 도움이 가장 필요한 사람의 입을 막는 것이 된다"가 근거였다.
+    // 이제는 커뮤니티에 남기는 대신 도움으로 연결한다. 두 결정의 관계와 조건은
+    // app/community/_lib/crisis.ts 주석에 있다.
+    //
+    // **400을 쓰지 않는다.** 사용자가 받는 것은 실패가 아니라 안내여야 한다. 화면(WriteModal)은
+    // 이 응답을 받으면 창을 닫지 않고 입력도 지우지 않는다.
+    // 판정은 isCrisis()가 아니라 blocksPosting()이다. isCrisis()는 오탐을 허용하도록
+    // 설계돼 있어(주석 명시) 사별·보도·비유까지 잡는다 — 안내를 띄우는 데는 맞지만
+    // 저장을 막는 기준으로 쓰면 "친구가 자살했다는 소식을 들었다"가 안 올라간다.
+    // blocksPosting()은 그중 1인칭 현재의 의도만 남긴다(_lib/crisis.ts).
+    if (blocksPosting(`${title} ${body}`)) {
+      return ok(crisisBlockedPayload())
+    }
+
     const mod = await moderate(`${title}\n\n${body}`, invokeBedrock)
     if (mod.verdict === "BLOCK") {
       return fail(BLOCK_CODE, mod.message, 400)
@@ -149,9 +171,9 @@ export async function POST(request: NextRequest) {
       console.error("[DAILY_COMMUNITY_POST] 미션 완료 처리 실패", error)
     }
 
-    // 위기 신호는 **막지 않는다.** 글은 그대로 올라가고, 작성자에게만 안내를 돌려준다.
-    // 막으면 도움이 가장 필요한 사람의 입을 막는 것이 된다.
-    // 다른 사람에게는 보이지 않는다 — 이 응답은 작성자만 받는다.
+    // 저장은 됐지만 걱정되는 신호는 있는 글 — blocksPosting()은 false인데 isCrisis()는
+    // true인 경우다(사별·보도·비유·회복 서사). 막지는 않되 안내는 보여준다.
+    // 여기 오는 글은 실제로 올라갔으므로 CRISIS_POST_NOTICE("올라갔어요…")가 사실과 맞는다.
     const crisisNotice = isCrisis(`${title} ${body}`) ? CRISIS_POST_NOTICE : null
 
     return ok({ post, granted, crisisNotice })

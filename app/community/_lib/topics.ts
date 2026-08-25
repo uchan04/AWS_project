@@ -1,37 +1,98 @@
-import type { TypeCode } from "@prisma/client"
+import type { GalleryType, TypeCode } from "@prisma/client"
 
-export type WriteTopic = { title: string; draft: string }
+/**
+ * 글쓰기 창의 주제 추천. **제목만 준다 — 초안은 만들지 않는다.**
+ *
+ * 2026-08-25 결정(사용자): 모든 갤러리에서 제목만 제안한다. 그전에는 제목과 초안
+ * (`{ title, draft }`)을 함께 줬고, 고르면 본문까지 채워졌다. 초안을 없앤 이유는
+ * 채워진 문장이 그 사람의 하루를 대신 규정하기 때문이다 — "오늘은 있는 걸로 대충
+ * 때웠다"가 이미 적혀 있으면 그렇지 않았던 사람은 지우고 다시 쓰는 일부터 해야 한다.
+ * 제목만 주면 소재만 건네고 판단은 비워 둘 수 있다.
+ *
+ * 같은 날 **LLM 추천도 껐다.** 전에는 `GET /api/community/topics`가 Bedrock으로
+ * 만들고(`lib/community/topics.ts`) 이 목록은 대비책이었다. 이제 이 파일이 유일한
+ * 출처다 — `lib/community/topics.ts`는 아무도 부르지 않는다.
+ *
+ * 문구 규칙(`docs/dev/community.md`):
+ * 오늘 하루 안에서 쓸 수 있는 가벼운 소재만. 성취·극복을 요구하지 않는다.
+ * 권유형("~해보세요")을 쓰지 않는다. 밖에 나가거나 사람을 만나는 것을 전제하지 않는다.
+ * 유형명·낙인 단어(`lib/diagnosis/reason.ts`의 BANNED)를 쓰지 않는다.
+ *
+ * 문구를 고치면 `npm run check:community`를 돌린다.
+ */
 
-// 글쓰기 주제 추천의 대비책. 본 추천은 GET /api/community/topics가 Bedrock으로 만들고
-// (lib/community/topics.ts), 그 호출이 실패하거나 검증에서 걸러지면 여기 문구가 남는다.
-// 유형별 6개 중 3개를 랜덤으로 보여준다.
-//
-// 지우지 말 것: 추천이 없어도 글은 쓸 수 있어야 한다. 이 파일을 없애고 LLM만 두면
-// Bedrock이 죽은 순간 글쓰기 창이 안내 없는 빈 입력칸으로 바뀐다.
-// 문구를 고칠 때는 `npm run check:community`를 돌린다 — LLM 출력과 같은 검사를 통과해야 한다.
-export const TOPICS: Record<TypeCode, WriteTopic[]> = {
+/** 한 번에 보여주는 개수 */
+export const TOPIC_COUNT = 3
+
+/**
+ * 제목 길이 상한. 사용자가 자기 이야기를 채워 넣을 여지를 남기는 길이다 —
+ * 길어질수록 제목이 이미 결론을 말해버린다.
+ */
+export const TOPIC_TITLE_MAX = 15
+
+/**
+ * 갤러리별 제목 6개. `GalleryType`(종족 3종 + ALL)을 그대로 키로 쓴다.
+ *
+ * `ALL`은 종족을 모르는 사람(진단 전)이 전체 탭에서 볼 목록이다. 종족을 아는 사람은
+ * 전체 탭에서도 자기 종족 목록을 본다 — 추천의 기준은 갤러리가 아니라 사용자 성향이다
+ * (`resolveTopicKey()` 참고). 그래서 ALL 문구는 어느 종족에게도 기울지 않게 썼다.
+ */
+export const TOPICS: Record<GalleryType, string[]> = {
+  ALL: [
+    "창밖을 봤던 잠깐",
+    "오늘 마신 것",
+    "미뤄둔 채로 둔 일",
+    "오늘 들린 소리",
+    "오래 머문 자리",
+    "오늘 문득 든 생각",
+  ],
   INDEPENDENT_LOW_INCOME: [
-    { title: "오늘 창밖 풍경", draft: "커튼을 열었더니 밖이 생각보다 밝았다. 잠깐 그대로 서 있었다." },
-    { title: "혼자 먹은 끼니", draft: "오늘은 있는 걸로 대충 때웠다. 그래도 따뜻한 걸 먹으니 좀 나았다." },
-    { title: "방 안에서 들리는 소리", draft: "냉장고 돌아가는 소리가 유난히 크게 들렸다. 조용한 게 편할 때도 있고 아닐 때도 있다." },
-    { title: "오늘 가장 조용했던 시간", draft: "오늘 제일 조용했던 건 해 질 무렵이었다. 그때는 아무 소리도 나지 않았다." },
-    { title: "미뤄둔 설거지", draft: "싱크대에 며칠째 그릇이 쌓여 있다. 오늘도 그냥 지나쳤다." },
-    { title: "밤에 틀어두는 소리", draft: "잠들기 전에 늘 켜두는 소리가 있다. 오늘도 그걸 틀어놓고 누워 있었다." },
+    "오늘 창밖 풍경",
+    "혼자 먹은 끼니",
+    "방 안에서 들리는 소리",
+    "오늘 가장 조용했던 시간",
+    "미뤄둔 설거지",
+    "밤에 틀어두는 소리",
   ],
   HEALTH_EMOTION: [
-    { title: "오늘 일어난 시각", draft: "오늘은 한참 누워 있다가 늦게 일어났다. 그래도 일어나긴 했다." },
-    { title: "아무것도 안 한 하루", draft: "오늘은 정말 아무것도 하지 않았다. 그런 날도 있는 것 같다." },
-    { title: "요즘 자주 드는 생각", draft: "요즘 자꾸 같은 생각이 맴돈다. 딱히 결론은 없다." },
-    { title: "오늘 유일하게 한 일", draft: "오늘 한 일이라곤 물 한 잔 마신 게 전부다. 그것도 늦은 오후였다." },
-    { title: "몸이 무겁던 날", draft: "오늘은 몸이 유난히 무거웠다. 이유는 잘 모르겠다." },
-    { title: "잠이 안 오던 밤", draft: "어젯밤엔 한참을 뒤척였다. 시계만 몇 번 봤다." },
+    "오늘 일어난 시각",
+    "아무것도 안 한 하루",
+    "요즘 자주 드는 생각",
+    "오늘 유일하게 한 일",
+    "몸이 무겁던 날",
+    "잠이 안 오던 밤",
   ],
   FAMILY_LIVING: [
-    { title: "방문을 닫는 순간", draft: "방문을 닫으면 그제야 숨이 좀 쉬어진다. 오늘도 한참 그러고 있었다." },
-    { title: "거실을 지나가며", draft: "거실을 지나갈 때 괜히 발소리를 줄이게 된다. 오늘도 그랬다." },
-    { title: "집인데 낯설던 순간", draft: "분명 익숙한 집인데 가끔 낯설게 느껴진다. 오늘 그런 순간이 있었다." },
-    { title: "혼자 있고 싶던 시간", draft: "오늘은 그냥 혼자 있고 싶었다. 그래서 방에서 나오지 않았다." },
-    { title: "밥상 앞에서", draft: "밥상 앞에 앉아 있는데 말이 잘 나오지 않았다. 그냥 조용히 먹었다." },
-    { title: "다들 잠든 뒤에", draft: "다들 잠든 뒤가 제일 편하다. 오늘도 그 시간에 깨어 있었다." },
+    "방문을 닫는 순간",
+    "거실을 지나가며",
+    "집인데 낯설던 순간",
+    "혼자 있고 싶던 시간",
+    "밥상 앞에서",
+    "다들 잠든 뒤에",
   ],
+}
+
+/**
+ * 어느 목록을 쓸지 고른다.
+ *
+ * 종족 갤러리는 그 갤러리 목록을 쓴다. 전체 탭은 **내 종족** 목록을 쓴다 —
+ * 추천의 기준은 "지금 보고 있는 갤러리"가 아니라 "이 사람의 성향"이기 때문이다.
+ * 진단 전이라 종족이 없으면 ALL로 떨어진다.
+ */
+export function resolveTopicKey(gallery: GalleryType, myTypeCode: TypeCode | null): GalleryType {
+  if (gallery !== "ALL") return gallery
+  return myTypeCode ?? "ALL"
+}
+
+/**
+ * 목록에서 `TOPIC_COUNT`개를 무작위로 고른다. Fisher-Yates 직접 구현이며
+ * 외부 라이브러리를 쓰지 않는다(`ChatPanel.pickThreeStarters()`와 같은 방식).
+ */
+export function pickTopics(gallery: GalleryType, myTypeCode: TypeCode | null): string[] {
+  const shuffled = [...TOPICS[resolveTopicKey(gallery, myTypeCode)]]
+  for (let i = shuffled.length - 1; i > 0; i--) {
+    const j = Math.floor(Math.random() * (i + 1))
+    ;[shuffled[i], shuffled[j]] = [shuffled[j], shuffled[i]]
+  }
+  return shuffled.slice(0, TOPIC_COUNT)
 }

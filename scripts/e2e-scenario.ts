@@ -372,16 +372,45 @@ async function main() {
     })
     record("욕설 없는 혼잣말은 통과한다", plain.status === 200, plain.body.error)
 
+    // 2026-08-25 정책 변경(D): 위기 신호 글은 **저장하지 않고** 도움 경로를 안내한다.
+    // 400이 아니라 200 + { crisisBlocked, notice }다 — 400은 화면에서 빨간 오류로 읽히고
+    // 지금 이 사람에게 필요한 것은 거절 통보가 아니다. 그래서 status는 200을 단정한다.
     const crisisPost = await call("POST", "/api/community/posts", {
       title: "요즘 생각",
       body: "그냥 사라지고 싶다는 생각이 자주 든다.",
       galleryType: "ALL",
     })
-    const crisisData = crisisPost.body.data as { crisisNotice?: string | null } | undefined
+    const crisisData = crisisPost.body.data as
+      | { crisisBlocked?: boolean; notice?: string; post?: unknown }
+      | undefined
     record(
-      "위기 신호 글은 올라가고 안내가 함께 온다",
-      crisisPost.status === 200 && Boolean(crisisData?.crisisNotice),
+      "위기 신호 글은 저장하지 않고 도움 안내를 준다 (200, 거절이 아니다)",
+      crisisPost.status === 200 && crisisData?.crisisBlocked === true && Boolean(crisisData?.notice),
       crisisPost.body,
+    )
+    // 저장되지 않았다는 사실이 응답 모양으로 드러나야 화면이 목록에 밀어 넣지 않는다
+    record("위기 신호 글 응답에 post가 없다", crisisData?.post === undefined, crisisPost.body)
+    // 안내 문구가 거절로 읽히면 안 된다. app/community/_lib/crisis.ts의 BLAMING_WORDS와 같은 목록
+    record(
+      "위기 안내 문구에 비난하는 말이 없다",
+      !["차단", "부적절", "규정", "위반", "금지", "삭제되었"].some((w) =>
+        (crisisData?.notice ?? "").includes(w),
+      ),
+      crisisData?.notice,
+    )
+    // 오탐이 곧 "글이 사라지는 것"이 된 뒤로 가장 위험한 경로다 — 사별 글은 올라가야 한다
+    const bereaved = await call("POST", "/api/community/posts", {
+      title: "친구 소식",
+      body: "친구가 자살했다는 소식을 들었다. 아직 실감이 안 난다.",
+      galleryType: "ALL",
+    })
+    const bereavedData = bereaved.body.data as
+      | { crisisBlocked?: boolean; post?: unknown }
+      | undefined
+    record(
+      "사별 글은 막지 않는다 (blocksPosting이 isCrisis보다 좁다)",
+      bereaved.status === 200 && !bereavedData?.crisisBlocked && Boolean(bereavedData?.post),
+      bereaved.body,
     )
 
     const abusive = await call("POST", "/api/community/posts", {
@@ -397,15 +426,21 @@ async function main() {
       })
       record("타인 공격 댓글은 거부", abusiveComment.body.error?.code === "ABUSIVE_CONTENT", abusiveComment.body)
 
+      // 글과 같은 기준이다(같은 blocksPosting). 두 라우트가 다른 모양을 주면 화면이 각각 처리해야 한다
       const crisisComment = await call("POST", `/api/community/posts/${postId}/comments`, {
         body: "저도 죽고 싶었던 날이 있었어요.",
       })
-      const commentData = crisisComment.body.data as { crisisNotice?: string | null } | undefined
+      const commentData = crisisComment.body.data as
+        | { crisisBlocked?: boolean; notice?: string; comment?: unknown }
+        | undefined
       record(
-        "위기 신호 댓글은 올라가고 안내가 함께 온다",
-        crisisComment.status === 200 && Boolean(commentData?.crisisNotice),
+        "위기 신호 댓글도 저장하지 않고 도움 안내를 준다",
+        crisisComment.status === 200 &&
+          commentData?.crisisBlocked === true &&
+          Boolean(commentData?.notice),
         crisisComment.body,
       )
+      record("위기 신호 댓글 응답에 comment가 없다", commentData?.comment === undefined, crisisComment.body)
     }
 
     const ghost = await call("GET", "/api/community/posts/does-not-exist")

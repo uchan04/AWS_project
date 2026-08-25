@@ -62,7 +62,9 @@ const REASON_TOOL = {
 // 출력에 섞이면 안 되는 단어. 3번 규칙을 모델의 선의에만 맡기지 않는다.
 // 하나라도 걸리면 그 응답을 버린다 — 잘못된 문구를 띄우는 것보다 안 띄우는 것이 낫다.
 //
-// export한 이유: 커뮤니티 주제 추천(lib/community/topics.ts)도 같은 낙인 단어를 막아야 한다.
+// export한 이유: 커뮤니티 주제 추천도 같은 낙인 단어를 막아야 한다. 2026-08-25 현재
+// 그 검사는 scripts/check-community.ts가 app/community/_lib/topics.ts의 문구에 직접 건다
+// (전에는 lib/community/topics.ts의 validateTopics()였고 그 파일은 LLM 추천 해제로 지웠다).
 // 목록을 두 곳에 두면 한쪽에만 단어가 추가돼 다른 쪽으로 새어 나간다.
 export const BANNED = [
   "유형",
