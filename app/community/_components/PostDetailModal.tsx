@@ -202,6 +202,8 @@ export function PostDetailModal({
       setCommentBody("")
       setPost((prev) => (prev ? { ...prev, commentCount: prev.commentCount + 1 } : prev))
       setAffinityNotice(json.data.granted > 0 ? `친밀도 +${json.data.granted}` : "오늘 친밀도를 이미 다 받았어요")
+      // 막지는 않았지만 걱정되는 신호가 있는 댓글(사별·보도·비유 등). 댓글은 달렸고 안내만 얹는다
+      if (json.data.crisisNotice) setCrisisNotice(json.data.crisisNotice)
       window.dispatchEvent(new CustomEvent("user-stats-changed"))
     } finally {
       setCommentPending(false)

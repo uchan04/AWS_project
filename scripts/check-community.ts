@@ -3,7 +3,12 @@ import { TOPICS, TOPIC_COUNT, TOPIC_TITLE_MAX, resolveTopicKey, pickTopics } fro
 import { pickHopeMessage, HOPE_MESSAGES } from "@/app/community/_lib/banner"
 import { BANNED } from "@/lib/diagnosis/reason"
 import { isCrisis } from "@/lib/safety"
-import { crisisBlockedPayload, CRISIS_BLOCKED_NOTICE, BLAMING_WORDS } from "@/app/community/_lib/crisis"
+import {
+  crisisBlockedPayload,
+  CRISIS_BLOCKED_NOTICE,
+  BLAMING_WORDS,
+  blocksPosting,
+} from "@/app/community/_lib/crisis"
 import { moderate } from "@/app/community/_lib/moderation"
 import type { GalleryType, TypeCode } from "@prisma/client"
 
@@ -92,6 +97,51 @@ for (const text of CRISIS_SAMPLES) {
 }
 for (const text of ORDINARY_SAMPLES) {
   assert.ok(!isCrisis(text), `평범한 글까지 잡으면 안 된다 — "${text}"`)
+}
+
+/*
+ * 저장을 막는 판정은 `isCrisis()`가 아니라 `blocksPosting()`이다.
+ *
+ * `isCrisis()`는 오탐을 허용하도록 설계돼 있고(그 주석에 명시), 결과가 "안내를 띄운다"일
+ * 때는 그 편향이 옳다. 결과가 "글이 저장되지 않는다"로 바뀌면서 대가가 달라졌다 —
+ * 아래 통과 목록은 전부 `isCrisis()`가 true로 잡는 문장이다. 그대로 막으면 사별한
+ * 사람의 글이 사라진다.
+ *
+ * 기울기는 미탐 쪽이다. 놓치면 글이 올라가고 안내는 여전히 뜬다.
+ */
+
+const MUST_BLOCK = [
+  "죽고 싶다",
+  "모든 걸 끝내고 싶다",
+  "이제 다 살기 싫다",
+  "자살하고 싶다",
+  // "들었다"를 통째로 제외하면 이 문장이 함께 새어나간다. 전언 명사가 앞에 붙은 경우만 본다
+  "죽고 싶다는 생각이 들었다",
+  // 회상 표지만 보고 제외하면 이 문장이 새어나간다. 회복 표현과 짝일 때만 제외한다
+  "예전에도 죽고 싶었고 지금도 죽고 싶다",
+]
+
+const MUST_NOT_BLOCK = [
+  "친구가 자살했다는 소식을 들었다",
+  "자살 예방 교육을 들었다",
+  "자살률 기사를 봤다",
+  "죽고 싶을 만큼 웃겼다",
+  "살기 싫을 만큼 더운 날씨",
+  "예전엔 죽고 싶었지만 지금은 괜찮다",
+  "드라마 주인공이 자살하는 장면이 힘들었다",
+]
+
+for (const text of MUST_BLOCK) {
+  assert.ok(blocksPosting(text), `저장을 막아야 한다 — "${text}"`)
+}
+for (const text of MUST_NOT_BLOCK) {
+  assert.ok(isCrisis(text), `전제가 깨졌다: isCrisis()가 이미 안 잡는다 — "${text}"`)
+  assert.ok(!blocksPosting(text), `막으면 안 된다 — "${text}"`)
+}
+
+// blocksPosting()은 판정을 넓히지 않는다. isCrisis()가 false면 언제나 false다
+for (const text of ORDINARY_SAMPLES) {
+  assert.ok(!blocksPosting(text), `위기가 아닌 글을 막았다 — "${text}"`)
 }
 
 const payload = crisisBlockedPayload()
@@ -252,7 +302,7 @@ async function checkCrisisModeration() {
 checkCrisisModeration()
   .then(() => {
     console.log(
-      `community 체크 통과 (제목 ${titleChecked}개 × 갤러리 ${TOPIC_GALLERIES.length}, 희망 문구 ${hopeChecked}개 × 갤러리 ${GALLERIES.length}, 위기 신호 검열 3케이스 + 모델 판정 4케이스, 위기 신호 판정 ${CRISIS_SAMPLES.length + ORDINARY_SAMPLES.length}건) — 위기 신호 글은 저장하지 않고 200 + crisisBlocked로 안내한다`,
+      `community 체크 통과 (제목 ${titleChecked}개 × 갤러리 ${TOPIC_GALLERIES.length}, 희망 문구 ${hopeChecked}개 × 갤러리 ${GALLERIES.length}, 위기 신호 검열 3케이스 + 모델 판정 4케이스, 위기 판정 ${CRISIS_SAMPLES.length + ORDINARY_SAMPLES.length}건, 차단 판정 ${MUST_BLOCK.length + MUST_NOT_BLOCK.length}건) — 위기 신호 글은 저장하지 않고 200 + crisisBlocked로 안내한다`,
     )
   })
   .catch((error) => {

@@ -26,10 +26,13 @@ export function WriteModal({ gallery, myTypeCode }: { gallery: GalleryTab; myTyp
   const [body, setBody] = useState("")
   const [pending, setPending] = useState(false)
   const [error, setError] = useState<string | null>(null)
-  // 위기 신호로 **저장되지 않았을 때** 띄우는 안내(2026-08-25 결정 변경, _lib/crisis.ts).
-  // 전에는 "글이 올라간 뒤"의 안내였다. 지금은 글이 올라가지 않았으므로 입력을 그대로 두고
-  // 안내를 위에 얹는다 — 쓴 글이 사라지면 안내가 벌처럼 읽힌다.
+  // 위기 안내. 두 갈래가 있고 화면이 서로 달라야 한다(_lib/crisis.ts).
+  //   crisisSaved=false — blocksPosting()에 걸려 **저장되지 않았다.** 입력을 그대로 두고
+  //     안내를 폼 위에 얹는다. 쓴 글이 사라지면 안내가 벌처럼 읽힌다
+  //   crisisSaved=true  — 저장은 됐지만 걱정되는 신호가 있다(사별·보도·비유·회복 서사).
+  //     글은 올라갔으므로 폼을 걷고 안내만 남긴다. 폼을 두면 안 올라간 것처럼 보인다
   const [crisisNotice, setCrisisNotice] = useState<string | null>(null)
+  const [crisisSaved, setCrisisSaved] = useState(false)
   // 모달을 열 때 정한다. 입력 중에는 목록이 바뀌지 않는다.
   const [topics, setTopics] = useState<string[]>([])
 
@@ -52,6 +55,7 @@ export function WriteModal({ gallery, myTypeCode }: { gallery: GalleryTab; myTyp
     setBody("")
     setError(null)
     setCrisisNotice(null)
+    setCrisisSaved(false)
   }
 
   // Escape로 닫기 · 초점 가두기 · 닫을 때 "글 쓰기" 버튼으로 초점 되돌리기.
@@ -81,12 +85,22 @@ export function WriteModal({ gallery, myTypeCode }: { gallery: GalleryTab; myTyp
       // 목록이 바뀐 것이 없으므로 refresh·재화 이벤트도 쏘지 않는다 — 쏘면 올라가지 않은 글
       // 때문에 목록이 새로 그려지고, 사용자는 자기 글을 찾다가 없는 것을 확인하게 된다.
       if (json.data?.crisisBlocked) {
+        setCrisisSaved(false)
         setCrisisNotice(json.data.notice)
         return
       }
 
       router.refresh()
       window.dispatchEvent(new CustomEvent("user-stats-changed"))
+
+      // 막지는 않았지만 걱정되는 신호가 있는 글. 글은 이미 올라갔고(위 refresh로 목록에
+      // 보인다) 여기서 닫으면 안내가 뜨자마자 사라져 읽을 시간이 없다.
+      if (json.data?.crisisNotice) {
+        setCrisisSaved(true)
+        setCrisisNotice(json.data.crisisNotice)
+        return
+      }
+
       close()
     } finally {
       setPending(false)
@@ -123,7 +137,9 @@ export function WriteModal({ gallery, myTypeCode }: { gallery: GalleryTab; myTyp
             <div className="mb-5 flex items-center justify-between">
               <h2 id="write-modal-title" className="text-base font-bold text-neutral-900">
                 {crisisNotice
-                  ? "잠깐 멈춰둘게요"
+                  ? crisisSaved
+                    ? "글이 올라갔어요"
+                    : "잠깐 멈춰둘게요"
                   : isAll
                     ? "전체 커뮤니티에 글쓰기"
                     : `${TRIBE[gallery].animal} 갤러리에 글쓰기`}
@@ -144,14 +160,28 @@ export function WriteModal({ gallery, myTypeCode }: { gallery: GalleryTab; myTyp
             {crisisNotice ? (
               <>
                 <CrisisNotice message={crisisNotice} />
-                <p className="mt-3 text-xs leading-relaxed text-neutral-500">
-                  전화가 어렵게 느껴지면 아래 글은 그대로 두었다가 나중에 올려도 괜찮아요.
-                  {CRISIS_BLOCKED_HOTLINE}번은 24시간 열려 있어요.
-                </p>
-                <div className="mt-4 mb-5 border-b border-neutral-200" />
+                {!crisisSaved && (
+                  <p className="mt-3 text-xs leading-relaxed text-neutral-500">
+                    전화가 어렵게 느껴지면 아래 글은 그대로 두었다가 나중에 올려도 괜찮아요.
+                    {CRISIS_BLOCKED_HOTLINE}번은 24시간 열려 있어요.
+                  </p>
+                )}
+                {!crisisSaved && <div className="mt-4 mb-5 border-b border-neutral-200" />}
+                {crisisSaved && (
+                  <div className="mt-5 flex justify-end">
+                    <button
+                      type="button"
+                      onClick={close}
+                      className="rounded-xl bg-neutral-900 px-6 py-2.5 text-sm font-bold text-white transition hover:bg-neutral-700"
+                    >
+                      닫기
+                    </button>
+                  </div>
+                )}
               </>
             ) : null}
 
+            {!crisisSaved && (
             <>
             {/* 주제 추천(SPEC 8절). 문구는 `_lib/topics.ts` 하나에서 온다.
                 **제목만 채운다** — 본문을 대신 써 주면 그 문장이 그 사람의 하루를 규정한다. */}
@@ -231,6 +261,7 @@ export function WriteModal({ gallery, myTypeCode }: { gallery: GalleryTab; myTyp
               </button>
             </div>
             </>
+            )}
           </div>
         </div>
       )}

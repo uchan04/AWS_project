@@ -9,8 +9,8 @@ import { isOwnCommunityKey } from "@/app/community/_lib/imageKey"
 import { grantAffinity, POST_AFFINITY } from "@/app/community/_lib/affinity"
 import { completeMissionByCode } from "@/lib/missions/completion"
 import { recordAttempt, retryAfter } from "@/lib/ratelimit"
-import { containsAbuse, isCrisis } from "@/lib/safety"
-import { crisisBlockedPayload } from "@/app/community/_lib/crisis"
+import { containsAbuse, isCrisis, CRISIS_POST_NOTICE } from "@/lib/safety"
+import { blocksPosting, crisisBlockedPayload } from "@/app/community/_lib/crisis"
 import { moderate, BLOCK_CODE } from "@/app/community/_lib/moderation"
 import { invokeBedrock } from "@/app/community/_lib/bedrock"
 
@@ -137,7 +137,11 @@ export async function POST(request: NextRequest) {
     //
     // **400을 쓰지 않는다.** 사용자가 받는 것은 실패가 아니라 안내여야 한다. 화면(WriteModal)은
     // 이 응답을 받으면 창을 닫지 않고 입력도 지우지 않는다.
-    if (isCrisis(`${title} ${body}`)) {
+    // 판정은 isCrisis()가 아니라 blocksPosting()이다. isCrisis()는 오탐을 허용하도록
+    // 설계돼 있어(주석 명시) 사별·보도·비유까지 잡는다 — 안내를 띄우는 데는 맞지만
+    // 저장을 막는 기준으로 쓰면 "친구가 자살했다는 소식을 들었다"가 안 올라간다.
+    // blocksPosting()은 그중 1인칭 현재의 의도만 남긴다(_lib/crisis.ts).
+    if (blocksPosting(`${title} ${body}`)) {
       return ok(crisisBlockedPayload())
     }
 
@@ -167,9 +171,12 @@ export async function POST(request: NextRequest) {
       console.error("[DAILY_COMMUNITY_POST] 미션 완료 처리 실패", error)
     }
 
-    // crisisNotice를 더 이상 돌려주지 않는다. 위기 신호 글은 위에서 저장 없이 돌아가므로
-    // 여기까지 온 글은 정의상 위기 신호가 아니다(2026-08-25 결정 변경, _lib/crisis.ts).
-    return ok({ post, granted })
+    // 저장은 됐지만 걱정되는 신호는 있는 글 — blocksPosting()은 false인데 isCrisis()는
+    // true인 경우다(사별·보도·비유·회복 서사). 막지는 않되 안내는 보여준다.
+    // 여기 오는 글은 실제로 올라갔으므로 CRISIS_POST_NOTICE("올라갔어요…")가 사실과 맞는다.
+    const crisisNotice = isCrisis(`${title} ${body}`) ? CRISIS_POST_NOTICE : null
+
+    return ok({ post, granted, crisisNotice })
   } catch (error) {
     if (error instanceof UnauthorizedError) return fail("UNAUTHORIZED", error.message, 401)
     throw error

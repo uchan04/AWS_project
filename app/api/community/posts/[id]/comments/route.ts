@@ -6,8 +6,8 @@ import { canAccessGallery } from "@/app/community/_lib/gallery"
 import { COMMENT_MAX } from "@/app/community/_lib/limits"
 import { grantAffinity, COMMENT_AFFINITY } from "@/app/community/_lib/affinity"
 import { recordAttempt, retryAfter } from "@/lib/ratelimit"
-import { containsAbuse, isCrisis } from "@/lib/safety"
-import { crisisBlockedPayload } from "@/app/community/_lib/crisis"
+import { containsAbuse, isCrisis, CRISIS_POST_NOTICE } from "@/lib/safety"
+import { blocksPosting, crisisBlockedPayload } from "@/app/community/_lib/crisis"
 import { moderate, BLOCK_CODE } from "@/app/community/_lib/moderation"
 import { invokeBedrock } from "@/app/community/_lib/bedrock"
 
@@ -61,7 +61,9 @@ export async function POST(request: NextRequest, ctx: RouteContext<"/api/communi
     //
     // 위기 신호는 저장하지 않고 안내만 돌려준다. 검열보다 먼저 본다(글 라우트와 같은 사안).
     // 결정 변경의 근거와 톤 규칙은 app/community/_lib/crisis.ts 주석에 있다.
-    if (isCrisis(body)) {
+    // 글 라우트와 같은 기준이다. isCrisis()가 아니라 blocksPosting()으로 막는다 —
+    // 이유는 그쪽 주석과 _lib/crisis.ts에 있다.
+    if (blocksPosting(body)) {
       return ok(crisisBlockedPayload())
     }
 
@@ -90,6 +92,8 @@ export async function POST(request: NextRequest, ctx: RouteContext<"/api/communi
         isOwn: true,
       },
       granted,
+      // 막지 않은 위기 신호(사별·보도·비유 등)에는 안내만 얹는다. 댓글은 실제로 달렸다
+      crisisNotice: isCrisis(body) ? CRISIS_POST_NOTICE : null,
     })
   } catch (error) {
     if (error instanceof UnauthorizedError) return fail("UNAUTHORIZED", error.message, 401)
