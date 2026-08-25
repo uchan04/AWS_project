@@ -150,6 +150,42 @@ model User {
   diagnosis     DiagnosisSession[]
   meetupsHosted Meetup[]
   meetupJoins   MeetupParticipant[]
+  outings       PetOuting[]
+}
+
+// 펫 외출 1회. 친밀도 200을 내고 4시간 뒤에 에피소드와 재화를 들고 돌아온다.
+// 계획과 값의 근거는 docs/dev/pet.md "펫 외출 시스템", 순수 함수는 lib/pet.ts 외출 절.
+//
+// User에 컬럼 5개를 붙이지 않고 표를 만든 이유: 조인이 없어 그쪽이 싸지만 이력이 남지
+// 않는다. 기획의 "자동 일기"(미션 기록 + 외출 스토리)의 재료가 이 표다.
+//
+// ★ 진행 중인 외출은 유저당 1건이고 그것을 **DB가** 막는다. Prisma 스키마 문법으로는
+//   조건부 유니크를 쓸 수 없어 마이그레이션 SQL에 부분 유니크 인덱스로 직접 넣었다
+//   (20260825120000_pet_outing). 애플리케이션 사전 조회로는 막을 수 없다 —
+//   "보내기"를 빠르게 두 번 누르면 친밀도 400이 나가고 외출 2건이 생긴다.
+//   **인덱스를 지우면 그 구멍이 조용히 다시 열린다.**
+model PetOuting {
+  id     String @id @default(cuid())
+  userId String
+
+  startedAt DateTime  @default(now())
+  returnsAt DateTime // startedAt + OUTING_MS. 폭을 저장하므로 OUTING_HOURS를 바꿔도 진행 중인 건이 어긋나지 않는다
+  claimedAt DateTime? // null이면 아직 안 받았다. 상태 판정은 lib/pet.ts outingState()가 한다
+
+  // 에피소드는 **문장이 아니라 키로** 저장한다. 문장을 저장하면 나중에 문구를 다듬을 때
+  // 옛 기록이 옛 문장으로 굳는다 (PET_IDLE_LINES를 상수로 둔 것과 같은 판단).
+  placeKey String
+  metKey   String
+  moodKey  String
+
+  // 배율 적용 **전** 기본 수량이다. 지급은 calculateReward()를 통과하므로 실지급과 다를 수
+  // 있고, 화면은 실지급을 보여준다. 보낼 때 뽑아 저장한다 — 복귀 때 뽑으면 새로고침에 값이 바뀐다.
+  gotSeeds  Int @default(0)
+  gotShards Int @default(0)
+
+  user User @relation(fields: [userId], references: [id])
+
+  @@index([userId, startedAt])
 }
 
 model DiagnosisSession {
