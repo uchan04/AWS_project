@@ -52,9 +52,10 @@ D 쪽 기능 구현은 끝났고, 외부 대기 항목도 없다. AWS 계정·`B
 - D 쪽 변경은 3파일뿐이다 — `_lib/gallery.ts`(`GalleryTab = GalleryType`, `canWriteToGallery()`는 항상 true), `app/api/community/posts/route.ts`(400 제거 + enum 검증), `WriteModal.tsx`(중립 색 + 추천 영역 제외). ALL 로직을 `gallery.ts` 한 곳에 모아둔 설계가 실제로 값을 했다
 - `galleryTypeFilter()`는 그대로다. 전체 탭은 여전히 필터 없이 ALL 글과 종족 갤러리 글을 함께 보여준다
 
-### 5. 글쓰기 주제 추천 — 고정 문구로 구현 (2026-08-20)
-- `app/community/_lib/topics.ts`(유형별 6개, `{ title, draft }`)에서 3개를 랜덤으로 뽑아 `WriteModal`에 카드로 띄운다. 클릭하면 제목·본문이 채워진다
-- **SPEC 8절이 명시한 LLM 추천은 아니다.** 일정상 고정 문구로 갔고, 구조는 `topics.ts` 교체만으로 LLM 전환이 되도록 열어뒀다. 근거는 아래 "결정한 것과 이유" 참고
+### 5. 글쓰기 주제 추천 — 제목 전용 상수로 구현 (2026-08-20 고정 문구 → 2026-08-22 LLM → 2026-08-25 제목 전용 상수)
+- `app/community/_lib/topics.ts`(갤러리 4개 × 6개, `string[]`)에서 3개를 랜덤으로 뽑아 `WriteModal`에 카드로 띄운다. 클릭하면 **제목만** 채워진다 — 본문은 건드리지 않는다
+- **초안(`draft`)은 없다.** 2026-08-25에 없앴다. 커뮤니티에 올라가는 글은 사용자가 직접 쓴 문장이어야 한다
+- **SPEC 8절이 명시한 LLM 추천은 아니다.** 2026-08-22에 Bedrock으로 붙였다가 2026-08-25에 해제했다. SPEC과 어긋나는 상태이며 A에게 통보가 필요하다. 근거는 아래 "결정한 것과 이유" 참고
 - **발표에서 AI 생성이라고 소개하지 않는다**
 
 ### 6. 미션 완료 연동 — 해소 (2026-08-21)
@@ -77,7 +78,7 @@ D 쪽 기능 구현은 끝났고, 외부 대기 항목도 없다. AWS 계정·`B
 ## 현재 상태
 - 완료: 갤러리 목록 화면, 상세 오버레이, 좋아요 토글, 댓글 작성, 글쓰기 모달, **전체 탭 글쓰기**, 본인 글 삭제, 본인 댓글 삭제, 친밀도 지급 헬퍼, 챗봇 시스템 프롬프트, 챗봇 메시지 저장 API(GET/POST, 친밀도 지급까지), 챗봇 패널 UI, Bedrock 스트리밍 응답 연결(`POST /api/chat/stream`), 타이핑 인디케이터, 유형별 챗봇 추천 문구 6개씩·3개 랜덤 노출(LLM 아님, 정적 상수), **챗봇 전역 오버레이 이전(`ChatLauncher` + `layout.tsx`, 임시 `/chat` 라우트 폐기)**, **희망 문구 배너(SPEC.md 9절)**, **좋아요 낙관적 갱신(1281ms 대기 제거)**, **오프라인 모임(2026-08-24 — API 6종, 목록·개설·신청·취소 화면, 결성·무산 알림, "내가 신청한 모임" 구역, 같은 날 중복 신청 제한)**
 - 진행 중: 없음
-- 미착수: 이미지 업로드, LLM 주제 추천(고정 문구로 대체됨 — 아래 "결정한 것과 이유" 참고)
+- 미착수: 이미지 업로드, LLM 주제 추천(2026-08-22에 붙였다가 2026-08-25에 해제 — 상수 문구로 되돌렸다. 아래 "결정한 것과 이유" 참고)
 - 보류(다음 세션 이전 필요 조건): 글쓰기 시 일일 미션(`DAILY_COMMUNITY_POST`) 완료 처리(B와 협의 필요), `ChatPanel`의 `layout.tsx` 이전(E 소유 파일이라 D가 직접 못 건드림) — 전부 아래 "결정한 것과 이유"에 근거 남김
 
 ## 구현한 파일
@@ -85,7 +86,7 @@ D 쪽 기능 구현은 끝났고, 외부 대기 항목도 없다. AWS 계정·`B
 - `app/community/_lib/gallery.ts` — `GalleryTab`("ALL" | TypeCode), `resolveGallery()`, `canAccessGallery()`, `listGalleryPosts()`. "ALL" 관련 로직을 전부 여기 모음
 - `app/community/_components/GalleryTabs.tsx` — 탭 2개(전체 커뮤니티 / 나의 종족). 종족 탭은 진단 완료 유저에게만 노출
 - `app/community/_components/PostCard.tsx` — 카드 그리드용 게시글 카드. 종족 배지는 전체 탭에서만 노출
-- `app/community/_lib/topics.ts` — **2026-08-20 추가.** 글쓰기 주제 추천 문구. `TOPICS: Record<TypeCode, WriteTopic[]>`, 유형별 6개씩 `{ title, draft }`. `app/chat/_lib/starters.ts`와 같은 구조·같은 톤의 주석을 쓴다. `TypeCode`는 `@prisma/client`에서 그대로 import. LLM 호출 없음
+- `app/community/_lib/topics.ts` — **2026-08-20 추가, 2026-08-25 제목 전용 전환.** 글쓰기 주제 추천 문구. `TOPICS: Record<GalleryType, string[]>`, 갤러리 4개(ALL + 종족 3) × 6개. 초안(`draft`)은 없고 제목만 준다. `TOPIC_COUNT`(3)·`TOPIC_TITLE_MAX`(15)와 `resolveTopicKey(gallery, myTypeCode)`·`pickTopics(gallery, myTypeCode)`를 함께 export한다. 셔플은 `app/chat/_lib/starters.ts`와 같은 Fisher-Yates 직접 구현이고 주석 톤도 같다. `GalleryType`·`TypeCode`는 `@prisma/client`에서 그대로 import. LLM 호출 없음
 - `app/community/_lib/banner.ts` — **2026-08-22 추가, 2026-08-23 갤러리별 분기.** 희망 문구 배너 상수(SPEC.md 9절). `HOPE_MESSAGES: Record<GalleryType, readonly string[]>`(갤러리 4개 × 5개 = 20개) + `pickHopeMessage(gallery, now)`. epoch를 주 단위로 나눈 나머지로 고르므로 교체 시점은 매주 목요일이다. 상단 주석에 문구 톤 규칙 4개(유형명·조언·증상 명명·과장 칭찬 금지)를 적어 뒀다
 - `app/community/_components/HopeBanner.tsx` — **2026-08-22 추가.** 커뮤니티 메인 배너. 서버 컴포넌트(상호작용 없음), props는 `{ gallery }` 하나. 전체 탭은 `border-neutral-200 bg-neutral-50`, 종족 갤러리는 `TRIBE[gallery].colorHex`를 `22`/`55` 알파로 인라인 `style`에 넣는다(`PostCard`의 배지 관습과 동일)
 - `app/community/_lib/format.ts` — `timeAgo()` 상대 시각 표기 (디자인 시안의 타임어고 방식으로 교체, 절대 날짜 포맷은 폐기)
@@ -128,7 +129,8 @@ D 쪽 기능 구현은 끝났고, 외부 대기 항목도 없다. AWS 계정·`B
 - `app/community/page.tsx` — 헤더에 `WriteModal` 배치(전체/종족 탭 공통, 내부에서 분기). **2026-08-20**: `getCurrentUser()`~`listGalleryPosts()`를 `try/catch`로 감싸고 실패 시 "로그인이 필요해요" 안내를 렌더한다. `export const dynamic = "force-dynamic"` 추가
 - `app/community/_components/PostList.tsx` — **2026-08-20**: `<PostDetailModal>`에 `key={selectedPostId}` 추가. 다른 글을 열면 컴포넌트가 새로 마운트되도록 보장한다
 - `app/community/_components/PostDetailModal.tsx` — **2026-08-20**: 상세 로드 `useEffect` 본문의 `setLoading(true)`·`setError(null)` 두 줄 삭제(lint `react-hooks/set-state-in-effect` 해소)
-- `app/community/_components/WriteModal.tsx` — **2026-08-20**: TODO 주석과 "주제 추천 준비 중이에요" 박스를 주제 추천 카드 3개로 교체. `topics` state와 `pickThreeTopics()`(모듈 스코프, Fisher-Yates 직접 구현) 추가. 글쓰기 버튼 `onClick`에서 뽑고 카드 클릭 시 `setTitle`·`setBody`로 두 입력창을 채운다. 종족 색은 기존 `tribeColor`를 그대로 쓴다
+- `app/community/_components/WriteModal.tsx` — **2026-08-20**: TODO 주석과 "주제 추천 준비 중이에요" 박스를 주제 추천 카드 3개로 교체. `topics` state와 `pickThreeTopics()`(모듈 스코프, Fisher-Yates 직접 구현) 추가. 글쓰기 버튼 `onClick`에서 뽑고 카드 클릭 시 `setTitle`·`setBody`로 두 입력창을 채운다. 종족 색은 기존 `tribeColor`를 그대로 쓴다 — **아래 2026-08-25 항목으로 대체됨**
+- `app/community/_components/WriteModal.tsx` — **2026-08-25**: 주제 추천이 제목 전용이 되면서 이 파일에 있던 `pickThreeTopics()`를 지우고 `_lib/topics.ts`의 `pickTopics(gallery, myTypeCode)`를 쓴다. `fetch("/api/community/topics")`·`cachedRef`·`topicsLoading`도 함께 삭제해 `loadTopics()`가 `setTopics(pickTopics(...))` 한 줄이 됐다. 카드에서 초안 줄을 빼고 `onClick`은 `setTitle(topic)`만 한다. 안내 문구는 "선택하면 제목이 채워져요". 전체 탭에서도 추천이 뜬다(`ALL` 문구 또는 내 종족 문구)
 - `app/api/community/posts/route.ts` — POST 추가(글쓰기)
 - `app/api/community/posts/[id]/route.ts` — DELETE 추가(본인 글 소프트 삭제), GET 응답에 `isOwn` 추가. GET의 `comments`도 prisma 결과 그대로 내리지 않고 `{ id, body, createdAt, user, isOwn }`으로 매핑(`userId`·`postId`·`deletedAt` 미노출)
 - `app/api/community/posts/[id]/comments/route.ts` — POST 응답의 `comment`를 GET 상세와 같은 형태(`{ id, body, createdAt, user, isOwn: true }`)로 매핑. 트랜잭션·`grantAffinity`·`COMMENT_AFFINITY` 로직은 그대로 둠
@@ -179,13 +181,20 @@ D 쪽 기능 구현은 끝났고, 외부 대기 항목도 없다. AWS 계정·`B
 - **`canWriteToGallery()`는 항상 `true`를 반환하고 인자를 받지 않는다.** 이제 모든 갤러리에 쓸 수 있어 인자를 안 쓰는데, 인자를 남기면 `@typescript-eslint/no-unused-vars` 경고가 새로 생긴다(이 프로젝트는 `_` 접두사도 경고 대상 — `_request` 사례). 호출부가 두 곳뿐이고 둘 다 이번에 고치는 파일이라 시그니처를 줄였다. 함수 자체는 해소 사실을 남기려고 유지한다. 종족 갤러리 소속 검사는 예전부터 `canAccessGallery()` 몫이다
 - **POST 라우트는 `Object.values(GalleryType)` 멤버십으로 검증한다.** 예전엔 임의 문자열을 `as GalleryTab`으로 캐스팅해 그대로 저장했다. 이제 enum에 없는 값은 400 `INVALID_BODY`로 막고, 통과한 값만 `canAccessGallery()`로 소속을 본다(ALL은 누구나, 종족은 본인만). 친밀도는 그대로 `POST_AFFINITY` 20이다 — 전체 탭 글도 종족 갤러리 글과 같다
 - **전체 갤러리 중립 색(`NEUTRAL_COLOR = "#9CA3AF"`)을 `WriteModal.tsx` 안에 뒀다.** `TRIBE`에는 ALL 키가 없고 `lib/types.ts`는 A 소유 공유 파일이라 건드리지 않는다. `ChatPanel`이 진단 전 유저를 위해 같은 상수를 자기 파일에 둔 선례를 따랐다 — 값이 두 곳에 생기지만, 공유 파일을 브랜치에서 고치는 비용이 더 크다(`CLAUDE.md` 1절)
-- **전체 탭에는 주제 추천을 넣지 않는다.** `TOPICS`는 유형별 문구이고 ALL 키가 없다. 여기에 ALL용 문구를 새로 만들면 "사용자 성향에 맞는 추천"이 아니라 아무에게나 같은 문구를 주는 것이 되어 기능의 의미가 사라진다. 전체 탭에서는 `setTopics([])`로 두고 기존 `topics.length > 0` 조건이 영역 자체를 렌더하지 않게 했다
+- ~~**전체 탭에는 주제 추천을 넣지 않는다.**~~ **뒤집힘(2026-08-25).**
+  - *이전 결정(2026-08-20)*: `TOPICS`는 유형별 문구이고 ALL 키가 없다. 여기에 ALL용 문구를 새로 만들면 "사용자 성향에 맞는 추천"이 아니라 아무에게나 같은 문구를 주는 것이 되어 기능의 의미가 사라진다. 전체 탭에서는 `setTopics([])`로 두고 `topics.length > 0` 조건이 영역 자체를 렌더하지 않게 했다
+  - *변경 사유*: "성향에 맞는 추천"은 **갤러리가 아니라 사용자**를 기준으로 하면 유지된다. `resolveTopicKey()`가 전체 탭에서도 내 종족 목록을 고르므로, 진단을 마친 사람은 전체 탭에서도 자기 성향 문구를 본다. ALL 문구 6개는 **진단 전인 사람만** 보는 목록이고, 그 사람에게는 애초에 성향이 없어 "아무에게나 같은 문구"라는 문제가 성립하지 않는다. 추천이 아예 없는 것보다는 낫다는 판단이다. 그래서 ALL 문구는 어느 종족에도 기울지 않게 썼다
 - **(지난 세션) LLM 주제 추천은 보류였다.** `WriteModal`에 비활성 영역과 TODO 주석만 남겼었다. 2026-08-20에 고정 문구로 구현하며 이 자리를 교체했다(아래 항목).
 - **주제 추천을 LLM이 아니라 고정 문구로 구현했다(2026-08-20).** `SPEC.md` 8절은 "LLM이 사용자 성향에 맞는 작성 주제·초안을 3가지 이상 추천"을 명시하지만, 남은 일정상 Bedrock 연동 대신 유형별 고정 문구를 택했다. 챗봇의 `app/chat/_lib/starters.ts`가 이미 같은 방식으로 돌아가고 있어 패턴을 그대로 본떴다. **구조는 LLM 전환이 열려 있다** — `WriteModal`은 `TOPICS[gallery]`에서 3개를 받아 쓰기만 하므로, 나중에 `topics.ts`를 Bedrock 호출로 바꾸면 컴포넌트는 그대로 둘 수 있다. **발표에서 이 기능을 AI 생성이라고 소개하지 않는다**
-- **문구 작성 규칙을 지켰다.** 오늘 하루 안에서 쓸 수 있는 가벼운 소재만 쓰고, 인생 계획·목표 같은 무거운 주제와 "~해보세요" 같은 권유형을 넣지 않았다(소재를 주는 것이지 조언이 아니다). 유형명을 문구에 드러내지 않고, 자해·죽음·질병 진단은 소재로 삼지 않았다. 유형별로는 혼자 보낸 시간의 작은 장면(`INDEPENDENT_LOW_INCOME`) / 아무것도 못 한 하루도 그대로 쓸 수 있는 주제(`HEALTH_EMOTION`) / 집 안에서 혼자 느낀 감정(`FAMILY_LIVING`)으로 방향을 갈랐다 — 각각 돈·일, 운동·습관 개선, 가족 평가·대화 권유를 소재에서 뺐다
-- **`pickThreeTopics()`는 모달을 열 때 호출한다.** `useState` 초기화 함수에 두면 페이지 로드 시 한 번 뽑혀 모달을 다시 열어도 같은 목록이 나오고, 렌더 중에 뽑으면 입력하는 동안 목록이 바뀐다. 글쓰기 버튼의 `onClick`에서 `setTopics(...)` + `setIsOpen(true)`를 함께 호출해 "열 때 한 번만"을 만족시켰다. 셔플은 `ChatPanel.pickThreeStarters()`와 같은 Fisher-Yates 직접 구현이다(외부 라이브러리 없음)
+- **LLM 주제 추천을 붙였다가 해제했다(2026-08-22 → 2026-08-25).** 8/22에 `lib/community/topics.ts`의 `suggestTopics()`가 Bedrock으로 만들고 `GET /api/community/topics`가 그것을 내려주며 `_lib/topics.ts`는 대비책으로 남는 구조를 만들었다. 8/25에 사용자 결정으로 되돌렸다 — 라우트에서 Bedrock 호출을 걷어내고 `pickTopics()` 상수만 남겼다. **`lib/community/topics.ts`는 고아가 됐다**(유일한 호출부가 그 라우트였다). A 소유 영역이라 삭제하지 않고 남겨뒀으니 살아 있는 대비책으로 오해하지 말 것. **`SPEC.md` 8절("LLM이 사용자 성향에 맞는 작성 주제·초안을 3가지 이상 추천")과 어긋나는 상태이며 A에게 통보가 필요하다**
+- **초안(`draft`)을 없앴다(2026-08-25, 사용자 결정).** 카드를 고르면 제목만 채우고 본문은 비워 둔다. 채워진 문장이 그 사람의 하루를 대신 규정하기 때문이다 — "오늘은 있는 걸로 대충 때웠다"가 이미 적혀 있으면 그렇지 않았던 사람은 지우고 다시 쓰는 일부터 해야 한다. 커뮤니티에 올라가는 글은 사용자가 직접 쓴 문장이어야 한다. 제목만 주면 소재만 건네고 판단은 비워 둘 수 있다
+- **`WriteModal`은 이제 `GET /api/community/topics`를 부르지 않는다.** 라우트가 화면과 똑같은 상수를 돌려주게 되어 왕복이 값을 잃었고, 상수를 받으려고 한 번 왕복하면 창이 열린 뒤 목록이 갈아끼워지며 제목 칸이 밀린다. **라우트는 지우지 않고 남겨뒀다** — 같은 `pickTopics()`를 쓰므로 결과가 같고, `scripts/e2e-scenario.ts`가 아직 이 경로를 두드린다. 라우트는 `?gallery=`를 받되 글 작성과 같은 규칙으로 `canAccessGallery()` 소속 검사를 한다(종족은 쿼리로 받지 않고 세션에서 읽는다)
+- **문구 작성 규칙을 지켰다.** 오늘 하루 안에서 쓸 수 있는 가벼운 소재만 쓰고, 인생 계획·목표 같은 무거운 주제와 "~해보세요" 같은 권유형을 넣지 않았다(소재를 주는 것이지 조언이 아니다). 유형명을 문구에 드러내지 않고, 자해·죽음·질병 진단은 소재로 삼지 않았다. 유형별로는 혼자 보낸 시간의 작은 장면(`INDEPENDENT_LOW_INCOME`) / 아무것도 못 한 하루도 그대로 쓸 수 있는 주제(`HEALTH_EMOTION`) / 집 안에서 혼자 느낀 감정(`FAMILY_LIVING`)으로 방향을 갈랐다 — 각각 돈·일, 운동·습관 개선, 가족 평가·대화 권유를 소재에서 뺐다. **2026-08-25부터 이 규칙을 `scripts/check-community.ts`가 문구에 직접 건다**(빈 제목 / `TOPIC_TITLE_MAX` 15자 초과 / 갤러리 내 중복 / `lib/diagnosis/reason.ts`의 `BANNED` 낙인 단어 / 권유형 어미). 전에는 `lib/community/topics.ts`의 `validateTopics()`를 검사했는데 그 함수가 고아가 되어 대체했다. 문구를 고치면 `npm run check:community`를 돌린다
+- **주제는 모달을 열 때 뽑는다**(2026-08-20에는 `WriteModal`의 `pickThreeTopics()`, 2026-08-25부터 `_lib/topics.ts`의 `pickTopics()`). `useState` 초기화 함수에 두면 페이지 로드 시 한 번 뽑혀 모달을 다시 열어도 같은 목록이 나오고, 렌더 중에 뽑으면 입력하는 동안 목록이 바뀐다. 글쓰기 버튼의 `onClick`에서 `setTopics(...)` + `setIsOpen(true)`를 함께 호출해 "열 때 한 번만"을 만족시켰다. 셔플은 `ChatPanel.pickThreeStarters()`와 같은 Fisher-Yates 직접 구현이다(외부 라이브러리 없음)
 - **`topics` state는 `canWriteToGallery()` 조기 return보다 위에 선언한다.** 아래에 두면 전체 탭에서 훅 호출 개수가 달라져 React가 터진다
-- **전체 탭에서는 추천 영역을 아예 렌더하지 않는다.** `gallery`가 `"ALL"`이면 `TypeCode`를 알 수 없어 `TOPICS[gallery]`를 못 쓴다. 전체 탭은 어차피 글쓰기가 막혀 있어 이 경로를 타지 않지만, `topics.length > 0` 조건으로 방어적으로 막아뒀다
+- ~~**전체 탭에서는 추천 영역을 아예 렌더하지 않는다.**~~ **뒤집힘(2026-08-25).**
+  - *이전 결정(2026-08-20)*: `gallery`가 `"ALL"`이면 `TypeCode`를 알 수 없어 `TOPICS[gallery]`를 못 쓴다. 전체 탭은 어차피 글쓰기가 막혀 있어 이 경로를 타지 않지만, `topics.length > 0` 조건으로 방어적으로 막아뒀다
+  - *변경 사유*: 전제 두 개가 다 사라졌다. `TOPICS`의 키가 `GalleryType`이 되어 `TOPICS["ALL"]`이 존재하고, 전체 탭 글쓰기는 2026-08-20에 풀렸다(위 "4. 전체 탭 글쓰기"). `topics.length > 0` 조건 자체는 그대로 두지만 이제 걸리지 않는다 — `pickTopics()`는 어떤 갤러리에서도 3개를 준다
 - **일일 미션(`DAILY_COMMUNITY_POST`) 완료 처리는 보류.** `UserMission`은 B의 도메인이라 직접 만들지 않음. 작성 API에 `// TODO: DAILY_COMMUNITY_POST 완료 처리 — 담당 B와 협의 중` 주석만 남김
 - 삭제는 소프트 삭제(`deletedAt`)이며 친밀도를 회수하지 않는다. `affinityToday`가 이미 누적돼 있어 삭제 후 재작성으로 하루 상한을 넘길 수 없음
 - **댓글 삭제도 친밀도를 회수하지 않는다.** 글 삭제와 같은 이유다 — `affinityToday`가 이미 누적돼 있어 지웠다 다시 써도 하루 상한 100을 넘길 수 없다. `grantAffinity`·`calculateReward`를 아예 부르지 않으므로 댓글 DELETE는 `getCurrentUserWithSkin()`이 아니라 `getCurrentUser()`를 쓴다(`activePetSkin`이 필요 없음)
@@ -298,7 +307,8 @@ D 쪽 기능 구현은 끝났고, 외부 대기 항목도 없다. AWS 계정·`B
 - 없음 (로컬 DB가 `prisma migrate`로 관리되지 않고 있던 것을 발견해 베이스라인 마이그레이션(`prisma/migrations/00000000000000_init`)을 만들어 해결. 기존 시드 데이터(미션 41개, 펫스킨 6개)는 유지됨. 스키마 담당과 공유 필요)
 
 ## 다음 할 일
-- ~~LLM 주제 추천 3가지 이상 연동~~ — **고정 문구로 대체했다(2026-08-20).** `app/community/_lib/topics.ts`의 유형별 6개 중 3개를 `WriteModal`이 카드로 보여준다. 나중에 LLM으로 전환한다면 `topics.ts`만 Bedrock 호출로 바꾸면 되고 컴포넌트는 그대로 둘 수 있다(비스트리밍 단발 호출이라 `ConverseCommand`가 맞다). SPEC 8절과의 차이와 발표 시 주의는 "결정한 것과 이유" 참고
+- ~~LLM 주제 추천 3가지 이상 연동~~ — **8/22에 붙였다가 8/25에 해제했다.** 지금은 `app/community/_lib/topics.ts`의 갤러리별 6개 중 3개를 `WriteModal`이 카드로 보여주고, **제목만** 채운다. `lib/community/topics.ts`는 남아 있지만 아무도 부르지 않는다. SPEC 8절과의 차이와 발표 시 주의는 "결정한 것과 이유" 참고
+- **A에게 통보 — 주제 추천이 SPEC 8절과 어긋난다.** LLM 추천 해제와 초안 폐지는 사용자 결정이다. `lib/community/topics.ts`(A 소유)가 고아가 된 사실도 함께 알린다. 삭제 여부는 A가 정한다
 - **`layout.tsx` 변경분 PR 리뷰 — E.** 전역 오버레이 이전은 끝났고(2026-08-20) E와 사전 공유했다. 공유 파일이므로 머지 전 PR 리뷰를 받는다. diff는 import 한 줄 + `<ChatLauncher />` 한 줄뿐이다
 - `app/chat/` 폴더 소유를 `CLAUDE.md` 2절에 정식 반영 — 팀 확인 대기 (계속 남아있는 이월 항목)
 - 좋아요 낙관적 갱신을 브라우저에서 한 번 눌러 확인 (preview 창의 `/community` 하이드레이션 문제로 미측정)
