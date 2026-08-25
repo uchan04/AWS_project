@@ -398,20 +398,10 @@ async function main() {
       ),
       crisisData?.notice,
     )
-    // 오탐이 곧 "글이 사라지는 것"이 된 뒤로 가장 위험한 경로다 — 사별 글은 올라가야 한다
-    const bereaved = await call("POST", "/api/community/posts", {
-      title: "친구 소식",
-      body: "친구가 자살했다는 소식을 들었다. 아직 실감이 안 난다.",
-      galleryType: "ALL",
-    })
-    const bereavedData = bereaved.body.data as
-      | { crisisBlocked?: boolean; post?: unknown }
-      | undefined
-    record(
-      "사별 글은 막지 않는다 (blocksPosting이 isCrisis보다 좁다)",
-      bereaved.status === 200 && !bereavedData?.crisisBlocked && Boolean(bereavedData?.post),
-      bereaved.body,
-    )
+    // 사별 검증은 아래 댓글 절에 둔다. 글 라우트는 POST_LIMIT = 5인데 `recordAttempt`가
+    // 안전 검사보다 앞에 있어(posts/route.ts:104) 검열로 막힌 요청도 카운트된다 — 이 절에서
+    // 이미 5칸을 쓰고 있어서 하나만 더 넣으면 아래 "타인 공격 글은 거부"가 도배 제한에 걸린다.
+    // 댓글은 COMMENT_LIMIT = 20이고 같은 blocksPosting()을 쓰므로 증거로 동등하다.
 
     const abusive = await call("POST", "/api/community/posts", {
       title: "화가 난다",
@@ -441,6 +431,20 @@ async function main() {
         crisisComment.body,
       )
       record("위기 신호 댓글 응답에 comment가 없다", commentData?.comment === undefined, crisisComment.body)
+
+      // 오탐이 곧 "글이 사라지는 것"이 된 뒤로 가장 위험한 경로다 — 사별은 막히면 안 된다.
+      // blocksPosting()이 isCrisis()보다 좁다는 것을 실제 요청으로 확인하는 유일한 단정이다.
+      const bereaved = await call("POST", `/api/community/posts/${postId}/comments`, {
+        body: "친구가 자살했다는 소식을 들었다. 아직 실감이 안 난다.",
+      })
+      const bereavedData = bereaved.body.data as
+        | { crisisBlocked?: boolean; comment?: unknown }
+        | undefined
+      record(
+        "사별 글은 막지 않는다 (blocksPosting이 isCrisis보다 좁다)",
+        bereaved.status === 200 && !bereavedData?.crisisBlocked && Boolean(bereavedData?.comment),
+        bereaved.body,
+      )
     }
 
     const ghost = await call("GET", "/api/community/posts/does-not-exist")
