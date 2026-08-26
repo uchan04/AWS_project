@@ -2,7 +2,7 @@ import type { NextRequest } from "next/server"
 import { getCurrentUser, UnauthorizedError } from "@/lib/auth"
 import { prisma } from "@/lib/prisma"
 import { ok, fail } from "@/lib/api"
-import { canViewGallery, postImageUrl } from "@/app/community/_lib/gallery"
+import { canAccessGallery, postImageUrl } from "@/app/community/_lib/gallery"
 
 export async function GET(_request: NextRequest, ctx: RouteContext<"/api/community/posts/[id]">) {
   try {
@@ -19,8 +19,8 @@ export async function GET(_request: NextRequest, ctx: RouteContext<"/api/communi
     })
     if (!post) return fail("NOT_FOUND", "게시글을 찾을 수 없어요", 404)
 
-    // 읽기다. 관리자는 모든 종족 갤러리의 글을 본다.
-    if (!canViewGallery(post.galleryType, user.typeCode, user.isAdmin)) {
+    // 관리자는 모든 종족 갤러리의 글을 본다.
+    if (!canAccessGallery(post.galleryType, user.typeCode, user.isAdmin)) {
       return fail("FORBIDDEN", "다른 종족의 갤러리는 볼 수 없어요", 400)
     }
 
