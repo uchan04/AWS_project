@@ -546,7 +546,7 @@ grantAffinity(user, base, source = "COMMUNITY", alreadyFromSource?)
 
 `build 0` · `tsc 0오류` · `eslint(app) 0` · `check:community`·`check:safety` 통과. 브라우저로 챗봇 헤더가 `40/40`, 게이지 100%인 것까지 확인했다.
 
-**`npm run e2e`는 돌리지 못했다** — RDS 커넥션 고갈(`STATUS.md` 차단 27번, 여유 −6). 머지 직전 실행에서는 80건 통과였다. 커넥션이 풀리면 다시 돌려야 한다.
+**`npm run e2e` 80건 통과 / 실패 0.** 두 번 실패한 뒤 세 번째에 통과했는데 **실패 원인은 코드가 아니라 RDS 커넥션 고갈**이었다(전부 `P2037`, 여유 −6 → 13으로 풀린 뒤 통과). `STATUS.md` 차단 27번 참고.
 
 ### 이것과 별개로 D가 볼 것 — 차단 31·32번
 
