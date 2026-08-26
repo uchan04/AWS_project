@@ -29,6 +29,7 @@ export async function myJoinedMeetups(userId: string): Promise<MeetupListItem[]>
           id: true,
           galleryType: true,
           title: true,
+          body: true,
           place: true,
           startsAt: true,
           status: true,

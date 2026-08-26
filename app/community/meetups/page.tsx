@@ -66,6 +66,7 @@ export default async function MeetupsPage() {
           id: true,
           galleryType: true,
           title: true,
+          body: true,
           place: true,
           startsAt: true,
           minCount: true,

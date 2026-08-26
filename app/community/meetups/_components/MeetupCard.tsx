@@ -37,6 +37,8 @@ export type MeetupListItem = {
   id: string
   galleryType: GalleryType
   title: string
+  // 모임 설명. 개설 폼·API가 빈 값을 거부해 실제로는 늘 채워져 있다(schema의 Meetup.body)
+  body: string
   place: string
   startsAt: Date
   minCount: number
@@ -159,10 +161,15 @@ export function MeetupCard({
     >
       {/* 카드가 여러 개 나열되므로 scale은 쓰지 않는다(격자가 흔들린다). 그림자 한 단계 + 2px 부양만 — PostCard.tsx와 같다. */}
       <div className="flex flex-col gap-3 rounded-2xl border border-neutral-200 bg-white p-5 transition duration-150 hover:border-neutral-300 hover:shadow-md motion-safe:hover:-translate-y-0.5">
+        {/* 위계는 두 단계다(2026-08-27). 위: 제목과 일시 — 크고 진하게.
+            아래: 설명과 장소·인원 — 작고 흐리게.
+            예전에는 제목이 font-medium 기본 크기이고 일시·장소·인원이 전부 text-sm neutral-600이라
+            무엇을 먼저 읽어야 할지 드러나지 않았다. 일시는 "언제 가야 하는가"라 제목 다음이고,
+            문자열이 20자쯤 되어(8월 28일 (금) 오전 11:09) 아래 라벨 줄에 끼워 넣으면 어차피 줄이 넘친다 */}
         <div className="flex items-start justify-between gap-2">
-          <div>
-            <p className="font-medium text-neutral-900">{meetup.title}</p>
-            <p className="mt-1 text-xs text-neutral-400">{meetup.host.nickname}</p>
+          <div className="min-w-0">
+            <p className="text-base font-bold break-words text-neutral-900">{meetup.title}</p>
+            <p className="mt-1 text-sm font-semibold text-neutral-800">{meetupDateTime(meetup.startsAt)}</p>
           </div>
 
           {/* 배지 어휘는 카드에 있던 종족 배지와 같다 — 알약 모양에 22 알파 배경, 원색 글자.
@@ -181,21 +188,49 @@ export function MeetupCard({
           )}
         </div>
 
-        <div className="flex flex-col gap-1 text-sm text-neutral-600">
-          <span>{meetupDateTime(meetup.startsAt)}</span>
-          <span>{meetup.place}</span>
-          {/* 강조는 inline-block 안에서만 일어난다. 줄 높이도 이웃 요소도 밀지 않는다.
-              글자 굵기는 건드리지 않는다 — 폭이 바뀌어 숫자가 흔들린다. */}
-          <span>
-            <span
-              className={
-                "inline-block transition duration-300 " +
-                (bumped ? "text-neutral-900 motion-safe:scale-110" : "text-neutral-500")
-              }
-            >
-              {meetup.joinCount} / {meetup.capacity}명
+        {/* 모임 설명(Meetup.body). 개설 폼과 API가 둘 다 빈 값을 거부하므로 실제로는 늘 있지만,
+            그래도 비어 있으면 영역째 그리지 않는다 — 빈 자리가 남으면 카드마다 높이가 달라진다.
+            line-clamp-3으로 길이를 묶고(2000자까지 들어온다), 작성자가 나눈 문단은 살리고
+            (whitespace-pre-line), 공백 없는 긴 문자열은 쪼갠다(break-words). 전문은 신청 확인에서
+            읽는 것이 아니라 이 카드가 전부이므로 3줄은 남긴다 */}
+        {meetup.body.trim() && (
+          <p className="line-clamp-3 text-sm leading-relaxed break-words whitespace-pre-line text-neutral-600">
+            {meetup.body}
+          </p>
+        )}
+
+        {/* 라벨 붙은 두 줄(2026-08-27). 잠깐 `주최자 · 장소 · 인원` 한 줄이었는데 값 셋이
+            구분자만으로 이어져 어느 것이 무엇인지 읽히지 않았고, 그 다음 시도인
+            `grid-cols-[auto_1fr]`은 2열로 잡히지 않아 라벨과 값이 세로로 쌓였다.
+            그래서 줄마다 flex를 쓰고 **라벨 폭을 w-8로 고정한다** — 값의 시작 위치가 두 줄에서
+            같아지고, 카드가 좁아져도 라벨이 줄지 않는다(shrink-0). 값 쪽은 min-w-0 break-words라
+            긴 장소명이 라벨 아래로 무너지지 않고 오른쪽 칸 안에서 접힌다.
+            라벨은 값보다 한 단계 더 흐리다(neutral-400 대 neutral-600). 값이 먼저 읽혀야 한다.
+
+            **주최자 닉네임은 뺐다.** 모임 개설은 관리자만 할 수 있어 매번 같은 이름이 뜬다.
+            데이터는 그대로 온다(page.tsx·_lib/joined.ts의 select, MeetupListItem.host) —
+            지우려면 조회까지 함께 손봐야 해서 표시만 멈춘다 */}
+        <div className="mt-1 flex flex-col gap-1.5 text-xs">
+          <div className="flex gap-3">
+            <span className="w-8 shrink-0 text-neutral-400">장소</span>
+            <span className="min-w-0 break-words text-neutral-600">{meetup.place}</span>
+          </div>
+
+          <div className="flex gap-3">
+            <span className="w-8 shrink-0 text-neutral-400">인원</span>
+            {/* 강조는 inline-block 안에서만 일어난다. 줄 높이도 이웃 요소도 밀지 않는다.
+                글자 굵기는 건드리지 않는다 — 폭이 바뀌어 숫자가 흔들린다. */}
+            <span className="text-neutral-600">
+              <span
+                className={
+                  "inline-block transition duration-300 " +
+                  (bumped ? "text-neutral-900 motion-safe:scale-110" : "text-neutral-600")
+                }
+              >
+                {meetup.joinCount} / {meetup.capacity}명
+              </span>
             </span>
-          </span>
+          </div>
         </div>
 
         {error && (
@@ -204,7 +239,10 @@ export function MeetupCard({
           </FadeIn>
         )}
 
-        <div className="flex flex-wrap gap-2">
+        {/* 버튼은 카드 오른쪽 끝에 모은다(2026-08-27). 한 줄에 들어오는 것은 전부 —
+            신청 취소·신청하기·정원 마감·결성 확인·무산이 같은 정렬을 따른다.
+            아래 확인 펼침들은 이 줄의 형제라 정렬에 영향을 받지 않는다(그 안의 배치는 그대로다) */}
+        <div className="flex flex-wrap justify-end gap-2">
           {meetup.joined && canCancel && (
             <button
               type="button"
