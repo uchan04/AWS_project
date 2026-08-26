@@ -41,6 +41,7 @@ const BACKGROUND_PRICE_SHARDS = 500
 import { ArtImage } from "@/app/components/ArtImage"
 import { useModalA11y } from "@/app/components/useModalA11y"
 import { CurrencyIcon } from "@/app/components/CurrencyIcon"
+import { openChat } from "@/app/chat/_lib/events"
 import PetRoom from "./PetRoom"
 import "@/styles/tokens.css"
 import "../pet.css"
@@ -905,13 +906,62 @@ export default function PetView({ initial }: { initial: PetState }) {
                 pet.css의 `.pet-room__evo` 자리 주석에 남겼다 */}
 
 
-            {/* 방 중앙 상단에 **경험치 유리 팝업**(.pet-exp-pop)이 있었다 — 씨앗을 넣으면
-                2.6초 떴다가 스스로 닫혔다. 2026-08-26 사용자 결정으로 걷었다: C의 개편이
-                좌상단에 **상주 Lv HUD**(.pet-hud-lv)를 뒀고, 그러면 같은 경험치 값이 한
-                화면에 두 벌이 된다. 남긴 것은 **연출뿐**이다 — expShow가 이제 팝업을 띄우지
-                않고 그 HUD의 게이지가 이전 위치에서 채워지게 한다(아래 .pet-hud-lv 자리).
-                팝업 CSS(liquid glass 네 겹 + petExpPop 키프레임)는 pet.css에서 지웠고
-                근거는 그 자리 주석에 남겼다 */}
+            {/* 경험치 유리 바 — 방 중앙 상단. 씨앗을 넣으면 2.6초 떴다가 스스로 닫힌다.
+                **상주 Lv HUD와 함께 나온다**(2026-08-26 사용자 결정). 같은 값이 두 곳에
+                보이지만 역할이 다르다: 좌상단 HUD는 **평상시 상태**를, 이 바는 **방금 오른
+                몫**을 알린다. 그래서 HUD 게이지의 채움 연출도 그대로 남아 있다.
+
+                한 번 걷었다가 되살린 것이다 — 자리 다섯 번의 내력과 실측(알약 10~44px ·
+                HUD 10~98px · 말풍선 322px부터)은 pet.css `.pet-exp-pop` 주석에 있다.
+
+                닫기 버튼이 없다 — 알림이지 대화 상자가 아니다. 그래서 `useModalA11y`를
+                쓰지 않는다: 초점을 빼앗으면 먹이기를 연달아 누를 수 없다.
+                `role="status"`가 스크린리더에 읽히는 경로다 */}
+            {expShow ? (
+              <div className="pet-exp-pop" role="status" aria-live="polite">
+                <div className="pet-exp-pop__box">
+                  <div className="pet-exp-pop__head">
+                    {/* 제목 앞 이모지는 2026-08-24 사용자 요청으로 되살린 것이다
+                        ("예전에 있던대로"). design.md의 "이모지는 마스코트 자리에만"에서
+                        벗어나는 자리다. 새 예외가 아니라 이 화면이 원래 갖고 있던 예외로
+                        돌아온 것이고, aria-hidden이라 스크린리더가 읽는 이름은 글자대로다 */}
+                    <p className="pet-exp-pop__title">
+                      <span aria-hidden="true">⭐</span> 경험치
+                    </p>
+                    <span className="pet-exp-pop__meta">
+                      {ko(pet.exp)} / {ko(need)}
+                    </span>
+                  </div>
+                  <div
+                    className="pet-gauge"
+                    role="progressbar"
+                    aria-label="다음 레벨까지 경험치"
+                    aria-valuemin={0}
+                    aria-valuemax={need}
+                    aria-valuenow={pet.exp}
+                  >
+                    {/* from이 있는 0.3초 동안은 **이전 위치**를 그린다. 그 뒤 현재 값으로
+                        바뀌면 CSS transition이 채워지는 모습을 만든다 —
+                        JS 애니메이션을 쓰지 않는다 */}
+                    <div
+                      className="pet-gauge__fill"
+                      style={{ width: `${(expShow.from ?? progress) * 100}%` }}
+                    />
+                  </div>
+                  {/* 지금까지 `Lv.25 마지막 진화`만 보여 줬다. 그 문구는 지금 무엇을 얼마나
+                      해야 하는지 알려 주지 않는다. 벤치마크한 육성 게임은 전부 남은 개수를
+                      쓴다 (2026-08-24 사용자 확정: seedsToNextStage 쪽을 쓴다) */}
+                  <p className="pet-exp-pop__foot">
+                    <span>현재 Lv.{pet.level}</span>
+                    <span>
+                      {nextStage
+                        ? `${STAGE_NAME[nextStage.stage - 1] ?? `${nextStage.stage}단계`}까지 씨앗 ${ko(nextStage.seeds)}개`
+                        : "마지막 단계예요"}
+                    </span>
+                  </p>
+                </div>
+              </div>
+            ) : null}
 
 
             {/* 여기 떠다니는 씨앗 장식 3개(🌱🌿🍃)가 있었다 — 2026-08-24 사용자 요청
@@ -1251,7 +1301,17 @@ export default function PetView({ initial }: { initial: PetState }) {
               만들려면 D 소유 파일에 새 인터페이스가 필요하다. D의 전역 챗봇 버튼이
               이미 우상단에 떠 있으므로 그것으로 갈음한다 */}
           <div className="pet-actions pet-actions--right">
-            <CircleBtn icon="💬" label="커뮤니티" href="/community" />
+            {/* 챗봇 — **우측 스택 맨 위다** (2026-08-26 사용자 요청).
+                전역 오버레이 버튼(ChatLauncher)이 `fixed top-4 right-4`라 좁은 화면에서
+                페이지 머리를 덮었고, 이 화면은 HUD를 갖고 있으므로 여기로 들였다.
+                그쪽은 `/pet`에서만 버튼을 감춘다 — 패널은 같은 컴포넌트가 그대로 연다.
+
+                링크가 아니라 버튼이다: 아래 셋은 다른 화면으로 가고, 이것은 이 화면에서
+                패널을 연다(CircleBtn이 href 유무로 태그를 가른다).
+                아이콘이 💬로 겹치던 커뮤니티는 🗨로 바꿨다 — 같은 스택에 같은 그림이
+                둘이면 무엇이 무엇인지 알 수 없다 */}
+            <CircleBtn icon="💬" label="마음 친구" onClick={openChat} />
+            <CircleBtn icon="🗨" label="커뮤니티" href="/community" />
             <CircleBtn icon="✅" label="미션" href="/missions" />
             <CircleBtn icon="🤝" label="모임" href="/community/meetups" />
           </div>

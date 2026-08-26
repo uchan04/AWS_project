@@ -3,6 +3,7 @@
 import { useEffect, useState } from "react"
 import { usePathname } from "next/navigation"
 import { CHAT_BUBBLES } from "../_lib/bubbles"
+import { CHAT_OPEN_EVENT } from "../_lib/events"
 import { ChatPanel } from "./ChatPanel"
 
 // 챗봇 버튼을 띄우는 화면. 홈·미션·키우기·커뮤니티 네 곳만이다(2026-08-21 확정 흐름).
@@ -44,6 +45,19 @@ export function ChatLauncher({ diagnosed }: { diagnosed: boolean }) {
     return () => window.clearTimeout(timer)
   }, [])
 
+  // **밖에서 여는 창구** (2026-08-26 사용자 요청, A 구현 — D 통보).
+  // 펫 화면이 자기 HUD에 챗봇 버튼을 갖게 되면서 필요해졌다. 이벤트로 둔 이유는
+  // `_lib/events.ts` 주석에 있다 — 요약하면 layout.tsx가 서버 컴포넌트라 상태를 못 들고,
+  // 그래서 이 래퍼가 상태를 갖고 있는 구조 자체가 props 전달을 막는다.
+  //
+  // 이 컴포넌트가 안 그려지는 화면(진단 전·허용 목록 밖)에서는 리스너도 없으므로
+  // 이벤트를 쏴도 아무 일이 없다 — 그쪽이 맞다. 챗봇이 없어야 하는 화면이다.
+  useEffect(() => {
+    const onOpen = () => setOpen(true)
+    window.addEventListener(CHAT_OPEN_EVENT, onOpen)
+    return () => window.removeEventListener(CHAT_OPEN_EVENT, onOpen)
+  }, [])
+
   // 마운트된 프레임에 최종 상태를 칠하면 전환이 생기지 않는다. 한 프레임 뒤에 올린다.
   useEffect(() => {
     if (!bubble) return
@@ -55,6 +69,18 @@ export function ChatLauncher({ diagnosed }: { diagnosed: boolean }) {
 
   // 패널이 열려 있는 동안에는 말풍선도 함께 사라진다 — 이미 말을 걸고 있는데 또 부를 이유가 없다.
   if (open) return <ChatPanel onClose={() => setOpen(false)} />
+
+  // **`/pet`에서는 떠 있는 버튼과 말풍선을 감춘다** (2026-08-26 사용자 요청).
+  // 그 화면이 챗봇 버튼을 자기 HUD(우측 스택)에 갖고 있어서 두 벌이 되고, 전역 오버레이가
+  // `fixed top-4 right-4`라 좁은 화면에서 페이지 머리("나의 펫")를 덮는 문제도 있었다
+  // (C가 2026-08-26 기록에 "이번 변경과 무관한 기존 상태이고 D 파일이다"로 남긴 것).
+  //
+  // **위 리스너보다 아래에 둔다.** 감추는 것은 버튼뿐이고 패널은 그대로 열린다 —
+  // 이 return이 리스너 등록보다 위에 오면 훅이 조건부로 호출돼 규칙 위반이다.
+  //
+  // 정확히 "/pet"만이다. `/pet/skins`·`/pet/cosmetics`·`/pet/rest`에는 HUD가 없으므로
+  // 접두사로 감추면 그 세 화면에서 챗봇에 닿을 길이 사라진다.
+  if (pathname === "/pet") return null
 
   // 크기: **2026-08-26 사용자 요청으로 1.5배를 되돌렸다.** h-12 w-12 text-xl(48px·20px)이
   // 원래 값이고 D가 쓴 그대로다.

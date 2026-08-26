@@ -4153,18 +4153,208 @@
   overflow-y: auto;
 }
 
-/* ── 경험치: 여기에 유리 팝업(.pet-exp-pop) 한 벌이 있었다 ────────────────────
+/* ── 경험치 팝업 (2026-08-26) ─────────────────────────────────────────────── */
+/*
+ * 씨앗을 먹인 직후 **방의 중앙 상단**에 스스로 열리고 2.6초 뒤 스스로 닫힌다.
+ *
+ * 자리가 다섯 번 바뀌었다. 남겨 두는 이유는 뒤로 돌아가지 않기 위해서다.
+ *
+ *   ① 오른쪽 열 카드      나타나는 순간 아래 카드 네 장이 밀렸다(실측 153px).
+ *                        방금 누른 먹이기 버튼이 손가락 아래에서 움직인다
+ *   ② 화면 상단 중앙      밀림은 사라졌지만 방 밖이라 시선이 위로 튀었다가 돌아온다
+ *   ③ 방 중앙 상단        씨앗이 오르는 곳도, 눈이 가 있는 곳도 펫이다
+ *   ④ 삭제               C의 개편이 좌상단에 상주 Lv HUD를 두어 게이지가 두 벌이 됐다
+ *   ⑤ 방 중앙 상단(지금)  **사용자 결정으로 되살렸다** — 상주 HUD와 함께 나온다.
+ *                        같은 값이 두 곳에 보이는 것을 감수한 판단이다: HUD는 평상시 상태를
+ *                        알리고 이 유리 바는 **방금 오른 몫**을 알린다. 역할이 다르다
+ *
+ * **자리는 알약 아래 3.5rem이다.** 넓은 화면(1100px) 실측으로 잡았다 —
+ * 재화 알약이 방 기준 10~44px, Lv HUD가 10~98px(좌측 10~138px), 말풍선이 322px부터다.
+ * 56px에서 시작하면 알약 아래이고, 가운데 정렬이라 왼쪽 끝이 약 246px이어서 HUD(138px)를
+ * 지나지 않으며, 높이 약 112px이라 말풍선(322px)에도 닿지 않는다.
+ *
+ * 좁은 화면(≤768px)에서는 방이 작아 Lv HUD와 겹친다. **의도한 것이다** — 둘이 같은
+ * 경험치를 말하므로 덮어도 모순이 없고, 2.6초 뒤 사라진다. `pointer-events: none`이라
+ * 그 동안에도 아래를 누를 수 있다
+ *
+ * ③이 fixed가 아니라 absolute인 이유가 여기다 — 기준이 뷰포트가 아니라 방이다.
+ * .pet-room이 position: relative(파일 앞 .pet-room)이므로 이 자리가 곧 방 기준이고,
+ * 방이 overflow: hidden이라 팝업이 방 밖으로 새지 않는다.
+ *
+ * 오버레이(어두운 배경)를 깔지 않는다. 알림이지 대화 상자가 아니고, 뒤를 덮으면
+ * 연달아 먹이는 동작이 막힌다. 그래서 pointer-events: none이다 — 팝업이 떠 있는
+ * 2.6초 동안에도 그 아래를 누를 수 있다.
+ *
+ * 닫기 버튼도 없다. 있으면 "닫아야 하는 것"이 되고, 하루에 여러 번 뜨는 알림에
+ * 매번 닫기를 요구하면 그게 일이 된다.
+ */
 
-   씨앗을 넣으면 방 중앙 상단에 2.6초 떴다가 스스로 닫히는 팝업이었다(liquid glass 네 겹 +
-   petExpPop 키프레임 + prefers-reduced-motion용 petExpPopFade). **2026-08-26 사용자
-   결정으로 걷었다** — C의 개편이 좌상단에 상주 Lv HUD(.pet-hud-lv)를 두었고, 그러면 같은
-   경험치 값이 한 화면에 두 벌이 된다.
+.pet-exp-pop {
+  position: absolute;
+  /* 재화 알약(방 기준 10~44px) 아래다. 위 주석의 실측 참고 */
+  top: 3.5rem;
+  left: 0;
+  right: 0;
+  /* 말풍선(.pet-welcome)이 --z-sticky다. 방이 짧으면 말풍선 윗부분과 겹치는데,
+     그때 위에 있어야 하는 쪽은 이쪽이다 — 말풍선은 5분마다 바뀌는 상주 문구고
+     이건 방금 누른 동작의 결과다 */
+  /* 알약·Lv HUD가 calc(--z-raised + 2)이고 말풍선이 --z-sticky다. 이 바는 그 위다 —
+     2.6초짜리 알림이라 겹칠 때 위에 있어야 하고, pointer-events: none이라 아래를 막지 않는다 */
+  z-index: calc(var(--z-sticky) + 1);
+  display: grid;
+  justify-items: center;
+  padding-inline: var(--space-xs);
+  pointer-events: none;
+}
 
-   **연출은 남았다.** PetView의 expShow가 이제 팝업을 띄우지 않고 그 HUD 게이지의 폭을
-   0.3초 동안 이전 위치로 잡는다. 아래 transition이 그 뒤 채워지는 모습을 만든다.
+/*
+ * Apple liquid glass(2025 디자인 언어)를 이 화면 색으로 옮긴 것. 네 겹이다.
+ *
+ *   1. 반투명 배경    뒤가 비쳐야 유리다. 위가 밝고 아래가 옅은 사선 그라디언트
+ *   2. backdrop-filter  뒤를 흐리고(blur) 채도를 올린다(saturate) — 유리의 핵심
+ *   3. 안쪽 하이라이트  inset 1px 흰 선. 유리 두께의 위쪽 모서리에 빛이 걸린 것
+ *   4. 바깥 그림자     크고 옅게. 화면에서 떠 있는 것으로 읽히게 한다
+ *
+ * blur만으로는 유리가 안 된다 — 3번이 없으면 그냥 흐린 사각형이다.
+ * saturate가 없으면 뒤의 종족색이 회색으로 빠져 유리가 플라스틱이 된다.
+ */
+.pet-exp-pop__box {
+  position: relative;
+  /* 22rem이었다. 기준이 화면에서 방으로 바뀌면서 20rem으로 줄였다 — 방은 화면보다
+     좁고(넓은 화면 실측 방 폭 = 왼쪽 열 폭), 방 폭을 꽉 채우면 유리가 창이 아니라
+     띠가 된다. 좁은 화면에서는 100%가 걸려 방 폭에서 좌우 여백만 뺀 값이 된다 */
+  width: min(20rem, 100%);
+  display: grid;
+  gap: 0.5rem;
+  padding: 0.875rem 1.125rem 0.75rem;
+  border-radius: 1.5rem;
+  overflow: hidden;
+  /* backdrop-filter를 못 쓰는 브라우저용 기본값. 이쪽은 더 불투명해야 글자가 읽힌다 */
+  background: linear-gradient(165deg, rgb(255 255 255 / 0.92), rgb(255 255 255 / 0.78));
+  border: 1px solid rgb(255 255 255 / 0.6);
+  box-shadow:
+    inset 0 1px 0 rgb(255 255 255 / 0.85),
+    inset 0 -1px 1px rgb(255 255 255 / 0.35),
+    0 1.25rem 2.5rem -0.75rem rgb(42 31 20 / 0.32),
+    0 0.125rem 0.5rem rgb(42 31 20 / 0.1);
+  animation: petExpPop 2.6s var(--ease-out) forwards;
+}
 
-   되살릴 값이 필요하면 이 파일의 커밋 이력을 본다 — 자리가 하루에 세 번 바뀐 내력(카드 →
-   화면 상단 → 방 중앙)과 실측(레이아웃 이동 153px → 0px)은 docs/dev/pet.md에 남아 있다 */
+@supports (backdrop-filter: blur(1px)) or (-webkit-backdrop-filter: blur(1px)) {
+  .pet-exp-pop__box {
+    /* 지원하면 배경을 걷어 실제로 뒤가 비치게 한다. 두 값 다 필요하다:
+       blur가 뒤를 지우고, saturate가 지워진 색을 되살린다 */
+    background: linear-gradient(165deg, rgb(255 255 255 / 0.5), rgb(255 255 255 / 0.24));
+    -webkit-backdrop-filter: blur(1.5rem) saturate(180%);
+    backdrop-filter: blur(1.5rem) saturate(180%);
+  }
+}
+
+/* 상단을 가로지르는 반사광 한 줄. 유리를 "표면"으로 만드는 것이 이 한 겹이다 —
+   빼면 균일한 반투명 면이 되고 재질이 사라진다. 각도(105deg)를 상자 그라디언트
+   (165deg)와 어긋나게 둬서 빛이 다른 방향에서 오는 것으로 읽힌다 */
+.pet-exp-pop__box::before {
+  content: "";
+  position: absolute;
+  inset: 0 0 auto;
+  height: 45%;
+  background: linear-gradient(
+    105deg,
+    rgb(255 255 255 / 0) 12%,
+    rgb(255 255 255 / 0.55) 38%,
+    rgb(255 255 255 / 0) 68%
+  );
+  pointer-events: none;
+}
+
+.pet-exp-pop__head {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: var(--space-xs);
+}
+
+.pet-exp-pop__title {
+  margin: 0;
+  font-size: var(--text-label);
+  font-weight: 600;
+  color: var(--color-ink);
+}
+
+.pet-exp-pop__meta {
+  font-size: var(--text-caption);
+  font-variant-numeric: tabular-nums;
+  color: var(--color-ink-2);
+}
+
+.pet-exp-pop__foot {
+  margin: 0;
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: var(--space-xs);
+  font-size: var(--text-caption);
+  color: var(--color-ink-2);
+}
+
+/* 채워지는 모습은 .pet-gauge__fill의 transition이 만든다 — JS 애니메이션이 없다.
+   전환 시간을 여기서 늘려 잡는다: 기본값은 즉시에 가까워서 올라가는 게 안 보인다 */
+.pet-exp-pop .pet-gauge__fill {
+  transition: width 0.8s cubic-bezier(0.22, 0.61, 0.36, 1);
+}
+
+/* 여닫기를 키프레임 하나로 처리한다. 길이(2.6초)가 PetView의 unmount 타이머와 같은
+   값이라, 나가는 연출이 끝나는 시점에 요소가 사라진다. 상태 하나로 여닫이가 되므로
+   `exiting` 같은 두 번째 state가 필요 없다 — 값을 두 곳에서 맞추는 대신 한 곳에서 맞춘다 */
+@keyframes petExpPop {
+  0% {
+    opacity: 0;
+    transform: translateY(-0.875rem) scale(0.94);
+  }
+  /* 살짝 지나쳤다 되돌아오는 구간(8% → 14%). 유리가 튀어나오는 느낌을 만든다 */
+  8% {
+    opacity: 1;
+    transform: translateY(0.125rem) scale(1.015);
+  }
+  14% {
+    transform: translateY(0) scale(1);
+  }
+  84% {
+    opacity: 1;
+    transform: translateY(0) scale(1);
+  }
+  100% {
+    opacity: 0;
+    transform: translateY(-0.5rem) scale(0.98);
+  }
+}
+
+/* 모션을 끈 사용자에게는 채워지는 연출도, 튀어나오는 연출도 주지 않는다.
+   대신 **사라지지 않게** 두지는 않는다 — 여기서 animation: none을 쓰면 팝업이
+   2.6초 동안 최종 상태(opacity 0)가 아니라 시작 상태로 남아 보이지 않게 된다.
+   그래서 애니메이션을 끄는 대신 페이드만 남긴 키프레임으로 갈아탄다 */
+@media (prefers-reduced-motion: reduce) {
+  .pet-exp-pop .pet-gauge__fill {
+    transition: none;
+  }
+  .pet-exp-pop__box {
+    animation-name: petExpPopFade;
+  }
+  .pet-exp-pop__box::before {
+    display: none;
+  }
+}
+
+@keyframes petExpPopFade {
+  0%,
+  100% {
+    opacity: 0;
+  }
+  6%,
+  90% {
+    opacity: 1;
+  }
+}
 
 /* 상주 HUD의 게이지. 기본 transition은 즉시에 가까워서 올라가는 것이 안 보인다 */
 .pet-hud-lv .pet-gauge__fill {
