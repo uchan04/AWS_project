@@ -1810,7 +1810,11 @@ function OutingDiaryModal({
         aria-modal="true"
         aria-labelledby="diary-title"
         tabIndex={-1}
-        className="pet-diary-pop__box screen-enter"
+        /* --diary 수식자는 **넓은 화면 2단 배치를 이 팝업에만** 걸기 위한 것이다.
+           `pet-diary-pop__box` 골격을 진화 단계 팝업(`.pet-evo-pop`)이 함께 쓰는데,
+           그쪽 자식들은 grid-area를 갖고 있지 않아서 공용 클래스에 배치를 넣으면
+           암시적 행으로 흩어진다 */
+        className="pet-diary-pop__box pet-diary-pop__box--diary screen-enter"
         onClick={(e) => e.stopPropagation()}
       >
         {/* ── 상단: 펫 모습 ── */}
