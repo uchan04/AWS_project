@@ -540,6 +540,91 @@
   white-space: nowrap;
 }
 
+/* ── 버튼 아이콘 (2026-08-26 사용자 시안: 손그림 아이콘 4장) ─────────────────────
+ *
+ * 이모지를 대신하는 SVG 8개다. 도형은 app/pet/_components/PetIcon.tsx에 있고 색은 여기 있다 —
+ * 방 배경 SVG(.pet-room__*)와 같은 분담이다.
+ *
+ * **외곽선은 종족색(--tribe-cta)을 따른다.** 시안은 갈색 한 벌이지만 그 게임은 팔레트가
+ * 하나이고, 이 앱은 종족이 셋이라 원의 링(--pet-chip-ring)이 종족색이다. 외곽선을 갈색으로
+ * 고정하면 고양이(파랑)·곰(초록) 링 안에서 아이콘만 갈색으로 뜬다.
+ *
+ * 획 굵기 1.7은 26px로 그려질 때 약 1.8px이다 — 시안의 굵은 선을 그 크기에서 흉내 내는 값이고,
+ * 2를 넘으면 24 좌표계의 작은 도형(ⓘ의 점, 체크)이 뭉개진다.
+ *
+ * 채색은 **사물 고유색**이다(잎은 초록, 지붕은 노랑, 막대 셋은 각각 다른 색). 방 배경 SVG가
+ * 같은 방식을 쓰고, 그 주석의 근거("종족색을 따르면 파란 나무·주황 하늘이 된다")가 그대로
+ * 적용된다. 채도는 낮게 유지한다 — design.md의 "채도 높은 색은 종족색 하나뿐"에 걸리지 않게
+ * 방 배경이 이미 쓰는 톤(#c8a878 계열)의 이웃 값들로 골랐다. */
+.pet-icon {
+  width: 1.65rem;
+  height: 1.65rem;
+  fill: none;
+  stroke: var(--tribe-cta);
+  stroke-width: 1.7;
+  stroke-linecap: round;
+  stroke-linejoin: round;
+}
+
+/* 선만 있는 도형(줄기·받침선·글자 획). 채우면 획이 면으로 번진다 */
+.pet-icon [data-f="stem"],
+.pet-icon [data-f="check"] {
+  fill: none;
+}
+
+/* 체크만 한 단 굵다 — 짧은 두 획이라 같은 굵기에서 가늘어 보인다(광학적 무게) */
+.pet-icon [data-f="check"] {
+  stroke-width: 2.1;
+}
+
+/* 점처럼 채우는 도형. ⓘ의 점이 유일하다 */
+.pet-icon [data-f="ink"] {
+  fill: var(--tribe-cta);
+  stroke: none;
+}
+
+.pet-icon [data-f="cream"] {
+  fill: var(--color-card);
+}
+
+/* 나무·종이 계열. 방 바닥(#c8a878)의 밝은 이웃이다 */
+.pet-icon [data-f="tan"] {
+  fill: #e6cfa8;
+}
+
+.pet-icon [data-f="door"],
+.pet-icon [data-f="latch"],
+.pet-icon [data-f="clip"],
+.pet-icon [data-f="ball"] {
+  fill: #cfae84;
+}
+
+/* 지붕 띠. 시안의 24H 띠가 노랑이다 */
+.pet-icon [data-f="roof"] {
+  fill: #e8ca7d;
+}
+
+.pet-icon [data-f="leaf"] {
+  fill: #7fb069;
+}
+
+/* 막대 셋. 시안이 살구·초록·파랑이고 그 순서까지 같다 */
+.pet-icon [data-f="bar1"] {
+  fill: #e08d7d;
+}
+
+.pet-icon [data-f="bar2"] {
+  fill: #7fb069;
+}
+
+.pet-icon [data-f="bar3"] {
+  fill: #6fa5cd;
+}
+
+/* 여기에 `[data-f="body"]`(모임 아이콘의 앞사람 몸)이 있었다 — 2026-08-26에 모임 아이콘을
+   "사람별로 닫힌 도형 한 쌍"으로 다시 그리면서 그 속성이 없어졌다(PetIcon.tsx meetup 주석).
+   지금 그 도형들은 cream을 쓴다 */
+
 /* 라벨 아래 한 줄. 지금은 외출 버튼의 "친밀도 N 부족" 하나뿐이다.
 
    **라벨과 같은 알약을 준다** (2026-08-26). 전에는 면 없는 맨 글자였고, 실측에서 기본 방의

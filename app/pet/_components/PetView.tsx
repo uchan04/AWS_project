@@ -22,6 +22,7 @@ import { EVOLUTION_LEVEL, SEED_TO_EXP, expToNextLevel } from "@/lib/types"
 import { ArtImage } from "@/app/components/ArtImage"
 import { useModalA11y } from "@/app/components/useModalA11y"
 import PetRoom from "./PetRoom"
+import { PetIcon } from "./PetIcon"
 import "@/styles/tokens.css"
 import "../pet.css"
 
@@ -963,7 +964,7 @@ export default function PetView({ initial }: { initial: PetState }) {
           {/* 좌측 = 이 화면에서 하는 것. 순서는 자주 누르는 것부터다 */}
           <div className="pet-actions pet-actions--left">
             <CircleBtn
-              icon="🌿"
+              icon={<PetIcon name="seed" />}
               label="씨앗 먹이기"
               onClick={() => setModal("seed")}
               active={modal === "seed"}
@@ -972,7 +973,7 @@ export default function PetView({ initial }: { initial: PetState }) {
                 DB에서 lib/outing.ts가 그렇게 내려보낸다 — 없는 기능을 광고하지 않는다 */}
             {outing.available ? (
               <CircleBtn
-                icon="🚪"
+                icon={<PetIcon name="outing" />}
                 label={outingLabelShort}
                 note={
                   outing.state === "IDLE" && outingShort > 0
@@ -988,19 +989,19 @@ export default function PetView({ initial }: { initial: PetState }) {
               />
             ) : null}
             <CircleBtn
-              icon="📊"
+              icon={<PetIcon name="chart" />}
               label="오늘의 활동"
               onClick={() => setModal("today")}
               active={modal === "today"}
             />
             <CircleBtn
-              icon="🏪"
+              icon={<PetIcon name="shop" />}
               label="펫꾸미기"
               onClick={() => setModal("shop")}
               active={modal === "shop"}
             />
             <CircleBtn
-              icon="🌟"
+              icon={<PetIcon name="info" />}
               label="펫 정보"
               onClick={() => setModal("info")}
               active={modal === "info"}
@@ -1018,9 +1019,9 @@ export default function PetView({ initial }: { initial: PetState }) {
               만들려면 D 소유 파일에 새 인터페이스가 필요하다. D의 전역 챗봇 버튼이
               이미 우상단에 떠 있으므로 그것으로 갈음한다 */}
           <div className="pet-actions pet-actions--right">
-            <CircleBtn icon="💬" label="커뮤니티" href="/community" />
-            <CircleBtn icon="✅" label="미션" href="/missions" />
-            <CircleBtn icon="🤝" label="모임" href="/community/meetups" />
+            <CircleBtn icon={<PetIcon name="community" />} label="커뮤니티" href="/community" />
+            <CircleBtn icon={<PetIcon name="mission" />} label="미션" href="/missions" />
+            <CircleBtn icon={<PetIcon name="meetup" />} label="모임" href="/community/meetups" />
           </div>
         </div>
 
@@ -1526,7 +1527,8 @@ function CircleBtn({
   disabled,
   active,
 }: {
-  icon: string
+  /** 2026-08-26: 이모지 한 자였다 → PetIcon SVG. 노드로 받으므로 나중에 <img>도 들어간다 */
+  icon: React.ReactNode
   label: string
   /** 라벨 아래 한 줄. 지금은 외출 버튼의 "친밀도 N 부족" 하나뿐이다 */
   note?: string
