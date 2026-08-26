@@ -55,13 +55,39 @@ async function main() {
 
   await assert.rejects(
     () => generateCommunityPresignedUrl({ userId: USER, contentType: "image/gif", fileSize: MB }),
-    (err: unknown) => err instanceof UploadError && /JPG·PNG·WEBP/.test(err.message),
+    (err: unknown) => err instanceof UploadError && /JPG·PNG/.test(err.message),
     "gif는 막는다",
   )
+  // **webp도 막힌다 (2026-08-26, D 요청).** Bedrock Guardrails 이미지 필터가 PNG·JPEG만
+  // 받으므로, webp를 허용하면 그 확장자로 올린 사진만 판정을 통째로 우회한다.
+  // 이 단정이 그 구멍을 다시 열지 못하게 막는다 — 되돌리려면 여기도 함께 고쳐야 한다.
+  await assert.rejects(
+    () => generateCommunityPresignedUrl({ userId: USER, contentType: "image/webp", fileSize: MB }),
+    (err: unknown) => err instanceof UploadError && /JPG·PNG/.test(err.message),
+    "webp도 막는다 — Guardrails 이미지 필터가 PNG·JPEG만 받는다",
+  )
+  // **상한이 5MB → 4MB로 내려갔다 (2026-08-26, D 요청).** Guardrails 이미지 판정의 상한에
+  // 맞춘 값이다(lib/uploads.ts COMMUNITY_MAX_SIZE 주석). 미션(3MB)과는 여전히 다르다.
   await assert.rejects(
     () => generateCommunityPresignedUrl({ userId: USER, contentType: "image/jpeg", fileSize: 6 * MB }),
-    (err: unknown) => err instanceof UploadError && /5MB/.test(err.message),
-    "5MB 초과는 막는다",
+    (err: unknown) => err instanceof UploadError && /4MB/.test(err.message),
+    "4MB 초과는 막는다",
+  )
+  // 경계: 정확히 4MB는 통과해야 한다. `>` 가 `>=` 로 바뀌면 여기서 걸린다
+  await assert.doesNotReject(
+    async () => {
+      try {
+        await generateCommunityPresignedUrl({
+          userId: USER,
+          contentType: "image/jpeg",
+          fileSize: 4 * MB,
+        })
+      } catch (err) {
+        // 자격증명이 없으면 서명 단계에서 죽는다 — 그것은 크기 검사 통과의 증거다
+        if (err instanceof UploadError) throw err
+      }
+    },
+    "정확히 4MB는 통과한다",
   )
   await assert.rejects(
     () => generateCommunityPresignedUrl({ userId: USER, contentType: "image/jpeg", fileSize: 0 }),
@@ -104,7 +130,9 @@ async function main() {
   try {
     signed = await generateCommunityPresignedUrl({
       userId: USER,
-      contentType: "image/webp",
+      // webp였다 — D가 2026-08-26에 허용 목록에서 지워서 이 요청이 UploadError로 죽고
+      // 아래 catch가 그것을 다시 던져 스크립트 전체가 실패했다. png로 바꾼다.
+      contentType: "image/png",
       fileSize: 4 * MB,
     })
   } catch (err) {
@@ -115,8 +143,8 @@ async function main() {
   if (signed) {
     assert.match(
       signed.s3Key,
-      new RegExp(`^${COMMUNITY_PREFIX}${USER}/[0-9a-f]{16}\\.webp$`),
-      "webp는 .webp 키로 나간다 — 미션 쪽 삼항(jpeg?jpg:png)이 복사되지 않았다",
+      new RegExp(`^${COMMUNITY_PREFIX}${USER}/[0-9a-f]{16}\\.png$`),
+      "png는 .png 키로 나간다 — 미션 쪽 삼항(jpeg?jpg:png)이 복사되지 않았다",
     )
     assert.equal(isOwnCommunityKey(signed.s3Key, USER), true, "발급한 키는 소유권 검사를 통과한다")
     assert.equal(signed.expiresIn, 300, "유효 시간은 5분이다")
