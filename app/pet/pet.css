@@ -343,25 +343,68 @@
 
    pointer-events는 건드리지 않는다. 이 상자는 버튼 크기만큼만 차지하므로(폭이 내용 폭)
    방을 덮지 않고, 펫 쓰다듬기 클릭을 막지 않는다 */
-.pet-actions {
-  position: absolute;
-  /* Lv 오버레이 아래에서 시작한다. 그 상자가 8px(top) + 88px(높이) = 96px을 쓰므로
-     6.5rem(104px)이면 8px 여유가 남는다 — 6rem이면 정확히 맞닿아 붙어 보인다 */
-  top: 6.5rem;
-  z-index: calc(var(--z-raised) + 2);
-  display: flex;
-  flex-direction: column;
+/* ── 하단 독 (2026-08-26 사용자 지시로 좌우 스택에서 재배치) ──────────────────
+ *
+ * `.pet-actions--left` 6개 / `--right` 4개 두 세로 스택이었다. 실서비스 육성 게임 5종이
+ * **전부 캐릭터 좌우를 비우고 버튼을 가장자리에 모은다**(docs/dev/pet.md 벤치마크 절) —
+ * 좌우에 세우면 시선이 가운데로 모이지 않는다.
+ *
+ * 세 덩어리다. 주 동작 2개(한 줄) · 보조 4개(한 줄) · 챗봇 1개(우하단 따로).
+ * 방 **밖**(.pet-stage 안)에 두는 것은 C의 판단 그대로다 — 방 안에 있으면 좁은 화면에서
+ * absolute를 풀 수 없고(풀면 방의 flex 흐름에 끼어 펫 옆에 선다), 얹은 채로 두면
+ * 버튼이 펫을 덮는다.
+ *
+ * 좁은 화면(≤768px)에서는 `static`으로 풀려 방 아래로 흐른다. 그 규칙도 C의 것을 잇는다 —
+ * 6개를 방 아래쪽 가로 줄로 얹었을 때 펫(272px)을 덮은 것이 그쪽 실측이다.
+ */
+/* **방 위에 얹지 않는다 — 모든 폭에서 방 아래다.**
+ *
+ * 처음에 `position: absolute; bottom` 으로 방 아래쪽에 얹어 봤고 **실측으로 버렸다**:
+ * 820px에서 방이 약 250px인데 독이 185px이라 펫이 버튼 뒤로 완전히 들어갔다.
+ * 펫은 방 **바닥**에 서고 독도 바닥에 앉으므로 둘이 같은 자리를 다툰다 —
+ * C가 좌우 스택을 만들 때 "방 아래쪽 가로 줄로 내려도 8개 버튼이 펫(272px)을 덮었다"로
+ * 적어 둔 것과 같은 벽이다. 버튼을 6개로 줄여도 그 벽은 그대로 있었다.
+ *
+ * 그래서 흐름에 둔다. `.pet-stage`가 `flex-direction: column`이고 방이 `flex: 1`이라
+ * 방이 남는 높이를 갖고 독이 그 아래에 선다 — 페이지가 독 높이만큼 길어지는 대신
+ * **방 안은 펫·쪽지·말풍선이 온전히 쓴다.**
+ *
+ * 실서비스 5종도 버튼을 장면 **위**가 아니라 **아래**에 둔다(Finch·ねこあつめ의 하단 탭).
+ * 좌우를 비우라는 것과 장면 위에 얹으라는 것은 다른 얘기였다.
+ */
+.pet-dock {
+  position: relative;
+  display: grid;
+  justify-items: center;
   gap: var(--space-2xs);
 }
 
-.pet-actions--left {
-  left: var(--space-2xs);
+/* 주 동작 줄. 둘뿐이라 가운데에 나란히 선다 */
+.pet-dock__main {
+  display: flex;
+  align-items: flex-start;
+  justify-content: center;
+  gap: var(--space-md);
 }
 
-.pet-actions--right {
-  right: var(--space-2xs);
-  /* 라벨을 오른쪽 끝에 맞춘다 — 왼쪽 스택은 왼쪽 정렬이라 두 스택이 방 바깥쪽을 향한다 */
-  align-items: flex-end;
+/* 보조 줄. 4개가 한 줄에 들어가지 않는 폭에서는 접힌다 */
+.pet-dock__sub {
+  display: flex;
+  align-items: flex-start;
+  justify-content: center;
+  flex-wrap: wrap;
+  gap: var(--space-sm);
+}
+
+/* 챗봇은 오른쪽 끝에 앉는다. 다른 기능으로 가는 문이라 주 동작·보조와 같은 줄에 서면
+   안 된다 — 셋을 나란히 두면 다시 "10개가 다 같다"로 돌아간다.
+   **독 안에서 `absolute`다**(방이 아니라 독이 기준이다 — 독이 흐름에 있으므로 안전하다).
+   그리드 행으로 두면 세 번째 행이 생겨 독이 272px이 됐고, 방(451px)에서 그만큼을 뺏는다.
+   실측으로 272 → 150px이 됐다 */
+.pet-dock > .pet-circle--chat {
+  position: absolute;
+  right: var(--space-sm);
+  bottom: 0;
 }
 
 /* 버튼 하나. 아이콘 원 + 라벨 알약이고 둘이 세로로 붙는다(시안 구조).
@@ -388,30 +431,73 @@
   cursor: default;
 }
 
-/* 아이콘 원. 면·번짐은 이 화면의 주 버튼(.pet-btn)과 같은 종족색 계열이다 —
-   새 색을 만들지 않는다. 3rem(48px)은 design.md의 44px 터치 하한 위이고, 라벨까지
-   합치면 한 버튼이 약 68px이라 좌측 5개가 340px 안에 들어간다(방 높이 하한 432px) */
+/* 아이콘 원의 골격. 크기·면은 아래 세 무게가 정한다 — 여기서는 공통값만 둔다.
+   면·번짐이 이 화면의 주 버튼(.pet-btn)과 같은 종족색 계열인 것은 그대로다(새 색 없음) */
 .pet-circle__icon {
   display: grid;
   place-items: center;
-  width: 3rem;
-  height: 3rem;
   border-radius: var(--radius-pill);
-  background: var(--pet-gloss), linear-gradient(135deg, var(--tribe-face), var(--tribe));
-  box-shadow: var(--pet-gloss-edge), 0 4px 12px color-mix(in oklch, var(--tribe) 38%, transparent);
-  font-size: var(--text-md);
   line-height: 1;
 }
 
+/* ── 무게 3종 (2026-08-26 사용자 지시) ────────────────────────────────────────
+ *
+ * **위계를 색이 아니라 채움과 크기로 가른다.** 종족색이 6종이라 색으로 나누면 종족마다
+ * 위계가 달라진다 — 여우(주황)에서 잘 갈리는 두 색이 고양이(파랑)에서 붙어 보인다.
+ *
+ * 전에는 10개가 전부 48px · 채운 종족색 · 20px 이모지로 **완전히 같았다.** 그러면
+ * `씨앗 먹이기`(이 화면에 온 이유)와 `미션`(다른 화면으로 이동)이 픽셀 하나 다르지 않다.
+ */
+
+/* 주 동작 — 채운 면 + 광택. 64px는 design.md의 44px 하한을 넉넉히 넘고, 라벨까지 88px이다 */
+.pet-circle--main .pet-circle__icon {
+  width: 4rem;
+  height: 4rem;
+  background: var(--pet-gloss), linear-gradient(135deg, var(--tribe-face), var(--tribe));
+  box-shadow: var(--pet-gloss-edge), 0 4px 12px color-mix(in oklch, var(--tribe) 38%, transparent);
+  font-size: var(--text-lg);
+}
+
+/* 보조 — **면을 비우고 테두리만.** 채움 여부가 위계다.
+   40px는 44px 하한 아래인데, 하한이 요구하는 것은 터치 **면적**이고 이 버튼은 아이콘 원
+   아래 라벨까지가 한 요소라 실제 높이가 40 + 라벨 약 20 = 60px이다(C가 2.5rem을 쓸 때
+   같은 근거를 적어 뒀다). 폭은 라벨 쪽이 더 넓어 44px을 넘는다 */
+.pet-circle--sub .pet-circle__icon {
+  width: 2.5rem;
+  height: 2.5rem;
+  border: 2px solid color-mix(in oklch, var(--tribe) 55%, transparent);
+  background: color-mix(in oklch, var(--color-card) 78%, transparent);
+  backdrop-filter: blur(4px);
+  font-size: var(--text-body);
+}
+
+/* 챗봇 — 흰 면 + 그림자. 전역 런처(ChatLauncher)가 쓰던 값 그대로다:
+   `bg-white text-xl shadow-lg`. 같은 기능이 화면마다 다른 물건으로 보이지 않게 한다 */
+.pet-circle--chat .pet-circle__icon {
+  width: 3.25rem;
+  height: 3.25rem;
+  background: #fff;
+  box-shadow: 0 6px 16px rgb(42 31 20 / 0.18);
+  font-size: var(--text-md);
+}
+
 /* 열려 있는 모달의 버튼. 면을 한 단 어둡게 해 "지금 이걸 보고 있다"를 남긴다 */
-.pet-circle[data-active="true"] .pet-circle__icon {
+.pet-circle--main[data-active="true"] .pet-circle__icon {
   background: var(--pet-gloss), linear-gradient(135deg, var(--tribe), var(--tribe-cta));
+}
+
+/* 보조는 면이 비어 있으므로 **테두리와 면을 함께 진하게** 한다 — 채우면 주 동작과 같은
+   무게가 되어 위계가 무너진다 */
+.pet-circle--sub[data-active="true"] .pet-circle__icon {
+  border-color: var(--tribe-cta);
+  background: color-mix(in oklch, var(--tribe) 22%, var(--color-card));
 }
 
 /* 못 누르는 버튼(외출 중, 친밀도 부족, 요청 진행 중)은 뜨지 않는다 —
    .pet-btn:disabled와 같은 처리다(번짐이 남으면 누를 수 있어 보인다) */
 .pet-circle:disabled .pet-circle__icon {
   background: var(--color-paper-2);
+  border-color: var(--color-rule);
   box-shadow: none;
   opacity: 0.7;
 }
@@ -3512,17 +3598,24 @@
      그래서 absolute를 **풀어** 방 밖(.pet-stage 안)으로 흐르게 한다. 페이지가 그만큼
      길어지지만 방 안은 펫과 쪽지가 온전히 쓴다.
      좌측 그룹이 위 줄, 우측 그룹이 아래 줄이다 — 자주 누르는 것이 위에 온다 */
-  .pet-actions {
+  /* 독 자체는 여기서 바꿀 것이 없다 — 모든 폭에서 방 아래 흐름이다(위 .pet-dock 주석).
+
+     다만 챗봇은 흐름으로 되돌린다. 375px에서 보조 4개가 두 줄로 접히는데, 얹혀 있으면
+     그 접힌 줄과 겹친다. 흐름에 두면 마지막 줄로 내려가 오른쪽 끝에 선다 */
+  .pet-dock > .pet-circle--chat {
     position: static;
-    flex-direction: row;
-    flex-wrap: wrap;
-    justify-content: center;
-    gap: var(--space-2xs);
+    justify-self: end;
+    margin-right: var(--space-sm);
   }
 
-  /* 세로 스택에서 쓰던 오른쪽 정렬을 되돌린다 — 가로 줄에서는 가운데다 */
-  .pet-actions--right {
-    align-items: center;
+  /* 주 동작 사이 간격을 좁히는 이유 — 375px에서 64px 버튼 2개 + 24px 간격이면 라벨
+     ("씨앗 먹이기" 약 72px · "외출 보내기" 약 72px)이 서로 붙는다 */
+  .pet-dock__main {
+    gap: var(--space-sm);
+  }
+
+  .pet-dock__sub {
+    gap: var(--space-xs);
   }
 
   .pet__top {

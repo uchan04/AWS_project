@@ -1222,16 +1222,38 @@ export default function PetView({ initial }: { initial: PetState }) {
 
           </div>
 
-        {/* **버튼 스택은 방 밖, 스테이지 안이다.** 넓은 화면에서는 position: absolute로
-            방 위에 얹히고(스테이지가 방과 같은 사각형이다), 좁은 화면에서는 static으로
-            풀려 방 아래로 흐른다 — pet.css .pet-actions 주석.
-            방 **안**에 두면 좁은 화면에서 8개 버튼이 펫(272px)을 덮는다(실측). 방 밖으로
-            빼면 그 폭에서 페이지가 조금 길어지는 대신 펫과 쪽지가 방을 온전히 쓴다 */}
-          {/* 좌측 = 이 화면에서 하는 것. 순서는 자주 누르는 것부터다 */}
-          <div className="pet-actions pet-actions--left">
+        {/* **버튼은 방 밖, 스테이지 안 하단이다** (2026-08-26 사용자 지시로 재배치).
+            넓은 화면에서는 `position: absolute`로 방 아래쪽에 얹히고(스테이지가 방과 같은
+            사각형이다), 좁은 화면에서는 `static`으로 풀려 방 아래로 흐른다 —
+            pet.css `.pet-dock` 주석.
+
+            ── 왜 좌우 스택에서 하단으로 옮겼는가 ──
+            실서비스 육성 게임 5종(Finch · 다마고치 Uni · ねこあつめ · My Talking Tom ·
+            포켓캠프)이 **전부 캐릭터 좌우를 비우고 버튼을 가장자리에 모은다.** 좌우에
+            세우면 시선이 가운데로 모이지 않는다. 근거는 docs/dev/pet.md의 벤치마크 절.
+
+            ── 왜 10개에서 7개로 줄었는가 ──
+            우측 스택 4개 중 **3개가 이미 다른 곳에 있었다**: 커뮤니티·미션은 사이드바에,
+            모임은 커뮤니티 화면 상단 입구에. 사이드바를 그대로 두면서 같은 링크를 같은
+            무게로 한 번 더 두는 것은 중복이고, C가 "중복 감수"로 정한 것은 *배치*였지
+            무게까지 같아야 한다는 뜻은 아니었다. 셋을 걷고 챗봇만 남겼다.
+            (그래서 `Sidebar.tsx`의 TABS를 여기 베껴 두던 문제도 함께 사라졌다 —
+            메뉴가 늘 때 두 곳을 고쳐야 하던 것이 한 곳이 됐다.)
+
+            ── 위계를 색이 아니라 채움으로 가른다 ──
+            종족색이 6종이라 색으로 나누면 종족마다 위계가 달라진다. 주 동작은 채운 면,
+            보조는 테두리만이다(`.pet-circle--sub`). 크기도 64 / 40px로 갈린다.
+
+            이모지는 **이번에 바꾸지 않았다** — 사용자가 무료 아이콘 세트
+            (magnific.com/icons · iconmonstr.com)를 참고해 나중에 교체하기로 했다.
+            지금 뜻이 어긋나 있는 것 4개는 docs/dev/pet.md "아이콘 교체 대기"에 적어 뒀다 */}
+        <div className="pet-dock">
+          {/* 주 동작 — 이 화면에 온 이유다. 둘뿐이라 나란히 선다 */}
+          <div className="pet-dock__main">
             <CircleBtn
               icon="🌿"
               label="씨앗 먹이기"
+              size="main"
               onClick={() => setModal("seed")}
               active={modal === "seed"}
             />
@@ -1241,6 +1263,7 @@ export default function PetView({ initial }: { initial: PetState }) {
               <CircleBtn
                 icon="🚪"
                 label={outingLabelShort}
+                size="main"
                 note={
                   outingLocked
                     ? `Lv.${EVOLUTION_LEVEL.STAGE2}부터`
@@ -1259,63 +1282,44 @@ export default function PetView({ initial }: { initial: PetState }) {
                 locked={outingLocked}
               />
             ) : null}
-            {/* 여행일기 보관함. **외출 버튼 바로 아래다** — 같은 기능의 과거이고,
-                방금 들은 이야기를 다시 찾는 사람이 외출 버튼 근처를 먼저 본다.
-                available: false면 외출 자체가 없으므로 이 버튼도 그리지 않는다 */}
+          </div>
+
+          {/* 보조 — 찾아서 여는 것들. 면을 비워 주 동작과 무게를 가른다.
+              순서는 "방금 것"에서 "전체"로 간다: 일기 → 오늘 → 꾸미기 → 정보 */}
+          <div className="pet-dock__sub">
             {outing.available ? (
-              <CircleBtn
-                icon="📖"
-                label="여행일기"
-                onClick={openHistory}
-                active={modal === "history"}
-              />
+              <CircleBtn icon="📖" label="여행일기" size="sub" onClick={openHistory} active={modal === "history"} />
             ) : null}
             <CircleBtn
               icon="📊"
               label="오늘의 활동"
+              size="sub"
               onClick={() => setModal("today")}
               active={modal === "today"}
             />
             <CircleBtn
               icon="🏪"
               label="펫꾸미기"
+              size="sub"
               onClick={() => setModal("shop")}
               active={modal === "shop"}
             />
             <CircleBtn
               icon="🌟"
               label="펫 정보"
+              size="sub"
               onClick={() => setModal("info")}
               active={modal === "info"}
             />
           </div>
 
-          {/* 우측 = 다른 화면으로 가는 길 (2026-08-26 사용자 결정).
-              **이 목록은 사이드바(app/components/Sidebar.tsx의 TABS)와 같은 곳을 가리킨다.**
-              사용자가 "만들고 사이드바도 그대로 둔다"를 골라 중복을 감수한 자리다 —
-              메뉴가 늘거나 경로가 바뀌면 **두 곳을 같이 고쳐야 한다.**
-              그 파일에서 import하지 않는 이유: E 소유이고 TABS를 export하지 않는다.
-
-              챗봇이 없다. ChatLauncher의 열림 상태가 그 컴포넌트 내부 useState이고
-              외부에서 열 인터페이스가 없다(app/chat/_components/ChatLauncher.tsx) —
-              만들려면 D 소유 파일에 새 인터페이스가 필요하다. D의 전역 챗봇 버튼이
-              이미 우상단에 떠 있으므로 그것으로 갈음한다 */}
-          <div className="pet-actions pet-actions--right">
-            {/* 챗봇 — **우측 스택 맨 위다** (2026-08-26 사용자 요청).
-                전역 오버레이 버튼(ChatLauncher)이 `fixed top-4 right-4`라 좁은 화면에서
-                페이지 머리를 덮었고, 이 화면은 HUD를 갖고 있으므로 여기로 들였다.
-                그쪽은 `/pet`에서만 버튼을 감춘다 — 패널은 같은 컴포넌트가 그대로 연다.
-
-                링크가 아니라 버튼이다: 아래 셋은 다른 화면으로 가고, 이것은 이 화면에서
-                패널을 연다(CircleBtn이 href 유무로 태그를 가른다).
-                아이콘이 💬로 겹치던 커뮤니티는 🗨로 바꿨다 — 같은 스택에 같은 그림이
-                둘이면 무엇이 무엇인지 알 수 없다 */}
-            <CircleBtn icon="💬" label="마음 친구" onClick={openChat} />
-            <CircleBtn icon="🗨" label="커뮤니티" href="/community" />
-            <CircleBtn icon="✅" label="미션" href="/missions" />
-            <CircleBtn icon="🤝" label="모임" href="/community/meetups" />
-          </div>
+          {/* 챗봇 — 셋 중 어디에도 안 넣고 따로 둔다. 주 동작도 아니고(이 화면의 일이 아니다)
+              보조도 아니다(다른 기능으로 가는 문이다). 자리는 우하단 — 전역 런처가 원래
+              그 계열의 자리를 쓰고 있었고, 앱 밖에서도 챗봇은 그 자리의 관습이 있다.
+              흰 면인 것도 그 런처의 값을 그대로 가져온 것이다 */}
+          <CircleBtn icon="💬" label="마음 친구" size="chat" onClick={openChat} />
         </div>
+      </div>
 
         {/* ── 모달 5개 ───────────────────────────────────────────────────────────
             몸통은 옛 카드 마크업 그대로다. 껍데기(.pet-modal)만 새로 만들었고
@@ -2096,6 +2100,7 @@ function CircleBtn({
   icon,
   label,
   note,
+  size = "sub",
   onClick,
   href,
   disabled,
@@ -2106,6 +2111,18 @@ function CircleBtn({
   label: string
   /** 라벨 아래 한 줄. 지금은 외출 버튼의 "친밀도 N 부족" 하나뿐이다 */
   note?: string
+  /**
+   * 무게 (2026-08-26 사용자 지시로 도입). **위계를 색이 아니라 채움과 크기로 가른다** —
+   * 종족색이 6종이라 색으로 나누면 종족마다 위계가 달라진다.
+   *
+   *   main  64px · 채운 종족색 + 광택      이 화면에 온 이유(먹이기·외출)
+   *   sub   40px · 면 없이 테두리만        찾아서 여는 것(일기·오늘·꾸미기·정보)
+   *   chat  52px · 흰 면 + 그림자          다른 기능으로 가는 문. 전역 런처의 값이다
+   *
+   * 기본값이 `sub`인 이유는 새 버튼을 추가할 때 **주 동작으로 올라가지 않게** 하려는
+   * 것이다 — 주 동작이 늘면 그게 늘었다는 사실이 눈에 보여야 한다.
+   */
+  size?: "main" | "sub" | "chat"
   onClick?: () => void
   href?: string
   disabled?: boolean
@@ -2134,7 +2151,7 @@ function CircleBtn({
 
   if (href) {
     return (
-      <Link className="pet-circle" href={href}>
+      <Link className={`pet-circle pet-circle--${size}`} href={href}>
         {inner}
       </Link>
     )
@@ -2143,7 +2160,7 @@ function CircleBtn({
   return (
     <button
       type="button"
-      className={`pet-circle${locked ? " pet-circle--locked" : ""}`}
+      className={`pet-circle pet-circle--${size}${locked ? " pet-circle--locked" : ""}`}
       onClick={onClick}
       disabled={disabled}
       aria-disabled={disabled}
