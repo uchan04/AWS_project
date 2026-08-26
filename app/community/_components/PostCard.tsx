@@ -1,5 +1,5 @@
 import type { GalleryPost } from "../_lib/gallery"
-import { communityAuthorLabel, communityAuthorBadge } from "../_lib/author"
+import { ADMIN_LABEL, communityAuthorBadge } from "../_lib/author"
 import { timeAgo } from "../_lib/format"
 
 /**
@@ -33,8 +33,28 @@ export function PostCard({
   showTribeBadge: boolean
   onClick: () => void
 }) {
-  // 관리자면 종족 대신 "관리자"다. 이름 줄과 배지가 같은 기준으로 갈린다(_lib/author.ts)
+  // 우측 배지. 관리자면 종족 대신 "관리자"다(_lib/author.ts)
   const badge = communityAuthorBadge(post.user)
+
+  /*
+   * 메타 줄의 작성자 표기. **닉네임만 쓴다(2026-08-26).**
+   *
+   * `communityAuthorLabel()`은 "느긋한 곰 · 곰과"를 준다. 그런데 같은 줄 오른쪽 끝에 이미
+   * 종족 배지가 있어서 한 줄에 종족이 두 번 나왔다.
+   *
+   * **`_lib/author.ts`의 그 함수를 고치지 않는다.** 공용이고, 종족 표기가 그대로여야 하는
+   * 화면이 따로 있다. 그래서 여기서만 다르게 조립한다(PostDetailModal이 같은 방식이다).
+   *
+   * 관리자 표기는 남긴다 — 종족이 아니라 역할이고, 배지가 없는 종족 갤러리에서도
+   * 남의 글을 지울 수 있는 사람이 누구인지는 드러나야 한다. 문구는 하드코딩하지 않고
+   * 그 파일이 export하는 ADMIN_LABEL을 쓴다.
+   *
+   * 배지가 없는 화면(종족 갤러리, showTribeBadge=false)에서 종족이 아예 사라지지만
+   * 잃는 정보는 없다 — 그 목록은 galleryType으로 걸러온 글이고 비관리자는 자기 종족
+   * 갤러리에만 쓸 수 있어(posts 라우트의 canAccessGallery) 작성자 종족이 곧 그 갤러리다.
+   * 관리자 글은 원래도 저 함수가 종족 대신 "관리자"를 주어 종족이 보이지 않았다.
+   */
+  const authorText = post.user.isAdmin ? `${post.user.nickname} · ${ADMIN_LABEL}` : post.user.nickname
 
   return (
     <button
@@ -47,10 +67,11 @@ export function PostCard({
           1줄로 자르면 긴 제목이 대부분 잘리고, 풀어두면 카드 높이가 제목 길이를 탄다 */}
       <p className="line-clamp-2 text-lg leading-snug font-bold break-words text-neutral-900">{post.title}</p>
 
-      {/* 2단 메타. 작성자·종족·시각을 한 줄로 합쳤다 — 제목을 세우려면 나머지가 물러나야 한다.
-          이름이 길 때 줄어드는 것은 이름뿐이다(truncate). 시각과 배지는 shrink-0으로 지킨다 */}
+      {/* 2단 메타. 작성자와 시각을 한 줄로 합쳤다 — 제목을 세우려면 나머지가 물러나야 한다.
+          이름이 길 때 줄어드는 것은 이름뿐이다(truncate). 시각과 배지는 shrink-0으로 지킨다.
+          **종족은 여기 쓰지 않는다** — 같은 줄 오른쪽 배지가 이미 말한다(아래 authorText 주석) */}
       <div className="flex items-center gap-2 text-xs text-neutral-400">
-        <span className="min-w-0 truncate">{communityAuthorLabel(post.user)}</span>
+        <span className="min-w-0 truncate">{authorText}</span>
         <span className="shrink-0">· {timeAgo(post.createdAt)}</span>
 
         {showTribeBadge && badge && (
