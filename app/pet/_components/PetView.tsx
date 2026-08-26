@@ -6,6 +6,9 @@ import type { TypeCode } from "@prisma/client"
 import {
   IDLE_MAX_SEEDS,
   IDLE_SEEDS_PER_HOUR,
+  OUTING_COST_AFFINITY,
+  OUTING_REWARD_MAX,
+  OUTING_REWARD_MIN,
   MS_PER_IDLE_SEED,
   OUTING_MS,
   PET_IDLE_LINES,
@@ -29,6 +32,10 @@ import {
   MEETUP_JOIN_AFFINITY,
 } from "@/app/community/_lib/affinity"
 import { AFFINITY_DAILY_CAP } from "@/lib/reward"
+// 배경 가격. prisma/seed/items.ts의 PRICE_BY_RARITY.COMMON과 같은 값이어야 한다 —
+// 그 파일은 시드(Node 전용)라 클라이언트에서 import하면 번들에 시드 코드가 섞인다.
+// 값이 갈리는 것을 막는 자리는 check:pet이다(그쪽이 시드 표를 직접 읽는다).
+const BACKGROUND_PRICE_SHARDS = 500
 import { ArtImage } from "@/app/components/ArtImage"
 import { useModalA11y } from "@/app/components/useModalA11y"
 import PetRoom from "./PetRoom"
@@ -319,19 +326,20 @@ export default function PetView({ initial }: { initial: PetState }) {
       name: "친밀도",
       icon: "❤️",
       value: pet.affinity,
-      use: "펫 방의 배경을 사요 (배경 하나 600)",
+      use: `펫을 밖에 내보내요 (외출 한 번 ${OUTING_COST_AFFINITY})`,
       how: [
         `챗봇과 1턴 대화 +${CHAT_TURN_AFFINITY} — 오늘 최대 ${AFFINITY_CAP_BY_SOURCE.CHAT}`,
         `커뮤니티 글 +${POST_AFFINITY} · 댓글 +${COMMENT_AFFINITY} · 모임 신청 +${MEETUP_JOIN_AFFINITY}`,
         `커뮤니티 세 가지를 합쳐 오늘 최대 ${AFFINITY_CAP_BY_SOURCE.COMMUNITY}`,
       ],
       cap: `하루 최대 ${AFFINITY_DAILY_CAP}. 대화만으로는 다 채울 수 없어요 — 나머지는 사람과 닿는 쪽에서 쌓여요`,
+      extra: `${OUTING_COST_AFFINITY}을 모으면 외출 한 번. 돌아올 때 씨앗 ${OUTING_REWARD_MIN}~${OUTING_REWARD_MAX}과 별조각 ${OUTING_REWARD_MIN}~${OUTING_REWARD_MAX}을 가져와요`,
     },
     {
       name: "별조각",
       icon: "⭐",
       value: pet.starShards,
-      use: "종족 외형 스킨을 사요 (하나 2,500)",
+      use: `외형 스킨(2,500)과 방 배경(${BACKGROUND_PRICE_SHARDS})을 사요`,
       how: [
         "일일 미션을 **전부** 다 하면 60 (하나라도 빠지면 0)",
         "출석 4일차 5 · 7일차 20 (주 25)",
@@ -1548,7 +1556,7 @@ function WalletInfoModal({
   row,
   onClose,
 }: {
-  row: { name: string; icon: string; use: string; how: string[]; cap: string }
+  row: { name: string; icon: string; use: string; how: string[]; cap: string; extra?: string }
   onClose: () => void
 }) {
   const boxRef = useModalA11y(onClose)
@@ -1587,6 +1595,8 @@ function WalletInfoModal({
             <li key={line}>{line}</li>
           ))}
         </ul>
+
+        {row.extra ? <p className="pet-wallet-pop__extra">{row.extra}</p> : null}
 
         <p className="pet-wallet-pop__cap">{row.cap}</p>
       </div>

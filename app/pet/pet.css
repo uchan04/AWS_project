@@ -1425,6 +1425,14 @@
   gap: 2px;
 }
 
+.pet-wallet-pop__extra {
+  margin: 0 0 var(--space-2xs);
+  padding: var(--space-2xs);
+  border-radius: var(--radius-input);
+  background: color-mix(in oklch, var(--color-muted) 12%, transparent);
+  color: var(--color-ink-2);
+}
+
 .pet-wallet-pop__cap {
   margin: 0;
   padding-top: var(--space-3xs);
