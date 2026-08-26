@@ -499,3 +499,55 @@ app/api/community/posts/[id]/comments/route.ts  54행 containsAbuse → 400 │ 
 **게이트가 라우트마다 손으로 반복되는 것이 근본 원인이다.** `lib/profile.ts`에 `diagnosed`
 기준이 있는데 API 쪽은 각자 `typeCode`를 본다. 공통화 처방은
 `docs/모듈-재배치-계획.md` 3번에 적었다(8/28 이후).
+
+---
+
+## A가 D 폴더를 고친 것 2건 (2026-08-26, 사용자 지시) — **통보**
+
+`app/community/_lib/affinity.ts`와 `app/chat/`은 D 소유다. 사용자 지시로 직접 고쳤으므로 여기 남긴다.
+
+### ① 친밀도 출처별 하루 상한 — 챗봇 40 / 커뮤니티 60
+
+`app/community/_lib/affinity.ts` · `app/api/chat/messages/route.ts`
+
+**왜 필요했나.** 전에는 총 상한 100 하나뿐이라 **챗봇 20턴으로 하루치를 다 채울 수 있었다.** 친밀도가 상점(지금은 펫 외출)의 화폐이므로, 그러면 **가장 쉬운 경로가 가장 어려운 경로와 똑같이 지불한다** — 사람과 닿을 재화 동기가 0이 된다. 챗봇에는 턴 제한도 없었다.
+
+```ts
+export const AFFINITY_CAP_BY_SOURCE = { CHAT: 40, COMMUNITY: 60 } as const
+grantAffinity(user, base, source = "COMMUNITY", alreadyFromSource?)
+```
+
+- **두 값의 합이 총 상한 100과 같다.** 그래서 총 상한이 출처 상한보다 먼저 걸리는 일이 없다 — 이게 아래 유도 계산을 정확하게 만든다
+- **마이그레이션을 만들지 않았다.** 챗봇 몫을 `ChatMessage`의 오늘 `USER` 메시지 수 × 5로 유도한다(`chatAffinityToday()`). `USER` 1건 = 정확히 5이고 챗봇 상한이 먼저 걸리므로 `min(40, 턴수×5)`가 실제 지급 누계와 같다. `@@index([userId, createdAt])`가 있어 인덱스 count 1회다. 발표 전에 공유 DB 스키마를 바꾸지 않으려고 이렇게 했다
+- 커뮤니티 몫은 `affinityToday − 챗봇 몫`이다. 출처가 둘뿐이라 정확하다
+- **`messages/route.ts`는 메시지를 만들기 *전에* 누계를 잰다.** 만든 뒤에 세면 방금 만든 1턴이 포함돼 8턴째가 이미 40으로 읽히고 그 턴이 0을 받는다. 그 값을 `alreadyFromSource`로 넘긴다
+- `lib/reward.ts`(C 소유)는 **건드리지 않았다.** `capAffinity`는 총 상한만 보고, 출처 상한은 이 파일이 얹는다
+
+**실측 (실제 요청)**
+
+```
+챗봇 턴1~8: +5씩 → 누계 40      턴9·10: +0
+커뮤니티 글1~3: +20씩 → 60       글4: +0
+최종 affinityToday 100 = 챗봇 40 + 커뮤니티 60
+```
+
+**되돌리려면** `AFFINITY_CAP_BY_SOURCE`를 `{ CHAT: 100, COMMUNITY: 100 }`으로 두면 예전 동작이 된다.
+
+### ② 챗봇 게이지가 총 친밀도/100 → 챗봇 몫/40
+
+`app/chat/_components/ChatPanel.tsx`
+
+- 헤더가 `친밀도 N/100` → **`오늘 대화로 받은 친밀도 N/40`**. 게이지 너비도 챗봇 몫 비율이다
+- 전에는 커뮤니티에서 받은 양까지 섞여서 **"챗봇으로 얼마 더 받을 수 있나"를 읽을 수 없었다**
+- `GET /api/chat/messages`가 `chatAffinityToday`·`chatAffinityCap`을 함께 내린다. `affinityToday`도 그대로 둬서 기존 호출부가 깨지지 않는다
+- 안내(ℹ)에 **모임 신청 +10**과 커뮤니티 합계 상한 60을 추가하고 한 줄 넣었다 — "대화만으로 하루치를 다 채울 수는 없어요. 나머지는 사람과 닿는 쪽에서 쌓여요"
+
+### 확인한 것
+
+`build 0` · `tsc 0오류` · `eslint(app) 0` · `check:community`·`check:safety` 통과. 브라우저로 챗봇 헤더가 `40/40`, 게이지 100%인 것까지 확인했다.
+
+**`npm run e2e`는 돌리지 못했다** — RDS 커넥션 고갈(`STATUS.md` 차단 27번, 여유 −6). 머지 직전 실행에서는 80건 통과였다. 커넥션이 풀리면 다시 돌려야 한다.
+
+### 이것과 별개로 D가 볼 것 — 차단 31·32번
+
+`STATUS.md`에 있다. **31번**은 위기 + 타인 공격이 함께 있는 글이 도움 안내 없이 400인 것(차단 30번과 같은 모양의 역전이 `containsAbuse` 관문에 남았다), **32번**은 모임 신청이 진단 완료를 요구하지 않는 것이다.
