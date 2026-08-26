@@ -50,6 +50,33 @@
   --tribe-soft: color-mix(in oklch, var(--tribe) 22%, var(--color-card));
   --tribe-wash: color-mix(in oklch, var(--tribe) 12%, var(--color-paper));
 
+  /* ── 윤곽선 체계 (2026-08-26 사용자 시안: 육성 게임 UI) ──────────────────────
+   *
+   * 사용자가 준 참고 화면의 인상은 **색이 아니라 두꺼운 윤곽선 + 안쪽 밝은 선**이다.
+   * 카드·버튼·게이지가 전부 진한 테두리로 둘러싸이고 그 안쪽에 한 줄이 더 있어서
+   * 스티커를 붙인 것처럼 보인다. 그 구조만 가져온다.
+   *
+   * **색은 그 게임의 황금빛을 따르지 않는다.** design.md 65행이 "채도가 높은 색은
+   * 종족색 하나뿐"이라고 못 박고 있어서, 금색을 새로 들이면 종족이 셋인 이 앱에서
+   * 종족색과 다투는 두 번째 채도 축이 생긴다. 그래서 윤곽선은 --tribe-cta 파생이다.
+   *
+   * 이 값들이 이 화면에만 있는 이유: styles/tokens.css는 홈·미션·커뮤니티가 함께 쓰는
+   * 파일이라 거기에 넣으면 남의 화면 카드까지 전부 테두리가 두꺼워진다(CLAUDE.md 1절).
+   *
+   * 명암비는 실측했다(canvas로 color-mix를 풀어 WCAG 식에 넣었다):
+   *   --tribe-cta 면 + --color-card 글자 = 여우 5.09 · 고양이 6.34 · 곰 5.42 → AA 통과
+   *   --tribe-cta2 면 = 6.77 · 8.09 · 7.21
+   * 그래서 아래 재화 알약을 어두운 면 + 밝은 글자로 뒤집을 수 있다(참고 이미지가 그 모양이다). */
+  --pet-outline: 3px solid var(--tribe-cta);
+  --pet-outline-thin: 2px solid var(--tribe-cta);
+  /* 윤곽선 **안쪽**에 한 줄 더. 참고 이미지의 이중 테두리를 만드는 값이고, inset이라
+     레이아웃을 밀지 않는다 — border를 두 겹 쓰려면 요소를 하나 더 넣어야 한다 */
+  --pet-inner-line: inset 0 0 0 2px color-mix(in oklch, var(--color-card) 74%, transparent);
+  /* 윤곽선을 두른 물건이 종이 위에 앉은 그림자. --shadow-card보다 진하다 —
+     테두리가 굵어진 만큼 그림자도 같이 올려야 카드가 납작해 보이지 않는다 */
+  --pet-drop: 0 3px 0 color-mix(in oklch, var(--tribe-cta) 22%, transparent),
+    0 6px 16px rgb(42 31 20 / 0.14);
+
   /* 2026-08-23 사용자 요청(광택 버튼 시안 2차): 머리 위 레벨 배지를 광택 있는 연한 칩으로
      바꿨다. "시안보다 연한 색을 원한다, 종족색을 따르되 투명도를 높이든 흰색을 섞든 알아서
      연하게" — 흰색(카드색)을 섞는 쪽을 골랐다. 반투명으로 연하게 만들면 배지 뒤가 방 배경
@@ -216,10 +243,18 @@
   /* 방 안쪽 폭을 넘지 않는다. 좌우 여백은 Lv 오버레이(왼쪽)와 균형을 맞춘 값이다 */
   max-width: calc(100% - var(--space-sm) * 2);
   padding: var(--space-3xs) var(--space-2xs);
+  /* 2026-08-26 시안: **면을 뒤집었다 — 어두운 종족색 + 밝은 글자.**
+     참고 이미지의 상단 재화 알약이 진한 갈색 면에 금색 테두리, 흰 숫자다. 반투명 밝은
+     면이던 것을 그대로 두면 배경 6종 중 밝은 셋(눈꽃 마을·푸른 빙해·오로라 들판) 위에서
+     알약이 사라진다 — 지금 이 화면은 방이 창을 채우므로 그 면적이 전보다 훨씬 넓다.
+     명암비 실측(위 윤곽선 체계 주석): --tribe-cta 면 + --color-card 글자가
+     여우 5.09 · 고양이 6.34 · 곰 5.42로 AA를 넘는다.
+     테두리는 안쪽 밝은 선 하나로 갈음한다 — 어두운 면에 어두운 테두리를 더하면 두께가
+     보이지 않고, 참고 이미지의 금색 테두리 자리가 이 밝은 선이다.
+     backdrop-filter를 걷었다: 면이 불투명해져 흐릴 대상이 없다 */
   border-radius: var(--radius-pill);
-  background: color-mix(in oklch, var(--color-card) 88%, transparent);
-  backdrop-filter: blur(8px);
-  box-shadow: var(--shadow-card);
+  background: var(--tribe-cta);
+  box-shadow: var(--pet-inner-line), var(--pet-drop);
 }
 
 .pet-bar__wallet {
@@ -245,7 +280,9 @@
   align-items: center;
   gap: var(--space-3xs);
   padding: 0 var(--space-2xs);
-  border-inline-end: 1px solid var(--color-rule);
+  /* 구분선도 어두운 면 위로 뒤집었다. --color-rule(#DDD0BC)은 밝은 면용이라 진한 면에서는
+     오히려 밝은 띠로 튄다 — 카드색을 26%만 섞어 면보다 한 단 밝은 선으로 둔다 */
+  border-inline-end: 1px solid color-mix(in oklch, var(--color-card) 26%, transparent);
 }
 
 .pet-bar__item:first-child {
@@ -268,9 +305,14 @@
    먹이기·외출이다 — 잉크색으로 두면 제목줄과 같은 무게가 된다.
    tabular-nums는 지갑 카드에서 그대로 가져온다. 값이 갱신될 때 자릿수가 바뀌어도
    옆 칸이 밀리지 않는다 */
+/* 2026-08-26 시안: 어두운 면으로 뒤집혔으므로 글자도 뒤집는다. --color-muted는 밝은 면
+   위에서 AA를 맞춘 값이라 어두운 면에서는 오히려 읽히지 않는다.
+   굵기를 700으로 올린 것도 참고 이미지다 — 그쪽 숫자가 굵고, 어두운 면 위 밝은 글자는
+   같은 굵기에서 가늘어 보이는 착시(광학적 무게)가 있어 한 단 올리는 것이 맞다 */
 .pet-bar__value {
-  color: var(--color-muted);
+  color: var(--color-card);
   font-size: var(--text-body);
+  font-weight: 700;
   font-variant-numeric: tabular-nums;
 }
 
@@ -302,10 +344,14 @@
   display: grid;
   gap: var(--space-3xs);
   padding: var(--space-2xs);
+  /* 2026-08-26 시안: 참고 이미지의 좌상단 상태판이 **크림 면 + 진한 윤곽선**이다.
+     재화 알약과 반대로 이쪽은 밝은 면을 유지한다 — 두 오버레이가 같은 어두운 면이면
+     방 위쪽이 띠 두 개로 막히고, 참고 이미지도 상태판은 밝고 재화 알약만 어둡다.
+     반투명 + 흐림을 걷은 이유는 알약과 같다: 배경 그림 6종 위에서 대비를 고정한다 */
+  border: var(--pet-outline-thin);
   border-radius: var(--radius-card);
-  background: color-mix(in oklch, var(--color-card) 88%, transparent);
-  backdrop-filter: blur(8px);
-  box-shadow: var(--shadow-card);
+  background: var(--color-card);
+  box-shadow: var(--pet-inner-line), var(--pet-drop);
 }
 
 /* 레벨은 이 오버레이에서 가장 큰 글자다. 알약을 씌우지 않은 이유: 이 상자 자체가 이미
@@ -391,21 +437,29 @@
 /* 아이콘 원. 면·번짐은 이 화면의 주 버튼(.pet-btn)과 같은 종족색 계열이다 —
    새 색을 만들지 않는다. 3rem(48px)은 design.md의 44px 터치 하한 위이고, 라벨까지
    합치면 한 버튼이 약 68px이라 좌측 5개가 340px 안에 들어간다(방 높이 하한 432px) */
+/* 2026-08-26 시안: **진한 링 + 안쪽 방사 그라디언트.** 참고 이미지의 원형 버튼이
+   "위쪽이 밝고 아래로 어두워지는 알" 모양이고 그 인상의 절반이 3px 링이다.
+   135deg 선형에서 `circle at 30% 25%` 방사로 바꾼 이유: 선형은 대각선 띠라 원 안에서
+   방향이 보이고, 방사는 한 점에서 퍼져 구슬처럼 보인다.
+   border가 3px 늘어난 만큼 안쪽이 좁아지므로 상자는 3.25rem이다 — 아이콘이 앉는 칸
+   (52 − 6 = 46px)이 옛 48px과 거의 같아 이모지 크기를 다시 잡을 필요가 없다 */
 .pet-circle__icon {
   display: grid;
   place-items: center;
-  width: 3rem;
-  height: 3rem;
+  width: 3.25rem;
+  height: 3.25rem;
+  border: var(--pet-outline);
   border-radius: var(--radius-pill);
-  background: var(--pet-gloss), linear-gradient(135deg, var(--tribe-face), var(--tribe));
-  box-shadow: var(--pet-gloss-edge), 0 4px 12px color-mix(in oklch, var(--tribe) 38%, transparent);
+  background:
+    radial-gradient(circle at 30% 25%, color-mix(in oklch, var(--tribe-face) 72%, #fff), var(--tribe) 70%);
+  box-shadow: var(--pet-inner-line), var(--pet-drop);
   font-size: var(--text-md);
   line-height: 1;
 }
 
 /* 열려 있는 모달의 버튼. 면을 한 단 어둡게 해 "지금 이걸 보고 있다"를 남긴다 */
 .pet-circle[data-active="true"] .pet-circle__icon {
-  background: var(--pet-gloss), linear-gradient(135deg, var(--tribe), var(--tribe-cta));
+  background: radial-gradient(circle at 30% 25%, var(--tribe), var(--tribe-cta) 75%);
 }
 
 /* 못 누르는 버튼(외출 중, 친밀도 부족, 요청 진행 중)은 뜨지 않는다 —
@@ -418,14 +472,22 @@
 
 /* 라벨 알약. 방 그림 위에 글자만 두면 배경 6종 중 밝은 셋에서 읽히지 않으므로 면을 깐다.
    재화 알약과 같은 반투명 카드색이다 */
+/* 2026-08-26 시안: **라벨도 윤곽선 알약이다.** 참고 이미지의 "쓰다듬기 / 놀아주기 /
+   간식주기"가 원형 버튼과 같은 테두리를 두른 알약이고, 그 한 쌍(원 + 알약)이 버튼 하나로
+   읽히게 만드는 장치다. 전에는 반투명 면 + 흐림이라 알약이 배경에 녹아 원만 남았다.
+   면을 불투명 카드색으로 올렸다 — backdrop-filter를 걷었으므로 배경 그림 6종 위에서
+   글자가 늘 같은 대비다(반투명이면 밝은 배경에서 대비가 내려간다).
+   글자색은 --tribe-cta다: 카드색 위에서 5.09~6.34:1로 AA를 넘고(위 윤곽선 체계 주석의
+   실측), 테두리와 같은 색이라 알약 하나가 한 덩어리로 보인다 */
 .pet-circle__label {
   padding: 0.1rem var(--space-2xs);
+  border: var(--pet-outline-thin);
   border-radius: var(--radius-pill);
-  background: color-mix(in oklch, var(--color-card) 85%, transparent);
-  backdrop-filter: blur(4px);
+  background: var(--color-card);
+  box-shadow: 0 2px 0 color-mix(in oklch, var(--tribe-cta) 20%, transparent);
   font-size: var(--text-label);
-  font-weight: 600;
-  color: var(--color-ink);
+  font-weight: 700;
+  color: var(--tribe-cta);
   white-space: nowrap;
 }
 
@@ -475,9 +537,15 @@
   max-height: calc(100dvh - var(--space-lg));
   overflow-y: auto;
   padding: var(--space-md);
+  /* 2026-08-26 시안: 모달 상자도 윤곽선을 두른다. 안쪽 카드가 같은 체계의 2px을 쓰므로
+     상자는 3px이라 층이 갈린다 — 같은 두께면 카드가 상자 벽에 붙어 보인다.
+     면은 --color-paper다(전에는 --color-card): 안쪽 카드가 --color-card라 상자가 한 단
+     어두워야 카드가 그 위에 얹힌 것으로 읽힌다. 카드 열이 없어진 화면에서 모달이
+     "종이", 카드가 "그 위의 조각"이다 */
+  border: var(--pet-outline);
   border-radius: var(--radius-card);
-  background: var(--color-card);
-  box-shadow: 0 12px 40px rgb(42 31 20 / 0.28);
+  background: var(--color-paper);
+  box-shadow: var(--pet-inner-line), 0 12px 40px rgb(42 31 20 / 0.28);
 }
 
 /* 진화 단계 4칸이 한 줄로 들어가야 하는 펫 정보 모달만 넓다 — 두 줄로 접히면
@@ -1047,9 +1115,15 @@
 /* 면은 **불투명한 카드색**, 선은 종족색이다 — 이유는 위 .pet-welcome 앞 주석 참고.
    stroke-width는 3인데, path에 vector-effect="non-scaling-stroke"가 걸려 있어
    상자가 늘어나도 화면에서 3px을 유지한다 */
+/* 2026-08-26 시안: 선 색을 --tribe-line(40% 희석)에서 --tribe-cta로 진하게 했다.
+   같은 방 안의 원형 버튼·Lv 상자·재화 알약이 전부 그 색 윤곽선을 두르게 됐으므로,
+   말풍선만 옅은 선으로 남으면 방에서 유일하게 다른 어휘가 된다.
+   **굵기는 3을 그대로 둔다** — 이 path는 손그림 blob이고 굵기를 올리면 굴곡이 뭉개진다
+   (윤곽선 체계의 3px과 숫자가 같은 것은 우연이 아니라 그 값에 맞춘 것이다).
+   쪽지(.pet-away__paper)는 이 체계에 넣지 않았다 — 찢어진 종이에는 윤곽선이 없다 */
 .pet-welcome__shape path {
   fill: var(--color-card);
-  stroke: var(--tribe-line);
+  stroke: var(--tribe-cta);
   stroke-width: 3;
   /* 손그림 느낌은 여기서 나온다. 굴곡이 만나는 자리와 꼬리 끝이 둥글어진다 */
   stroke-linejoin: round;
@@ -1543,14 +1617,18 @@
    1.07:1뿐이라 테두리도 그림자도 없으면 카드가 배경에 잠긴다. 커뮤니티 카드는 순백(#fff)
    위 베이지라 그 차이만으로 칸이 서는데 여기 카드색은 크림색이라 같은 방법이 안 통한다.
    --shadow-card는 tokens.css의 .hm-card가 쓰는 값이라 새로 만든 색이 아니다. */
+/* 2026-08-26 시안: 테두리 없는 흰 카드에서 **윤곽선 카드**로 갔다. 카드가 이제 거의 전부
+   모달 안에 있어서(개편으로 화면에서 카드 열이 사라졌다) 모달 상자 위에 한 겹 더 얹히는
+   자리다 — 테두리가 없으면 모달 면과 카드 면이 1.07:1로 갈리지 않아 카드 경계가 사라진다 */
 .pet-card {
   display: grid;
   align-content: start;
   gap: var(--space-2xs);
   padding: var(--space-sm);
+  border: var(--pet-outline-thin);
   border-radius: var(--radius-card);
   background: var(--color-card);
-  box-shadow: var(--shadow-card);
+  box-shadow: var(--pet-inner-line), var(--shadow-card);
 }
 
 /* .pet-card--wallet(보유 재화 카드의 흰 면)이 여기 있었다 — **2026-08-26 사용자 요청으로
@@ -1715,11 +1793,17 @@
    유지한 채 광택을 그 **위에 겹으로** 얹었고, 글자 흰 그림자는 되살리지 않았다.
    높이는 1.25 → 1.5rem으로 올렸다. 광택은 위아래로 밝은 띠·어두운 띠를 나눠야 보이는데
    1.25rem(테두리 2px 빼면 실효 16px)에서는 띠가 각각 8px밖에 안 돼 뭉개졌다. */
+/* 2026-08-26 시안: 테두리를 --tribe-line(40% 희석)에서 **--tribe-cta**로 진하게 바꿨다.
+   참고 이미지의 게이지가 그 모양이다 — 진한 테두리 안에 밝은 채움이 들어가야 막대가
+   "담긴 것"으로 보인다. 옅은 테두리에서는 채움과 테두리가 같은 계열이라 경계가 흐렸다.
+   **게이지 안에 숫자를 다시 넣지 않는다.** 참고 이미지는 넣지만, 이 화면은 2026-08-23에
+   그것을 지웠고 이유가 그대로다 — 움직이는 그라디언트 위 글자라 대비가 채움률에 따라
+   변한다. 숫자는 게이지 밖(위 __meta / 아래 각주)이 정본이다 */
 .pet-gauge {
   position: relative;
   height: 1.5rem;
   overflow: hidden;
-  border: 2px solid var(--tribe-line);
+  border: var(--pet-outline-thin);
   border-radius: var(--radius-pill);
   background: var(--color-paper);
   /* 빈 칸이 파인 홈으로 보이게 하는 안쪽 그림자. 채움이 덮은 자리에서는
@@ -1780,8 +1864,12 @@
    종족색 테두리로 둘러싸인 빈 홈이라, 막대가 초록이라는 것이 화면에서 읽히지 않았다.
    값은 --tribe-line과 **같은 계산식에 색만 바꾼 것**이다(원색 40% + 카드색) — 새 색이
    아니고, 굵기·명도 무게가 경험치 게이지 테두리와 같게 유지된다 */
+/* 2026-08-26 시안: 본체 게이지가 --tribe-cta 윤곽선으로 진해졌으므로 이 변형도 같은 무게로
+   올린다. 40% 희석은 옛 --tribe-line과 짝이던 값이라 이제 혼자 옅다.
+   --pet-seed-2는 씨앗 버튼 테두리와 같은 값이다 — 같은 재화를 가리키는 막대와 버튼이
+   한 줄에 서므로 테두리 색이 갈리면 둘이 다른 것처럼 보인다 */
 .pet-gauge--seed {
-  border-color: color-mix(in oklch, var(--pet-seed) 40%, var(--color-card));
+  border-color: var(--pet-seed-2);
 }
 
 .pet-gauge--seed .pet-gauge__fill {
@@ -2008,7 +2096,12 @@
   place-items: center;
   min-height: var(--control-h);
   padding: 0 var(--space-sm);
-  border: none;
+  /* 2026-08-26 시안: `border: none` → 윤곽선. 참고 이미지의 버튼이 전부 진한 링을 두르고
+     있고, 이 화면의 원형 버튼·라벨 알약이 이미 그 체계로 갔으므로 주 버튼만 테두리 없이
+     남으면 한 화면에 두 어휘가 섞인다.
+     단계 그림자(0 4px 0)는 그대로 둔다 — 테두리와 겹치지 않고, 그것이 이 버튼의 "눌린다"는
+     신호다(:active가 그 단을 깔고 앉는다) */
+  border: var(--pet-outline-thin);
   text-decoration: none;
   border-radius: var(--radius-input);
   background: var(--pet-gloss), linear-gradient(135deg, var(--tribe-face), var(--tribe));
@@ -2037,6 +2130,11 @@
    그 값(0 4px 10px, 색 38%)을 그대로 가져왔다. 새 색은 없다. 초록 계열이어야 하므로
    --tribe가 아니라 --pet-seed를 섞는다 */
 .pet-btn--seed {
+  /* 2026-08-26 시안: 본체(.pet-btn)가 --tribe-cta 윤곽선을 갖게 되면서 이 초록 버튼만
+     **갈색 테두리**를 두르게 됐다. 초록 면에 갈색 링은 두 재료가 붙은 것으로 보인다.
+     테두리 색만 씨앗 초록의 진한 단(--pet-seed-2)으로 갈아 얹는다 — 굵기는 체계와 같은
+     2px이고, 씨앗 초록은 이 파일이 이미 인정한 유일한 예외색이다(--pet-seed 주석) */
+  border-color: var(--pet-seed-2);
   background: var(--pet-gloss), linear-gradient(135deg, #c4e6b8, var(--pet-seed-fill-2));
   /* box-shadow는 목록이 통째로 교체되므로, 광택 두 줄을 여기서도 다시 써야 한다.
      본체의 단계 그림자(0 4px 0 --tribe-cta)는 이 교체로 사라진다 — 그것이 의도다 */
@@ -2302,13 +2400,16 @@
   gap: var(--space-2xs);
 }
 
+/* 2026-08-26 시안: 회색 테두리(--color-rule)를 종족색 윤곽선으로 바꿨다. 참고 이미지의
+   별 5칸처럼 "칸"이 또렷해야 진화 4단계가 한 줄의 눈금으로 읽힌다.
+   --now(현재 단계)와 --locked(잠김) 변형은 아래에서 이 값을 각자 덮는다 */
 .pet-evo-card {
   position: relative;
   display: grid;
   justify-items: center;
   gap: var(--space-3xs);
   padding: var(--space-sm) var(--space-2xs);
-  border: 2px solid var(--color-rule);
+  border: var(--pet-outline-thin);
   border-radius: var(--radius-card);
   background: var(--color-paper);
   text-align: center;
@@ -2993,7 +3094,11 @@
    --on 칸(종족색 면)·--locked 칸(죽인 종이색) 위에서는 이 흰 면이 버튼 경계를 만든다 */
 .pet-btn--ghost {
   min-height: var(--control-h); /* design.md 모바일 하한선: 44px 터치 타깃 */
-  border: 2px solid var(--tribe-line);
+  /* 2026-08-26 시안: --tribe-line(40% 희석) → 윤곽선 체계와 같은 --tribe-cta.
+     이 버튼은 "테두리만 있는 버튼"이라 테두리가 곧 버튼이다 — 체계에서 빠지면
+     같은 화면의 채운 버튼보다 오히려 약해 보인다(design.md 126행의 Secondary 정의는
+     "테두리만 있는 pill"이고 테두리 색을 못 박지 않는다) */
+  border: var(--pet-outline-thin);
   background: var(--color-card);
   box-shadow: var(--pet-shop-lift);
   color: var(--tribe-cta);
