@@ -23,6 +23,9 @@ type DetailPost = {
   title: string
   body: string
   createdAt: string
+  // 첨부 사진. 없으면 둘 다 null이고, CLOUDFRONT_DOMAIN이 비어 있으면 key만 있고 url이 null이다.
+  imageKey: string | null
+  imageUrl: string | null
   likeCount: number
   commentCount: number
   likedByMe: boolean
@@ -187,10 +190,19 @@ export function PostDetailModal({
         setActionError(json.error.message)
         return
       }
+      // 위기 신호면 댓글이 **저장되지 않았다**(2026-08-25 결정 변경, _lib/crisis.ts).
+      // 목록에 밀어 넣지 않는다 — 응답에 comment가 없어 undefined가 들어가고 렌더가 깨진다.
+      // 입력도 지우지 않는다. 쓴 말이 사라지면 안내가 벌처럼 읽힌다.
+      if (json.data.crisisBlocked) {
+        setCrisisNotice(json.data.notice)
+        return
+      }
+
       setComments((prev) => [...prev, json.data.comment])
       setCommentBody("")
       setPost((prev) => (prev ? { ...prev, commentCount: prev.commentCount + 1 } : prev))
       setAffinityNotice(json.data.granted > 0 ? `친밀도 +${json.data.granted}` : "오늘 친밀도를 이미 다 받았어요")
+      // 막지는 않았지만 걱정되는 신호가 있는 댓글(사별·보도·비유 등). 댓글은 달렸고 안내만 얹는다
       if (json.data.crisisNotice) setCrisisNotice(json.data.crisisNotice)
       window.dispatchEvent(new CustomEvent("user-stats-changed"))
     } finally {
@@ -256,6 +268,17 @@ export function PostDetailModal({
             <div className="flex-1 overflow-y-auto px-7 py-6">
               <h2 className="mb-2 text-lg font-bold text-neutral-900">{post.title}</h2>
               <p className="mb-6 whitespace-pre-wrap text-[15px] leading-relaxed text-neutral-800">{post.body}</p>
+
+              {/* 상세에서는 원본 비율 그대로 본다. 목록 카드만 16:9로 자른다(PostCard 주석 참고).
+                  next/image를 쓰지 않는 이유는 미션 화면과 같다 — 설정에 없는 hostname이면 throw한다. */}
+              {post.imageUrl && (
+                // eslint-disable-next-line @next/next/no-img-element
+                <img
+                  src={post.imageUrl}
+                  alt="글에 첨부된 사진"
+                  className="mb-6 h-auto w-full rounded-xl bg-neutral-100"
+                />
+              )}
 
               <button
                 type="button"

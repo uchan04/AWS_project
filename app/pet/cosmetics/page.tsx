@@ -71,12 +71,23 @@ export default async function CosmeticsPage() {
     console.error("[/pet/cosmetics]", error)
     return (
       <main className="pet pet--shop">
-        <div className="pet__top">
-          <h1 className="pet__title">배경 상점</h1>
-          <Link className="pet-plank" href="/pet">
-            펫으로
-          </Link>
-        </div>
+        {/* 정상 화면과 같은 배너를 쓴다 — 실패한 화면만 머리가 다르면 같은 곳이 아닌 것처럼 보인다.
+            장식 이모지는 목록이 없는 자리에 흥을 붙이는 것이라 여기서는 뺀다 */}
+        <header className="pet-banner">
+          <div className="pet-banner__inner">
+            <div>
+              <span className="pet-banner__eyebrow" aria-hidden="true">
+                ✦ BACKGROUND SHOP ✦
+              </span>
+              <h1 className="pet__title">배경 상점</h1>
+            </div>
+            <div className="pet-banner__acts">
+              <Link className="pet-plank" href="/pet">
+                <span aria-hidden="true">🐾</span> 펫으로
+              </Link>
+            </div>
+          </div>
+        </header>
         <div className="pet-card">
           <h2 className="pet-card__title">배경 목록을 불러오지 못했어요</h2>
           <span className="pet-card__meta">잠시 후 다시 들어와 주세요.</span>

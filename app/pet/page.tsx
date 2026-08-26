@@ -151,6 +151,12 @@ export default async function PetPage() {
       // 오늘 들어온 양. 잔액과 달리 화면에서 갱신하지 않는다 — 먹이기는 씨앗을 쓰는 것이고,
       // 방치형 수령은 미션이 아니라서 "오늘 미션으로 +N"이 바뀌지 않는다
       today: { seeds: todaySeeds, starShards: todayShards, affinity: todayAffinity },
+      // 누적 출석일. "오늘의 활동" 카드의 네 번째 칸이다 (2026-08-24 사용자 요청).
+      // User에 이미 있는 컬럼이라 쿼리가 늘지 않는다 — AttendanceClaim을 세지 않는 이유가
+      // 그것이고, 그 표를 세면 같은 수를 두 곳에서 계산하게 된다(출석 지급은 B의
+      // 미션 화면이 하고 attendanceTotal이 그 결과다).
+      // 연속 출석(user.streakCount)이 아니다 — 이유는 PetView의 todayTiles 주석
+      attendanceDays: user.attendanceTotal,
       idleSeeds,
       idleCapped: idle.capped,
       msToNextSeed: idle.msToNextSeed,
