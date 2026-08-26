@@ -4210,3 +4210,92 @@
   color: inherit;
   cursor: pointer;
 }
+
+/* ── 여행일기 보관함 목록 (2026-08-26 사용자 요청) ────────────────────────────
+ *
+ * `보관함 → 목록 → 일기` 세 단계의 가운데다. 모달 껍데기(.pet-modal)는 C의 것을 쓰고
+ * 여기서는 줄 모양만 정한다 — 껍데기를 새로 만들면 이 화면의 모달이 두 종류가 된다.
+ *
+ * 종이 일기(.pet-diary-pop)의 색을 쓰지 않는다. 그쪽은 "한 장을 펼쳐 읽는" 자리라
+ * 노란 종이가 재질이고, 목록은 **고르는 자리**라 이 화면의 카드색이 맞다.
+ */
+
+.pet-history {
+  margin: 0;
+  padding: 0;
+  list-style: none;
+  display: grid;
+  gap: var(--space-3xs);
+  /* 10건이 화면을 넘지 않게 여기서만 스크롤한다. 모달 높이는 껍데기가 잡는다 */
+  max-height: min(60dvh, 26rem);
+  overflow-y: auto;
+}
+
+/* 줄 전체가 버튼이다. 날짜(고정 폭) · 제목(남는 폭) · 재화(내용 폭) 세 칸이고
+   제목만 늘어난다 — 세 칸을 1fr로 나누면 날짜가 줄바꿈된다 */
+.pet-history__row {
+  display: grid;
+  grid-template-columns: auto minmax(0, 1fr) auto;
+  align-items: center;
+  gap: var(--space-2xs);
+  width: 100%;
+  min-height: var(--control-h);
+  padding: var(--space-3xs) var(--space-2xs);
+  border: 0;
+  border-radius: var(--radius-input);
+  background: var(--color-card);
+  font-family: inherit;
+  font-size: var(--text-label);
+  text-align: left;
+  cursor: pointer;
+}
+
+.pet-history__row:hover {
+  background: color-mix(in oklch, var(--tribe) 12%, var(--color-card));
+}
+
+.pet-history__date {
+  font-variant-numeric: tabular-nums;
+  color: var(--color-muted);
+}
+
+.pet-history__title {
+  font-family: var(--font-display);
+  color: var(--color-ink);
+  /* 제목이 길면 자른다 — 줄바꿈되면 줄 높이가 들쭉날쭉해져 목록이 목록으로 안 읽힌다.
+     전체 문장은 누르면 열리는 일기 안에 있다 */
+  overflow: hidden;
+  white-space: nowrap;
+  text-overflow: ellipsis;
+}
+
+.pet-history__loot {
+  display: flex;
+  align-items: center;
+  gap: 3px;
+  font-variant-numeric: tabular-nums;
+  color: var(--color-ink-2);
+}
+
+/* 읽는 중 · 실패 · 빈 상태가 같은 자리를 쓴다. 세 문장의 길이가 달라 높이가 흔들리므로
+   최소 높이를 줄 하나만큼 준다 */
+.pet-history__note {
+  margin: 0;
+  min-height: var(--control-h);
+  display: grid;
+  place-items: center;
+  padding: var(--space-2xs);
+  border-radius: var(--radius-input);
+  background: var(--color-paper-2);
+  font-size: var(--text-label);
+  color: var(--color-muted);
+  text-align: center;
+}
+
+/* 상한을 적어 둔다 — 10건이 상한이라는 것을 모르면 옛 기록이 사라진 것으로 읽힌다 */
+.pet-history__foot {
+  margin: 0;
+  font-size: var(--text-caption);
+  color: var(--color-muted);
+  text-align: center;
+}

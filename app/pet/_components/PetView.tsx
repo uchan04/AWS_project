@@ -22,7 +22,7 @@ import {
   outingRemainingLabel,
   seedsToNextStage,
 } from "@/lib/pet"
-import type { OutingView } from "@/lib/outing"
+import { OUTING_HISTORY_LIMIT, type OutingHistoryItem, type OutingView } from "@/lib/outing"
 import { EVOLUTION_LEVEL, SEED_TO_EXP, expToNextLevel } from "@/lib/types"
 // 안내 문구의 숫자를 손으로 적지 않는다 — 값이 바뀌면 문구가 조용히 거짓이 된다.
 // ChatPanel도 같은 모듈에서 상수만 가져온다(클라이언트 컴포넌트에서 이미 쓰는 방식).
@@ -179,6 +179,17 @@ const feedStep = (current: number, preset: number) =>
 const ko = (n: number) => n.toLocaleString("ko-KR")
 
 /**
+ * 보관함 목록의 날짜. `08. 26`처럼 짧게 쓴다 — 목록은 한 줄에 날짜·제목·재화가 함께
+ * 서므로 연도가 들어갈 폭이 없다. 일기 안에는 연도까지 있다(OutingDiaryModal).
+ * `toLocaleDateString`을 쓰지 않는 이유도 그쪽과 같다: 로케일마다 자리 폭이 흔들린다.
+ */
+function historyDate(iso: string): string {
+  const d = new Date(iso)
+  if (Number.isNaN(d.getTime())) return ""
+  return `${String(d.getMonth() + 1).padStart(2, "0")}. ${String(d.getDate()).padStart(2, "0")}`
+}
+
+/**
  * 평상시 대사가 다음 문장으로 넘어가는 간격 (2026-08-23).
  * 길게 잡은 값이다 — 이유는 아래 순환 useEffect 주석에 있다.
  *
@@ -263,8 +274,37 @@ export default function PetView({ initial }: { initial: PetState }) {
   // 2026-08-26 개편: 카드 5장이 모달로 들어갔다. **상태를 하나로 둔다**(시안과 같은 방식) —
   // boolean 5개면 둘이 동시에 열린 상태를 코드가 표현할 수 있게 되고, 그 조합은 화면에서
   // 뜻이 없다(모달 위에 모달은 이 앱에 없다). null이 "닫힘"이다
-  const [modal, setModal] = useState<"seed" | "shop" | "today" | "info" | "outing" | null>(null)
+  const [modal, setModal] = useState<"seed" | "shop" | "today" | "info" | "history" | null>(null)
   const closeModal = () => setModal(null)
+
+  /**
+   * 여행일기 보관함 (2026-08-26 사용자 요청). **최근 10건만** 본다.
+   *
+   * `보관함 → 목록 → 일기` 세 단계다. 목록에서 한 줄을 누르면 같은 종이 일기 팝업이
+   * 열리는데, 그때는 **읽기 전용**이다 — 재화를 다시 주지 않는다(수령은 `POST /claim`
+   * 하나뿐이다).
+   *
+   * `undefined`(아직 안 불렀다) / `null`(실패) / 배열을 구분한다. 홈 미션 카드가 로딩 중에
+   * 실패 문구를 띄우던 버그(차단 3번)와 같은 갈림이다 — 하나로 합치면 여는 순간
+   * "기록이 없어요"가 깜빡인다.
+   */
+  const [history, setHistory] = useState<OutingHistoryItem[] | null | undefined>(undefined)
+  /** 목록에서 고른 한 건. 열려 있으면 종이 일기가 읽기 전용으로 뜬다 */
+  const [historyPick, setHistoryPick] = useState<OutingHistoryItem | null>(null)
+
+  /** 보관함을 열 때만 부른다 — 화면 진입에서 왕복을 늘리지 않는다 */
+  async function openHistory() {
+    setModal("history")
+    // 이미 받아 뒀으면 다시 부르지 않는다. 외출을 새로 수령하면 아래 hearOuting이 비운다
+    if (history !== undefined) return
+    try {
+      const res = await fetch("/api/pet/outing/history")
+      const json = await res.json()
+      setHistory(res.ok ? (json.data?.items ?? []) : null)
+    } catch {
+      setHistory(null)
+    }
+  }
 
   // 말풍선을 덮는 반응 대사. 지금은 먹이기만 여기 온다 — 쓰다듬기는 text가 null이라
   // 파티클만 띄우고 이 값은 계속 null이다(위 reaction 주석)
@@ -797,6 +837,9 @@ export default function PetView({ initial }: { initial: PetState }) {
       // 사용자가 쓴 20문구와 먹이기 답뿐이라는 규칙을 지킨다(위 pat·react 주석)
       react(null)
       // 토스트를 띄우지 않는다 — 아래 여행일기 팝업이 같은 재화를 하단에 담는다
+      // 보관함 캐시를 비운다 — 방금 받은 건이 목록의 맨 위여야 한다.
+      // null(실패)이 아니라 undefined로 되돌려서 다음에 열 때 다시 부른다
+      setHistory(undefined)
       setDiary({
         title: next.title,
         returnedAt: next.returnedAt,
@@ -1164,6 +1207,17 @@ export default function PetView({ initial }: { initial: PetState }) {
                 }}
                 disabled={outingBlocked}
                 locked={outingLocked}
+              />
+            ) : null}
+            {/* 여행일기 보관함. **외출 버튼 바로 아래다** — 같은 기능의 과거이고,
+                방금 들은 이야기를 다시 찾는 사람이 외출 버튼 근처를 먼저 본다.
+                available: false면 외출 자체가 없으므로 이 버튼도 그리지 않는다 */}
+            {outing.available ? (
+              <CircleBtn
+                icon="📖"
+                label="여행일기"
+                onClick={openHistory}
+                active={modal === "history"}
               />
             ) : null}
             <CircleBtn
@@ -1557,6 +1611,60 @@ export default function PetView({ initial }: { initial: PetState }) {
               app/pet/page.tsx가 계속 채우고, pet.css의 .pet-log 규칙도 남아 있다.
               되살릴 일이 생기면 그 두 벌이 이미 있으므로 이 자리에 카드만 다시 세우면 된다 */}
 
+        {/* 여행일기 보관함 — 목록 (2026-08-26 사용자 요청).
+            `보관함 → 목록 → 일기` 세 단계다. 여기서 한 줄을 누르면 같은 종이 일기가
+            **읽기 전용**으로 열린다(아래 historyPick).
+
+            최근 10건만 본다(OUTING_HISTORY_LIMIT). 하루 최대 2회니까 약 5일치다 —
+            그보다 길게 두면 스크롤이 기억을 대신하지 못한다. "더 보기"를 두지 않은 것은
+            이 목록이 성취 기록이 아니라 *방금 것을 다시 찾는 자리*이기 때문이다.
+
+            아직 안 받은 건은 목록에 없다(서버가 claimedAt으로 걸러 준다) — 보관함에서
+            먼저 읽히면 누르기 전에 다 보여 주는 것이 된다 */}
+        {modal === "history" ? (
+          <PetModal title="여행일기" onClose={closeModal}>
+            <p className="pet-card__title">
+              <span aria-hidden="true">📖</span> 여행일기
+            </p>
+            {history === undefined ? (
+              // 읽는 중과 실패를 가른다 — 하나로 합치면 여는 순간 "기록이 없어요"가 깜빡인다
+              <p className="pet-history__note">불러오는 중이에요</p>
+            ) : history === null ? (
+              <p className="pet-history__note">기록을 불러오지 못했어요. 잠시 후 다시 열어 주세요</p>
+            ) : history.length === 0 ? (
+              <p className="pet-history__note">
+                아직 다녀온 기록이 없어요. 외출을 한 번 보내면 여기에 남아요
+              </p>
+            ) : (
+              <ul className="pet-history">
+                {history.map((h) => (
+                  <li key={h.id}>
+                    {/* 줄 전체가 버튼이다 — 손가락으로 누르는 화면이라 표적이 클수록 낫다
+                        (옛 지갑 줄·재화 알약과 같은 판단) */}
+                    <button
+                      type="button"
+                      className="pet-history__row"
+                      onClick={() => setHistoryPick(h)}
+                      aria-haspopup="dialog"
+                    >
+                      <span className="pet-history__date">{historyDate(h.returnedAt)}</span>
+                      <span className="pet-history__title">{h.title}</span>
+                      <span className="pet-history__loot">
+                        <CurrencyIcon currency="seed" size={14} /> {ko(h.gained.seeds)}
+                        <CurrencyIcon currency="starShard" size={14} /> {ko(h.gained.starShards)}
+                      </span>
+                    </button>
+                  </li>
+                ))}
+              </ul>
+            )}
+            {/* 개수를 적어 둔다 — 10건이 상한이라는 것을 모르면 옛 기록이 사라진 것으로 읽힌다 */}
+            {history && history.length > 0 ? (
+              <p className="pet-history__foot">최근 {ko(OUTING_HISTORY_LIMIT)}건까지 남아요</p>
+            ) : null}
+          </PetModal>
+        ) : null}
+
         {modal === "today" ? (
           <PetModal title="오늘의 활동" onClose={closeModal}>
           {/* 오늘의 활동 (2026-08-24 사용자 요청). 값의 출처와 시안에서 달라진 점은 위
@@ -1667,6 +1775,22 @@ export default function PetView({ initial }: { initial: PetState }) {
           onClose={() => setDiary(null)}
         />
       ) : null}
+
+      {/* 보관함에서 고른 옛 일기. **같은 컴포넌트를 읽기 전용으로 쓴다** — 종이 시안을
+          두 벌로 만들면 한쪽만 고쳐진다. 다른 것은 맨 아래 버튼뿐이다:
+          방금 받은 일기는 `{펫} 맞이하기`(만나러 간다), 옛 일기는 `닫기`다.
+          `맞이하기`를 옛 기록에 두면 재화를 또 받는 것처럼 읽힌다 */}
+      {historyPick ? (
+        <OutingDiaryModal
+          skinName={pet.skinName}
+          title={historyPick.title}
+          returnedAt={historyPick.returnedAt}
+          episode={historyPick.episode}
+          gained={historyPick.gained}
+          readOnly
+          onClose={() => setHistoryPick(null)}
+        />
+      ) : null}
     </main>
   )
 }
@@ -1757,6 +1881,7 @@ function OutingDiaryModal({
   returnedAt,
   episode,
   gained,
+  readOnly,
   onClose,
 }: {
   skinName: string
@@ -1764,6 +1889,12 @@ function OutingDiaryModal({
   returnedAt: string
   episode: string[]
   gained: { seeds: number; starShards: number }
+  /**
+   * 보관함에서 옛 일기를 볼 때 true (2026-08-26). **바뀌는 것은 맨 아래 버튼 하나다** —
+   * `{펫} 맞이하기`는 방금 돌아온 펫을 만나러 가는 말이고, 옛 기록에 그 버튼을 두면
+   * 재화를 또 받는 것처럼 읽힌다. 재화 지급 경로는 `POST /claim` 하나뿐이다.
+   */
+  readOnly?: boolean
   onClose: () => void
 }) {
   const boxRef = useModalA11y(onClose)
@@ -1877,8 +2008,14 @@ function OutingDiaryModal({
         </ul>
 
         <button type="button" className="pet-btn pet-diary__go" onClick={onClose}>
-          <span aria-hidden="true">🐾</span> {skinName} 맞이하기{" "}
-          <span aria-hidden="true">🐾</span>
+          {readOnly ? (
+            "닫기"
+          ) : (
+            <>
+              <span aria-hidden="true">🐾</span> {skinName} 맞이하기{" "}
+              <span aria-hidden="true">🐾</span>
+            </>
+          )}
         </button>
       </div>
     </div>
