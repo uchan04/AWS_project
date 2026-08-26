@@ -692,7 +692,10 @@ export default function PetView({ initial }: { initial: PetState }) {
       <header className="pet__top">
         <div>
           <h1 className="pet__title">나의 펫</h1>
-          <p className="pet__lede">씨앗을 먹이고 함께 성장하세요</p>
+          {/* 2026-08-26 사용자 요청으로 바꿨다. 전에는 "씨앗을 먹이고 함께 성장하세요"였다 —
+              씨앗 투입은 이 화면의 여러 장치 중 하나이고, 친밀도 → 외출 → 이야기가
+              이 화면이 실제로 향하는 곳이다(SPEC.md 5절 펫 외출 절) */}
+          <p className="pet__lede">친밀도를 올려 펫의 외출 이야기를 들어보세요</p>
         </div>
       </header>
 
