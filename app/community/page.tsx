@@ -2,6 +2,7 @@ import { redirect } from "next/navigation"
 import type { TypeCode } from "@prisma/client"
 import { UnauthorizedError, getCurrentUser } from "@/lib/auth"
 import { TRIBE } from "@/lib/types"
+import Link from "next/link"
 import { GalleryTabs } from "./_components/GalleryTabs"
 import { HopeBanner } from "./_components/HopeBanner"
 import { PostList } from "./_components/PostList"
@@ -67,6 +68,22 @@ export default async function CommunityPage(props: PageProps<"/community">) {
       </div>
 
       <GalleryTabs active={gallery} myTypeCode={myTypeCode} />
+
+      {/* 오프라인 모임 입구 (2026-08-26, A). **사이드바 `모임` 탭을 여기로 내렸다** —
+          모임은 커뮤니티의 한 형태이고 탭 하나를 쓸 만큼의 사용 빈도가 아니다
+          (탭 5 → 3, app/components/Sidebar.tsx 주석).
+          라우트(`/community/meetups`)는 그대로다. 탭 대신 이 줄이 유일한 입구가 되므로
+          위쪽(탭 바로 아래)에 둔다 — 글 목록 아래에 두면 스크롤해야 찾는다.
+          `MeetupNotice`가 이미 맨 위에 있으므로 알림이 있을 때는 그쪽이 먼저 눈에 온다 */}
+      <Link
+        href="/community/meetups"
+        className="flex items-center justify-between rounded-2xl border border-neutral-200 bg-white px-4 py-3 text-sm transition-colors hover:bg-neutral-50"
+      >
+        <span className="flex items-center gap-2 font-semibold text-neutral-900">
+          <span aria-hidden="true">🤝</span> 오프라인 모임
+        </span>
+        <span className="text-neutral-500">보러 가기 →</span>
+      </Link>
 
       {/* 희망 문구 배너(SPEC 9절). 탭 아래에 둔다 — 배너 문구가 지금 고른 탭에 따라
           갈리므로("고양잇과족에게:"), 원인인 탭이 결과인 배너보다 위에 있어야 읽힌다.

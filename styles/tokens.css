@@ -892,3 +892,124 @@ body {
   font-size: var(--text-label);
   color: var(--color-muted);
 }
+
+/* ─────────────────────────────────────────────────────────────────────
+   "알을 받았어요" 팝업 (2026-08-26 사용자 결정, A)
+
+   진단 직후 첫 진단에만 뜬다. 두 가지를 한 번에 한다 — 알을 받았다는 사실과,
+   **그 알이 무엇이 되는지.** 두 번째가 이 팝업을 만든 이유다: 그전에는 진화 4단계를
+   보여주는 자리가 /pet의 작은 🌟 버튼 하나뿐이었고, 진단 직후에 그 버튼을 누를
+   이유가 없었다.
+
+   오버레이 값(색·z-index·반경·그림자)은 Sidebar의 내 계정 모달과 **같다** —
+   앱 안에서 팝업이 두 종류로 보이지 않게 한다.
+   ───────────────────────────────────────────────────────────────────── */
+.hm-egg {
+  position: fixed;
+  inset: 0;
+  z-index: 400;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: var(--space-md);
+  background: rgb(42 31 20 / 0.45);
+}
+
+.hm-egg__box {
+  display: grid;
+  gap: var(--space-2xs);
+  justify-items: center;
+  width: 100%;
+  max-width: 24rem;
+  max-height: min(90dvh, 42rem);
+  overflow-y: auto;
+  padding: var(--space-md);
+  border-radius: 28px;
+  background: var(--color-card);
+  box-shadow: 0 32px 80px rgb(0 0 0 / 0.2);
+  text-align: center;
+}
+
+/* 알 이모지. hm-bounce는 이미 있는 키프레임이고 prefers-reduced-motion 처리도 그쪽에 있다 */
+.hm-egg__art {
+  font-size: 3.5rem;
+  line-height: 1;
+}
+
+.hm-egg__title {
+  margin: 0;
+  font-family: var(--font-display);
+  font-size: var(--text-xl);
+  color: var(--color-ink);
+}
+
+.hm-egg__lead {
+  margin: 0;
+  font-size: var(--text-label);
+  line-height: 1.6;
+  color: var(--color-ink-2);
+}
+
+.hm-egg__label {
+  margin: var(--space-2xs) 0 0;
+  font-size: var(--text-label);
+  font-weight: 700;
+  color: var(--color-ink);
+}
+
+/* 4단계를 세로로 세운다. 가로로 놓으면 좁은 화면에서 칸이 4등분돼 글자가 끊긴다 —
+   /pet의 진화 팝업은 24rem 폭에서 2×2로 접히지만 여기는 리스트가 낫다:
+   "이렇게 자란다"는 **순서**의 정보이고 세로가 순서를 더 잘 읽힌다 */
+.hm-egg__stages {
+  display: grid;
+  gap: 4px;
+  width: 100%;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+  counter-reset: egg;
+}
+
+.hm-egg__stage {
+  display: flex;
+  align-items: center;
+  gap: var(--space-2xs);
+  padding: var(--space-2xs);
+  border-radius: var(--radius-input);
+  background: color-mix(in oklch, var(--color-rule) 40%, transparent);
+  font-size: var(--text-label);
+  color: var(--color-ink-2);
+}
+
+/* 지금 단계만 종족색을 얹는다. 나머지를 흐리게 하지 않는다 — 잠금 표시를 쓰면
+   "아직 못 가진 것" 목록이 되고, 이 팝업의 목적은 열망이지 결핍이 아니다 */
+.hm-egg__stage--now {
+  background: color-mix(in oklch, var(--tribe) 16%, transparent);
+  color: var(--color-ink);
+}
+
+.hm-egg__stage-name {
+  font-family: var(--font-display);
+  min-width: 3.5em;
+  text-align: left;
+}
+
+.hm-egg__stage-range {
+  margin-left: auto;
+  font-variant-numeric: tabular-nums;
+  color: var(--color-muted);
+}
+
+.hm-egg__stage-badge {
+  padding: 1px 8px;
+  border-radius: var(--radius-pill);
+  background: var(--tribe);
+  color: #fff;
+  font-size: 0.7rem;
+  font-weight: 700;
+}
+
+.hm-egg__close {
+  width: 100%;
+  margin-top: var(--space-2xs);
+}

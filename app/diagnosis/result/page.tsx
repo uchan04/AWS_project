@@ -12,7 +12,8 @@ import { useRouter } from "next/navigation"
 import Link from "next/link"
 import { useEffect, useState } from "react"
 import { REDIAGNOSIS_ENABLED } from "@/lib/diagnosis/flags"
-import { NICKNAME_MAX, TRIBE, isValidNickname } from "@/lib/types"
+import { EVOLUTION_LEVEL, NICKNAME_MAX, TRIBE, isValidNickname } from "@/lib/types"
+import { useModalA11y } from "@/app/components/useModalA11y"
 import "@/styles/tokens.css"
 import { type DiagnosisView, fetchMe, fetchReason, saveNickname } from "../api"
 
@@ -31,6 +32,22 @@ export default function DiagnosisResultPage() {
   // 방금 진단을 마치고 온 것인지. AskFlow가 ?new=1을 붙여 보낸다.
   // 이 화면은 이름을 바꾸러 다시 들어오는 경로이기도 해서(하단 탭·사이드바) 문구를 갈라야 한다.
   const [justDiagnosed, setJustDiagnosed] = useState(false)
+  /**
+   * "알을 받았어요" 팝업 (2026-08-26 사용자 결정).
+   *
+   * 왜 필요했나 — 알을 받고 나서 **이게 뭐가 되는지 모른 채** 시작했다. 진화 4단계를
+   * 보여주는 자리가 `/pet`의 작은 🌟 버튼 하나뿐이었고, 그 버튼을 진단 직후에 누를
+   * 이유가 없다. **열망을 만드는 유일한 지점이 비어 있었다.**
+   *
+   * `?new=1`로 들어온 첫 진단에만 뜬다 — 이름을 바꾸러 다시 들어올 때마다 뜨면
+   * 안내가 아니라 방해가 된다(justDiagnosed와 같은 조건을 쓴다).
+   *
+   * 단계 이름·구간은 `/pet`의 진화 팝업과 **같은 값을 쓴다**(EVOLUTION_LEVEL이 정본).
+   * 그림은 쓰지 않는다 — 이 화면은 스킨을 모르고, 여기서 S3 URL을 조립하면 규칙이
+   * 두 벌이 된다(lib/assets.ts가 유일한 조립 경로다).
+   */
+  const [eggOpen, setEggOpen] = useState(false)
+  const eggBoxRef = useModalA11y(() => setEggOpen(false), eggOpen)
 
   useEffect(() => {
     let alive = true
@@ -38,7 +55,10 @@ export default function DiagnosisResultPage() {
       .then((me) => {
         if (!alive) return
         // 쿼리는 마운트 후에 읽는다. 렌더 중에 읽으면 서버·클라이언트 문구가 달라 하이드레이션이 깨진다
-        setJustDiagnosed(new URLSearchParams(window.location.search).has("new"))
+        const isNew = new URLSearchParams(window.location.search).has("new")
+        setJustDiagnosed(isNew)
+        // 첫 진단에만 알 팝업을 띄운다(위 eggOpen 주석)
+        if (isNew) setEggOpen(true)
         if (!me) {
           setView({ status: "empty" })
           return
@@ -233,6 +253,57 @@ export default function DiagnosisResultPage() {
           </div>
         </div>
       </div>
+
+      {/* ── "알을 받았어요" 팝업 (2026-08-26 사용자 결정) ──
+          첫 진단에만 뜬다. 두 가지를 한 번에 한다 — 알을 받았다는 사실과, **그 알이
+          무엇이 되는지**. 두 번째가 이 팝업을 만든 이유다(위 eggOpen 주석).
+          오버레이·박스 값은 내 계정 모달과 같다 — 앱 안에서 팝업이 두 종류로 보이지 않게 한다 */}
+      {eggOpen && (
+        <div className="hm-egg" onClick={() => setEggOpen(false)}>
+          <div
+            ref={eggBoxRef}
+            role="dialog"
+            aria-modal="true"
+            aria-labelledby="egg-title"
+            tabIndex={-1}
+            className="hm-egg__box screen-enter"
+            onClick={(e) => e.stopPropagation()}
+          >
+            <span className="hm-egg__art hm-bounce" aria-hidden="true">
+              🥚
+            </span>
+            <h2 className="hm-egg__title" id="egg-title">
+              알을 하나 받았어요
+            </h2>
+            {/* 종족 이름을 쓴다. 유형명은 절대 넣지 않는다(낙인 위험, CLAUDE.md) */}
+            <p className="hm-egg__lead">
+              {tribe.animal} 알이에요. 미션을 하면 씨앗이 모이고, 그 씨앗으로 자라요.
+            </p>
+
+            <p className="hm-egg__label">이렇게 자라요</p>
+            <ol className="hm-egg__stages">
+              {[
+                { name: "알", range: `Lv.1 ~ ${EVOLUTION_LEVEL.STAGE2 - 1}`, now: true },
+                { name: "아기", range: `Lv.${EVOLUTION_LEVEL.STAGE2} ~ ${EVOLUTION_LEVEL.STAGE3 - 1}` },
+                { name: "청소년", range: `Lv.${EVOLUTION_LEVEL.STAGE3} ~ ${EVOLUTION_LEVEL.STAGE4 - 1}` },
+                { name: "성체", range: `Lv.${EVOLUTION_LEVEL.STAGE4}+` },
+              ].map((st) => (
+                <li key={st.name} className={`hm-egg__stage${st.now ? " hm-egg__stage--now" : ""}`}>
+                  <span className="hm-egg__stage-name">{st.name}</span>
+                  <span className="hm-egg__stage-range">{st.range}</span>
+                  {st.now ? <span className="hm-egg__stage-badge">지금</span> : null}
+                </li>
+              ))}
+            </ol>
+
+            {/* 재촉하지 않는다. "지금 미션 하러 가기" 같은 버튼을 두지 않는 이유 —
+                이 화면의 다음 동작은 이름을 정하는 것이고, 그건 팝업 뒤에 이미 있다 */}
+            <button type="button" className="hm-btn hm-egg__close" onClick={() => setEggOpen(false)}>
+              알아볼게요
+            </button>
+          </div>
+        </div>
+      )}
     </main>
   )
 }

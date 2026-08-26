@@ -3252,6 +3252,43 @@
      늘리지 않는다. 카드가 넓은 화면에서만 길어지는 것은 여백이 거기에만 있기 때문이다) */
   .pet__grid {
     grid-template-columns: 1fr;
+    /* 2026-08-26: 1단이 되면 두 열이 **순서대로** 흐른다 — 왼쪽 열(방·재화·상점 2개)이
+       802px이라 오른쪽 열 첫 카드인 외출이 뷰포트(724px) 밖으로 밀렸다. 실측이다.
+       display: contents로 두 열의 자식을 그리드에 직접 올려 order로 다시 세운다 */
+    display: grid;
+  }
+
+  .pet__col {
+    display: contents;
+  }
+
+  /* 좁은 화면 순서. **외출을 방 바로 아래로 올린다** — 친밀도가 모였을 때만 보이는 카드라
+     그때 못 찾으면 기능이 없는 것과 같다(카드가 접히는 조건은 PetView 주석 참고) */
+  .pet-room {
+    order: 1;
+  }
+  .pet-card--outing {
+    order: 2;
+  }
+  .pet-card--wallet {
+    order: 3;
+  }
+  .pet-card--exp {
+    order: 4;
+  }
+  .pet-card--feed {
+    order: 6;
+  }
+  .pet-card--today {
+    order: 7;
+  }
+  /* 상점 입구는 재화를 본 다음이다. 나머지(씨앗 줍기 등)는 기본 order: 0이 아니라
+     5를 받아 투입 앞에 선다 — 씨앗을 받고 나서 넣는 순서다 */
+  .pet__col--room > *:not(.pet-room):not(.pet-card--wallet) {
+    order: 8;
+  }
+  .pet__col--side > *:not(.pet-card--outing):not(.pet-card--exp):not(.pet-card--feed):not(.pet-card--today) {
+    order: 5;
   }
 
   .pet__top {

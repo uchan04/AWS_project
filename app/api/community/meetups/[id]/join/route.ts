@@ -25,6 +25,25 @@ class MeetupJoinError extends Error {
 export async function POST(_request: NextRequest, ctx: RouteContext<"/api/community/meetups/[id]/join">) {
   try {
     const user = await getCurrentUserWithSkin()
+
+    // 진단 완료를 요구한다 (2026-08-26, 차단 32번 해소).
+    //
+    // 이 라우트만 typeCode를 안 봤다 — 다른 쓰기·조회 라우트 10개는 전부 본다
+    // (posts · posts/[id] · comments · like · topics · missions · missions/complete ·
+    //  pet · pet/skins · pet/skins/buy). 사이드바는 profile.diagnosed로 막히지만
+    // **미들웨어는 세션만 보고 통과시키므로** URL 직접 입력으로 닿았다.
+    //
+    // 왜 다른 게이트보다 중요한가: 오프라인 모임은 100단계 사다리의 **8구간
+    // ("대화와 모임")**에 놓인 행동이다. 사다리를 한 칸도 오르지 않은 사람이 서비스에서
+    // 위험도가 가장 높은 행동에 바로 닿는다. 크래시가 안 나서 지금까지 안 보였다 —
+    // 화면에 뜨는 닉네임이 개설자 것이라 신청자 값이 null이어도 그려진다.
+    //
+    // adjective까지 보는 이유는 lib/profile.ts의 diagnosed와 같은 기준을 쓰기 위해서다.
+    // typeCode만 있고 형용사가 없는 행은 진단이 중간에 끊긴 상태다.
+    if (!user.typeCode || !user.adjective) {
+      return fail("NOT_DIAGNOSED", "먼저 진단을 마치면 모임에 신청할 수 있어요", 400)
+    }
+
     const { id } = await ctx.params
 
     const meetup = await prisma.meetup.findUnique({
