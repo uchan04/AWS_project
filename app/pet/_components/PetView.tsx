@@ -1055,6 +1055,56 @@ export default function PetView({ initial }: { initial: PetState }) {
                 CSS(.pet-room__seeds·.pet-room__seed)와 petFloatSeed 키프레임도 함께 지웠다.
                 방을 채우는 것은 배경 그림과 펫뿐이다 */}
 
+            {/* ── 오른쪽 세로 레일 (2026-08-26 사용자 지시) ──────────────────────────
+                `더보기` 안의 다섯을 **펫 옆 빈 밴드**에 세운다. 평소에는 아이콘만이고
+                **마우스를 올리면 왼쪽으로 늘어나며 이름이 나온다.**
+
+                ── 왜 `hover: hover`에서만 보이나 ──
+                이 방식은 라벨을 hover에 의존한다. **터치에는 hover가 없어서** 이름이
+                영원히 안 뜨고, 지금 이모지 4개가 뜻과 어긋나 있어(📊 차트 · 🏪 편의점 ·
+                🌟 무의미) 아이콘만으로는 학습성이 성립하지 않는다.
+                그래서 **마우스가 있는 기기에서만 레일을 쓰고, 터치에서는 `더보기`를 쓴다.**
+                폭(`max-width`)이 아니라 `hover` 능력으로 가르는 것이 요점이다 — 좁은
+                데스크톱 창에도 마우스가 있고, 넓은 태블릿에도 없다.
+                한 기기에 길은 하나다: 레일이 보이면 `더보기` 알약이 사라진다.
+
+                ── 다른 버튼을 가리지 않는다 ──
+                세로로 쌓고 **가로로만** 늘어난다. 형제는 위아래에 있으므로 늘어나도 닿지
+                않는다(사용자 조건). 늘어난 폭은 128px로 묶었다 — 넓은 화면에서 펫 오른쪽
+                빈 밴드가 132px이라 그 안에 들어간다.
+
+                `:focus-visible`도 같이 늘린다. 키보드로 넘어가는 사람에게 hover가 없다 */}
+            <div className="pet-rail">
+              {[
+                outing.available
+                  ? { icon: "📖", label: "여행일기", go: openHistory, on: modal === "history" }
+                  : null,
+                { icon: "📊", label: "오늘의 활동", go: () => setModal("today"), on: modal === "today" },
+                { icon: "🏪", label: "펫꾸미기", go: () => setModal("shop"), on: modal === "shop" },
+                { icon: "🌟", label: "펫 정보", go: () => setModal("info"), on: modal === "info" },
+                { icon: "💬", label: "마음 친구", go: openChat, on: false },
+              ]
+                .filter(
+                  (r): r is { icon: string; label: string; go: () => void; on: boolean } => r !== null,
+                )
+                .map((r) => (
+                  <button
+                    key={r.label}
+                    type="button"
+                    className="pet-rail__btn"
+                    onClick={r.go}
+                    data-active={r.on ? "true" : undefined}
+                  >
+                    {/* 라벨이 늘어나며 나오는 부분. **aria에서 숨기지 않는다** —
+                        스크린리더에는 늘 읽혀야 하고, 눈에만 접혀 있다 */}
+                    <span className="pet-rail__label">{r.label}</span>
+                    <span className="pet-rail__icon" aria-hidden="true">
+                      {r.icon}
+                    </span>
+                  </button>
+                ))}
+            </div>
+
             {/* ── 방 안 하단 액션 바 (2026-08-26 사용자 지시) ────────────────────────
                 **버튼을 방 밖으로 내지 않는다** — 배경이 좁아져 답답해진다는 지적이었다.
                 그래서 방 안에 두면서 펫을 가리지 않을 만큼 작게 만든다.
