@@ -3409,7 +3409,9 @@
   background: color-mix(in oklch, var(--tribe) 10%, transparent);
   list-style: none;
   display: grid;
-  gap: var(--space-3xs);
+  /* 5축 전환으로 한 원소가 **한 문단**이 됐다(장소+사건+결과+만난것). 줄 간격이 아니라
+     문단 간격이 필요하다 — 3xs로 두면 도입·본문·기분이 한 덩어리로 붙어 읽힌다 */
+  gap: var(--space-2xs);
   overflow-y: auto;
   font-size: var(--text-label);
   line-height: 1.65;
