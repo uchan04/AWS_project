@@ -5,6 +5,7 @@ import type { GalleryType, MeetupStatus } from "@prisma/client"
 import { TRIBE } from "@/lib/types"
 import { meetupDateTime } from "../../_lib/format"
 import { FadeIn, Spinner } from "./transitions"
+import { CancelJoinConfirm } from "./CancelJoinConfirm"
 
 // 전체 갤러리는 종족이 없어 TRIBE에 키가 없다. WriteModal이 같은 이유로 자기 파일에 둔 값을 그대로 쓴다.
 const NEUTRAL_COLOR = "#9CA3AF"
@@ -25,23 +26,12 @@ const ENTER_MAX_DELAY_MS = 240
 // 인원 수 강조가 원래 색으로 돌아가기까지의 시간. 아래 duration-300과 같은 값이다.
 const BUMP_MS = 300
 
-// 인라인 펼침 전환. 무산 확인·신청 확인·취소 사유 세 영역이 같은 값을 쓴다.
+// 인라인 펼침 전환. 무산 확인·신청 확인 두 영역이 같은 값을 쓴다(취소 확인은 CancelJoinConfirm이 같은 값을 갖는다).
 // 전환만 motion-safe로 감싸고 상태 클래스(max-h/opacity)는 감싸지 않는다 —
 // reduced-motion에서는 즉시 열리고 닫히되 움직이지 않아야 한다.
 const EXPAND_BASE = "overflow-hidden motion-safe:transition-all motion-safe:duration-200 motion-safe:ease-out"
 const EXPAND_CLOSED = "max-h-0 opacity-0"
 const EXPAND_PANEL = "flex flex-col gap-2 rounded-xl border border-neutral-200 bg-neutral-50 p-3"
-
-// 취소 사유 입력의 상한. API도 같은 값으로 막는다(join/route.ts DELETE).
-const REASON_MAX = 200
-
-/**
- * 취소 사유는 어떤 경우에도 필수가 아니다.
- * 필수로 만들면 취소 자체를 회피하고 말없이 안 나타나는 쪽으로 흐른다.
- * 그래서 "취소하기"는 아무것도 고르지 않아도 눌리고(disabled로 막지 않는다),
- * 사유를 남기지 않는 "말하지 않고 취소"가 따로 있다. 이 규칙을 바꾸지 않는다.
- */
-const CANCEL_REASONS = ["일정이 겹쳤어요", "몸이 안 좋아요", "마음이 준비되지 않았어요", "장소가 멀어요", "기타"]
 
 export type MeetupListItem = {
   id: string
@@ -84,8 +74,6 @@ export function MeetupCard({
   const [confirmingJoin, setConfirmingJoin] = useState(false)
   const [choosingReason, setChoosingReason] = useState(false)
   const [confirmingCancel, setConfirmingCancel] = useState(false)
-  const [pickedReason, setPickedReason] = useState<string | null>(null)
-  const [reasonNote, setReasonNote] = useState("")
   const [entered, setEntered] = useState(false)
   const [bumped, setBumped] = useState(false)
   const lastJoinCount = useRef(meetup.joinCount)
@@ -154,15 +142,6 @@ export function MeetupCard({
     setConfirmingJoin(false)
     setChoosingReason(false)
     setConfirmingCancel(false)
-    setPickedReason(null)
-    setReasonNote("")
-  }
-
-  function cancelWithReason() {
-    // 고른 사유와 덧붙인 한 줄을 합친다. 둘 다 없으면 body 자체를 보내지 않는다 —
-    // 서버는 reason이 없으면 cancelReason을 null로 그대로 둔다.
-    const combined = [pickedReason, reasonNote.trim()].filter(Boolean).join(" · ").slice(0, REASON_MAX)
-    run("leave", `/api/community/meetups/${meetup.id}/join`, "DELETE", combined ? { body: { reason: combined } } : {})
   }
 
   const BUTTON_BASE =
@@ -296,14 +275,23 @@ export function MeetupCard({
                 지금 정하지 않아도 괜찮으니, 갈 수 있을 때 신청해 주세요.
               </p>
 
-              <div className="flex flex-col gap-0.5 text-xs text-neutral-500">
-                <span>{meetupDateTime(meetup.startsAt)}</span>
-                <span>{meetup.place}</span>
-              </div>
+              {/* 날짜·장소를 다시 적지 않는다(2026-08-27). 바로 위 카드 본문에 같은 두 줄이
+                  이미 있고, 펼침이 그것을 덮지도 않는다 — 같은 화면에서 두 번 읽히면 확인
+                  영역이 길어지기만 한다 */}
 
               <p className="text-xs text-neutral-400">신청한 뒤에도 언제든 취소할 수 있어요.</p>
 
+              {/* 왼쪽이 되돌리는 쪽, 오른쪽이 실행이다 — 취소 확인(CancelJoinConfirm)과 같은 순서를 쓴다.
+                  뒤집으면 습관으로 누르던 사람이 뜻하지 않은 쪽을 누르게 된다 */}
               <div className="flex gap-2">
+                <button
+                  type="button"
+                  onClick={closePanels}
+                  disabled={!confirmingJoin || pending !== null}
+                  className={QUIET_BUTTON}
+                >
+                  조금 더 생각해볼게요
+                </button>
                 <button
                   type="button"
                   onClick={() =>
@@ -316,79 +304,21 @@ export function MeetupCard({
                   {pending === "join" && <Spinner />}
                   신청할게요
                 </button>
-                <button
-                  type="button"
-                  onClick={closePanels}
-                  disabled={!confirmingJoin || pending !== null}
-                  className={QUIET_BUTTON}
-                >
-                  조금 더 생각해볼게요
-                </button>
               </div>
             </div>
           </div>
         )}
 
-        {/* 취소 사유. 고르지 않아도 취소된다 — 위 CANCEL_REASONS 주석 참고. */}
+        {/* 취소 확인. 나의 신청 현황 모달과 **같은 컴포넌트**를 쓴다(CancelJoinConfirm).
+            2026-08-27 이전에는 여기에 사유 칩과 한 줄 입력이 있었는데, 취소하려는 사람에게
+            이유를 묻는 자리를 없앴다. 사유를 보내지 않으면 서버는 cancelReason을 null로 둔다 */}
         {canCancel && (
-          <div
-            aria-hidden={!choosingReason}
-            className={EXPAND_BASE + " " + (choosingReason ? "max-h-[32rem] opacity-100" : EXPAND_CLOSED)}
-          >
-            <div className={EXPAND_PANEL}>
-              <p className="text-xs leading-relaxed text-neutral-600">괜찮으시면 이유를 하나만 알려주세요. 선택이에요.</p>
-
-              <div className="flex flex-wrap gap-2">
-                {CANCEL_REASONS.map((reason) => (
-                  <button
-                    key={reason}
-                    type="button"
-                    // 다시 누르면 해제된다. 한 번 고르면 못 무르는 선택은 부담이 된다.
-                    onClick={() => setPickedReason((current) => (current === reason ? null : reason))}
-                    disabled={!choosingReason || pending !== null}
-                    className={
-                      "rounded-xl border px-3 py-1.5 text-xs font-semibold transition duration-150 disabled:cursor-not-allowed " +
-                      (pickedReason === reason
-                        ? "border-neutral-900 bg-neutral-900 text-white"
-                        : "border-neutral-300 bg-white text-neutral-600 hover:bg-neutral-100")
-                    }
-                  >
-                    {reason}
-                  </button>
-                ))}
-              </div>
-
-              <input
-                value={reasonNote}
-                onChange={(event) => setReasonNote(event.target.value)}
-                maxLength={REASON_MAX}
-                disabled={!choosingReason || pending !== null}
-                placeholder="한 줄 덧붙이기 (선택)"
-                className="w-full rounded-xl border border-neutral-300 bg-white px-3 py-2 text-xs text-neutral-900 placeholder:text-neutral-400 outline-none focus:border-neutral-500"
-              />
-
-              <div className="flex flex-wrap gap-2">
-                <button
-                  type="button"
-                  onClick={cancelWithReason}
-                  // 아무것도 고르지 않아도 눌린다. 사유를 필수로 만들지 않는다.
-                  disabled={!choosingReason || pending !== null}
-                  className={QUIET_BUTTON}
-                >
-                  {pending === "leave" && <Spinner />}
-                  취소하기
-                </button>
-                <button
-                  type="button"
-                  onClick={() => run("leave", `/api/community/meetups/${meetup.id}/join`, "DELETE")}
-                  disabled={!choosingReason || pending !== null}
-                  className={BUTTON_BASE + " text-neutral-500 underline underline-offset-4 hover:text-neutral-700"}
-                >
-                  말하지 않고 취소
-                </button>
-              </div>
-            </div>
-          </div>
+          <CancelJoinConfirm
+            open={choosingReason}
+            pending={pending !== null}
+            onKeep={closePanels}
+            onConfirm={() => run("leave", `/api/community/meetups/${meetup.id}/join`, "DELETE")}
+          />
         )}
 
         {isAdmin && canAct && (
