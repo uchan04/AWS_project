@@ -19,6 +19,20 @@ D 쪽 기능 구현은 끝났고, 외부 대기 항목도 없다. AWS 계정·`B
   켠 뒤에는 그 계정으로 모임에 **신청할 수 없다**(관리자의 역할은 개설·결성확인·무산뿐이다). 신청 흐름을 확인하려면 일반 계정이 따로 필요하다
 - **모임은 전체 갤러리 하나로만 운영한다.** `Meetup.galleryType` 컬럼과 API의 검증은 그대로 살아 있고 개설 화면에서만 `ALL`로 고정한다. 종족 모임을 열기로 하면 `MeetupCreateModal`의 선택지를 되살리고 **소속 검사(`canAccessGallery`)를 신청 라우트와 목록 조회에 다시 넣어야 한다** — 한 번 넣었다가 "전체 모임 하나로 통합" 결정으로 되돌렸다
 
+### 0. 글 사진 첨부 — 표시·저장만 완료, 업로드 화면은 **보류** (2026-08-25)
+
+`Post.imageKey`를 저장하고 목록·상세에 그리는 데까지 했다. **글쓰기 화면의 첨부 UI는 만들지 않았다** — 올릴 곳이 없기 때문이다. 재개할 때 이 항목부터 본다.
+
+- **커뮤니티용 presign이 레포에 없다.** 지시서가 가리킨 `lib/uploads.ts`·`app/api/upload/community/presign/route.ts`·`isOwnCommunityKey()`는 **어느 브랜치에도, 히스토리에도 없다**(2026-08-25 확인). 존재하는 presign은 `app/api/upload/presign` 하나뿐이고 `missionId` + `requiresPhoto` 미션 + 진단 완료를 강제하므로 커뮤니티에 쓸 수 없다. E가 그 파일을 올리기 전에는 `WriteModal`을 만들어도 404다 (사용자 결정으로 [1] 보류)
+- **`S3_BUCKET`이 빈 값이다**(`docs/STATUS.md`). presign이 생겨도 실제 업로드는 그다음 문제다
+- `CLOUDFRONT_DOMAIN`이 비면 `cdnUrl()`이 null을 주고 `postImageUrl()`도 null이라 **사진 영역 자체가 안 그려진다.** 글은 정상이다 — 첨부가 안 보이면 먼저 이 환경변수를 본다
+
+**소유 검증은 커뮤니티 쪽에 뒀다** — `app/community/_lib/imageKey.ts`의 `isOwnCommunityKey(key, userId)`. E의 `lib/uploads.ts`가 없고 `app/api/upload/`는 수정 금지 영역이라 판정만 이쪽에 만들었다. **E의 파일이 생기면 이 파일을 지우고 그쪽으로 갈아탄다**(규칙이 두 벌이면 갈라진다).
+
+이 검사를 빼면 안 되는 이유는 구멍이 실재하기 때문이다. `POST /api/community/posts`는 본문의 `imageKey`를 그대로 저장하고 목록·상세가 그 값을 `cdnUrl()`에 넣어 그린다. 검사가 없으면 본문에 `missions/<남의 userId>/….jpg`를 직접 넣는 것만으로 **남이 올린 미션 사진이 자기 글 이미지로 커뮤니티에 걸린다.** 글쓰기 권한 말고는 아무것도 필요 없다. 통과 조건은 `community/<본인 userId>/<파일명>` 정확히 세 조각이고, 확장자는 jpg·jpeg·png·webp뿐이다(CloudFront가 `.html`·`.svg`를 원본으로 내려주면 그 도메인에서 스크립트가 도는 XSS가 된다). `verifyCommunityObject()`류의 HeadObject 확인은 붙이지 않았다 — 키 소유 검증만으로 노출 문제는 막힌다.
+
+`_lib/limits.ts`에 있던 "키 형식은 검사하지 않는다(presign이 만든 값이므로)"는 주석은 **틀려서 걷었다.** 이 값은 presign이 아니라 요청 본문에서 온다.
+
 ### 1. Bedrock 스트리밍 응답 — 완료 (2026-08-19)
 `POST /api/chat/stream`을 새로 만들어 `ConverseStreamCommand`로 응답을 스트리밍하고, 스트림이 `messageStop`까지 정상 종료된 경우에만 `ChatRole.ASSISTANT`로 저장한다. 기존 `app/api/chat/messages/route.ts`(사용자 발화 저장 + 친밀도 지급)는 건드리지 않았다. 자세한 내용은 아래 "구현한 파일"·"결정한 것과 이유" 참고.
 
@@ -38,9 +52,10 @@ D 쪽 기능 구현은 끝났고, 외부 대기 항목도 없다. AWS 계정·`B
 - D 쪽 변경은 3파일뿐이다 — `_lib/gallery.ts`(`GalleryTab = GalleryType`, `canWriteToGallery()`는 항상 true), `app/api/community/posts/route.ts`(400 제거 + enum 검증), `WriteModal.tsx`(중립 색 + 추천 영역 제외). ALL 로직을 `gallery.ts` 한 곳에 모아둔 설계가 실제로 값을 했다
 - `galleryTypeFilter()`는 그대로다. 전체 탭은 여전히 필터 없이 ALL 글과 종족 갤러리 글을 함께 보여준다
 
-### 5. 글쓰기 주제 추천 — 고정 문구로 구현 (2026-08-20)
-- `app/community/_lib/topics.ts`(유형별 6개, `{ title, draft }`)에서 3개를 랜덤으로 뽑아 `WriteModal`에 카드로 띄운다. 클릭하면 제목·본문이 채워진다
-- **SPEC 8절이 명시한 LLM 추천은 아니다.** 일정상 고정 문구로 갔고, 구조는 `topics.ts` 교체만으로 LLM 전환이 되도록 열어뒀다. 근거는 아래 "결정한 것과 이유" 참고
+### 5. 글쓰기 주제 추천 — 제목 전용 상수로 구현 (2026-08-20 고정 문구 → 2026-08-22 LLM → 2026-08-25 제목 전용 상수)
+- `app/community/_lib/topics.ts`(갤러리 4개 × 6개, `string[]`)에서 3개를 랜덤으로 뽑아 `WriteModal`에 카드로 띄운다. 클릭하면 **제목만** 채워진다 — 본문은 건드리지 않는다
+- **초안(`draft`)은 없다.** 2026-08-25에 없앴다. 커뮤니티에 올라가는 글은 사용자가 직접 쓴 문장이어야 한다
+- **SPEC 8절이 명시한 LLM 추천은 아니다.** 2026-08-22에 Bedrock으로 붙였다가 2026-08-25에 해제했다. SPEC과 어긋나는 상태이며 A에게 통보가 필요하다. 근거는 아래 "결정한 것과 이유" 참고
 - **발표에서 AI 생성이라고 소개하지 않는다**
 
 ### 6. 미션 완료 연동 — 해소 (2026-08-21)
@@ -63,7 +78,7 @@ D 쪽 기능 구현은 끝났고, 외부 대기 항목도 없다. AWS 계정·`B
 ## 현재 상태
 - 완료: 갤러리 목록 화면, 상세 오버레이, 좋아요 토글, 댓글 작성, 글쓰기 모달, **전체 탭 글쓰기**, 본인 글 삭제, 본인 댓글 삭제, 친밀도 지급 헬퍼, 챗봇 시스템 프롬프트, 챗봇 메시지 저장 API(GET/POST, 친밀도 지급까지), 챗봇 패널 UI, Bedrock 스트리밍 응답 연결(`POST /api/chat/stream`), 타이핑 인디케이터, 유형별 챗봇 추천 문구 6개씩·3개 랜덤 노출(LLM 아님, 정적 상수), **챗봇 전역 오버레이 이전(`ChatLauncher` + `layout.tsx`, 임시 `/chat` 라우트 폐기)**, **희망 문구 배너(SPEC.md 9절)**, **좋아요 낙관적 갱신(1281ms 대기 제거)**, **오프라인 모임(2026-08-24 — API 6종, 목록·개설·신청·취소 화면, 결성·무산 알림, "내가 신청한 모임" 구역, 같은 날 중복 신청 제한)**
 - 진행 중: 없음
-- 미착수: 이미지 업로드, LLM 주제 추천(고정 문구로 대체됨 — 아래 "결정한 것과 이유" 참고)
+- 미착수: 이미지 업로드, LLM 주제 추천(2026-08-22에 붙였다가 2026-08-25에 해제 — 상수 문구로 되돌렸다. 아래 "결정한 것과 이유" 참고)
 - 보류(다음 세션 이전 필요 조건): 글쓰기 시 일일 미션(`DAILY_COMMUNITY_POST`) 완료 처리(B와 협의 필요), `ChatPanel`의 `layout.tsx` 이전(E 소유 파일이라 D가 직접 못 건드림) — 전부 아래 "결정한 것과 이유"에 근거 남김
 
 ## 구현한 파일
@@ -71,7 +86,7 @@ D 쪽 기능 구현은 끝났고, 외부 대기 항목도 없다. AWS 계정·`B
 - `app/community/_lib/gallery.ts` — `GalleryTab`("ALL" | TypeCode), `resolveGallery()`, `canAccessGallery()`, `listGalleryPosts()`. "ALL" 관련 로직을 전부 여기 모음
 - `app/community/_components/GalleryTabs.tsx` — 탭 2개(전체 커뮤니티 / 나의 종족). 종족 탭은 진단 완료 유저에게만 노출
 - `app/community/_components/PostCard.tsx` — 카드 그리드용 게시글 카드. 종족 배지는 전체 탭에서만 노출
-- `app/community/_lib/topics.ts` — **2026-08-20 추가.** 글쓰기 주제 추천 문구. `TOPICS: Record<TypeCode, WriteTopic[]>`, 유형별 6개씩 `{ title, draft }`. `app/chat/_lib/starters.ts`와 같은 구조·같은 톤의 주석을 쓴다. `TypeCode`는 `@prisma/client`에서 그대로 import. LLM 호출 없음
+- `app/community/_lib/topics.ts` — **2026-08-20 추가, 2026-08-25 제목 전용 전환.** 글쓰기 주제 추천 문구. `TOPICS: Record<GalleryType, string[]>`, 갤러리 4개(ALL + 종족 3) × 6개. 초안(`draft`)은 없고 제목만 준다. `TOPIC_COUNT`(3)·`TOPIC_TITLE_MAX`(15)와 `resolveTopicKey(gallery, myTypeCode)`·`pickTopics(gallery, myTypeCode)`를 함께 export한다. 셔플은 `app/chat/_lib/starters.ts`와 같은 Fisher-Yates 직접 구현이고 주석 톤도 같다. `GalleryType`·`TypeCode`는 `@prisma/client`에서 그대로 import. LLM 호출 없음
 - `app/community/_lib/banner.ts` — **2026-08-22 추가, 2026-08-23 갤러리별 분기.** 희망 문구 배너 상수(SPEC.md 9절). `HOPE_MESSAGES: Record<GalleryType, readonly string[]>`(갤러리 4개 × 5개 = 20개) + `pickHopeMessage(gallery, now)`. epoch를 주 단위로 나눈 나머지로 고르므로 교체 시점은 매주 목요일이다. 상단 주석에 문구 톤 규칙 4개(유형명·조언·증상 명명·과장 칭찬 금지)를 적어 뒀다
 - `app/community/_components/HopeBanner.tsx` — **2026-08-22 추가.** 커뮤니티 메인 배너. 서버 컴포넌트(상호작용 없음), props는 `{ gallery }` 하나. 전체 탭은 `border-neutral-200 bg-neutral-50`, 종족 갤러리는 `TRIBE[gallery].colorHex`를 `22`/`55` 알파로 인라인 `style`에 넣는다(`PostCard`의 배지 관습과 동일)
 - `app/community/_lib/format.ts` — `timeAgo()` 상대 시각 표기 (디자인 시안의 타임어고 방식으로 교체, 절대 날짜 포맷은 폐기)
@@ -85,6 +100,9 @@ D 쪽 기능 구현은 끝났고, 외부 대기 항목도 없다. AWS 계정·`B
 - `app/api/community/posts/[id]/comments/[commentId]/route.ts` — DELETE. 본인 댓글 소프트 삭제. `Comment.deletedAt` 설정 + `Post.commentCount` 감소를 `$transaction`으로 묶음(댓글 작성의 create + increment와 대칭). 소유자 검사 앞에 `comment.postId !== id`를 먼저 확인한다
 
 - `app/community/_components/WriteModal.tsx` — 글쓰기 버튼 + 모달을 한 컴포넌트로 통합(트리거가 이번 세션에 새로 생기는 것이라 지시된 파일 목록에도 이 컴포넌트만 있고 별도 트리거 컴포넌트는 없었음). `gallery` prop이 `"ALL"`이면 버튼을 비활성화하고 "전체 커뮤니티 글쓰기는 준비 중이에요" 안내만 노출, 종족 갤러리일 때만 모달이 동작. `_lib/gallery.ts`의 `canWriteToGallery()`로 판단(클라이언트 쪽은 UX용 차단이고, 실제 차단은 서버가 함)
+
+- `app/community/_lib/moderation.ts` — **2026-08-22 추가, 2026-08-25 위기 신호 예외.** 글·댓글 2단 검열. 우회 표기 정규화(`normalizeForPolicy`·`squeeze`) + 초성 축약(`containsChosungAbuse`) + 모음 제스처(`containsGestureAbuse`) + **축약형(`ABBREV_PAT` — `ㅈ같`·`ㅈ됐`·`ㅈ망`·`ㅈㄲ`)** + 사전(`findProfanity`, `POLICY = "BLANKET"`) + Bedrock 문맥 판정(`MODEL_JUDGE`). **축약형은 자모 분해형에서 못 잡는다** — `ㅈ같다`는 `ㅈㄱㅏㅌㄷㅏ`라서 `좆같`(`ㅈㅗㅈㄱㅏㅌ`) 패턴과 어긋나므로 조합된 형태(원문·`normalizeForPolicy`·`squeeze`) 세 벌에서 대조한다. **앞 자음 lookbehind(`(?<![ㄱ-ㅎ])`)로 `ㅇㅈ`(인정)·`ㅈㅅ`(죄송)을 뺀다** — `squeeze()`가 공백을 지우면 "ㅇㅈ 같은 생각"이 "ㅇㅈ같은"이 되어 걸린다. 앞이 완성형이면 잡는다("개ㅈ같다"). `moderate(text, invokeModel?, opts?)`가 유일한 진입점이고 **throw하지 않는다**(fail-open). `opts.crisis`면 사전 차단 한 단계만 건너뛴다 — 이유는 아래 "검열과 위기 신호의 순서" 참고. **2026-08-25 결정 변경 이후 두 라우트는 이 인자를 넘기지 않는다**(위기 신호 글이 검열 전에 돌아간다. 아래 "위기 신호 글을 저장하지 않는다" 참고). 외부 라이브러리 없음
+- `app/community/_lib/bedrock.ts` — **2026-08-22 추가.** `moderate()`가 쓰는 단발 Bedrock 호출. 3초를 넘기면 던지고 `moderate()`가 그것을 삼킨다
 
 ### 오프라인 모임 (2026-08-24 추가, SPEC.md 8절)
 
@@ -114,7 +132,8 @@ D 쪽 기능 구현은 끝났고, 외부 대기 항목도 없다. AWS 계정·`B
 - `app/community/page.tsx` — 헤더에 `WriteModal` 배치(전체/종족 탭 공통, 내부에서 분기). **2026-08-20**: `getCurrentUser()`~`listGalleryPosts()`를 `try/catch`로 감싸고 실패 시 "로그인이 필요해요" 안내를 렌더한다. `export const dynamic = "force-dynamic"` 추가
 - `app/community/_components/PostList.tsx` — **2026-08-20**: `<PostDetailModal>`에 `key={selectedPostId}` 추가. 다른 글을 열면 컴포넌트가 새로 마운트되도록 보장한다
 - `app/community/_components/PostDetailModal.tsx` — **2026-08-20**: 상세 로드 `useEffect` 본문의 `setLoading(true)`·`setError(null)` 두 줄 삭제(lint `react-hooks/set-state-in-effect` 해소)
-- `app/community/_components/WriteModal.tsx` — **2026-08-20**: TODO 주석과 "주제 추천 준비 중이에요" 박스를 주제 추천 카드 3개로 교체. `topics` state와 `pickThreeTopics()`(모듈 스코프, Fisher-Yates 직접 구현) 추가. 글쓰기 버튼 `onClick`에서 뽑고 카드 클릭 시 `setTitle`·`setBody`로 두 입력창을 채운다. 종족 색은 기존 `tribeColor`를 그대로 쓴다
+- `app/community/_components/WriteModal.tsx` — **2026-08-20**: TODO 주석과 "주제 추천 준비 중이에요" 박스를 주제 추천 카드 3개로 교체. `topics` state와 `pickThreeTopics()`(모듈 스코프, Fisher-Yates 직접 구현) 추가. 글쓰기 버튼 `onClick`에서 뽑고 카드 클릭 시 `setTitle`·`setBody`로 두 입력창을 채운다. 종족 색은 기존 `tribeColor`를 그대로 쓴다 — **아래 2026-08-25 항목으로 대체됨**
+- `app/community/_components/WriteModal.tsx` — **2026-08-25**: 주제 추천이 제목 전용이 되면서 이 파일에 있던 `pickThreeTopics()`를 지우고 `_lib/topics.ts`의 `pickTopics(gallery, myTypeCode)`를 쓴다. `fetch("/api/community/topics")`·`cachedRef`·`topicsLoading`도 함께 삭제해 `loadTopics()`가 `setTopics(pickTopics(...))` 한 줄이 됐다. 카드에서 초안 줄을 빼고 `onClick`은 `setTitle(topic)`만 한다. 안내 문구는 "선택하면 제목이 채워져요". 전체 탭에서도 추천이 뜬다(`ALL` 문구 또는 내 종족 문구)
 - `app/api/community/posts/route.ts` — POST 추가(글쓰기)
 - `app/api/community/posts/[id]/route.ts` — DELETE 추가(본인 글 소프트 삭제), GET 응답에 `isOwn` 추가. GET의 `comments`도 prisma 결과 그대로 내리지 않고 `{ id, body, createdAt, user, isOwn }`으로 매핑(`userId`·`postId`·`deletedAt` 미노출)
 - `app/api/community/posts/[id]/comments/route.ts` — POST 응답의 `comment`를 GET 상세와 같은 형태(`{ id, body, createdAt, user, isOwn: true }`)로 매핑. 트랜잭션·`grantAffinity`·`COMMENT_AFFINITY` 로직은 그대로 둠
@@ -165,13 +184,20 @@ D 쪽 기능 구현은 끝났고, 외부 대기 항목도 없다. AWS 계정·`B
 - **`canWriteToGallery()`는 항상 `true`를 반환하고 인자를 받지 않는다.** 이제 모든 갤러리에 쓸 수 있어 인자를 안 쓰는데, 인자를 남기면 `@typescript-eslint/no-unused-vars` 경고가 새로 생긴다(이 프로젝트는 `_` 접두사도 경고 대상 — `_request` 사례). 호출부가 두 곳뿐이고 둘 다 이번에 고치는 파일이라 시그니처를 줄였다. 함수 자체는 해소 사실을 남기려고 유지한다. 종족 갤러리 소속 검사는 예전부터 `canAccessGallery()` 몫이다
 - **POST 라우트는 `Object.values(GalleryType)` 멤버십으로 검증한다.** 예전엔 임의 문자열을 `as GalleryTab`으로 캐스팅해 그대로 저장했다. 이제 enum에 없는 값은 400 `INVALID_BODY`로 막고, 통과한 값만 `canAccessGallery()`로 소속을 본다(ALL은 누구나, 종족은 본인만). 친밀도는 그대로 `POST_AFFINITY` 20이다 — 전체 탭 글도 종족 갤러리 글과 같다
 - **전체 갤러리 중립 색(`NEUTRAL_COLOR = "#9CA3AF"`)을 `WriteModal.tsx` 안에 뒀다.** `TRIBE`에는 ALL 키가 없고 `lib/types.ts`는 A 소유 공유 파일이라 건드리지 않는다. `ChatPanel`이 진단 전 유저를 위해 같은 상수를 자기 파일에 둔 선례를 따랐다 — 값이 두 곳에 생기지만, 공유 파일을 브랜치에서 고치는 비용이 더 크다(`CLAUDE.md` 1절)
-- **전체 탭에는 주제 추천을 넣지 않는다.** `TOPICS`는 유형별 문구이고 ALL 키가 없다. 여기에 ALL용 문구를 새로 만들면 "사용자 성향에 맞는 추천"이 아니라 아무에게나 같은 문구를 주는 것이 되어 기능의 의미가 사라진다. 전체 탭에서는 `setTopics([])`로 두고 기존 `topics.length > 0` 조건이 영역 자체를 렌더하지 않게 했다
+- ~~**전체 탭에는 주제 추천을 넣지 않는다.**~~ **뒤집힘(2026-08-25).**
+  - *이전 결정(2026-08-20)*: `TOPICS`는 유형별 문구이고 ALL 키가 없다. 여기에 ALL용 문구를 새로 만들면 "사용자 성향에 맞는 추천"이 아니라 아무에게나 같은 문구를 주는 것이 되어 기능의 의미가 사라진다. 전체 탭에서는 `setTopics([])`로 두고 `topics.length > 0` 조건이 영역 자체를 렌더하지 않게 했다
+  - *변경 사유*: "성향에 맞는 추천"은 **갤러리가 아니라 사용자**를 기준으로 하면 유지된다. `resolveTopicKey()`가 전체 탭에서도 내 종족 목록을 고르므로, 진단을 마친 사람은 전체 탭에서도 자기 성향 문구를 본다. ALL 문구 6개는 **진단 전인 사람만** 보는 목록이고, 그 사람에게는 애초에 성향이 없어 "아무에게나 같은 문구"라는 문제가 성립하지 않는다. 추천이 아예 없는 것보다는 낫다는 판단이다. 그래서 ALL 문구는 어느 종족에도 기울지 않게 썼다
 - **(지난 세션) LLM 주제 추천은 보류였다.** `WriteModal`에 비활성 영역과 TODO 주석만 남겼었다. 2026-08-20에 고정 문구로 구현하며 이 자리를 교체했다(아래 항목).
 - **주제 추천을 LLM이 아니라 고정 문구로 구현했다(2026-08-20).** `SPEC.md` 8절은 "LLM이 사용자 성향에 맞는 작성 주제·초안을 3가지 이상 추천"을 명시하지만, 남은 일정상 Bedrock 연동 대신 유형별 고정 문구를 택했다. 챗봇의 `app/chat/_lib/starters.ts`가 이미 같은 방식으로 돌아가고 있어 패턴을 그대로 본떴다. **구조는 LLM 전환이 열려 있다** — `WriteModal`은 `TOPICS[gallery]`에서 3개를 받아 쓰기만 하므로, 나중에 `topics.ts`를 Bedrock 호출로 바꾸면 컴포넌트는 그대로 둘 수 있다. **발표에서 이 기능을 AI 생성이라고 소개하지 않는다**
-- **문구 작성 규칙을 지켰다.** 오늘 하루 안에서 쓸 수 있는 가벼운 소재만 쓰고, 인생 계획·목표 같은 무거운 주제와 "~해보세요" 같은 권유형을 넣지 않았다(소재를 주는 것이지 조언이 아니다). 유형명을 문구에 드러내지 않고, 자해·죽음·질병 진단은 소재로 삼지 않았다. 유형별로는 혼자 보낸 시간의 작은 장면(`INDEPENDENT_LOW_INCOME`) / 아무것도 못 한 하루도 그대로 쓸 수 있는 주제(`HEALTH_EMOTION`) / 집 안에서 혼자 느낀 감정(`FAMILY_LIVING`)으로 방향을 갈랐다 — 각각 돈·일, 운동·습관 개선, 가족 평가·대화 권유를 소재에서 뺐다
-- **`pickThreeTopics()`는 모달을 열 때 호출한다.** `useState` 초기화 함수에 두면 페이지 로드 시 한 번 뽑혀 모달을 다시 열어도 같은 목록이 나오고, 렌더 중에 뽑으면 입력하는 동안 목록이 바뀐다. 글쓰기 버튼의 `onClick`에서 `setTopics(...)` + `setIsOpen(true)`를 함께 호출해 "열 때 한 번만"을 만족시켰다. 셔플은 `ChatPanel.pickThreeStarters()`와 같은 Fisher-Yates 직접 구현이다(외부 라이브러리 없음)
+- **LLM 주제 추천을 붙였다가 해제했다(2026-08-22 → 2026-08-25).** 8/22에 `lib/community/topics.ts`의 `suggestTopics()`가 Bedrock으로 만들고 `GET /api/community/topics`가 그것을 내려주며 `_lib/topics.ts`는 대비책으로 남는 구조를 만들었다. 8/25에 사용자 결정으로 되돌렸다 — 라우트에서 Bedrock 호출을 걷어내고 `pickTopics()` 상수만 남겼다. **`lib/community/topics.ts`는 고아가 됐다**(유일한 호출부가 그 라우트였다). A 소유 영역이라 삭제하지 않고 남겨뒀으니 살아 있는 대비책으로 오해하지 말 것. **`SPEC.md` 8절("LLM이 사용자 성향에 맞는 작성 주제·초안을 3가지 이상 추천")과 어긋나는 상태이며 A에게 통보가 필요하다**
+- **초안(`draft`)을 없앴다(2026-08-25, 사용자 결정).** 카드를 고르면 제목만 채우고 본문은 비워 둔다. 채워진 문장이 그 사람의 하루를 대신 규정하기 때문이다 — "오늘은 있는 걸로 대충 때웠다"가 이미 적혀 있으면 그렇지 않았던 사람은 지우고 다시 쓰는 일부터 해야 한다. 커뮤니티에 올라가는 글은 사용자가 직접 쓴 문장이어야 한다. 제목만 주면 소재만 건네고 판단은 비워 둘 수 있다
+- **`WriteModal`은 이제 `GET /api/community/topics`를 부르지 않는다.** 라우트가 화면과 똑같은 상수를 돌려주게 되어 왕복이 값을 잃었고, 상수를 받으려고 한 번 왕복하면 창이 열린 뒤 목록이 갈아끼워지며 제목 칸이 밀린다. **라우트는 지우지 않고 남겨뒀다** — 같은 `pickTopics()`를 쓰므로 결과가 같고, `scripts/e2e-scenario.ts`가 아직 이 경로를 두드린다. 라우트는 `?gallery=`를 받되 글 작성과 같은 규칙으로 `canAccessGallery()` 소속 검사를 한다(종족은 쿼리로 받지 않고 세션에서 읽는다)
+- **문구 작성 규칙을 지켰다.** 오늘 하루 안에서 쓸 수 있는 가벼운 소재만 쓰고, 인생 계획·목표 같은 무거운 주제와 "~해보세요" 같은 권유형을 넣지 않았다(소재를 주는 것이지 조언이 아니다). 유형명을 문구에 드러내지 않고, 자해·죽음·질병 진단은 소재로 삼지 않았다. 유형별로는 혼자 보낸 시간의 작은 장면(`INDEPENDENT_LOW_INCOME`) / 아무것도 못 한 하루도 그대로 쓸 수 있는 주제(`HEALTH_EMOTION`) / 집 안에서 혼자 느낀 감정(`FAMILY_LIVING`)으로 방향을 갈랐다 — 각각 돈·일, 운동·습관 개선, 가족 평가·대화 권유를 소재에서 뺐다. **2026-08-25부터 이 규칙을 `scripts/check-community.ts`가 문구에 직접 건다**(빈 제목 / `TOPIC_TITLE_MAX` 15자 초과 / 갤러리 내 중복 / `lib/diagnosis/reason.ts`의 `BANNED` 낙인 단어 / 권유형 어미). 전에는 `lib/community/topics.ts`의 `validateTopics()`를 검사했는데 그 함수가 고아가 되어 대체했다. 문구를 고치면 `npm run check:community`를 돌린다
+- **주제는 모달을 열 때 뽑는다**(2026-08-20에는 `WriteModal`의 `pickThreeTopics()`, 2026-08-25부터 `_lib/topics.ts`의 `pickTopics()`). `useState` 초기화 함수에 두면 페이지 로드 시 한 번 뽑혀 모달을 다시 열어도 같은 목록이 나오고, 렌더 중에 뽑으면 입력하는 동안 목록이 바뀐다. 글쓰기 버튼의 `onClick`에서 `setTopics(...)` + `setIsOpen(true)`를 함께 호출해 "열 때 한 번만"을 만족시켰다. 셔플은 `ChatPanel.pickThreeStarters()`와 같은 Fisher-Yates 직접 구현이다(외부 라이브러리 없음)
 - **`topics` state는 `canWriteToGallery()` 조기 return보다 위에 선언한다.** 아래에 두면 전체 탭에서 훅 호출 개수가 달라져 React가 터진다
-- **전체 탭에서는 추천 영역을 아예 렌더하지 않는다.** `gallery`가 `"ALL"`이면 `TypeCode`를 알 수 없어 `TOPICS[gallery]`를 못 쓴다. 전체 탭은 어차피 글쓰기가 막혀 있어 이 경로를 타지 않지만, `topics.length > 0` 조건으로 방어적으로 막아뒀다
+- ~~**전체 탭에서는 추천 영역을 아예 렌더하지 않는다.**~~ **뒤집힘(2026-08-25).**
+  - *이전 결정(2026-08-20)*: `gallery`가 `"ALL"`이면 `TypeCode`를 알 수 없어 `TOPICS[gallery]`를 못 쓴다. 전체 탭은 어차피 글쓰기가 막혀 있어 이 경로를 타지 않지만, `topics.length > 0` 조건으로 방어적으로 막아뒀다
+  - *변경 사유*: 전제 두 개가 다 사라졌다. `TOPICS`의 키가 `GalleryType`이 되어 `TOPICS["ALL"]`이 존재하고, 전체 탭 글쓰기는 2026-08-20에 풀렸다(위 "4. 전체 탭 글쓰기"). `topics.length > 0` 조건 자체는 그대로 두지만 이제 걸리지 않는다 — `pickTopics()`는 어떤 갤러리에서도 3개를 준다
 - **일일 미션(`DAILY_COMMUNITY_POST`) 완료 처리는 보류.** `UserMission`은 B의 도메인이라 직접 만들지 않음. 작성 API에 `// TODO: DAILY_COMMUNITY_POST 완료 처리 — 담당 B와 협의 중` 주석만 남김
 - 삭제는 소프트 삭제(`deletedAt`)이며 친밀도를 회수하지 않는다. `affinityToday`가 이미 누적돼 있어 삭제 후 재작성으로 하루 상한을 넘길 수 없음
 - **댓글 삭제도 친밀도를 회수하지 않는다.** 글 삭제와 같은 이유다 — `affinityToday`가 이미 누적돼 있어 지웠다 다시 써도 하루 상한 100을 넘길 수 없다. `grantAffinity`·`calculateReward`를 아예 부르지 않으므로 댓글 DELETE는 `getCurrentUserWithSkin()`이 아니라 `getCurrentUser()`를 쓴다(`activePetSkin`이 필요 없음)
@@ -273,6 +299,69 @@ D 쪽 기능 구현은 끝났고, 외부 대기 항목도 없다. AWS 계정·`B
 - **`NEUTRAL_COLOR`는 "종족색 없음"을 뜻하는 부재 표시라 주 CTA 배경으로 쓰지 않는다.** 모든 모임이 `ALL`이 되면서 `galleryColor`가 항상 `#9CA3AF`로 풀려 신청 버튼이 비활성처럼 보였다. 신청 계열 버튼은 `MEETUP_ACCENT`(`#0F766E`)를 쓴다. 값은 `lib/types.ts`·`app/globals.css`가 아니라 `MeetupCard.tsx`에 둔다 — 둘 다 공유 파일이고(`CLAUDE.md` 1절) 화면 하나 때문에 공유 색 토큰을 늘릴 이유가 없다. `WriteModal`이 `NEUTRAL_COLOR`를 자기 파일에 둔 것과 같은 방식
 - **`notifiedCancelAt`은 이름을 바꾸지 않고 의미만 넓혔다.** 결성 알림을 붙이면서 "이 신청 건의 상태 변경 알림을 보여준 시각"이 됐다. 이름을 고치면 마이그레이션이 또 나가 5인이 전부 받아야 하므로 `_lib/notice.ts` 주석과 `SPEC.md` 11절에 의미만 적었다
 
+### 차단용 판정을 따로 만들었다 (2026-08-25) — `blocksPosting()`
+
+바로 아래 결정 변경으로 위기 판정의 결과가 *"안내를 한 번 더 띄운다"* 에서 **"글이 저장되지 않는다"** 로 바뀌었다. `isCrisis()`는 주석이 밝히듯 **오탐을 허용하도록** 설계된 판정이라 그 편향이 더는 맞지 않는다. 실측(2026-08-25)에서 아래가 전부 걸렸다.
+
+| 문장 | `isCrisis()` | 성격 |
+|---|---|---|
+| 친구가 자살했다는 소식을 들었다 | 걸림 | 사별 |
+| 자살 예방 교육을 들었다 | 걸림 | 공익·교육 |
+| 자살률 기사를 봤다 | 걸림 | 보도 |
+| 드라마 주인공이 자살하는 장면이 힘들었다 | 걸림 | 창작물 |
+| 죽고 싶을 만큼 웃겼다 | 걸림 | 비유 |
+| 살기 싫을 만큼 더운 날씨 | 걸림 | 비유 |
+
+오탐의 대가가 **사별한 사람의 글이 막히는 것**이 됐다. 그래서 `app/community/_lib/crisis.ts`에 `blocksPosting()`을 새로 만들었다. **`lib/safety.ts`는 고치지 않았다**(E 소유이고, `isCrisis()`는 안내용으로 계속 맞다).
+
+- **판정을 넓히지 않는다.** `isCrisis()`가 true인 것 중에서만 true가 될 수 있다. 하는 일은 좁히는 것뿐이다
+- **문장 단위로 본다.** 글 전체에 제외 규칙을 걸면 앞 문단의 "친구가"가 뒷 문단의 고백을 통과시킨다. 문장으로 잘랐을 때 아무것도 안 걸리는데 전체로는 걸리면(표현이 문장 경계를 넘어간 경우) 전체를 한 문장처럼 본다
+- **제외 규칙 네 가지** — ① 3인칭 주어·전언·보도/교육/통계 ② `~을 만큼`·`~을 정도로` 비유 ③ 과거 회상 **+ 회복 표현**(둘이 함께일 때만) ④ `자살`·`자해`가 유일한 근거일 때는 1인칭 의도 표현을 따로 요구
+- **막지 않은 위기 신호에는 안내를 그대로 띄운다.** `blocksPosting()`은 false인데 `isCrisis()`는 true인 글은 저장되고, 응답에 `crisisNotice`(`CRISIS_POST_NOTICE`)가 함께 나간다. 이 경로는 글이 실제로 올라가므로 그 문구의 "올라갔어요"가 사실과 맞는다
+
+**함정 두 개를 피했다.** `들었다`를 통째로 제외하면 **"죽고 싶다는 생각이 들었다"** 가 함께 새어나간다 — 1인칭 고백이다. 그래서 앞에 전언 명사(`소식·이야기·말·소문`)가 붙은 경우만 본다. 회상 표지(`예전에`)만 보고 제외하면 **"예전에도 죽고 싶었고 지금도 죽고 싶다"** 가 새어나간다 — 그래서 회복 표현(`지금은 괜찮`)과 짝일 때만 제외한다. 둘 다 `check:community`에 케이스로 박았다.
+
+**정규식으로 가르지 못한 것 — 남은 미탐 3가지.** 지시("무리하게 넣지 말고 보고하라, 미탐이 오탐보다 낫다")에 따라 넣지 않았다.
+
+1. **`죽고 싶을 만큼 힘들다`가 통과한다.** `죽고 싶을 만큼 웃겼다`와 형태가 같다. 뒤에 오는 말이 농담인지 고통인지는 정규식이 가를 수 없다
+2. **3인칭 주어가 같은 문장에 있으면 통과한다.** "친구가 부럽다, 나는 죽고 싶다"처럼 한 문장에 섞이면 막지 않는다. 문장 단위로 줄여 범위는 좁혔지만 문장 안에서는 못 가른다
+3. **`률`·`율`·`장면` 같은 보도 표지가 우연히 섞이면 통과한다.** "합격률 보고 죽고 싶다" 같은 문장이다
+
+세 경우 모두 **글은 올라가고 안내는 그대로 뜬다.** 막지 못한 것이지 놓친 것이 아니다.
+
+### 위기 신호 글을 저장하지 않는다 (2026-08-25) — **팀 결정 변경**
+
+**이전 결정(2026-08-23)**: 위기 신호 글·댓글은 **막지 않는다.** 그대로 저장하고 작성자에게만 상담 안내(`CRISIS_POST_NOTICE`)를 돌려줬다. 근거는 라우트 주석에 이렇게 적혀 있었다 — *"막으면 도움이 가장 필요한 사람의 입을 막는 것이 된다."* 바로 위 "검열과 위기 신호의 순서"(차단 30번)도 그 결정을 지키려고 만든 것이다.
+
+**바뀐 결정(2026-08-25, 사용자)**: **저장하지 않는다.** 대신 작성자에게 도움 경로를 안내한다. 커뮤니티에 글로 남기는 대신 도움으로 연결하는 쪽을 택했다.
+
+두 결정은 *"이 사람을 거절하지 않는다"* 는 같은 목적을 갖는다. 그래서 구현에 조건이 붙는다(`app/community/_lib/crisis.ts` 주석이 정본).
+
+- **실패가 아니라 안내다.** `400`이 아니라 `200` + `{ crisisBlocked: true, notice }`로 준다. 400은 화면에서 빨간 오류로 읽히고, 지금 이 사람에게 필요한 것은 거절 통보가 아니다
+- **쓴 글을 지우지 않는다.** `WriteModal`·`PostDetailModal` 모두 입력을 그대로 두고 안내만 위에 얹는다. 창도 닫지 않는다. 어렵게 쓴 글이 사라지면 안내가 벌처럼 읽힌다
+- **비난하는 말을 쓰지 않는다.** "차단"·"부적절"·"규정"·"위반"·"금지"를 쓰지 않는다. `check:community`가 안내 문구에서 이 단어들을 검사한다
+- **저장되지 않았으므로 `router.refresh()`도 재화 이벤트도 쏘지 않는다.** 쏘면 목록이 새로 그려지고 사용자는 자기 글을 찾다가 없는 것을 확인하게 된다
+
+**`CRISIS_POST_NOTICE`를 쓰지 않았다.** 그 문구는 *"올라갔어요"* 로 시작한다 — 저장하던 시절의 문장이라 그대로 쓰면 올리지 않은 글을 올렸다고 알리는 셈이 된다. `lib/safety.ts`는 E 소유라 고치지 않고 `app/community/_lib/crisis.ts`에 `CRISIS_BLOCKED_NOTICE`를 새로 뒀다. `check:community`가 이 문구에 "올라갔어요"가 들어가지 않는지 검사한다.
+
+**챗봇 이동 경로는 넣지 못했다.** 지시에 "(2) 챗봇에게 이야기하기 — 쓴 본문을 들고 챗봇으로 이동"이 있었으나 **`ChatLauncher`에 초기 메시지를 넘기는 인터페이스가 없다.** `ChatPanel({ onClose })`이 전부이고, 열림 상태는 `ChatLauncher` 내부 `useState`이며 `app/layout.tsx`에 전역 마운트돼 있어 `WriteModal`이 잡을 손잡이가 없다. 새 인터페이스를 임의로 만들지 말라는 지시에 따라 **(1) 전화 안내만 넣었다.** 넣으려면 `ChatLauncher`에 외부에서 여는 경로(전역 이벤트 또는 context)와 `ChatPanel`의 초안 프리필이 함께 필요하다 — D 담당이지만 `layout.tsx`(E 소유)도 건드릴 가능성이 있어 별도 건으로 남긴다.
+
+**`moderate()`의 `opts.crisis`는 두 라우트에서 더 이상 쓰지 않는다.** 위기 신호 글이 검열에 닿기 전에 돌아가기 때문이다. `moderation.ts`의 기능과 `check:community`의 3케이스는 **지우지 않고 남겼다** — `moderate()`가 가진 보장이고, 저장하는 쪽으로 되돌릴 때 그대로 필요하다.
+
+**남은 위험**: `isCrisis()`는 주석이 밝히듯 *"오탐을 허용하는 쪽으로 판정한다"*. 막지 않던 시절에는 오탐의 대가가 "안내가 한 번 더 뜬다"였지만, 이제는 **오탐이 곧 글이 저장되지 않는 것**이다. 정규식을 넓힐 때 이 비용이 달라졌다는 것을 먼저 본다(`docs/dev/safety.md`).
+
+### 검열과 위기 신호의 순서 (2026-08-25) — 차단 30번 해소
+
+`app/community/_lib/moderation.ts`가 글·댓글의 2단 검열을 한다(1단계 사전·규칙 동기 판정, 2단계 Bedrock 문맥 판정). `lib/safety.ts`의 `containsAbuse()`가 2인칭 지시가 붙은 말만 잡는 데 비해, 이쪽은 우회 표기(`ㅄ`·`시1발`·`병@신`)와 욕설이 하나도 없는 모욕("너 임마 청년임?")까지 본다. `POLICY = "BLANKET"`이라 **대상이 없는 욕설도 막는다** — 기록된 팀 결정(TARGETED)과 다른 값이고 D가 의도적으로 고른 것이다.
+
+- **버그**: 두 라우트 모두 `moderate()`의 BLOCK 반환이 `isCrisis()` 계산보다 앞에 있었다. 그래서 **위기 신호 글에 욕설이 섞이면 상담 안내(`CRISIS_POST_NOTICE`) 대신 400 차단이 나갔다.** 절박한 글에는 자기를 향한 욕이 섞이기 쉽고 `BLANKET`은 그것까지 막으므로, 이 순서는 **도움이 가장 필요한 사람만 정확히 걸러냈다.** 같은 라우트가 아래쪽에 "위기 신호는 막지 않는다 — 막으면 도움이 가장 필요한 사람의 입을 막는 것이 된다"고 스스로 적어둔 자리다
+- **고침**: `moderate()`에 세 번째 인자 `opts?: { crisis?: boolean }`를 뒀다. `opts.crisis`면 **`POLICY === "BLANKET"`의 사전 hit 분기 한 곳만** 건너뛴다. 두 라우트는 `isCrisis()`를 `moderate()` **앞으로** 올려 `const crisis`에 담고 `{ crisis }`로 넘기며, 아래 `crisisNotice`는 같은 값을 재사용한다(같은 텍스트를 두 번 재지 않는다)
+- **일부러 함께 풀지 않은 것**: `containsAbuse` · `containsChosungAbuse` · `containsGestureAbuse`는 위기 여부와 무관하게 그대로 막는다. 그쪽은 대상이 있는 욕설·모욕이고, 여기서 함께 풀면 **"죽고싶다"를 덧붙여 남을 공격하는 우회**가 열린다. 기준은 "자기를 향한 말은 통과, 남을 향한 말은 위기 신호가 있어도 차단"이다. **반면 축약형(`ABBREV_PAT`)은 사전 계층이라 `crisis` 플래그로 함께 풀린다** — `findProfanity()`가 돌려주는 hit이고, 위기 신호 글에서 건너뛰는 것이 바로 그 사전 차단 분기다(실측: `"ㅈ같다 다 죽고 싶다"`가 `crisis: true`면 WARN, `false`면 BLOCK. 같은 조건에서 `"병신아 죽고 싶다"`는 그대로 BLOCK)
+- **챗봇 경로에는 같은 구조가 없다.** `app/api/chat/stream/route.ts`는 `isCrisis()`가 이미 맨 앞이고(`BEDROCK_MODEL_ID` 검사보다도 위다) `moderate()`를 부르지 않는다. `app/api/chat/messages/route.ts`에는 검열 자체가 없다
+- **2단계(모델 판정)의 `BLOCK`은 위기 신호가 있어도 열지 않는다 — 확정(2026-08-25).** 앞선 커밋에서 "남은 구멍"으로 적어뒀던 자리이고, 열려다가 **열 수 없다는 결론**이 나왔다. `JUDGE_SYSTEM`의 `BLOCK` 정의가 곧 *"다른 사람이나 집단을 향한 욕설, 비하 호칭, 조롱, 위협, 차별 표현"* 이라 **`BLOCK` 자체가 이미 "남을 향한 공격"을 뜻한다.** 자기를 향한 말은 같은 taxonomy에서 `SELF`로 갈라져 나오고, `SELF`·`WARN`·`OK`는 이미 통과한다(스텁으로 실측, `check:community` 4번). 모델 응답에는 `verdict`와 자유 문장 `reason`뿐이라 **`BLOCK` 안을 더 가를 필드가 없다** — 사전 hit 분기를 열 때와 같은 기준("자기를 향한 말은 통과, 남을 향한 말은 위기 신호가 있어도 차단")을 적용하면 여는 것이 곧 우회를 여는 것이 된다
+- **그래서 실제로 남는 위험은 모델의 오분류 하나다.** 자기비하 위기 글을 모델이 `SELF`가 아니라 `BLOCK`으로 잘못 보면 여전히 400이 나간다. 이걸 막으려면 모델 응답이 아니라 **결정론적 대상 판정**(`containsAbuse` 또는 `HAS_TARGET`)을 근거로 "모델은 BLOCK이라는데 2인칭 대상이 하나도 없다 → 위기 글로 본다"를 새로 만들어야 한다. 판정 기준을 하나 더 만드는 일이라 팀 결정 없이는 넣지 않는다
+- `scripts/check-community.ts`가 3케이스를 고정한다 — 위기+욕설 통과 / 욕설만 400 / 위기+대상 있는 욕설("너 죽어") 400. 같은 문장을 `crisis: false`로도 재서 통과 이유가 그 플래그임을 못박는다. `invokeModel`은 넘기지 않으므로 Bedrock 없이 돈다
+
 ## 알려진 한계 (2026-08-24)
 
 - **같은 날 중복 신청 검사가 트랜잭션 밖 `findFirst`다.** 같은 날 두 모임에 거의 동시에 신청하면 둘 다 통과할 수 있다. 날짜 기반 유니크 제약을 걸 수 없어 DB로는 막지 못한다. 사람이 실수로 낼 수 있는 상황이 아니라 그대로 둔다
@@ -284,8 +373,75 @@ D 쪽 기능 구현은 끝났고, 외부 대기 항목도 없다. AWS 계정·`B
 - 없음 (로컬 DB가 `prisma migrate`로 관리되지 않고 있던 것을 발견해 베이스라인 마이그레이션(`prisma/migrations/00000000000000_init`)을 만들어 해결. 기존 시드 데이터(미션 41개, 펫스킨 6개)는 유지됨. 스키마 담당과 공유 필요)
 
 ## 다음 할 일
-- ~~LLM 주제 추천 3가지 이상 연동~~ — **고정 문구로 대체했다(2026-08-20).** `app/community/_lib/topics.ts`의 유형별 6개 중 3개를 `WriteModal`이 카드로 보여준다. 나중에 LLM으로 전환한다면 `topics.ts`만 Bedrock 호출로 바꾸면 되고 컴포넌트는 그대로 둘 수 있다(비스트리밍 단발 호출이라 `ConverseCommand`가 맞다). SPEC 8절과의 차이와 발표 시 주의는 "결정한 것과 이유" 참고
+- ~~LLM 주제 추천 3가지 이상 연동~~ — **8/22에 붙였다가 8/25에 해제했다.** 지금은 `app/community/_lib/topics.ts`의 갤러리별 6개 중 3개를 `WriteModal`이 카드로 보여주고, **제목만** 채운다. `lib/community/topics.ts`는 남아 있지만 아무도 부르지 않는다. SPEC 8절과의 차이와 발표 시 주의는 "결정한 것과 이유" 참고
+- **A에게 통보 — 주제 추천이 SPEC 8절과 어긋난다.** LLM 추천 해제와 초안 폐지는 사용자 결정이다. `lib/community/topics.ts`(A 소유)가 고아가 된 사실도 함께 알린다. 삭제 여부는 A가 정한다
 - **`layout.tsx` 변경분 PR 리뷰 — E.** 전역 오버레이 이전은 끝났고(2026-08-20) E와 사전 공유했다. 공유 파일이므로 머지 전 PR 리뷰를 받는다. diff는 import 한 줄 + `<ChatLauncher />` 한 줄뿐이다
 - `app/chat/` 폴더 소유를 `CLAUDE.md` 2절에 정식 반영 — 팀 확인 대기 (계속 남아있는 이월 항목)
 - 좋아요 낙관적 갱신을 브라우저에서 한 번 눌러 확인 (preview 창의 `/community` 하이드레이션 문제로 미측정)
 - 댓글 작성도 같은 판단을 적용할 수 있다. 다만 댓글 `id`가 서버 생성이라 임시 id로 그렸다가 응답으로 교체해야 하고, 그 사이 삭제 버튼이 눌리는 경우를 막아야 한다
+
+
+---
+
+## A가 넘기는 계측 2건 (2026-08-24, **미수정 — D 판단 대기**)
+
+`app/community/`는 D 소유라 고치지 않았다. 실측값과 근거만 남긴다.
+
+### ① 위기 신호 글에 욕설이 섞이면 상담 안내 대신 차단된다 → `STATUS.md` 차단 30번
+
+**정책 논쟁이 아니라 라우트가 스스로 모순하는 자리다.** 세 줄로 닫힌다.
+
+`app/api/community/posts/route.ts`의 순서:
+
+```
+126행  const mod = await moderate(...)
+127행  if (mod.verdict === "BLOCK") return fail(BLOCK_CODE, ...)   ← 여기서 끊긴다
+131행  post 생성
+152행  // 위기 신호는 **막지 않는다.** ... 막으면 도움이 가장 필요한 사람의 입을 막는 것이 된다
+153행  const crisisNotice = isCrisis(...) ? CRISIS_POST_NOTICE : null   ← 도달하지 못한다
+```
+
+152행 주석이 스스로 "막지 않는다"고 적어 두었는데 26줄 위가 먼저 끊는다.
+`POLICY = "BLANKET"`이 되면서 생긴 상호작용이고, **`moderation.ts`의 정책 주석은
+자기비하·혼잣말만 다루고 위기 경로를 언급하지 않는다** — 의도한 것이 아닐 가능성이 크다.
+
+실측(`findProfanity` + `isCrisis` 직접 호출):
+
+| 입력 | 위기 | 욕설 | 결과 |
+|---|---|---|---|
+| `죽고 싶다` | O | — | 통과 + 상담 안내(109) |
+| `죽고 싶다 씨발 진짜 못 버티겠다` | O | O | **400 차단 — 상담 안내 못 받음** |
+| `다 씨발 그냥 사라지고 싶어` | O | O | **400 차단** |
+| `진짜 죽어버리고 싶은 하루였다` | O | — | 통과 + 상담 안내 |
+
+- **조치:** `moderate()` 앞에서 `isCrisis()`를 먼저 보고 위기 신호가 있으면 차단을 건너뛴다.
+  **BLANKET 정책은 그대로 유지된다** — 위기 글에만 예외를 두는 것이다
+- 정책 자체는 D의 것을 따르기로 했다(2026-08-24 사용자 결정). 이 항목은 위기 경로 예외 하나다
+- **`npm run e2e`는 이 구멍을 못 잡는다** — 위기 단정과 욕설 단정이 각각 다른 글이라 **둘이 섞인
+  글**을 아무도 보내지 않는다. 고칠 때 단정 1건을 함께 넣는다
+
+정규화 쪽은 그대로 살려 둘 값이 있다. 이전에 뚫려 있던 우회가 실제로 막힌다 —
+`씨 발`·`시1발`·`병@신`·`ㅂㅕㅇㅅㅣㄴ`(자모 분리)이 전부 사전에 걸리고,
+`containsAbuse`를 한 글자도 안 건드리며, Bedrock 판정은 실패 시 `passthrough`로 fail-open이다.
+
+### ② `/community/meetups`의 `pendingMeetupNotices()`가 불필요하게 직렬이다
+
+응답 p50 **737ms**로 인증된 화면 중 두 번째로 느리다(`/pet` 1103ms 다음. `/missions` 551ms,
+`/community` 554ms, `/settings` 371ms). RDS가 us-east-1이라 왕복 1회가 약 180ms이므로 왕복 4회분이다.
+
+`app/community/meetups/page.tsx`의 await 순서:
+
+```
+1) getCurrentUser()                                     직렬
+2) myJoinedMeetups(user.id)                             직렬
+3) prisma.meetup.findMany({ id: { notIn: joined... } })  직렬 — joined에 **실제로 의존한다** ✓
+4) pendingMeetupNotices(user.id)                        직렬 — user.id만 쓴다 ✗
+```
+
+**4번은 2·3번 결과에 의존하지 않는다.** 2번과 `Promise.all`로 묶으면 왕복 1회,
+**약 180ms(전체의 25%)**가 빠진다. 3번은 `joined`의 id를 `notIn`으로 쓰므로 진짜 의존이라
+그대로 둬야 한다 — 병렬로 만들려면 `notIn`을 버리고 JS에서 걸러야 하고, 그건 쿼리 의미가
+달라져 행을 더 끌어온다.
+
+같은 판단을 `/missions`에서 이미 했다(`docs/dev/perf.md` "고친 것 4번째") — 거기서도 손댈
+레버는 **직렬 단계의 개수**였다.

@@ -2992,6 +2992,204 @@ A의 `feat/diagnosis`에서 매핑이 맞바뀌었고 8/19 팀 확인으로 의�
 
 ---
 
+## 펫 외출 시스템 — 구현 계획 (2026-08-24, A가 기획 정리)
+
+> **2026-08-26 정정 — 이 절의 "미구현"은 작성 시점 상태다.** 계획 1~5번은 2026-08-25에
+> 전부 구현됐다(아래 "1번" · "2·3·4번" · "상점 별조각 전환" 세 절). 이 절은 **값의 근거**로
+> 남긴다 — 30~50 · 4시간 · 배경 500이 어떤 시뮬레이션에서 나왔는지는 여기에만 있다.
+
+사용자 기획 변경으로 나온 계획이다. **작성 시점에는 코드도 스키마도 손대지 않았다.** 값은 수급·소모
+시뮬레이션으로 정했고 근거를 함께 남긴다. 순서·소유는 절 끝 "순서와 위험" 참고.
+
+기획 한 줄: **친밀도 200 소모 → 펫 외출 → 복귀 시 에피소드 + 랜덤 재화.
+그리고 상점 구매 재화를 별조각으로 통일한다.**
+
+### 왜 이 변경이 구조적으로 맞는가
+
+지금은 **친밀도가 배경을 사고 별조각이 스킨을 산다** — 두 재화가 같은 일(상점)을 하고 서로
+경쟁한다. 친밀도를 외출 전용으로 옮기면 두 가지가 생긴다.
+
+1. **의미 축이 선다.** 친밀도 수급처가 글 20 · 댓글 5 · 채팅 1턴 5 · 모임 신청 10으로
+   **전부 사람과 닿는 행동**이다. "사람과 닿아서 번 것으로 펫을 밖에 보낸다"는 은유가 맞는다
+2. **두 재화가 경쟁 대신 연결된다.** 외출 복귀에 별조각이 나오면 친밀도가 상점 재화의
+   간접 수급로가 된다 — 친밀도 200 = 외출 1회 = 별조각 N개가 곧 환율이다
+
+덤으로 `EffectType.AFFINITY` 스킨(친밀도 +%)이 **외출 빈도 배율**이 되어 새 의미를 얻는다.
+
+### 확정한 값과 근거
+
+| 값 | 결정 | 근거 |
+|---|---|---|
+| 비용 | 친밀도 **200** | 일일 상한이 `AFFINITY_DAILY_CAP = 100`이라 **최소 2일 1회**. 매일이면 사건이 아니라 일과가 된다 |
+| 보상 | 씨앗 **30~50** + 별조각 **30~50** (둘 다) | 아래 시뮬레이션 |
+| 소요 시간 | **4시간** | 방치형이 `MS_PER_IDLE_SEED` 30분/개라 그보다 확실히 길어야 구분된다. 오전에 보내면 오후에 온다 |
+| 배경 가격 | 별조각 **500** (`PRICE_BY_RARITY.COMMON` 600 → 500) | 아래 시뮬레이션 |
+| 동료 수집 | **제외.** 컬럼만 nullable로 남긴다 | 캐릭터 그림이 없다. `public/images/decor_*` 11장은 장식이고 동료가 아니다 |
+
+### 시뮬레이션 — 「둘 다」와 배경 500을 고른 근거
+
+기존 수급 실측: 씨앗 = 일일 미션 60 + 방치형 48/일 + 단계 미션 `(18+구간×4)×3`.
+별조각 = 일일 전체 완료 60 + 출석 주 25 + 단계 미션 `(구간−2)×3`. 친밀도 = 일일 상한 100.
+
+| 모드 | 30일 | 100일 | 외출이 별조각에 기여 |
+|---|---|---|---|
+| 하나만 (둘 중 랜덤 1종) | 씨앗 5,900 / 별조각 2,217 | 23,800 / 8,437 | 약 13% |
+| **둘 다** | 씨앗 6,180 / 별조각 2,537 | 24,800 / 9,437 | **약 23%** |
+
+**「둘 다」를 고른 이유 셋.** ① 「하나만」이면 절반의 외출에서 별조각이 안 나오고, 사용자는
+"씨앗만 나왔네"를 실패로 읽는다 — 2일에 한 번뿐인 이벤트에서 실망 확률 50%는 너무 높다.
+② 외출 기여도가 13% → 23%로 올라가야 친밀도→별조각 환전 통로가 실제로 의미를 갖는다.
+③ 씨앗은 이미 남는 재화라 인플레 위험이 없다(30일 차이 280 = 방치형 6일치 미만).
+
+배경만 모으는 데 걸리는 일수 — **지금 친밀도 600×6 = 36일**이 기준선이다:
+
+| 배경 1종 | 6종 합 | 하나만 | 둘 다 |
+|---|---|---|---|
+| 300 | 1,800 | 25일 | 22일 |
+| 400 | 2,400 | 33일 | 29일 |
+| **500** | 3,000 | 40일 | **36일** ← 현재와 같다 |
+| 600 | 3,600 | 48일 | 42일 |
+
+**500을 고른 이유:** 「둘 다」 모드에서 정확히 36일이 되어 **체감이 바뀌지 않으면서 재화만
+통일된다.** 가격 변경의 근거가 "균형 맞추려고"가 아니라 "현재 체감을 보존하려고"가 된다.
+배경 6종이 전부 `COMMON`이라 **`PRICE_BY_RARITY.COMMON` 한 줄만 고치면 6종이 따라온다.**
+
+### 스키마 — 마이그레이션 1건 (전원 합의 필요)
+
+```sql
+CREATE TABLE "PetOuting" (
+  "id"        TEXT PRIMARY KEY,
+  "userId"    TEXT NOT NULL REFERENCES "User"("id"),
+  "startedAt" TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
+  "returnsAt" TIMESTAMP NOT NULL,
+  "claimedAt" TIMESTAMP,
+  "placeKey"  TEXT NOT NULL,
+  "metKey"    TEXT NOT NULL,
+  "moodKey"   TEXT NOT NULL,
+  "gotSeeds"  INTEGER NOT NULL DEFAULT 0,
+  "gotShards" INTEGER NOT NULL DEFAULT 0,
+  "companionKey" TEXT
+);
+CREATE INDEX "PetOuting_userId_startedAt_idx" ON "PetOuting"("userId", "startedAt");
+
+-- ★ 진행 중인 외출은 유저당 1건. 부분 유니크 인덱스로 DB가 막는다
+CREATE UNIQUE INDEX "PetOuting_active_uniq" ON "PetOuting"("userId") WHERE "claimedAt" IS NULL;
+
+ALTER TABLE "CosmeticItem" ADD COLUMN "priceShards" INTEGER;
+UPDATE "CosmeticItem" SET "priceShards" = 500;
+```
+
+세 가지 설계 판단을 남긴다.
+
+- **`User`에 컬럼 5개를 붙이지 않고 표를 만든다.** 조인이 없어 그쪽이 싸지만 이력이 남지
+  않는다 — 기획의 "자동 일기"(미션 기록 + 외출 스토리 조합)의 재료가 이 표다
+- **부분 유니크 인덱스가 핵심이다.** Prisma 스키마 문법으로 표현이 안 되므로 마이그레이션
+  SQL에 직접 쓰고 스키마에는 주석으로 남긴다. **이게 없으면 "보내기"를 두 번 빨리 누를 때
+  친밀도 400이 나가고 외출 2건이 생긴다** — 애플리케이션 사전 조회로는 막을 수 없다
+- **에피소드를 문장이 아니라 키로 저장한다.** 문장을 저장하면 나중에 문구를 다듬을 때 옛
+  기록이 옛 문장으로 굳는다(`PET_IDLE_LINES`를 상수로 둔 것과 같은 판단)
+- **`priceAffinity`는 지우지 않는다.** 되돌릴 수 있게 남기고 코드가 안 읽는다.
+  `affinityOnly`도 의미가 죽지만 주석으로 사망 표시만 한다 — 마이그레이션을 하나 줄인다
+
+### 순수 함수 — `lib/pet.ts`
+
+```ts
+export const OUTING_COST_AFFINITY = 200
+export const OUTING_HOURS = 4
+export const OUTING_REWARD_MIN = 30
+export const OUTING_REWARD_MAX = 50
+
+/** rand를 주입받는다 — Math.random()을 안에 박으면 check:pet이 경계를 검증할 수 없다 */
+export function rollOutingReward(rand: () => number): { seeds: number; starShards: number }
+
+/** 장소 8 × 만난 것 6 × 기분 5 = 240가지 */
+export const OUTING_PLACES / OUTING_MET / OUTING_MOODS
+export function outingEpisode(placeKey, metKey, moodKey): string
+
+/** 화면과 API가 같은 판정을 쓴다 */
+export function outingState(o: PetOuting | null, now: Date): "IDLE" | "AWAY" | "RETURNED"
+```
+
+**에피소드 문장은 A가 쓰지 않는다.** `PET_GREETINGS`·`PET_IDLE_LINES` 20문장을 사용자가 직접
+쓰고 `check:pet`이 원문을 못 박은 선례가 이 서비스의 톤을 지켜 왔다. 자리(19줄)만 만들고
+초안을 제안한다.
+
+### API — `app/api/pet/outing/` (신규)
+
+**`POST`(보내기)** — 차감은 스킨 구매와 **같은 패턴**이다. `$transaction` 안에서
+
+```ts
+const paid = await tx.user.updateMany({
+  where: { id: user.id, affinity: { gte: OUTING_COST_AFFINITY } },
+  data: { affinity: { decrement: OUTING_COST_AFFINITY } },
+})
+if (paid.count === 0) → 400 NOT_ENOUGH_AFFINITY
+```
+
+**소모에는 `calculateReward()`를 쓰지 않는다** — `/api/pet/feed`·스킨 구매와 같은 이유다
+(배율은 획득에만 붙는다). 3축과 보상은 **보낼 때** 뽑아 저장한다 — 복귀 때 뽑으면 새로고침에
+값이 바뀐다. 부분 유니크 인덱스의 P2002는 400 `ALREADY_OUT`으로 바꾼다.
+
+**복귀는 라우트가 아니라 `ensureOutingReturn(user)`이 한다.** `CLAUDE.md` 8절이 EventBridge·
+Lambda를 금지하므로 스케줄러가 없다 — `ensureMissionReset()`과 방치형 씨앗이 이미 쓰는
+**pull 패턴**을 따른다. `/pet` 진입과 `GET /api/pet`이 부른다.
+
+```ts
+// returnsAt <= now && claimedAt == null 이면 지급하고 claimedAt을 찍는다
+const reward = calculateReward(user.activePetSkin, { seeds: o.gotSeeds, starShards: o.gotShards })
+```
+
+**지급은 반드시 `calculateReward()`를 통과한다**(절대 규칙). 그래서 저장값과 실지급이 다를 수
+있다 — 화면은 실지급을 보여준다. **낙관적 갱신은 하지 않는다**(클라이언트가 랜덤 값을 모른다).
+
+### 화면 — 세 상태
+
+| 상태 | 방 | 카드 |
+|---|---|---|
+| `IDLE` | 펫 + 말풍선 (지금과 같다) | `외출 보내기 · 친밀도 200` / 부족하면 남은 양 |
+| `AWAY` | **펫 없음 — 빈 방으로 두지 않는다.** 창밖 실루엣이나 남긴 쪽지 | `밖에 나갔어요 · N시간 M분 뒤` |
+| `RETURNED` | 펫 + 반가움 연출 | 에피소드 문장 + 받은 재화. 누르면 지급 |
+
+**`AWAY`의 톤이 이 기획의 성패다.** 고립은둔 서비스에서 "아무도 없는 방"이 "혼자 남았다"로
+읽히면 안 되고 "곧 돌아온다"로 읽혀야 한다. 안 쓰이는 `public/images/decor_*` 11장
+(합계 58KB, 평균 5.3KB)에서 하나를 쓸 수 있다.
+
+### 상점 전환
+
+- `prisma/seed/items.ts` — `PRICE_BY_RARITY.COMMON` 600 → 500, 시드가 `priceShards`를 채운다
+- `app/api/pet/cosmetics/buy/route.ts` — 차감을 `affinity` → `starShards`(같은 `gte` 패턴)
+- `app/pet/_components/CosmeticList.tsx` — HUD·가격 표시 💛 → ⭐
+
+### 검증 — `check:pet`에 넣을 것
+
+- `rollOutingReward()`가 **항상 30~50** — `rand`를 0·0.5·1로 고정해 경계 확인
+- 에피소드 풀 개수·원문·중복 (사용자 문장이 조용히 다듬어지는 것을 막는다)
+- `outingState()` 경계 — `returnsAt` 직전/직후 × `claimedAt` 유무 4조합
+- **`OUTING_COST_AFFINITY / AFFINITY_DAILY_CAP === 2`를 못 박는다.** 어느 한쪽을 바꾸면
+  "2일 1회" 페이싱이 조용히 무너지므로 여기서 걸리게 한다
+
+`npm run e2e` 시나리오 1건: 친밀도 부족 → 400 / 보내기 직후 재요청 → `ALREADY_OUT` /
+`returnsAt` 전 복귀 시도 → 지급 없음.
+
+### 순서와 위험
+
+| # | 작업 | 소유 | 위험 |
+|---|---|---|---|
+| 1 | 순수 함수 + `check:pet` | C | **없음** — DB·화면 무관. 여기서 값이 코드로 고정된다 |
+| 2 | 스키마 + 마이그레이션 | **전원 합의** | 공유 DB 쓰기. 되돌리기는 컬럼·표 drop이라 가능 |
+| 3 | API 2개 + `ensureOutingReturn` | C | 재화 경로. `calculateReward()` 경유 확인 |
+| 4 | 화면 3상태 | C | `AWAY` 톤이 핵심 |
+| 5 | 상점 전환 | C | 아래 숨은 문제 |
+
+**1번은 스키마·DB·화면과 완전히 독립이다.** 마이그레이션 합의를 기다리지 않고 만들 수 있고,
+만들어 두면 값(30~50 · 4시간 · 240가지)이 코드로 고정되어 나머지가 그것을 읽는다.
+
+**5번의 숨은 문제:** 사용자들이 이미 친밀도를 갖고 있다(테스트 계정 780). 상점을 별조각으로
+바꾸는 순간 그 잔액은 외출로만 쓰인다. 780이면 외출 3회분이라 오히려 시작 선물이 되지만,
+**배경을 사려고 모아 둔 사람에게는 목표가 사라진다** — 전환 시 안내 문구가 필요하다.
+
+---
+
 ## 펫 외출 시스템 — 1번(순수 함수 + check:pet) 구현 (2026-08-25, C)
 
 A가 `develop`에 정리한 "펫 외출 시스템 — 구현 계획"의 **1번 작업만** 했다. 계획이 적어 둔

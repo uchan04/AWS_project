@@ -4,11 +4,15 @@ import { prisma } from "@/lib/prisma"
 import { ok, fail } from "@/lib/api"
 import { GalleryType } from "@prisma/client"
 import { resolveGallery, canAccessGallery, listGalleryPosts } from "@/app/community/_lib/gallery"
-import { TITLE_MAX, BODY_MAX } from "@/app/community/_lib/limits"
+import { TITLE_MAX, BODY_MAX, IMAGE_KEY_MAX } from "@/app/community/_lib/limits"
+import { isOwnCommunityKey } from "@/app/community/_lib/imageKey"
 import { grantAffinity, POST_AFFINITY } from "@/app/community/_lib/affinity"
 import { completeMissionByCode } from "@/lib/missions/completion"
 import { recordAttempt, retryAfter } from "@/lib/ratelimit"
 import { containsAbuse, isCrisis, CRISIS_POST_NOTICE } from "@/lib/safety"
+import { blocksPosting, crisisBlockedPayload } from "@/app/community/_lib/crisis"
+import { moderate, BLOCK_CODE } from "@/app/community/_lib/moderation"
+import { invokeBedrock } from "@/app/community/_lib/bedrock"
 
 // 도배 방어. 로그인 라우트는 IP로 세지만(clientKey) 여기는 인증된 뒤라 userId로 센다 —
 // IP는 위조되고 공유 회선이면 남까지 막힌다. 글은 한 번 쓰는 데 몇 분이 걸리는 행동이라
@@ -63,6 +67,28 @@ export async function POST(request: NextRequest) {
       return fail("BODY_TOO_LONG", `본문은 ${BODY_MAX}자까지 쓸 수 있어요`, 400)
     }
 
+    /*
+     * 첨부 사진(Post.imageKey). 선택이라 없으면 null 그대로 둔다.
+     *
+     * **키가 본인 것인지 반드시 확인한다.** presign이 발급한 값이라고 가정하지 않는다 —
+     * 이 값은 요청 본문에서 오고, 저장되면 목록·상세가 그대로 cdnUrl()에 넣어 그린다.
+     * 검사를 빼면 본문에 `missions/<남의 userId>/….jpg`를 직접 넣는 것만으로 남의 미션
+     * 사진이 자기 글 이미지로 커뮤니티에 걸린다. 판정 근거는 _lib/imageKey.ts 주석에 있다.
+     */
+    const rawImageKey = payload?.imageKey
+    let imageKey: string | null = null
+    if (rawImageKey !== undefined && rawImageKey !== null) {
+      if (typeof rawImageKey !== "string" || rawImageKey.length > IMAGE_KEY_MAX) {
+        return fail("INVALID_BODY", "사진 정보를 다시 확인해주세요", 400)
+      }
+      // 빈 문자열은 "첨부 안 함"과 같게 본다. 화면이 제거 버튼으로 비운 경우다.
+      const trimmed = rawImageKey.trim()
+      if (trimmed && !isOwnCommunityKey(trimmed, user.id)) {
+        return fail("INVALID_IMAGE", "잘못된 이미지예요", 400)
+      }
+      imageKey = trimmed || null
+    }
+
     // 스키마의 GalleryType enum에 있는 값만 받는다(ALL 포함).
     const galleryType = (Object.values(GalleryType) as string[]).includes(requested)
       ? (requested as GalleryType)
@@ -86,8 +112,46 @@ export async function POST(request: NextRequest) {
       return fail("ABUSIVE_CONTENT", "다른 사람을 향한 말이 담겨 있어요. 표현을 고쳐서 다시 올려주세요", 400)
     }
 
+    // 2단 검열(_lib/moderation.ts). 1단계는 사전 정규식(동기), 2단계는 Bedrock 문맥 판정이다.
+    // 위 containsAbuse()가 2인칭 지시가 붙은 말만 잡는 데 비해, 이쪽은 우회 표기(ㅄ·시1발)와
+    // 욕설이 하나도 없는 모욕("너 임마 청년임?")까지 본다. 둘은 겹치지 않으므로 함께 둔다.
+    //
+    // 제목과 본문을 합쳐 **한 번만** 부른다. 따로 부르면 Bedrock 왕복이 2회가 되고,
+    // 제목에서 시작해 본문으로 이어지는 문장을 반쪽씩만 보게 된다.
+    //
+    // moderate()는 던지지 않는다 — Bedrock 실패·타임아웃(3초)·모델 ID 미설정을 전부 내부에서
+    // 삼키고 1단계 결과를 돌려준다(fail-open). 모델 장애로 글쓰기가 멈추지 않는다.
+    //
+    // BLOCK만 막는다. WARN은 통과, **SELF는 반드시 통과시킨다** — "나 진짜 병신 같아"는
+    // 남을 향한 말이 아니라 이 서비스가 받아내야 할 말이다(moderation.ts JUDGE_SYSTEM 주석).
+    //
+    // **위기 신호를 검열보다 먼저 본다.** 순서가 뒤집히면 위기 신호 글에 욕설이 섞인 순간
+    // 상담 안내 대신 400이 나간다 — POLICY가 BLANKET이라 대상 없는 욕설까지 막는데,
+    // 절박한 글에는 자기를 향한 욕이 섞이기 쉽다. 그러면 도움 안내가 가장 필요한 사람에게만
+    // 닿지 않는다.
+    //
+    // **저장하지 않는다(2026-08-25 팀 결정 변경).** 그전에는 글을 그대로 올리고 작성자에게만
+    // 안내를 돌려줬다 — "막으면 도움이 가장 필요한 사람의 입을 막는 것이 된다"가 근거였다.
+    // 이제는 커뮤니티에 남기는 대신 도움으로 연결한다. 두 결정의 관계와 조건은
+    // app/community/_lib/crisis.ts 주석에 있다.
+    //
+    // **400을 쓰지 않는다.** 사용자가 받는 것은 실패가 아니라 안내여야 한다. 화면(WriteModal)은
+    // 이 응답을 받으면 창을 닫지 않고 입력도 지우지 않는다.
+    // 판정은 isCrisis()가 아니라 blocksPosting()이다. isCrisis()는 오탐을 허용하도록
+    // 설계돼 있어(주석 명시) 사별·보도·비유까지 잡는다 — 안내를 띄우는 데는 맞지만
+    // 저장을 막는 기준으로 쓰면 "친구가 자살했다는 소식을 들었다"가 안 올라간다.
+    // blocksPosting()은 그중 1인칭 현재의 의도만 남긴다(_lib/crisis.ts).
+    if (blocksPosting(`${title} ${body}`)) {
+      return ok(crisisBlockedPayload())
+    }
+
+    const mod = await moderate(`${title}\n\n${body}`, invokeBedrock)
+    if (mod.verdict === "BLOCK") {
+      return fail(BLOCK_CODE, mod.message, 400)
+    }
+
     const post = await prisma.post.create({
-      data: { userId: user.id, galleryType, title, body },
+      data: { userId: user.id, galleryType, title, body, imageKey },
       include: { user: { select: { nickname: true, typeCode: true } } },
     })
 
@@ -107,9 +171,9 @@ export async function POST(request: NextRequest) {
       console.error("[DAILY_COMMUNITY_POST] 미션 완료 처리 실패", error)
     }
 
-    // 위기 신호는 **막지 않는다.** 글은 그대로 올라가고, 작성자에게만 안내를 돌려준다.
-    // 막으면 도움이 가장 필요한 사람의 입을 막는 것이 된다.
-    // 다른 사람에게는 보이지 않는다 — 이 응답은 작성자만 받는다.
+    // 저장은 됐지만 걱정되는 신호는 있는 글 — blocksPosting()은 false인데 isCrisis()는
+    // true인 경우다(사별·보도·비유·회복 서사). 막지는 않되 안내는 보여준다.
+    // 여기 오는 글은 실제로 올라갔으므로 CRISIS_POST_NOTICE("올라갔어요…")가 사실과 맞는다.
     const crisisNotice = isCrisis(`${title} ${body}`) ? CRISIS_POST_NOTICE : null
 
     return ok({ post, granted, crisisNotice })

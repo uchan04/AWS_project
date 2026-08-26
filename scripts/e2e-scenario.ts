@@ -342,14 +342,35 @@ async function main() {
       record("댓글 상한 초과 거부", longComment.body.error?.code === "COMMENT_TOO_LONG", longComment.body)
     }
 
-    // 안전 판정(lib/safety.ts). 오탐 쪽을 먼저 확인한다 — 아래 도배 검사가 한도를
-    // 다 쓰기 전에 "통과해야 하는 글"을 써야 한다
+    // 안전 판정. 오탐 쪽을 먼저 확인한다 — 아래 도배 검사가 한도를 다 쓰기 전에
+    // "통과해야 하는 글"을 써야 한다.
+    //
+    // 2026-08-24 정책 변경: D가 `app/community/_lib/moderation.ts`에 `POLICY = "BLANKET"`을
+    // 넣어 **대상이 없어도 사전에 걸리면 막는다**. 그 전까지 이 자리는 "대상 없는 욕설은
+    // 막지 않는다"(`lib/safety.ts` containsAbuse의 기록된 결정)를 단정했다. 사용자 결정으로
+    // D의 변경을 따르기로 해서 단정을 뒤집는다 — 정규화(`씨 발`·`시1발`·`병@신`·`ㅂㅕㅇㅅㅣㄴ`)까지
+    // 함께 들어왔고 그쪽은 이전에 뚫려 있던 우회를 막는다.
+    // 차단 케이스에 **우회 표기**를 쓴다. 글 하나로 두 가지를 함께 확인한다 —
+    // 차단된 요청도 레이트 리밋 한도를 쓰므로(아래 도배 검사가 그 한도를 센다)
+    // 검사마다 글을 하나씩 늘리면 도배 검사가 먼저 걸려 무관한 실패가 난다
     const venting = await call("POST", "/api/community/posts", {
-      title: "씨발 오늘 진짜 힘들었다",
+      title: "시1발 오늘 진짜 힘들었다",
+      body: "누구한테 하는 말도 아니고 그냥 혼자 하는 말이다. 숫자를 끼운 우회 표기다.",
+      galleryType: "ALL",
+    })
+    record(
+      "BLANKET 정책: 대상 없는 욕설도, 우회 표기(시1발)도 막는다",
+      venting.body.error?.code === "BLOCKED_EXPRESSION",
+      venting.body,
+    )
+
+    // 통과해야 하는 글. 욕설이 없으면 막히지 않는다 — 아래 도배 검사가 한도를 쓰기 전에 필요하다
+    const plain = await call("POST", "/api/community/posts", {
+      title: "오늘 진짜 힘들었다",
       body: "누구한테 하는 말도 아니고 그냥 혼자 하는 말이다. 이건 막히면 안 된다.",
       galleryType: "ALL",
     })
-    record("대상 없는 욕설은 막지 않는다", venting.status === 200, venting.body.error)
+    record("욕설 없는 혼잣말은 통과한다", plain.status === 200, plain.body.error)
 
     const crisisPost = await call("POST", "/api/community/posts", {
       title: "요즘 생각",

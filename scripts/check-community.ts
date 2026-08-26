@@ -1,66 +1,176 @@
-// 커뮤니티 주제 추천의 출력 검사. Bedrock 없이 도는 부분만 고정한다.
-// 낙인 단어 차단이 이 기능의 유일한 안전장치이므로 모델의 선의에 맡기지 않는다.
-//
-//   npm run check:community
-
 import assert from "node:assert/strict"
-import { TOPIC_COUNT, validateTopics } from "@/lib/community/topics"
-import { TOPICS } from "@/app/community/_lib/topics"
+import { TOPICS, TOPIC_COUNT, TOPIC_TITLE_MAX, resolveTopicKey, pickTopics } from "@/app/community/_lib/topics"
 import { pickHopeMessage, HOPE_MESSAGES } from "@/app/community/_lib/banner"
 import { BANNED } from "@/lib/diagnosis/reason"
+import { isCrisis } from "@/lib/safety"
+import {
+  crisisBlockedPayload,
+  CRISIS_BLOCKED_NOTICE,
+  BLAMING_WORDS,
+  blocksPosting,
+} from "@/app/community/_lib/crisis"
+import { moderate } from "@/app/community/_lib/moderation"
 import type { GalleryType, TypeCode } from "@prisma/client"
 
-const GOOD = [
-  { title: "오늘 창밖 풍경", draft: "커튼을 열었더니 밖이 생각보다 밝았다. 잠깐 그대로 서 있었다." },
-  { title: "혼자 먹은 끼니", draft: "오늘은 있는 걸로 대충 때웠다. 그래도 따뜻한 걸 먹으니 좀 나았다." },
-  { title: "미뤄둔 설거지", draft: "싱크대에 며칠째 그릇이 쌓여 있다. 오늘도 그냥 지나쳤다." },
-]
+// 주제 추천은 2026-08-25부터 **제목만** 준다. 초안(draft)이 없어졌고 LLM 추천도 껐다.
+// 그래서 여기서 검사하던 lib/community/topics.ts의 validateTopics()는 더 이상 쓰이지 않는다
+// (그 파일은 아무도 부르지 않는다). 대신 이 파일의 문구가 유일한 출처가 됐으므로
+// 낙인 단어 검사를 문구 전체에 직접 건다 — 이 기능의 유일한 안전장치다.
 
-assert.equal(validateTopics(GOOD).length, TOPIC_COUNT, "정상 3개는 통과한다")
-assert.throws(() => validateTopics(GOOD.slice(0, 2)), /개수/, "2개는 막는다")
-assert.throws(() => validateTopics("주제"), /개수/, "배열이 아니면 막는다")
-assert.throws(
-  () => validateTopics([...GOOD.slice(0, 2), { title: "  ", draft: "내용은 있다." }]),
-  /제목 길이/,
-  "빈 제목은 막는다",
-)
-assert.throws(
-  () => validateTopics([...GOOD.slice(0, 2), { title: "제목이 스무 자를 넘어가는 아주 긴 제목입니다", draft: "내용." }]),
-  /제목 길이/,
-  "20자를 넘는 제목은 막는다",
-)
-assert.throws(
-  () => validateTopics([...GOOD.slice(0, 2), { title: "설거지", draft: "  " }]),
-  /초안 길이/,
-  "빈 초안은 막는다",
-)
-assert.throws(
-  () => validateTopics([...GOOD.slice(0, 2), { title: "긴 초안", draft: "가".repeat(91) }]),
-  /초안 길이/,
-  "90자를 넘는 초안은 막는다",
-)
-assert.throws(() => validateTopics([GOOD[0], GOOD[0], GOOD[1]]), /중복/, "같은 제목 두 개는 막는다")
-assert.throws(
-  () => validateTopics([...GOOD.slice(0, 2), { title: "고립된 하루", draft: "오늘도 혼자였다." }]),
-  /쓸 수 없는 단어/,
-  "낙인 단어는 막는다",
-)
-assert.throws(
-  () => validateTopics([...GOOD.slice(0, 2), { title: "내 유형 이야기", draft: "분류를 보고 왔다." }]),
-  /쓸 수 없는 단어/,
-  "유형·분류는 막는다",
-)
+const TOPIC_GALLERIES = Object.keys(TOPICS) as GalleryType[]
 
-// 대비책으로 쓰는 고정 문구도 같은 검사를 통과해야 한다. 여기서 걸러지면
-// LLM이 실패한 순간에 화면이 검사도 못 지난 문구를 띄우게 된다
-let fallbackChecked = 0
-for (const [code, list] of Object.entries(TOPICS) as [TypeCode, typeof GOOD][]) {
-  assert.ok(list.length >= TOPIC_COUNT, `${code} 고정 문구가 ${TOPIC_COUNT}개보다 적다`)
-  for (let i = 0; i + TOPIC_COUNT <= list.length; i += TOPIC_COUNT) {
-    validateTopics(list.slice(i, i + TOPIC_COUNT))
-    fallbackChecked += TOPIC_COUNT
+assert.equal(TOPIC_GALLERIES.length, 4, "갤러리 4개(전체 + 종족 3)에 각각 제목 목록이 있다")
+
+let titleChecked = 0
+for (const gallery of TOPIC_GALLERIES) {
+  const titles = TOPICS[gallery]
+
+  assert.ok(titles.length >= TOPIC_COUNT, `${gallery} 제목이 ${TOPIC_COUNT}개보다 적다`)
+  assert.equal(new Set(titles).size, titles.length, `${gallery}: 같은 제목이 두 번 있다`)
+
+  for (const title of titles) {
+    assert.ok(title.trim().length > 0, `${gallery}: 빈 제목이 있다`)
+    assert.ok(
+      title.length <= TOPIC_TITLE_MAX,
+      `${gallery}: 제목이 ${TOPIC_TITLE_MAX}자를 넘는다 — "${title}" (${title.length}자)`,
+    )
+
+    // 낙인 단어(lib/diagnosis/reason.ts). 배너와 같은 목록을 쓴다
+    const hit = BANNED.find((word) => title.includes(word))
+    assert.equal(hit, undefined, `${gallery}: 제목에 낙인 단어 "${hit}"가 있다 — "${title}"`)
+
+    // 권유형 금지. 소재를 주는 것이지 조언이 아니다(docs/dev/community.md 문구 규칙)
+    assert.ok(
+      !/해\s?보세요|하세요|해야/.test(title),
+      `${gallery}: 제목이 조언이다 — "${title}"`,
+    )
+    titleChecked += 1
   }
 }
+
+// 전체 탭은 종족을 아는 사람에게 그 종족 목록을, 진단 전인 사람에게 ALL 목록을 준다
+assert.equal(resolveTopicKey("ALL", null), "ALL", "진단 전 전체 탭은 ALL 문구다")
+assert.equal(
+  resolveTopicKey("ALL", "HEALTH_EMOTION" as TypeCode),
+  "HEALTH_EMOTION",
+  "진단을 마쳤으면 전체 탭에서도 내 종족 문구다",
+)
+assert.equal(
+  resolveTopicKey("FAMILY_LIVING" as GalleryType, "HEALTH_EMOTION" as TypeCode),
+  "FAMILY_LIVING",
+  "종족 갤러리는 그 갤러리 문구다",
+)
+
+// 뽑기는 개수를 지키고 같은 제목을 두 번 주지 않는다
+for (const gallery of TOPIC_GALLERIES) {
+  const picked = pickTopics(gallery, null)
+  assert.equal(picked.length, TOPIC_COUNT, `${gallery}: ${TOPIC_COUNT}개를 뽑는다`)
+  assert.equal(new Set(picked).size, TOPIC_COUNT, `${gallery}: 뽑은 제목이 겹친다`)
+}
+
+/* ────────────────────────────────────────────────────────────
+ * 위기 신호 글·댓글 (2026-08-25 팀 결정 변경)
+ *
+ * 이전: 저장하고 작성자에게 안내만 돌려줬다.
+ * 지금: 저장하지 않고 안내만 돌려준다. 응답은 400이 아니라 200 + crisisBlocked 다.
+ *
+ * 라우트를 직접 부르지는 않는다 — 이 스크립트는 서버도 DB도 없이 도는 순수 함수 검사다.
+ * 대신 두 라우트가 공유하는 판정(isCrisis)과 응답 본문(crisisBlockedPayload)을 여기서 고정한다.
+ * ──────────────────────────────────────────────────────────── */
+
+const CRISIS_SAMPLES = [
+  "모든 걸 끝내고 싶다",
+  "이제 다 살기 싫다",
+  "그냥 죽고 싶다는 생각만 든다",
+  "사라지고 싶어",
+  "태어나지 않았으면 좋았을 텐데",
+]
+
+const ORDINARY_SAMPLES = [
+  "오늘 창밖이 밝았다",
+  "요즘 잠이 잘 안 온다",
+  "밥을 늦게 먹었다",
+]
+
+for (const text of CRISIS_SAMPLES) {
+  assert.ok(isCrisis(text), `위기 신호로 잡혀야 한다 — "${text}"`)
+}
+for (const text of ORDINARY_SAMPLES) {
+  assert.ok(!isCrisis(text), `평범한 글까지 잡으면 안 된다 — "${text}"`)
+}
+
+/*
+ * 저장을 막는 판정은 `isCrisis()`가 아니라 `blocksPosting()`이다.
+ *
+ * `isCrisis()`는 오탐을 허용하도록 설계돼 있고(그 주석에 명시), 결과가 "안내를 띄운다"일
+ * 때는 그 편향이 옳다. 결과가 "글이 저장되지 않는다"로 바뀌면서 대가가 달라졌다 —
+ * 아래 통과 목록은 전부 `isCrisis()`가 true로 잡는 문장이다. 그대로 막으면 사별한
+ * 사람의 글이 사라진다.
+ *
+ * 기울기는 미탐 쪽이다. 놓치면 글이 올라가고 안내는 여전히 뜬다.
+ */
+
+const MUST_BLOCK = [
+  "죽고 싶다",
+  "모든 걸 끝내고 싶다",
+  "이제 다 살기 싫다",
+  "자살하고 싶다",
+  // "들었다"를 통째로 제외하면 이 문장이 함께 새어나간다. 전언 명사가 앞에 붙은 경우만 본다
+  "죽고 싶다는 생각이 들었다",
+  // 회상 표지만 보고 제외하면 이 문장이 새어나간다. 회복 표현과 짝일 때만 제외한다
+  "예전에도 죽고 싶었고 지금도 죽고 싶다",
+]
+
+const MUST_NOT_BLOCK = [
+  "친구가 자살했다는 소식을 들었다",
+  "자살 예방 교육을 들었다",
+  "자살률 기사를 봤다",
+  "죽고 싶을 만큼 웃겼다",
+  "살기 싫을 만큼 더운 날씨",
+  "예전엔 죽고 싶었지만 지금은 괜찮다",
+  "드라마 주인공이 자살하는 장면이 힘들었다",
+]
+
+for (const text of MUST_BLOCK) {
+  assert.ok(blocksPosting(text), `저장을 막아야 한다 — "${text}"`)
+}
+for (const text of MUST_NOT_BLOCK) {
+  assert.ok(isCrisis(text), `전제가 깨졌다: isCrisis()가 이미 안 잡는다 — "${text}"`)
+  assert.ok(!blocksPosting(text), `막으면 안 된다 — "${text}"`)
+}
+
+// blocksPosting()은 판정을 넓히지 않는다. isCrisis()가 false면 언제나 false다
+for (const text of ORDINARY_SAMPLES) {
+  assert.ok(!blocksPosting(text), `위기가 아닌 글을 막았다 — "${text}"`)
+}
+
+const payload = crisisBlockedPayload()
+
+// 저장된 것이 없다는 사실이 응답 모양으로 드러나야 한다.
+// post·comment가 실려 나가면 화면이 목록에 밀어 넣는다(PostDetailModal이 그렇게 깨졌었다)
+assert.equal(payload.crisisBlocked, true, "응답에 crisisBlocked: true 가 있다")
+assert.ok(!("post" in payload), "저장하지 않았으므로 post를 담지 않는다")
+assert.ok(!("comment" in payload), "저장하지 않았으므로 comment를 담지 않는다")
+assert.ok(payload.notice.trim().length > 0, "안내 문구가 비어 있지 않다")
+
+// 톤. 거절이 아니라 다른 길을 알려주는 자리다(_lib/crisis.ts 조건 3)
+for (const word of BLAMING_WORDS) {
+  assert.ok(
+    !payload.notice.includes(word),
+    `안내 문구가 거절로 읽힌다 — "${word}"가 들어 있다: "${payload.notice}"`,
+  )
+}
+assert.ok(
+  !/해\s?보세요|하세요|해야/.test(payload.notice),
+  `안내 문구가 조언이다 — "${payload.notice}"`,
+)
+
+// lib/safety.ts의 CRISIS_POST_NOTICE는 "올라갔어요"로 시작한다 — 저장하던 시절의 문장이다.
+// 그걸 그대로 쓰면 올리지 않은 글을 올렸다고 알리게 된다
+assert.ok(
+  !CRISIS_BLOCKED_NOTICE.includes("올라갔어요"),
+  "안내가 글이 올라갔다고 말하면 안 된다 — 저장하지 않았다",
+)
 
 // 희망 문구 배너(SPEC 9절). 갤러리 4개가 각자 배열을 갖는다(app/community/_lib/banner.ts).
 // 한 주 안에서는 같은 문구가 나오고, 주가 넘어가면 바뀐다.
@@ -106,6 +216,96 @@ for (const gallery of GALLERIES) {
   }
 }
 
-console.log(
-  `community 체크 통과 (주제 검증 11, 고정 문구 ${fallbackChecked}개, 희망 문구 ${hopeChecked}개 × 갤러리 ${GALLERIES.length}갤러리) — 고정 문구는 LLM 실패 시 대비책이다`,
-)
+/*
+ * 위기 신호 글이 검열에 걸리지 않는지 본다(2026-08-25, 차단 30번).
+ *
+ * `moderate()`의 사전 차단(POLICY = BLANKET)은 대상이 없는 욕설까지 막는데, 절박한 글에는
+ * 자기를 향한 욕이 섞이기 쉽다. `{ crisis }`를 주면 사전 차단만 풀리고 대상 있는 욕설은
+ * 그대로 막힌다 — 여기서 재는 것은 `moderate()`의 그 계약이다.
+ *
+ * **2026-08-25 이후 두 라우트는 이 인자를 넘기지 않는다.** 위기 신호 글은 검열에 닿기 전에
+ * 저장 없이 돌아가기 때문이다(위 "위기 신호 글·댓글" 절). 그래도 이 검사는 남겨둔다 —
+ * `moderate()`가 가진 보장이고, 위기 신호를 다시 저장하는 쪽으로 되돌릴 때 필요하다.
+ *
+ * Bedrock은 부르지 않는다. 1~3번은 `invokeModel`을 아예 넘기지 않고, 2단계까지 재는
+ * 4번은 고정 JSON을 돌려주는 스텁을 넘긴다.
+ */
+async function checkCrisisModeration() {
+  // 1. 위기 신호 + 대상 없는 욕설 → 통과해야 한다. 막으면 상담 안내가 닿지 못한다
+  const crisisWithProfanity = "죽고 싶다. 시발 진짜 다 싫다"
+  assert.equal(isCrisis(crisisWithProfanity), true, "위기 신호를 못 읽으면 이 검사가 무의미하다")
+  const passed = await moderate(crisisWithProfanity, undefined, { crisis: true })
+  assert.notEqual(
+    passed.verdict,
+    "BLOCK",
+    `위기 신호 글이 욕설 때문에 막혔다 — 상담 안내 대신 400이 나간다 (hits: ${passed.hits.join(",")})`,
+  )
+
+  // 2. 위기 신호가 없으면 종전대로 막는다. 1번이 정책을 통째로 푼 것이 아님을 못박는다
+  const profanityOnly = "시발 진짜 다 싫다"
+  assert.equal(isCrisis(profanityOnly), false, "위기 신호가 없어야 하는 문장이다")
+  assert.equal(
+    (await moderate(profanityOnly, undefined, { crisis: false })).verdict,
+    "BLOCK",
+    "위기 신호 없는 욕설은 종전대로 막는다",
+  )
+  // 같은 문장을 crisis 없이 부른 경우(기본값)도 같다 — 세 번째 인자는 선택이다
+  assert.equal((await moderate(profanityOnly)).verdict, "BLOCK", "opts 없이 불러도 종전과 같다")
+  // 1번 문장도 crisis=false로 부르면 막힌다. 통과시킨 것이 위기 신호임을 확인한다
+  assert.equal(
+    (await moderate(crisisWithProfanity, undefined, { crisis: false })).verdict,
+    "BLOCK",
+    "1번이 통과한 이유는 crisis 플래그다",
+  )
+
+  // 3. 위기 신호가 있어도 대상 있는 욕설은 막는다.
+  //    "죽고싶다"를 덧붙여 남을 공격하는 우회를 열어주지 않는다
+  const crisisWithTargetedAbuse = "죽고 싶다. 너 죽어"
+  assert.equal(isCrisis(crisisWithTargetedAbuse), true, "위기 신호가 있어야 하는 문장이다")
+  assert.equal(
+    (await moderate(crisisWithTargetedAbuse, undefined, { crisis: true })).verdict,
+    "BLOCK",
+    "위기 신호를 붙여도 대상 있는 욕설은 막는다",
+  )
+
+  /*
+   * 4. 2단계(Bedrock 문맥 판정)까지 갔을 때의 계약.
+   *
+   * 스텁을 넘겨 Bedrock 없이 잰다 — moderate()의 invokeModel 인자가 그 자리다.
+   * 위기 신호가 사전 차단을 열어주므로 이 문장은 실제로 모델 단계까지 온다.
+   *
+   * **모델이 BLOCK을 줄 때는 위기 신호가 있어도 막는다. 의도한 동작이다.**
+   * JUDGE_SYSTEM의 BLOCK 정의가 "다른 사람이나 집단을 향한 욕설·비하 호칭·조롱·위협·차별"
+   * 이라, BLOCK 자체가 곧 "남을 향한 공격"이다. 자기를 향한 말은 그 taxonomy에서 SELF로
+   * 갈라져 나오고 SELF·WARN·OK는 아래처럼 이미 통과한다. 응답에는 verdict와 자유 문장
+   * reason뿐이라 BLOCK 안을 더 가를 필드가 없다 — 그래서 BLOCK은 열지 않는다.
+   */
+  const crisisSelfBlame = "죽고 싶다. 나 진짜 병신 같아"
+  const judge = (verdict: string) => async () => JSON.stringify({ verdict, reason: "검사" })
+  assert.equal(isCrisis(crisisSelfBlame), true, "위기 신호가 있어야 하는 문장이다")
+
+  for (const verdict of ["SELF", "WARN", "OK"]) {
+    assert.notEqual(
+      (await moderate(crisisSelfBlame, judge(verdict), { crisis: true })).verdict,
+      "BLOCK",
+      `위기 신호 글을 모델이 ${verdict}로 봤는데 막혔다`,
+    )
+  }
+
+  assert.equal(
+    (await moderate(crisisSelfBlame, judge("BLOCK"), { crisis: true })).verdict,
+    "BLOCK",
+    "모델 BLOCK은 위기 신호가 있어도 막는다(BLOCK = 남을 향한 공격)",
+  )
+}
+
+checkCrisisModeration()
+  .then(() => {
+    console.log(
+      `community 체크 통과 (제목 ${titleChecked}개 × 갤러리 ${TOPIC_GALLERIES.length}, 희망 문구 ${hopeChecked}개 × 갤러리 ${GALLERIES.length}, 위기 신호 검열 3케이스 + 모델 판정 4케이스, 위기 판정 ${CRISIS_SAMPLES.length + ORDINARY_SAMPLES.length}건, 차단 판정 ${MUST_BLOCK.length + MUST_NOT_BLOCK.length}건) — 위기 신호 글은 저장하지 않고 200 + crisisBlocked로 안내한다`,
+    )
+  })
+  .catch((error) => {
+    console.error(error)
+    process.exit(1)
+  })

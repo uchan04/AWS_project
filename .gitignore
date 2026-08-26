@@ -43,3 +43,6 @@ yarn-error.log*
 # typescript
 *.tsbuildinfo
 next-env.d.ts
+
+# 공유 DB 시드 전 Mission 스냅샷. 되돌릴 때만 쓰는 로컬 파일이라 커밋하지 않는다
+prisma/_backup-*.json
