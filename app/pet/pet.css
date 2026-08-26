@@ -343,184 +343,213 @@
 
    pointer-events는 건드리지 않는다. 이 상자는 버튼 크기만큼만 차지하므로(폭이 내용 폭)
    방을 덮지 않고, 펫 쓰다듬기 클릭을 막지 않는다 */
-/* ── 하단 독 (2026-08-26 사용자 지시로 좌우 스택에서 재배치) ──────────────────
+/* ── 상단 한 띠: Lv·경험치 + 재화 3종 (2026-08-26 사용자 지시) ────────────────
  *
- * `.pet-actions--left` 6개 / `--right` 4개 두 세로 스택이었다. 실서비스 육성 게임 5종이
- * **전부 캐릭터 좌우를 비우고 버튼을 가장자리에 모은다**(docs/dev/pet.md 벤치마크 절) —
- * 좌우에 세우면 시선이 가운데로 모이지 않는다.
+ * 두 덩어리였다(.pet-hud-lv 좌상단 · .pet-bar 상단 중앙). 375px에서 방이 279×352인데
+ * 말풍선 112 + 알약 29 + Lv 88 + 펫 274 = 503이라 셋이 서로를 덮었다 —
+ * **자리를 옮겨 풀 문제가 아니라 방이 담을 수 없는 양이었다.** 한 줄로 합쳐 34px로 줄인다.
  *
- * 세 덩어리다. 주 동작 2개(한 줄) · 보조 4개(한 줄) · 챗봇 1개(우하단 따로).
- * 방 **밖**(.pet-stage 안)에 두는 것은 C의 판단 그대로다 — 방 안에 있으면 좁은 화면에서
- * absolute를 풀 수 없고(풀면 방의 flex 흐름에 끼어 펫 옆에 선다), 얹은 채로 두면
- * 버튼이 펫을 덮는다.
- *
- * 좁은 화면(≤768px)에서는 `static`으로 풀려 방 아래로 흐른다. 그 규칙도 C의 것을 잇는다 —
- * 6개를 방 아래쪽 가로 줄로 얹었을 때 펫(272px)을 덮은 것이 그쪽 실측이다.
+ * 방 밖으로 내지 않는다(사용자 지시: "배경이 좁아지니까 답답함이 느껴짐").
  */
-/* **방 위에 얹지 않는다 — 모든 폭에서 방 아래다.**
- *
- * 처음에 `position: absolute; bottom` 으로 방 아래쪽에 얹어 봤고 **실측으로 버렸다**:
- * 820px에서 방이 약 250px인데 독이 185px이라 펫이 버튼 뒤로 완전히 들어갔다.
- * 펫은 방 **바닥**에 서고 독도 바닥에 앉으므로 둘이 같은 자리를 다툰다 —
- * C가 좌우 스택을 만들 때 "방 아래쪽 가로 줄로 내려도 8개 버튼이 펫(272px)을 덮었다"로
- * 적어 둔 것과 같은 벽이다. 버튼을 6개로 줄여도 그 벽은 그대로 있었다.
- *
- * 그래서 흐름에 둔다. `.pet-stage`가 `flex-direction: column`이고 방이 `flex: 1`이라
- * 방이 남는 높이를 갖고 독이 그 아래에 선다 — 페이지가 독 높이만큼 길어지는 대신
- * **방 안은 펫·쪽지·말풍선이 온전히 쓴다.**
- *
- * 실서비스 5종도 버튼을 장면 **위**가 아니라 **아래**에 둔다(Finch·ねこあつめ의 하단 탭).
- * 좌우를 비우라는 것과 장면 위에 얹으라는 것은 다른 얘기였다.
- */
-.pet-dock {
-  position: relative;
-  display: grid;
-  justify-items: center;
-  gap: var(--space-2xs);
-}
-
-/* 주 동작 줄. 둘뿐이라 가운데에 나란히 선다 */
-.pet-dock__main {
-  display: flex;
-  align-items: flex-start;
-  justify-content: center;
-  gap: var(--space-md);
-}
-
-/* 보조 줄. 4개가 한 줄에 들어가지 않는 폭에서는 접힌다 */
-.pet-dock__sub {
-  display: flex;
-  align-items: flex-start;
-  justify-content: center;
-  flex-wrap: wrap;
-  gap: var(--space-sm);
-}
-
-/* 챗봇은 오른쪽 끝에 앉는다. 다른 기능으로 가는 문이라 주 동작·보조와 같은 줄에 서면
-   안 된다 — 셋을 나란히 두면 다시 "10개가 다 같다"로 돌아간다.
-   **독 안에서 `absolute`다**(방이 아니라 독이 기준이다 — 독이 흐름에 있으므로 안전하다).
-   그리드 행으로 두면 세 번째 행이 생겨 독이 272px이 됐고, 방(451px)에서 그만큼을 뺏는다.
-   실측으로 272 → 150px이 됐다 */
-.pet-dock > .pet-circle--chat {
+.pet-hud {
   position: absolute;
-  right: var(--space-sm);
-  bottom: 0;
+  top: var(--space-2xs);
+  left: 0;
+  right: 0;
+  z-index: calc(var(--z-raised) + 2);
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: center;
+  gap: var(--space-2xs);
+  padding-inline: var(--space-2xs);
+  /* 띠 자체는 면이 없다 — 안의 두 덩어리가 각자 알약이다. 면을 한 겹 더 두면
+     방 그림 위에 판이 하나 얹혀 배경 6종이 다 가려진다 */
+  pointer-events: none;
 }
 
-/* 버튼 하나. 아이콘 원 + 라벨 알약이고 둘이 세로로 붙는다(시안 구조).
-   <button>과 <Link>가 같은 클래스를 쓴다 — 우측 스택은 링크다(CircleBtn 주석) */
-.pet-circle {
-  display: grid;
-  justify-items: center;
-  gap: 0.2rem;
-  padding: 0;
-  border: none;
-  background: none;
-  text-decoration: none;
-  cursor: pointer;
-  /* 시안이 hover에서 1.1배, active에서 0.95배로 튄다. 이 앱의 다른 버튼은 1px 눌림이라
-     그쪽에 맞춘다 — 한 화면에서 버튼이 두 방식으로 반응하면 다른 물건으로 읽힌다 */
-  transition: transform var(--dur-micro) var(--ease-out);
+/* 안의 두 덩어리는 흐름에 선다(각자 absolute였다). 누를 수 있어야 하므로 이벤트를 되살린다 */
+.pet-hud > * {
+  position: static;
+  pointer-events: auto;
 }
 
-.pet-circle:active:not(:disabled) {
-  transform: translateY(1px);
+/* Lv 덩어리를 한 줄로 눕힌다. 세로 3줄(Lv / 게이지 / exp)이 88px을 먹던 것이
+   가로 한 줄이면 약 30px이다. `exp / need` 숫자는 **띠에서 뺀다** — 게이지가 이미 비율을
+   말하고, 정확한 값은 씨앗을 넣을 때 유리 바가 크게 보여 준다(.pet-exp-pop) */
+.pet-hud .pet-hud-lv {
+  display: flex;
+  align-items: center;
+  gap: var(--space-2xs);
+  padding: var(--space-3xs) var(--space-2xs);
 }
 
-.pet-circle:disabled {
-  cursor: default;
+.pet-hud .pet-hud-lv__exp {
+  display: none;
 }
 
-/* 아이콘 원의 골격. 크기·면은 아래 세 무게가 정한다 — 여기서는 공통값만 둔다.
-   면·번짐이 이 화면의 주 버튼(.pet-btn)과 같은 종족색 계열인 것은 그대로다(새 색 없음) */
-.pet-circle__icon {
-  display: grid;
-  place-items: center;
-  border-radius: var(--radius-pill);
-  line-height: 1;
+.pet-hud .pet-hud-lv .pet-gauge {
+  width: 4.5rem;
+  height: 0.9rem;
+  border-width: 2px;
 }
 
-/* ── 무게 3종 (2026-08-26 사용자 지시) ────────────────────────────────────────
+/* ── 방 안 하단 액션 바 (2026-08-26 사용자 지시) ───────────────────────────────
  *
- * **위계를 색이 아니라 채움과 크기로 가른다.** 종족색이 6종이라 색으로 나누면 종족마다
- * 위계가 달라진다 — 여우(주황)에서 잘 갈리는 두 색이 고양이(파랑)에서 붙어 보인다.
+ * 자리가 네 번 바뀐 끝이다: 오른쪽 열 카드 → 방 좌우 원형 스택 → 방 **아래** 독 →
+ * **방 안** 하단 띠(지금). 방 아래로 내렸더니 "배경이 좁아져 답답하다"는 지적이 왔고,
+ * 방 안에 두려면 발자국이 작아야 한다 — 원 + 라벨 구조는 한 버튼이 약 68px이라
+ * 일곱이 들어가지 않았다. 그래서 **주 동작 2개 + `☰ 더보기` 하나**다.
  *
- * 전에는 10개가 전부 48px · 채운 종족색 · 20px 이모지로 **완전히 같았다.** 그러면
- * `씨앗 먹이기`(이 화면에 온 이유)와 `미션`(다른 화면으로 이동)이 픽셀 하나 다르지 않다.
+ * 배경 6종 위에서 읽히려면 면이 필요하다. 재화 알약과 **같은 값**을 쓴다
+ * (반투명 카드색 + blur) — C가 6종에서 확인해 둔 값이고 새 색을 만들지 않는다.
+ *
+ * 자리는 방 아래쪽이다. 펫은 방 바닥에 서지만 그림 아래 투명 여백이 있어(--pet-char-sink)
+ * 띠가 지나는 것은 발치다. 실측으로 확인한다.
  */
-
-/* 주 동작 — 채운 면 + 광택. 64px는 design.md의 44px 하한을 넉넉히 넘고, 라벨까지 88px이다 */
-.pet-circle--main .pet-circle__icon {
-  width: 4rem;
-  height: 4rem;
-  background: var(--pet-gloss), linear-gradient(135deg, var(--tribe-face), var(--tribe));
-  box-shadow: var(--pet-gloss-edge), 0 4px 12px color-mix(in oklch, var(--tribe) 38%, transparent);
-  font-size: var(--text-lg);
+.pet-acts {
+  position: absolute;
+  bottom: var(--space-2xs);
+  left: 0;
+  right: 0;
+  z-index: calc(var(--z-raised) + 2);
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: center;
+  gap: var(--space-2xs);
+  padding-inline: var(--space-2xs);
 }
 
-/* 보조 — **면을 비우고 테두리만.** 채움 여부가 위계다.
-   40px는 44px 하한 아래인데, 하한이 요구하는 것은 터치 **면적**이고 이 버튼은 아이콘 원
-   아래 라벨까지가 한 요소라 실제 높이가 40 + 라벨 약 20 = 60px이다(C가 2.5rem을 쓸 때
-   같은 근거를 적어 뒀다). 폭은 라벨 쪽이 더 넓어 44px을 넘는다 */
-.pet-circle--sub .pet-circle__icon {
-  width: 2.5rem;
-  height: 2.5rem;
-  border: 2px solid color-mix(in oklch, var(--tribe) 55%, transparent);
-  background: color-mix(in oklch, var(--color-card) 78%, transparent);
-  backdrop-filter: blur(4px);
-  font-size: var(--text-body);
-}
-
-/* 챗봇 — 흰 면 + 그림자. 전역 런처(ChatLauncher)가 쓰던 값 그대로다:
-   `bg-white text-xl shadow-lg`. 같은 기능이 화면마다 다른 물건으로 보이지 않게 한다 */
-.pet-circle--chat .pet-circle__icon {
-  width: 3.25rem;
-  height: 3.25rem;
-  background: #fff;
-  box-shadow: 0 6px 16px rgb(42 31 20 / 0.18);
-  font-size: var(--text-md);
-}
-
-/* 열려 있는 모달의 버튼. 면을 한 단 어둡게 해 "지금 이걸 보고 있다"를 남긴다 */
-.pet-circle--main[data-active="true"] .pet-circle__icon {
-  background: var(--pet-gloss), linear-gradient(135deg, var(--tribe), var(--tribe-cta));
-}
-
-/* 보조는 면이 비어 있으므로 **테두리와 면을 함께 진하게** 한다 — 채우면 주 동작과 같은
-   무게가 되어 위계가 무너진다 */
-.pet-circle--sub[data-active="true"] .pet-circle__icon {
-  border-color: var(--tribe-cta);
-  background: color-mix(in oklch, var(--tribe) 22%, var(--color-card));
-}
-
-/* 못 누르는 버튼(외출 중, 친밀도 부족, 요청 진행 중)은 뜨지 않는다 —
-   .pet-btn:disabled와 같은 처리다(번짐이 남으면 누를 수 있어 보인다) */
-.pet-circle:disabled .pet-circle__icon {
-  background: var(--color-paper-2);
-  border-color: var(--color-rule);
-  box-shadow: none;
-  opacity: 0.7;
-}
-
-/* 라벨 알약. 방 그림 위에 글자만 두면 배경 6종 중 밝은 셋에서 읽히지 않으므로 면을 깐다.
-   재화 알약과 같은 반투명 카드색이다 */
-.pet-circle__label {
-  padding: 0.1rem var(--space-2xs);
+/* 버튼 하나. 알약 모양이고 글자가 안에 있다 — 아이콘 아래 라벨을 두면 높이가 두 배가 된다 */
+.pet-act {
+  display: flex;
+  align-items: center;
+  gap: 0.3rem;
+  /* 44px 터치 하한(design.md). 방 안이라 더 키울 수 없어 정확히 그 값이다 */
+  min-height: 2.75rem;
+  padding: 0 var(--space-sm);
+  border: 2px solid transparent;
   border-radius: var(--radius-pill);
-  background: color-mix(in oklch, var(--color-card) 85%, transparent);
-  backdrop-filter: blur(4px);
+  background: color-mix(in oklch, var(--color-card) 88%, transparent);
+  backdrop-filter: blur(6px);
+  box-shadow: 0 2px 8px rgb(42 31 20 / 0.14);
+  font-family: var(--font-display);
   font-size: var(--text-label);
   font-weight: 600;
   color: var(--color-ink);
   white-space: nowrap;
+  cursor: pointer;
+  transition: transform var(--dur-micro) var(--ease-out);
 }
 
-/* 라벨 아래 한 줄. 지금은 외출 버튼의 "친밀도 N 부족" 하나뿐이다 */
-.pet-circle__note {
-  font-size: 0.64rem;
-  color: var(--color-strong);
-  white-space: nowrap;
+.pet-act:active:not(:disabled) {
+  transform: translateY(1px);
 }
+
+/* 주 동작은 종족색 테두리로 가른다. **면을 채우지 않는다** — 방 그림 위라 채우면
+   배경이 그만큼 가려지고, 6종 중 밝은 셋에서는 글자 대비가 오히려 떨어진다 */
+.pet-act--primary {
+  border-color: color-mix(in oklch, var(--tribe) 62%, transparent);
+}
+
+/* 더보기는 테두리 없이 한 단 옅다 — 주 동작과 위계를 가른다 */
+.pet-act--more {
+  background: color-mix(in oklch, var(--color-card) 78%, transparent);
+  color: var(--color-ink-2);
+}
+
+/* 아직 못 하는 상태(1단계·친밀도 부족). **disabled가 아니다** — 눌리고 이유를 말한다.
+   그래서 cursor도 pointer를 지킨다: not-allowed면 눌러 볼 생각을 하지 않는다(유연성) */
+.pet-act--primary[data-cant] {
+  border-color: var(--color-rule);
+  color: var(--color-muted);
+}
+
+/* 정말 못 누르는 것만(요청 중·외출 중) 이 모습이다 */
+.pet-act:disabled {
+  border-color: var(--color-rule);
+  color: var(--color-muted);
+  box-shadow: none;
+  cursor: default;
+}
+
+/* ── 더보기 목록 ───────────────────────────────────────────────────────────── */
+
+/* 아이콘 + 이름 + 한 줄 설명. **설명이 이 목록의 존재 이유다**(학습성) —
+   원형 버튼에 `📊` 하나만 있는 것과, `오늘의 활동 — 오늘 들어온 재화를 봐요`를
+   읽는 것은 다르다 */
+.pet-menu {
+  margin: 0;
+  padding: 0;
+  list-style: none;
+  display: grid;
+  gap: var(--space-3xs);
+}
+
+.pet-menu__row {
+  display: grid;
+  grid-template-columns: auto minmax(0, 1fr) auto;
+  align-items: center;
+  gap: var(--space-2xs);
+  width: 100%;
+  min-height: 3.25rem;
+  padding: var(--space-2xs);
+  border: 0;
+  border-radius: var(--radius-input);
+  background: var(--color-card);
+  font-family: inherit;
+  text-align: left;
+  cursor: pointer;
+}
+
+.pet-menu__row:hover {
+  background: color-mix(in oklch, var(--tribe) 12%, var(--color-card));
+}
+
+.pet-menu__icon {
+  display: grid;
+  place-items: center;
+  width: 2.25rem;
+  height: 2.25rem;
+  border-radius: var(--radius-pill);
+  background: color-mix(in oklch, var(--tribe) 18%, transparent);
+  font-size: var(--text-body);
+  line-height: 1;
+}
+
+.pet-menu__body {
+  display: grid;
+  gap: 1px;
+}
+
+.pet-menu__label {
+  font-family: var(--font-display);
+  font-size: var(--text-body);
+  color: var(--color-ink);
+}
+
+.pet-menu__desc {
+  font-size: var(--text-caption);
+  color: var(--color-muted);
+}
+
+.pet-menu__caret {
+  font-size: var(--text-body);
+  color: var(--color-muted);
+}
+
+/* 여기에 **.pet-circle 계열 12벌**이 있었다 — C의 2026-08-26 시안이 방 좌우에 세운
+   아이콘 원 + 라벨 알약이고, 같은 날 무게 3단(main/sub/chat)까지 붙었다.
+   **방 안 알약 액션 바(.pet-act)로 대체돼 전부 걷었다**(사용자 지시).
+
+   되살릴 값: 원 3rem(main 4 / sub 2.5 / chat 3.25rem) · radius --radius-pill ·
+   면 var(--pet-gloss) + linear-gradient(135deg, --tribe-face, --tribe) ·
+   번짐 0 4px 12px color-mix(--tribe 38%) · 라벨 알약 --color-card 85% + blur(4px) ·
+   note 0.64rem --color-strong · disabled면 --color-paper-2 + opacity .7.
+   전부 git 이력에 있다 */
+
+
 
 /* ── 모달 (2026-08-26 시안) ────────────────────────────────────────────────── */
 
@@ -3598,24 +3627,56 @@
      그래서 absolute를 **풀어** 방 밖(.pet-stage 안)으로 흐르게 한다. 페이지가 그만큼
      길어지지만 방 안은 펫과 쪽지가 온전히 쓴다.
      좌측 그룹이 위 줄, 우측 그룹이 아래 줄이다 — 자주 누르는 것이 위에 온다 */
-  /* 독 자체는 여기서 바꿀 것이 없다 — 모든 폭에서 방 아래 흐름이다(위 .pet-dock 주석).
-
-     다만 챗봇은 흐름으로 되돌린다. 375px에서 보조 4개가 두 줄로 접히는데, 얹혀 있으면
-     그 접힌 줄과 겹친다. 흐름에 두면 마지막 줄로 내려가 오른쪽 끝에 선다 */
-  .pet-dock > .pet-circle--chat {
+  /* ── 읽는 값 둘을 방 위로 흘린다 (2026-08-26) ──────────────────────────────
+   *
+   * 375px에서 방이 279×352인데 말풍선(112) + 알약(29) + Lv HUD(88) + 펫(274) = 503이다.
+   * **방이 담을 수 없는 양이라 자리를 옮겨 풀 문제가 아니었다** — 말풍선이 방 상단 112px을
+   * 다 먹고 알약과 HUD를 함께 덮었다(실측: 말풍선 17~129 · 알약 10~39 · HUD 54~142).
+   *
+   * 말풍선과 펫은 방 안에 있어야 한다(펫이 말하는 것으로 읽혀야 하고, 말풍선 자리가
+   * `--pet-char-w`에 묶여 있다). 그래서 **읽는 값 둘만** 방 위로 낸다. 독이 방 아래로
+   * 내려간 것과 대칭이고, 폰 화면의 관습(상단 HUD 띠 + 그 아래 장면)과도 맞는다 */
+  .pet-bar,
+  .pet-hud-lv {
     position: static;
-    justify-self: end;
-    margin-right: var(--space-sm);
+    width: fit-content;
+    margin-inline: auto;
   }
 
-  /* 주 동작 사이 간격을 좁히는 이유 — 375px에서 64px 버튼 2개 + 24px 간격이면 라벨
-     ("씨앗 먹이기" 약 72px · "외출 보내기" 약 72px)이 서로 붙는다 */
-  .pet-dock__main {
-    gap: var(--space-sm);
+  /* `.pet-stage { align-items: center }`를 넣었다가 **바로 버렸다.** 스테이지가
+     `flex-direction: column`이라 그 값이 방까지 내용 폭으로 줄여서 방이 세로선 하나가 됐다
+     (실측: 방 폭이 279 → 약 2px). 가운데 정렬은 위 두 규칙의
+     `width: fit-content` + `margin-inline: auto`만으로 된다 — 그쪽은 자기 폭만 건드린다 */
+
+  .pet-hud-lv {
+    --gauge-w: 5rem;
+    /* 넓은 화면에서 쓰던 top 값을 지운다 — static이면 무의미하고, 남겨 두면 다음 사람이
+       이 규칙이 안 먹는 줄 알고 값을 고친다 */
+    top: auto;
+    left: auto;
   }
 
-  .pet-dock__sub {
-    gap: var(--space-xs);
+  /* ── 액션 바를 한 줄로 지킨다 (2026-08-26 실측) ──────────────────────────────
+   *
+   * 375px에서 방 안쪽이 약 263px인데 알약 셋이 118 + 119 + 85 + 간격 16 = 338px이라
+   * **두 줄로 접혔고, 그 두 줄(96px)이 펫을 거의 다 덮었다.** 한 줄(44px)이면 지나는 것은
+   * 발치뿐이다(넓은 화면 실측: 펫 상자 433~752 · 바 717~761 → 겹치는 것은 아래 35px).
+   *
+   * **글자를 지키고 아이콘을 뺐다.** 사용자가 "원칙에 부합하면 글씨를 없애도 된다"고 했지만
+   * 지금 이모지 4개가 뜻과 어긋나 있어(📊 차트 · 🏪 편의점 · 🌟 무의미) 글자를 빼면
+   * **학습성이 먼저 깨진다.** 아이콘은 지금 장식에 가깝고 글자가 뜻을 지고 있다.
+   * 아이콘을 교체한 뒤에 다시 판단할 자리다.
+   *
+   * 계산: 글자만이면 68 + 68 + 40 = 176px, 여백 8×2씩이면 224 + 간격 16 = 240 < 263 ✓
+   */
+  .pet-act {
+    padding: 0 var(--space-2xs);
+  }
+
+  /* 아이콘만 숨긴다. 잠금 자물쇠도 함께 사라지는데, 그 상태는 **회색 테두리 + 누르면 나오는
+     안내**가 이미 말한다 — 신호가 셋에서 둘로 줄 뿐 없어지지 않는다 */
+  .pet-act > span[aria-hidden="true"] {
+    display: none;
   }
 
   .pet__top {
@@ -4462,22 +4523,7 @@
   }
 }
 
-/* 잠긴 원형 버튼 (1단계 외출). `:disabled`와 **모습은 같고 동작은 다르다** —
-   눌리되 요청을 보내지 않고 안내만 띄운다. 그래서 cursor가 not-allowed가 아니라
-   pointer다: not-allowed면 눌러 볼 생각을 하지 않는다 */
-.pet-circle--locked .pet-circle__icon {
-  background: var(--color-paper-2);
-  color: var(--color-muted);
-}
-
-.pet-circle--locked .pet-circle__label,
-.pet-circle--locked .pet-circle__note {
-  color: var(--color-muted);
-}
-
-.pet-circle--locked {
-  cursor: pointer;
-}
+/* 잠긴 원형 버튼 규칙 3벌이 있었다 — .pet-act--primary[data-cant]가 그 몫을 잇는다 */
 
 /* 재화 알약의 칸 전체가 버튼이다(2026-08-26 사용자 결정). 지갑 카드가 사라지면서 재화
    안내 팝업의 입구를 이쪽이 물려받았다. 버튼 기본 스타일만 끄고 **알약의 모양은 그대로

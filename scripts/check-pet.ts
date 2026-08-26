@@ -27,6 +27,7 @@ import {
   OUTING_LEGS_MAX,
   OUTING_MIN_STAGE,
   OUTING_LOCK_MESSAGE,
+  outingNeedAffinityMessage,
   OUTING_TITLE_SUFFIX,
   outingTitle,
   OUTING_RECENT_AVOID,
@@ -1206,5 +1207,25 @@ for (const suffix of OUTING_TITLE_SUFFIX) {
     `뒷말이 받침에 따라 갈리는 조사로 시작한다: "${suffix}"`,
   )
 }
+
+// ── 친밀도 부족 안내 (2026-08-26 사용자 지시) ─────────────────────────────────
+//
+// 각주로 늘 떠 있던 `친밀도 200 부족`을 걷고 **누를 때만** 말하게 했다.
+// 1단계 잠금(OUTING_LOCK_MESSAGE)과 같은 규칙을 지키는지 기계로 본다.
+
+for (const short of [1, 7, 200, 1234]) {
+  const m = outingNeedAffinityMessage(short)
+  assert.ok(m.includes(short.toLocaleString("ko-KR")), `부족한 양이 안 들어 있다: "${m}"`)
+  // 조사를 `친밀도가`로 앞에 붙인다 — 숫자 뒤에 `이/가`를 두면 그 숫자의 **읽는 소리**로
+  // 갈린다(30이 / 5가). 이 단정이 그 실수를 막는다
+  assert.ok(m.startsWith("친밀도가 "), `조사가 숫자 뒤로 갔다: "${m}"`)
+  assert.ok(m.length <= 40, `안내가 40자를 넘는다(${m.length}): "${m}"`)
+  for (const bad of [...BANNED_TONE, "!", "하세요", "해보세요", "주세요", "부족"]) {
+    assert.ok(!m.includes(bad), `안내에 금지 표현 "${bad}"가 있다: "${m}"`)
+  }
+}
+// 음수·소수도 0으로 눌린다 (화면이 Math.max로 막지만 여기서도 안전해야 한다)
+assert.ok(outingNeedAffinityMessage(-5).includes("0"))
+assert.ok(outingNeedAffinityMessage(3.7).includes("3"))
 
 console.log("pet 체크 통과")

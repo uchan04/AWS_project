@@ -15,6 +15,7 @@ import {
   animalEmoji,
   canGoOuting,
   OUTING_LOCK_MESSAGE,
+  outingNeedAffinityMessage,
   applySeeds,
   expProgress,
   levelUpReply,
@@ -275,7 +276,7 @@ export default function PetView({ initial }: { initial: PetState }) {
   // 2026-08-26 개편: 카드 5장이 모달로 들어갔다. **상태를 하나로 둔다**(시안과 같은 방식) —
   // boolean 5개면 둘이 동시에 열린 상태를 코드가 표현할 수 있게 되고, 그 조합은 화면에서
   // 뜻이 없다(모달 위에 모달은 이 앱에 없다). null이 "닫힘"이다
-  const [modal, setModal] = useState<"seed" | "shop" | "today" | "info" | "history" | null>(null)
+  const [modal, setModal] = useState<"seed" | "shop" | "today" | "info" | "history" | "menu" | null>(null)
   const closeModal = () => setModal(null)
 
   /**
@@ -351,6 +352,7 @@ export default function PetView({ initial }: { initial: PetState }) {
     ? Math.min(1, Math.max(0, 1 - outingLeft / OUTING_MS))
     : outing.progress
   const outingLabel = away ? outingRemainingLabel(outingLeft) : outing.remainingLabel
+
   // 장소 키에서 다시 만든다. 1막("방금 나갔어") → 2막("지금 공원쯤이야") → 3막("돌아가는 중")이
   // 진행률 1/3·2/3에서 넘어간다. 키가 없으면(예전 응답) 서버 문장을 그대로 쓴다
   const outingLine =
@@ -367,6 +369,19 @@ export default function PetView({ initial }: { initial: PetState }) {
    */
   const outingLocked = !canGoOuting(pet.evolutionStage)
 
+  /**
+   * 아직 못 나가는 두 상태 — 1단계(알)와 친밀도 부족.
+   *
+   * **둘 다 `disabled`가 아니다.** 눌러야 이유가 나오는 버튼이라 클릭 이벤트가 와야 한다
+   * (2026-08-26 사용자 지시: 1단계 제한처럼 친밀도도 눌렀을 때 안내한다).
+   * 그래서 이 식에는 **정말 못 누르는 것만** 넣는다 — 요청 진행 중과 외출 중이다.
+   *
+   * 각주(`Lv.5부터` · `친밀도 200 부족`)는 같은 지시로 **걷었다.** 누르면 나오는 안내와
+   * 같은 말이 늘 떠 있는 것은 중복이고, 부족을 반복해서 알리는 것이 이 대상에게 나쁘다.
+   */
+  const outingCantYet = outingLocked || (outing.state === "IDLE" && outingShort > 0)
+  const outingBlocked = pending || away
+
   // 2026-08-26 개편: 외출 카드가 원형 버튼 하나로 줄었다. **라벨이 상태를 말하므로 팝업을
   // 한 겹 더 두지 않는다** — IDLE에서 "외출 보내기"를 눌러 또 "외출 보내기"가 뜨면 탭이
   // 헛돈다. RETURNED만 모달을 연다(에피소드 세 줄 + 보상 + 수령이 한 화면에 있어야 한다).
@@ -374,18 +389,13 @@ export default function PetView({ initial }: { initial: PetState }) {
   // 2026-08-26(밤) 머지: RETURNED에서 모달을 한 겹 두지 않는다. 여행일기가 종이 시안
   // 팝업이 되면서 `이야기 듣기` → 모달 → `이야기 듣기` 버튼이 두 번이 됐다.
   // 지금은 원형 버튼이 곧바로 hearOuting()을 부르고 그 결과로 일기가 뜬다.
-  const outingLabelShort = outingLocked
+  const outingLabelShort = outingCantYet
     ? "외출 보내기"
     : outing.state === "RETURNED"
       ? "이야기 듣기"
       : away
         ? outingLabel
         : "외출 보내기"
-  // 잠긴 상태는 **disabled가 아니다.** 눌러야 이유가 나오는 버튼이라 클릭 이벤트가 와야
-  // 한다(사용자 요청: "눌렀을 땐 2단계 이상이 되면 보낼 수 있다고"). 그래서 outingLocked를
-  // 이 식에 넣지 않고 onClick에서 갈랐다
-  const outingBlocked =
-    !outingLocked && (pending || away || (outing.state !== "RETURNED" && outingShort > 0))
 
   // 재화 3종. 2026-08-21 사용자 결정으로 셋이 같은 칸을 쓴다 — 전에는 씨앗만 초록, 나머지
   // 둘은 나무색이었다. 색은 종족색 하나로 끝내고 구분은 이모지가 한다
@@ -900,6 +910,81 @@ export default function PetView({ initial }: { initial: PetState }) {
         <div className="pet-room">
             <PetRoom imageUrl={pet.roomImageUrl} />
 
+            {/* ── 상단 한 줄: Lv·경험치 + 재화 3종 (2026-08-26 사용자 지시) ──────────
+                두 덩어리(.pet-hud-lv · .pet-bar)를 **한 띠로 합쳤다.** 따로 두면 375px에서
+                서로와 말풍선을 덮었다 — 방 279×352에 말풍선 112 + 알약 29 + Lv 88 + 펫 274가
+                들어가지 않는다(실측). 한 줄로 합치면 세로 117 → 약 34px이다.
+
+                **방 밖으로 내지 않는다**(사용자 지시: "배경이 좁아지니까 답답함이 느껴짐").
+                띠는 반투명 카드색 + blur이라 배경 6종 위에서 대비가 확보된다 — 재화 알약이
+                이미 그 값을 쓰고 있었고 C가 6종에서 확인해 둔 것이다 */}
+            <div className="pet-hud">
+            {/* 좌상단 Lv + 경험치. 옛 "🍎 경험치" 카드가 여기로 왔다 — 게이지 골격은
+                그 카드가 쓰던 .pet-gauge 그대로다(높이·홈 그림자·전환).
+                진화 임박 각주("다음 단계까지 씨앗 N개")는 여기 두지 않고 펫 정보 모달로
+                보냈다. 방 위에 얹는 오버레이는 한눈에 읽히는 두 줄이어야 하고,
+                그 문장은 세 번째 줄이 된다 */}
+            <div className="pet-hud-lv">
+              <p className="pet-hud-lv__level">Lv.{pet.level}</p>
+              <div
+                className="pet-gauge"
+                role="progressbar"
+                aria-label="다음 레벨까지 경험치"
+                aria-valuemin={0}
+                aria-valuemax={need}
+                aria-valuenow={pet.exp}
+              >
+                {/* 씨앗을 넣은 직후 0.3초 동안 **이전 위치**를 그린다. 그 뒤 현재 값으로
+                    바뀌면 CSS transition(.pet-hud-lv .pet-gauge__fill)이 채워지는 모습을
+                    만든다 — JS 애니메이션을 쓰지 않는다.
+                    2026-08-26 밤 머지에서 이 연출만 살렸다. 같은 값을 방 중앙 유리 팝업으로
+                    또 띄우던 것을 걷었고(사용자 결정), 게이지는 이 한 벌이다.
+                    expShow가 null인 평상시에는 그냥 현재 값이라 아무 일도 하지 않는다 */}
+                <div
+                  className="pet-gauge__fill"
+                  style={{ width: `${(expShow?.from ?? progress) * 100}%` }}
+                />
+              </div>
+              <p className="pet-hud-lv__exp">
+                {ko(pet.exp)} / {ko(need)}
+              </p>
+            </div>
+            {/* 재화 알약. 2026-08-26 오전에 만든 상단 바를 **자리만 옮긴 것**이다 —
+                마크업·클래스가 그대로이고 상점 버튼 2개만 빠졌다(좌측 "펫꾸미기"로 갔다).
+                이름을 sr-only로 남기는 처리도 그대로다: 시안에는 아이콘과 숫자만 있는데
+                그렇게만 두면 스크린리더에 아무것도 남지 않는다 */}
+            <div className="pet-bar">
+              <ul className="pet-bar__wallet">
+                {wallet.map((row) => (
+                  <li className="pet-bar__item" key={row.name}>
+                    {/* 2026-08-26 사용자 결정: **칸 전체가 버튼이다.** 지갑 카드가 개편에서
+                        사라지면서 재화 안내(획득 방법·하루 상한)를 여는 자리가 없어졌는데,
+                        얼마를 어떻게 벌 수 있는지는 이 서비스에서 가장 많이 물어보게 되는
+                        것이다. 알약이 그 입구를 물려받는다.
+                        `li` 안을 버튼으로 감싼 것은 알약이 방 위에 떠 있는 좁은 자리라
+                        ⓘ 같은 표시를 따로 둘 폭이 없어서다 — 손가락으로 누르는 화면이라
+                        표적은 칸 전체가 낫다(옛 지갑 줄도 줄 전체가 버튼이었다).
+                        아이콘은 aria-hidden이고 이름이 sr-only로 남아 있으므로 버튼 이름은
+                        "씨앗 3,000"으로 읽힌다 */}
+                    <button
+                      type="button"
+                      className="pet-bar__btn"
+                      onClick={() => setWalletInfo(row.name)}
+                      aria-haspopup="dialog"
+                    >
+                      <span className="pet-bar__icon" aria-hidden="true">
+                        {row.icon}
+                      </span>
+                      <span className="sr-only">{row.name}</span>
+                      <span className="pet-bar__value">{ko(row.value)}</span>
+                    </button>
+                  </li>
+                ))}
+              </ul>
+            </div>
+            </div>
+
+
             {/* 방 오른쪽 위에 진화 단계를 여는 🌟 버튼이 있었다 — 2026-08-26 사용자 결정으로
                 걷었다. C의 개편에서 진화 단계가 **`펫 정보` 모달** 안으로 들어갔고, 입구를
                 두 곳에 두지 않는다. 되살릴 값(2rem · top/right --space-2xs · z 2)은
@@ -969,6 +1054,63 @@ export default function PetView({ initial }: { initial: PetState }) {
                 3개(✨⭐✨)도 같은 요청으로 함께 걷었다(아래 .pet-char 주석).
                 CSS(.pet-room__seeds·.pet-room__seed)와 petFloatSeed 키프레임도 함께 지웠다.
                 방을 채우는 것은 배경 그림과 펫뿐이다 */}
+
+            {/* ── 방 안 하단 액션 바 (2026-08-26 사용자 지시) ────────────────────────
+                **버튼을 방 밖으로 내지 않는다** — 배경이 좁아져 답답해진다는 지적이었다.
+                그래서 방 안에 두면서 펫을 가리지 않을 만큼 작게 만든다.
+
+                ── 왜 2개 + 더보기인가 (UI/UX 원칙 4개 기준) ──
+                **직관성** 주 동작 둘은 글자로 무엇인지 말한다. 아이콘만 두면 지금 이모지
+                        (📊 차트 · 🏪 편의점 · 🌟 무의미)로는 뜻이 전달되지 않는다
+                **유효성** 이 화면에 온 목적이 먹이기와 외출이다. 그 둘은 한 번에 닿는다
+                **학습성** 나머지 다섯은 `더보기` 안에서 **아이콘 + 이름 + 한 줄 설명**으로
+                        보인다 — 원형 버튼 7개를 늘어놓는 것보다 처음 온 사람에게 낫다
+                **유연성** 못 하는 상태(1단계·친밀도 부족)에서도 눌리고 이유를 말한다.
+                        틀린 것을 막는 대신 왜 안 되는지 알린다
+
+                `더보기`에 점 세 개만 두지 않고 **글자를 붙였다** — 아이콘만이면 무엇이
+                열리는지 배울 길이 없다(학습성).
+
+                띠는 반투명 카드색 + blur다. 배경 6종 위에서 대비가 확보된 값이고
+                (재화 띠와 같은 값), 방 아래쪽 여백에 앉아 펫 발치만 지난다 */}
+            <div className="pet-acts">
+              <button
+                type="button"
+                className="pet-act pet-act--primary"
+                onClick={() => setModal("seed")}
+                aria-haspopup="dialog"
+              >
+                <span aria-hidden="true">🌿</span> 씨앗 먹이기
+              </button>
+              {/* available: false면 버튼이 아예 없다. 마이그레이션(PetOuting)이 안 들어간
+                  DB에서 lib/outing.ts가 그렇게 내려보낸다 — 없는 기능을 광고하지 않는다 */}
+              {outing.available ? (
+                <button
+                  type="button"
+                  className="pet-act pet-act--primary"
+                  data-cant={outingCantYet ? "" : undefined}
+                  disabled={outingBlocked}
+                  onClick={() => {
+                    // 못 나가는 두 상태는 요청을 보내지 않고 이유만 알린다(유연성)
+                    if (outingLocked) setToast({ text: OUTING_LOCK_MESSAGE })
+                    else if (outing.state === "RETURNED") hearOuting()
+                    else if (outingShort > 0)
+                      setToast({ text: outingNeedAffinityMessage(outingShort) })
+                    else sendOuting()
+                  }}
+                >
+                  <span aria-hidden="true">{outingCantYet ? "🔒" : "🚪"}</span> {outingLabelShort}
+                </button>
+              ) : null}
+              <button
+                type="button"
+                className="pet-act pet-act--more"
+                onClick={() => setModal("menu")}
+                aria-haspopup="dialog"
+              >
+                <span aria-hidden="true">☰</span> 더보기
+              </button>
+            </div>
 
             {/* 펫 대사 (2026-08-23 사용자 요청). 20문장 전부 사용자가 직접 쓴 것이다.
                 들어오면 접속 인사(서버가 고른다), 5분마다 평상시 대사로 넘어간다.
@@ -1153,172 +1295,9 @@ export default function PetView({ initial }: { initial: PetState }) {
                 DOM 순서만으로도 위에 그려지고, .pet-room이 overflow: hidden이라
                 어느 폭에서도 방 밖으로 새지 않는다 */}
 
-            {/* 좌상단 Lv + 경험치. 옛 "🍎 경험치" 카드가 여기로 왔다 — 게이지 골격은
-                그 카드가 쓰던 .pet-gauge 그대로다(높이·홈 그림자·전환).
-                진화 임박 각주("다음 단계까지 씨앗 N개")는 여기 두지 않고 펫 정보 모달로
-                보냈다. 방 위에 얹는 오버레이는 한눈에 읽히는 두 줄이어야 하고,
-                그 문장은 세 번째 줄이 된다 */}
-            <div className="pet-hud-lv">
-              <p className="pet-hud-lv__level">Lv.{pet.level}</p>
-              <div
-                className="pet-gauge"
-                role="progressbar"
-                aria-label="다음 레벨까지 경험치"
-                aria-valuemin={0}
-                aria-valuemax={need}
-                aria-valuenow={pet.exp}
-              >
-                {/* 씨앗을 넣은 직후 0.3초 동안 **이전 위치**를 그린다. 그 뒤 현재 값으로
-                    바뀌면 CSS transition(.pet-hud-lv .pet-gauge__fill)이 채워지는 모습을
-                    만든다 — JS 애니메이션을 쓰지 않는다.
-
-                    2026-08-26 밤 머지에서 이 연출만 살렸다. 같은 값을 방 중앙 유리 팝업으로
-                    또 띄우던 것을 걷었고(사용자 결정), 게이지는 이 한 벌이다.
-                    expShow가 null인 평상시에는 그냥 현재 값이라 아무 일도 하지 않는다 */}
-                <div
-                  className="pet-gauge__fill"
-                  style={{ width: `${(expShow?.from ?? progress) * 100}%` }}
-                />
-              </div>
-              <p className="pet-hud-lv__exp">
-                {ko(pet.exp)} / {ko(need)}
-              </p>
-            </div>
-
-            {/* 재화 알약. 2026-08-26 오전에 만든 상단 바를 **자리만 옮긴 것**이다 —
-                마크업·클래스가 그대로이고 상점 버튼 2개만 빠졌다(좌측 "펫꾸미기"로 갔다).
-                이름을 sr-only로 남기는 처리도 그대로다: 시안에는 아이콘과 숫자만 있는데
-                그렇게만 두면 스크린리더에 아무것도 남지 않는다 */}
-            <div className="pet-bar">
-              <ul className="pet-bar__wallet">
-                {wallet.map((row) => (
-                  <li className="pet-bar__item" key={row.name}>
-                    {/* 2026-08-26 사용자 결정: **칸 전체가 버튼이다.** 지갑 카드가 개편에서
-                        사라지면서 재화 안내(획득 방법·하루 상한)를 여는 자리가 없어졌는데,
-                        얼마를 어떻게 벌 수 있는지는 이 서비스에서 가장 많이 물어보게 되는
-                        것이다. 알약이 그 입구를 물려받는다.
-
-                        `li` 안을 버튼으로 감싼 것은 알약이 방 위에 떠 있는 좁은 자리라
-                        ⓘ 같은 표시를 따로 둘 폭이 없어서다 — 손가락으로 누르는 화면이라
-                        표적은 칸 전체가 낫다(옛 지갑 줄도 줄 전체가 버튼이었다).
-                        아이콘은 aria-hidden이고 이름이 sr-only로 남아 있으므로 버튼 이름은
-                        "씨앗 3,000"으로 읽힌다 */}
-                    <button
-                      type="button"
-                      className="pet-bar__btn"
-                      onClick={() => setWalletInfo(row.name)}
-                      aria-haspopup="dialog"
-                    >
-                      <span className="pet-bar__icon" aria-hidden="true">
-                        {row.icon}
-                      </span>
-                      <span className="sr-only">{row.name}</span>
-                      <span className="pet-bar__value">{ko(row.value)}</span>
-                    </button>
-                  </li>
-                ))}
-              </ul>
-            </div>
 
           </div>
 
-        {/* **버튼은 방 밖, 스테이지 안 하단이다** (2026-08-26 사용자 지시로 재배치).
-            넓은 화면에서는 `position: absolute`로 방 아래쪽에 얹히고(스테이지가 방과 같은
-            사각형이다), 좁은 화면에서는 `static`으로 풀려 방 아래로 흐른다 —
-            pet.css `.pet-dock` 주석.
-
-            ── 왜 좌우 스택에서 하단으로 옮겼는가 ──
-            실서비스 육성 게임 5종(Finch · 다마고치 Uni · ねこあつめ · My Talking Tom ·
-            포켓캠프)이 **전부 캐릭터 좌우를 비우고 버튼을 가장자리에 모은다.** 좌우에
-            세우면 시선이 가운데로 모이지 않는다. 근거는 docs/dev/pet.md의 벤치마크 절.
-
-            ── 왜 10개에서 7개로 줄었는가 ──
-            우측 스택 4개 중 **3개가 이미 다른 곳에 있었다**: 커뮤니티·미션은 사이드바에,
-            모임은 커뮤니티 화면 상단 입구에. 사이드바를 그대로 두면서 같은 링크를 같은
-            무게로 한 번 더 두는 것은 중복이고, C가 "중복 감수"로 정한 것은 *배치*였지
-            무게까지 같아야 한다는 뜻은 아니었다. 셋을 걷고 챗봇만 남겼다.
-            (그래서 `Sidebar.tsx`의 TABS를 여기 베껴 두던 문제도 함께 사라졌다 —
-            메뉴가 늘 때 두 곳을 고쳐야 하던 것이 한 곳이 됐다.)
-
-            ── 위계를 색이 아니라 채움으로 가른다 ──
-            종족색이 6종이라 색으로 나누면 종족마다 위계가 달라진다. 주 동작은 채운 면,
-            보조는 테두리만이다(`.pet-circle--sub`). 크기도 64 / 40px로 갈린다.
-
-            이모지는 **이번에 바꾸지 않았다** — 사용자가 무료 아이콘 세트
-            (magnific.com/icons · iconmonstr.com)를 참고해 나중에 교체하기로 했다.
-            지금 뜻이 어긋나 있는 것 4개는 docs/dev/pet.md "아이콘 교체 대기"에 적어 뒀다 */}
-        <div className="pet-dock">
-          {/* 주 동작 — 이 화면에 온 이유다. 둘뿐이라 나란히 선다 */}
-          <div className="pet-dock__main">
-            <CircleBtn
-              icon="🌿"
-              label="씨앗 먹이기"
-              size="main"
-              onClick={() => setModal("seed")}
-              active={modal === "seed"}
-            />
-            {/* available: false면 버튼이 아예 없다. 마이그레이션(PetOuting)이 안 들어간
-                DB에서 lib/outing.ts가 그렇게 내려보낸다 — 없는 기능을 광고하지 않는다 */}
-            {outing.available ? (
-              <CircleBtn
-                icon="🚪"
-                label={outingLabelShort}
-                size="main"
-                note={
-                  outingLocked
-                    ? `Lv.${EVOLUTION_LEVEL.STAGE2}부터`
-                    : outing.state === "IDLE" && outingShort > 0
-                      ? `친밀도 ${ko(outingShort)} 부족`
-                      : undefined
-                }
-                onClick={() => {
-                  // 1단계(알)는 요청을 보내지 않고 이유만 알린다. 카드를 숨기지 않는 이유는
-                  // 알 → 아기가 레벨 4칸이고, 숨기면 그동안 기능의 존재를 모르기 때문이다
-                  if (outingLocked) setToast({ text: OUTING_LOCK_MESSAGE })
-                  else if (outing.state === "RETURNED") hearOuting()
-                  else sendOuting()
-                }}
-                disabled={outingBlocked}
-                locked={outingLocked}
-              />
-            ) : null}
-          </div>
-
-          {/* 보조 — 찾아서 여는 것들. 면을 비워 주 동작과 무게를 가른다.
-              순서는 "방금 것"에서 "전체"로 간다: 일기 → 오늘 → 꾸미기 → 정보 */}
-          <div className="pet-dock__sub">
-            {outing.available ? (
-              <CircleBtn icon="📖" label="여행일기" size="sub" onClick={openHistory} active={modal === "history"} />
-            ) : null}
-            <CircleBtn
-              icon="📊"
-              label="오늘의 활동"
-              size="sub"
-              onClick={() => setModal("today")}
-              active={modal === "today"}
-            />
-            <CircleBtn
-              icon="🏪"
-              label="펫꾸미기"
-              size="sub"
-              onClick={() => setModal("shop")}
-              active={modal === "shop"}
-            />
-            <CircleBtn
-              icon="🌟"
-              label="펫 정보"
-              size="sub"
-              onClick={() => setModal("info")}
-              active={modal === "info"}
-            />
-          </div>
-
-          {/* 챗봇 — 셋 중 어디에도 안 넣고 따로 둔다. 주 동작도 아니고(이 화면의 일이 아니다)
-              보조도 아니다(다른 기능으로 가는 문이다). 자리는 우하단 — 전역 런처가 원래
-              그 계열의 자리를 쓰고 있었고, 앱 밖에서도 챗봇은 그 자리의 관습이 있다.
-              흰 면인 것도 그 런처의 값을 그대로 가져온 것이다 */}
-          <CircleBtn icon="💬" label="마음 친구" size="chat" onClick={openChat} />
-        </div>
       </div>
 
         {/* ── 모달 5개 ───────────────────────────────────────────────────────────
@@ -1674,6 +1653,52 @@ export default function PetView({ initial }: { initial: PetState }) {
               데이터는 그대로 내려온다 — PetState의 daysTogether·missionsDone·attendanceTotal은
               app/pet/page.tsx가 계속 채우고, pet.css의 .pet-log 규칙도 남아 있다.
               되살릴 일이 생기면 그 두 벌이 이미 있으므로 이 자리에 카드만 다시 세우면 된다 */}
+
+        {/* ── 더보기 (2026-08-26 사용자 지시) ─────────────────────────────────────
+            방 안 액션 바에 두지 못한 다섯을 모았다. **원형 버튼을 늘어놓는 것보다 낫다**고
+            본 이유가 학습성이다 — 여기서는 아이콘 옆에 **이름과 한 줄 설명**이 함께 온다.
+            처음 온 사람이 `📊`를 보고 무엇인지 짐작해야 하는 것과, `오늘의 활동 — 오늘 들어온
+            재화를 봐요`를 읽는 것은 다르다.
+
+            순서는 "방금 것"에서 "전체"로 간다. 마음 친구가 마지막인 것은 이 화면의 일이
+            아니라 다른 기능으로 가는 문이기 때문이다 */}
+        {modal === "menu" ? (
+          <PetModal title="더보기" onClose={closeModal}>
+            <p className="pet-card__title">
+              <span aria-hidden="true">☰</span> 더보기
+            </p>
+            <ul className="pet-menu">
+              {[
+                outing.available
+                  ? { icon: "📖", label: "여행일기", desc: "다녀온 이야기를 다시 읽어요", go: openHistory }
+                  : null,
+                { icon: "📊", label: "오늘의 활동", desc: "오늘 들어온 재화를 봐요", go: () => setModal("today") },
+                { icon: "🏪", label: "펫꾸미기", desc: "외형과 배경을 바꿔요", go: () => setModal("shop") },
+                { icon: "🌟", label: "펫 정보", desc: "자라는 단계와 쌓인 씨앗을 봐요", go: () => setModal("info") },
+                { icon: "💬", label: "마음 친구", desc: "오늘 하루를 이야기해요", go: openChat },
+              ]
+                .filter((r): r is { icon: string; label: string; desc: string; go: () => void } => r !== null)
+                .map((r) => (
+                  <li key={r.label}>
+                    {/* 줄 전체가 버튼이다 — 손가락으로 누르는 화면이라 표적이 클수록 낫다
+                        (재화 띠·보관함 목록과 같은 판단) */}
+                    <button type="button" className="pet-menu__row" onClick={r.go}>
+                      <span className="pet-menu__icon" aria-hidden="true">
+                        {r.icon}
+                      </span>
+                      <span className="pet-menu__body">
+                        <span className="pet-menu__label">{r.label}</span>
+                        <span className="pet-menu__desc">{r.desc}</span>
+                      </span>
+                      <span className="pet-menu__caret" aria-hidden="true">
+                        ›
+                      </span>
+                    </button>
+                  </li>
+                ))}
+            </ul>
+          </PetModal>
+        ) : null}
 
         {/* 여행일기 보관함 — 목록 (2026-08-26 사용자 요청).
             `보관함 → 목록 → 일기` 세 단계다. 여기서 한 줄을 누르면 같은 종이 일기가
@@ -2086,92 +2111,17 @@ function OutingDiaryModal({
   )
 }
 
-// ── 원형 조작 버튼 (2026-08-26 시안) ─────────────────────────────────────────────
+// 여기에 **CircleBtn**(원형 조작 버튼)이 있었다 — C의 2026-08-26 시안이 방 좌우에 세운
+// 아이콘 원 + 라벨 알약 구조다. 같은 날 사용자 지시로 화면이 두 번 더 바뀌면서 걷혔다:
+//   ① 좌우 스택 10개 → 방 아래 하단 독 7개(무게 3단)
+//   ② 방 아래 독 → **방 안** 액션 바 2개 + `☰ 더보기`
+// ②의 이유는 "배경이 좁아지니까 답답함이 느껴짐"이었다. 방 안에 두려면 발자국이 작아야
+// 하고, 원 + 라벨 구조는 한 버튼이 약 68px이라 일곱이 들어가지 않았다.
 //
-// 방 좌우에 세로로 쌓이는 버튼 하나다. 아이콘 원 + 라벨 알약 구조이고 라벨이 **글자로**
-// 남는다 — 아이콘만 두면 스크린리더에 아무것도 안 남고, 이 화면은 그 실수를 이미 한 번
-// 했다(2026-08-23에 걷어낸 상단 씨앗 HUD).
-//
-// href를 주면 <Link>, 안 주면 <button>이다. 우측 스택은 다른 화면으로 가는 링크이고
-// 좌측 스택은 이 화면에서 무언가를 여는 버튼이라 둘이 같은 껍데기를 쓰되 태그가 갈린다.
-// 링크에 disabled가 없는 것은 <a>가 그 속성을 못 받기 때문이고, 지금 링크 3개는
-// 막히는 상태가 없다.
-function CircleBtn({
-  icon,
-  label,
-  note,
-  size = "sub",
-  onClick,
-  href,
-  disabled,
-  locked,
-  active,
-}: {
-  icon: string
-  label: string
-  /** 라벨 아래 한 줄. 지금은 외출 버튼의 "친밀도 N 부족" 하나뿐이다 */
-  note?: string
-  /**
-   * 무게 (2026-08-26 사용자 지시로 도입). **위계를 색이 아니라 채움과 크기로 가른다** —
-   * 종족색이 6종이라 색으로 나누면 종족마다 위계가 달라진다.
-   *
-   *   main  64px · 채운 종족색 + 광택      이 화면에 온 이유(먹이기·외출)
-   *   sub   40px · 면 없이 테두리만        찾아서 여는 것(일기·오늘·꾸미기·정보)
-   *   chat  52px · 흰 면 + 그림자          다른 기능으로 가는 문. 전역 런처의 값이다
-   *
-   * 기본값이 `sub`인 이유는 새 버튼을 추가할 때 **주 동작으로 올라가지 않게** 하려는
-   * 것이다 — 주 동작이 늘면 그게 늘었다는 사실이 눈에 보여야 한다.
-   */
-  size?: "main" | "sub" | "chat"
-  onClick?: () => void
-  href?: string
-  disabled?: boolean
-  /**
-   * 잠긴 상태(2026-08-26 밤 머지). **`disabled`와 모습은 같고 동작은 다르다** —
-   * `disabled`면 클릭 이벤트가 안 와서 이유를 설명할 수 없다. 지금 쓰는 곳은 1단계(알)의
-   * 외출 버튼 하나이고, 눌리되 요청을 보내지 않고 안내 토스트만 띄운다.
-   *
-   * `aria-disabled`도 붙이지 않는다. 그 속성은 "지금 못 쓴다"를 알리는데 이 버튼은
-   * **눌러야 설명이 나오는** 버튼이라 스크린리더 사용자에게도 눌러야 한다고 알려야 한다.
-   */
-  locked?: boolean
-  active?: boolean
-}) {
-  const inner = (
-    <>
-      {/* 잠기면 자물쇠로 갈린다. 라벨은 "외출 보내기" 그대로 둔다 —
-          이름이 바뀌면 무엇을 누르는 버튼인지가 흔들린다 */}
-      <span className="pet-circle__icon" aria-hidden="true">
-        {locked ? "🔒" : icon}
-      </span>
-      <span className="pet-circle__label">{label}</span>
-      {note ? <span className="pet-circle__note">{note}</span> : null}
-    </>
-  )
-
-  if (href) {
-    return (
-      <Link className={`pet-circle pet-circle--${size}`} href={href}>
-        {inner}
-      </Link>
-    )
-  }
-
-  return (
-    <button
-      type="button"
-      className={`pet-circle pet-circle--${size}${locked ? " pet-circle--locked" : ""}`}
-      onClick={onClick}
-      disabled={disabled}
-      aria-disabled={disabled}
-      // 열려 있는 모달의 버튼을 눌린 상태로 둔다. 모달이 화면 가운데를 덮으므로
-      // 어느 버튼에서 왔는지가 남아 있지 않으면 닫은 뒤 자리를 다시 찾게 된다
-      data-active={active ? "true" : undefined}
-    >
-      {inner}
-    </button>
-  )
-}
+// 되살릴 값: 아이콘 원 3rem(main 4 / sub 2.5 / chat 3.25rem) · radius --radius-pill ·
+// 면 var(--pet-gloss) + linear-gradient(135deg, --tribe-face, --tribe) ·
+// 라벨 --text-label 600 · href 유무로 <Link>/<button>을 가르는 구조 ·
+// locked prop(disabled가 아니라 눌리되 안내만 하는 상태). 전부 git 이력에 있다.
 
 // ── 모달 껍데기 ────────────────────────────────────────────────────────────────
 //
