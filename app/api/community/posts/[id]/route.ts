@@ -57,7 +57,9 @@ export async function GET(_request: NextRequest, ctx: RouteContext<"/api/communi
   }
 }
 
-// 본인 글만 삭제 가능. 소프트 삭제이며 친밀도는 회수하지 않는다(SPEC.md 8절 취지).
+// 본인 글 또는 관리자(User.isAdmin)만 삭제 가능. 소프트 삭제이며 친밀도는 회수하지 않는다
+// (SPEC.md 8절 취지). **관리자 삭제도 본인 삭제와 동작이 같다** — 회수·미션 취소를 붙이면
+// 남이 지웠다는 이유로 작성자의 재화가 사라진다. 관리자 판정은 meetups 라우트와 같은 방식이다.
 export async function DELETE(_request: NextRequest, ctx: RouteContext<"/api/community/posts/[id]">) {
   try {
     const user = await getCurrentUser()
@@ -66,7 +68,9 @@ export async function DELETE(_request: NextRequest, ctx: RouteContext<"/api/comm
     const post = await prisma.post.findUnique({ where: { id }, select: { userId: true, deletedAt: true } })
     if (!post) return fail("NOT_FOUND", "게시글을 찾을 수 없어요", 404)
 
-    if (post.userId !== user.id) return fail("FORBIDDEN", "본인 글만 삭제할 수 있어요", 400)
+    if (post.userId !== user.id && !user.isAdmin) {
+      return fail("FORBIDDEN", "본인 글만 삭제할 수 있어요", 400)
+    }
 
     if (post.deletedAt) return fail("NOT_FOUND", "이미 삭제된 글이에요", 404)
 

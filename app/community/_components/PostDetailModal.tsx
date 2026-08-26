@@ -41,10 +41,14 @@ export function PostDetailModal({
   postId,
   onClose,
   onDeleted,
+  isAdmin,
 }: {
   postId: string
   onClose: () => void
   onDeleted: () => void
+  // 관리자면 남의 글·댓글에도 삭제 버튼을 띄운다. isOwn은 "본인 여부" 그대로 두고
+  // 여기서 or로 더한다 — 서버가 내려주는 isOwn의 뜻을 바꾸지 않는다.
+  isAdmin: boolean
 }) {
   // Escape로 닫기 · 초점 가두기 · 닫을 때 열었던 글 카드로 초점 되돌리기
   // (app/components/useModalA11y.ts). PostList가 key={selectedPostId}로 그리므로
@@ -244,7 +248,7 @@ export function PostDetailModal({
                 <p className="text-xs text-neutral-400">{timeAgo(new Date(post.createdAt))}</p>
               </div>
               <div className="flex items-center gap-2">
-                {post.isOwn && (
+                {(post.isOwn || isAdmin) && (
                   <button
                     type="button"
                     onClick={handleDelete}
@@ -302,7 +306,7 @@ export function PostDetailModal({
                       <div className="mb-1 flex items-center gap-2">
                         <span className="text-sm font-semibold text-neutral-900">{authorText(comment.user)}</span>
                         <span className="text-xs text-neutral-400">{timeAgo(new Date(comment.createdAt))}</span>
-                        {comment.isOwn && (
+                        {(comment.isOwn || isAdmin) && (
                           <button
                             type="button"
                             onClick={() => handleDeleteComment(comment.id)}

@@ -3,7 +3,8 @@ import { getCurrentUser, UnauthorizedError } from "@/lib/auth"
 import { prisma } from "@/lib/prisma"
 import { ok, fail } from "@/lib/api"
 
-// 본인 댓글만 삭제 가능. 소프트 삭제이며 친밀도는 회수하지 않는다(글 삭제와 동일한 이유).
+// 본인 댓글 또는 관리자(User.isAdmin)만 삭제 가능. 소프트 삭제이며 친밀도는 회수하지 않는다
+// (글 삭제와 동일한 이유). 관리자 삭제도 본인 삭제와 동작이 같다.
 // 친밀도를 건드리지 않으므로 activePetSkin이 필요 없어 getCurrentUser()를 쓴다.
 export async function DELETE(
   _request: NextRequest,
@@ -22,7 +23,9 @@ export async function DELETE(
     // URL의 글과 댓글이 안 맞으면 엉뚱한 글의 commentCount를 깎게 된다.
     if (comment.postId !== id) return fail("NOT_FOUND", "댓글을 찾을 수 없어요", 404)
 
-    if (comment.userId !== user.id) return fail("FORBIDDEN", "본인 댓글만 삭제할 수 있어요", 400)
+    if (comment.userId !== user.id && !user.isAdmin) {
+      return fail("FORBIDDEN", "본인 댓글만 삭제할 수 있어요", 400)
+    }
 
     // 이 검사가 없으면 같은 댓글을 두 번 지울 때 commentCount가 음수가 된다.
     if (comment.deletedAt) return fail("NOT_FOUND", "이미 삭제된 댓글이에요", 404)
