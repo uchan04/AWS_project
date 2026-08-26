@@ -1149,7 +1149,7 @@ export function rollOutingLegs(
   // 가까운 곳 → 먼 곳 순으로 세운다. 여행 경로처럼 읽힌다
   chosen.sort((a, b) => a.stage - b.stage || OUTING_PLACES.indexOf(a) - OUTING_PLACES.indexOf(b))
 
-  return chosen.map((place) => {
+  const legs = chosen.map((place) => {
     const fresh = place.deeds.filter((d) => !avoid.has(outingComboKey({ place: place.key, deed: d.key })))
     const deeds = fresh.length > 0 ? fresh : place.deeds
     const deed = deeds[pickIndex(deeds.length)]
@@ -1161,6 +1161,23 @@ export function rollOutingLegs(
       sight: sight.key,
     }
   })
+
+  // **한 외출이 전부 ③(담담·미완)이 되지 않게 한다.**
+  //
+  // 결과는 유형마다 ① 해냈다 ② 좋았다 ③ 담담 순이고 leg마다 독립으로 뽑는다. 그래서 2곳이면
+  // 1/9(약 11%)이 전부 ③이 된다 — 실측에서 실제로 나왔다:
+  //   "무슨 냄새인지는 몰랐어" + "오래 봤는데 잘 모르겠더라" + 기분 "계속 보고 있었어"
+  // 세 박자가 다 시들하면 친밀도 200을 태운 값이 안 보인다(보람이 사라진다).
+  //
+  // ③을 없애지 않는다 — 그것이 실패 여지다. **전부 ③인 경우에만** 한 곳을 ①/②로 올린다.
+  // 어느 곳을 올릴지는 rand에서 파생시킨다(같은 seed면 같은 결과여야 한다).
+  const FLAT = 2
+  if (legs.length > 0 && legs.every((l) => l.result === FLAT)) {
+    const lift = pickIndex(legs.length)
+    legs[lift].result = pickIndex(FLAT) // 0(해냈다) 또는 1(좋았다)
+  }
+
+  return legs
 }
 
 /**

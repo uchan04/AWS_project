@@ -992,6 +992,27 @@ for (const r of [0, 0.25, 0.5, 0.75, 0.999]) {
   }
 }
 assert.equal(OUTING_RECENT_AVOID, 30)
+// **전부 ③(담담·미완)인 외출이 나오지 않아야 한다.** leg마다 독립으로 뽑으면 2곳이면
+// 1/9이 전부 ③이 되고, 그러면 친밀도 200을 태운 값이 안 보인다. rand를 훑어 확인한다
+for (let i = 0; i <= 40; i++) {
+  const r = i / 40
+  for (const stage of [2, 3, 4]) {
+    const legs = rollOutingLegs(stage, () => r)
+    assert.ok(
+      !legs.every((l) => l.result === 2),
+      `stage ${stage} rand ${r}: 결과가 전부 담담이다 (${JSON.stringify(legs.map((l) => l.result))})`,
+    )
+  }
+}
+// 그렇다고 ③이 사라지면 안 된다 — 실패 여지가 없어진다. 어딘가에서는 나와야 한다
+{
+  let sawFlat = false
+  for (let i = 0; i <= 200; i++) {
+    const legs = rollOutingLegs(4, () => i / 200)
+    if (legs.some((l) => l.result === 2)) sawFlat = true
+  }
+  assert.ok(sawFlat, "담담한 결과가 아예 안 나오면 실패 여지가 사라진다")
+}
 // 변동폭이 조용히 줄어드는 것을 막는다. 15곳 × 사건 4 × 결과 3 × 만난것 3 × 기분 8
 assert.equal(OUTING_COMBINATIONS, 15 * 4 * 3 * 3 * 8)
 
