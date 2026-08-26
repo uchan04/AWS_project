@@ -914,15 +914,34 @@ export default function PetView({ initial }: { initial: PetState }) {
                 DOM 순서만으로도 위에 그려지고, .pet-room이 overflow: hidden이라
                 어느 폭에서도 방 밖으로 새지 않는다 */}
 
-            {/* 좌상단 Lv + 경험치. 옛 "🍎 경험치" 카드가 여기로 왔다 — 게이지 골격은
-                그 카드가 쓰던 .pet-gauge 그대로다(높이·홈 그림자·전환).
-                진화 임박 각주("다음 단계까지 씨앗 N개")는 여기 두지 않고 펫 정보 모달로
-                보냈다. 방 위에 얹는 오버레이는 한눈에 읽히는 두 줄이어야 하고,
-                그 문장은 세 번째 줄이 된다 */}
+            {/* 상태판. 옛 "🍎 경험치" 카드가 여기로 왔고, **2026-08-26 사용자 요청으로 재화
+                3종까지 이 안으로 합쳤다**("재화 세개 레벨 창에다가 가로로 합쳐주고"). 그래서
+                방 위에 뜨는 오버레이가 둘에서 하나가 됐다 — 옛 재화 알약(.pet-bar)은 지웠다.
+
+                구성은 사용자가 준 두 번째 시안(육성 게임 상태판)을 따른다:
+                  1줄  Lv + 펫 이름
+                  2줄  경험치 게이지 — **숫자가 게이지 안**에 있다
+                  3줄  재화 3종 가로
+
+                **게이지 안 숫자는 2026-08-23에 지운 것을 되살린 것이다.** 그때 지운 이유는
+                "움직이는 그라디언트 위 글자라 대비가 채움률에 따라 변한다"였고 그 지적은
+                옳았다. 시안이 그 자리에 숫자를 두므로 되살리되, **글자에 어두운 테두리를
+                입혀** 채움 위·트랙 위 어디서나 같은 대비가 나오게 했다(pet.css
+                .pet-gauge__inline 주석에 그 값이 있다). 그러니까 옛 결정을 뒤집은 것이 아니라
+                그 결정의 근거를 없앤 것이다.
+
+                진화 임박 각주("다음 단계까지 씨앗 N개")는 여기 두지 않는다 — 펫 정보 모달에
+                있고, 방 위 오버레이에 네 번째 줄을 붙이면 방을 그만큼 더 가린다 */}
             <div className="pet-hud-lv">
-              <p className="pet-hud-lv__level">Lv.{pet.level}</p>
+              <p className="pet-hud-lv__head">
+                <span className="pet-hud-lv__level">Lv.{pet.level}</span>
+                {/* 시안의 이름 자리다. 이 앱에는 펫 이름 컬럼이 없어(2026-08-23 기록) 스킨
+                    이름을 쓴다 — 방 안에서 이 캐릭터가 무엇인지 알려 주는 유일한 글자였고
+                    지금까지 sr-only로만 있었다(.pet-char 안) */}
+                <span className="pet-hud-lv__name">{pet.skinName}</span>
+              </p>
               <div
-                className="pet-gauge"
+                className="pet-gauge pet-gauge--inline"
                 role="progressbar"
                 aria-label="다음 레벨까지 경험치"
                 aria-valuemin={0}
@@ -930,25 +949,23 @@ export default function PetView({ initial }: { initial: PetState }) {
                 aria-valuenow={pet.exp}
               >
                 <div className="pet-gauge__fill" style={{ width: `${progress * 100}%` }} />
+                {/* 게이지 위에 얹는 글자. aria는 위 progressbar가 이미 값을 말하므로
+                    이 글자는 눈으로 보는 쪽 전용이다(중복해서 읽히지 않게 aria-hidden) */}
+                <span className="pet-gauge__inline-text" aria-hidden="true">
+                  {ko(pet.exp)} / {ko(need)}
+                </span>
               </div>
-              <p className="pet-hud-lv__exp">
-                {ko(pet.exp)} / {ko(need)}
-              </p>
-            </div>
 
-            {/* 재화 알약. 2026-08-26 오전에 만든 상단 바를 **자리만 옮긴 것**이다 —
-                마크업·클래스가 그대로이고 상점 버튼 2개만 빠졌다(좌측 "펫꾸미기"로 갔다).
-                이름을 sr-only로 남기는 처리도 그대로다: 시안에는 아이콘과 숫자만 있는데
-                그렇게만 두면 스크린리더에 아무것도 남지 않는다 */}
-            <div className="pet-bar">
-              <ul className="pet-bar__wallet">
+              {/* 재화 3종 가로. 이름을 sr-only로 남기는 처리는 옛 재화 알약에서 그대로 가져왔다 —
+                  시안에는 아이콘과 숫자만 있는데 그렇게만 두면 스크린리더에 아무것도 안 남는다 */}
+              <ul className="pet-hud-lv__wallet">
                 {wallet.map((row) => (
-                  <li className="pet-bar__item" key={row.name}>
-                    <span className="pet-bar__icon" aria-hidden="true">
+                  <li className="pet-hud-lv__coin" key={row.name}>
+                    <span className="pet-hud-lv__coin-icon" aria-hidden="true">
                       {row.icon}
                     </span>
                     <span className="sr-only">{row.name}</span>
-                    <span className="pet-bar__value">{ko(row.value)}</span>
+                    <span className="pet-hud-lv__coin-value">{ko(row.value)}</span>
                   </li>
                 ))}
               </ul>
