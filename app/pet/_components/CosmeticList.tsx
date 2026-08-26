@@ -3,6 +3,7 @@
 import { useState } from "react"
 import Link from "next/link"
 import type { Rarity, Slot, TypeCode } from "@prisma/client"
+import { CurrencyIcon } from "@/app/components/CurrencyIcon"
 import "@/styles/tokens.css"
 import "../pet.css"
 
@@ -228,7 +229,7 @@ export default function CosmeticList({
                   친밀도를 보여주는 자리가 아니게 된 것이고, 별조각 아이콘은 홈 지갑·
                   외형 상점과 같은 ⭐를 쓴다. 같은 재화가 화면마다 다른 그림이면 안 된다 */}
               <span className="pet-hud__icon" aria-hidden="true">
-                ⭐
+                <CurrencyIcon currency="starShard" size={18} />
               </span>
               <span className="pet-hud__value" aria-hidden="true">
                 {ko(starShards)}

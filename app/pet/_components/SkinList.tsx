@@ -5,6 +5,7 @@ import Link from "next/link"
 import type { TypeCode } from "@prisma/client"
 import { animalEmoji } from "@/lib/pet"
 import { ArtImage } from "@/app/components/ArtImage"
+import { CurrencyIcon } from "@/app/components/CurrencyIcon"
 import { TRIBE } from "@/lib/types"
 import "@/styles/tokens.css"
 import "../pet.css"
@@ -169,7 +170,7 @@ export default function SkinList({
             <p className="pet-hud" aria-label={`별조각 ${ko(starShards)}`}>
               {/* --wood 변형은 2026-08-21에 지웠다. 아이콘 칸이 종족색 하나로 통일됐다 */}
               <span className="pet-hud__icon" aria-hidden="true">
-                ⭐
+                <CurrencyIcon currency="starShard" size={18} />
               </span>
               <span className="pet-hud__value" aria-hidden="true">
                 {ko(starShards)}
