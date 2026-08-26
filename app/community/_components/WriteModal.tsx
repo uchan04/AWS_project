@@ -16,6 +16,19 @@ import { CRISIS_BLOCKED_HOTLINE } from "../_lib/crisis"
 const NEUTRAL_COLOR = "#9CA3AF"
 
 /*
+ * 글쓰기 버튼 배경(2026-08-26). **globals.css의 강조색을 그대로 가져온 값이다** —
+ * `:focus-visible` 아웃라인과 `.skip-to-content`의 `background:#a9542a; color:#fff`가
+ * 같은 색이라, 새 색을 만들지 않고 이미 있는 "채운 강조 + 흰 글자" 쌍을 재사용한다.
+ * 값을 바꿔야 하면 globals.css와 함께 바꾼다(여기만 바꾸면 초점 표시와 어긋난다).
+ *
+ * **갤러리 색(tribeColor)을 따르지 않는다.** 전체 갤러리에서 tribeColor는 NEUTRAL_COLOR
+ * 회색이라 화면에서 가장 약한 채움이 됐고(흰 글자 대비 2.2:1로 AA 미달), 바로 옆의
+ * 검은 탭보다 눌러야 할 것으로 안 보인다는 피드백이 나왔다. 이 화면의 유일한 주요 액션은
+ * 맥락과 무관하게 같은 세기여야 한다 — 지금 어느 갤러리인지는 탭과 배너가 이미 알린다.
+ */
+const WRITE_ACCENT = "#A9542A"
+
+/*
  * 첨부 사진. 값은 발급 쪽(`lib/uploads.ts`)과 같아야 한다 — 여기서 거르는 것은 편의이고
  * **신뢰 경계는 서버다.** presign이 같은 타입·크기를 다시 검사하고, 저장 직전에
  * `isAttachableImageKey()`가 키를 한 번 더 본다.
@@ -244,10 +257,10 @@ export function WriteModal({ gallery, myTypeCode }: { gallery: GalleryTab; myTyp
           loadTopics()
           setIsOpen(true)
         }}
-        // 배경이 종족 색(인라인)이라 hover:bg-*로는 못 건드린다. 색과 무관한 그림자·이동·축소로 반응을 만든다.
+        // 배경이 인라인 색(WRITE_ACCENT)이라 hover:bg-*로는 못 건드린다. 색과 무관한 그림자·이동·축소로 반응을 만든다.
         // 이동·확대만 motion-safe:로 감싼다 — prefers-reduced-motion에서도 그림자는 남아야 무엇을 누르는지 보인다.
         className="rounded-xl px-5 py-2.5 text-sm font-semibold text-white shadow-sm transition duration-150 hover:shadow-lg focus-visible:shadow-lg focus-visible:ring-2 focus-visible:ring-neutral-900 focus-visible:ring-offset-2 focus-visible:outline-none active:shadow-sm motion-safe:hover:-translate-y-0.5 motion-safe:hover:scale-[1.02] motion-safe:focus-visible:-translate-y-0.5 motion-safe:active:translate-y-0 motion-safe:active:scale-[0.98]"
-        style={{ backgroundColor: tribeColor }}
+        style={{ backgroundColor: WRITE_ACCENT }}
       >
         ✏️ 글 쓰기
       </button>
