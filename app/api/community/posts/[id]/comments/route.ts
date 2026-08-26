@@ -52,6 +52,21 @@ export async function POST(request: NextRequest, ctx: RouteContext<"/api/communi
 
     // 댓글은 대상이 있는 글이라 공격이 나올 자리가 글보다 많다.
     // 판정 기준과 이유는 lib/safety.ts와 posts/route.ts의 같은 블록 주석에 있다.
+    // ── 위기 신호를 **모든 차단보다 먼저** 본다 (2026-08-26, 차단 31번 해소) ──
+    //
+    // 전에는 containsAbuse() 뒤에 있었다. 그래서 위기 신호와 타인 공격이 함께 있는 글이
+    // 도움 안내 없이 400을 받았다 — 실측:
+    //   "너 병신이냐 나는 죽고 싶다"          abuse=T crisis=T blocks=T → 400 ABUSIVE_CONTENT
+    //   "너 같은 새끼 때문에 죽고 싶다"        abuse=T crisis=T blocks=T → 400
+    // 차단 30번(moderate 앞으로 옮긴 것)과 **같은 모양의 역전이 이 관문에 남아 있었다.**
+    //
+    // **우회가 열리지 않는다.** blocksPosting()은 글을 저장하지 않는다 — 공격 글에
+    // "죽고 싶다"를 덧붙여도 게시되지 않고, 달라지는 것은 응답뿐이다(400 + "표현을 고쳐주세요"
+    // → 200 + 도움 안내). 공격을 통과시키는 분기가 아니므로 D가 우려한 우회와 무관하다.
+    if (blocksPosting(body)) {
+      return ok(crisisBlockedPayload())
+    }
+
     if (containsAbuse(body)) {
       return fail("ABUSIVE_CONTENT", "다른 사람을 향한 말이 담겨 있어요. 표현을 고쳐서 다시 올려주세요", 400)
     }
@@ -63,9 +78,6 @@ export async function POST(request: NextRequest, ctx: RouteContext<"/api/communi
     // 결정 변경의 근거와 톤 규칙은 app/community/_lib/crisis.ts 주석에 있다.
     // 글 라우트와 같은 기준이다. isCrisis()가 아니라 blocksPosting()으로 막는다 —
     // 이유는 그쪽 주석과 _lib/crisis.ts에 있다.
-    if (blocksPosting(body)) {
-      return ok(crisisBlockedPayload())
-    }
 
     const mod = await moderate(body, invokeBedrock)
     if (mod.verdict === "BLOCK") {

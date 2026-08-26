@@ -1,4 +1,5 @@
 import { MeetupStatus } from "@prisma/client"
+import { redirect } from "next/navigation"
 import { getCurrentUser } from "@/lib/auth"
 import { prisma } from "@/lib/prisma"
 import { MeetupList } from "./_components/MeetupList"
@@ -20,6 +21,11 @@ export default async function MeetupsPage() {
   // 인증이나 DB가 실패해도 화면을 죽이지 않고 안내를 띄운다(community/page.tsx와 같은 패턴).
   try {
     const user = await getCurrentUser()
+
+    // 진단 전이면 커뮤니티로 보낸다 (2026-08-26, 차단 32번). app/community/page.tsx가
+    // 같은 기준을 쓴다. **라우트 쪽 가드가 본체다** — 페이지만 막으면 API는 열려 있다
+    // (join/route.ts 주석). 이쪽은 화면이 반쪽으로 그려지는 것을 막는 몫이다
+    if (!user.typeCode || !user.adjective) redirect("/community")
     isAdmin = user.isAdmin
 
     // "지금"을 한 번만 찍어 조회와 화면이 같은 기준을 쓰게 한다.

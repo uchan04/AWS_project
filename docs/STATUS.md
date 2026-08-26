@@ -2,7 +2,11 @@
 
 **모든 세션은 이 문서부터 읽는다.** 그다음 아래 "지금 읽어야 할 문서"만 읽고 시작한다.
 
-최종 갱신: **2026-08-26 (A) — 펫 화면 IA를 정리하고(카드 9장 → 5장) 역할별 인계 문서를 썼다. `docs/인계-2026-08-26.md`.**
+최종 갱신: **2026-08-26 (A) — 차단 31·32번을 닫았다.** 위기 + 타인 공격이 함께 있는 글에 109 안내가 나가고, 진단 전에는 오프라인 모임에 신청할 수 없다. `app/community/`(D 소유) 4파일 + e2e 단정 2건(80 → **82건**). 세부와 되돌릴 지점은 `docs/dev/community.md` 맨 아래 절.
+
+**A의 나머지 작업은 `improve/service-quality`에 남겨 뒀다** — 홈 제거(탭 5 → 3)·펫 화면 IA·경험치 팝업·1단계 외출 잠금·진단 직후 알 팝업이다. 그쪽은 C·B·E 소유 파일을 크게 건드려서(펫 +700줄, `Sidebar` 탭 구조, `styles/tokens.css`) **담당자에게 알린 뒤 따로 올린다.** 이 푸시에는 안전 수정만 있다.
+
+이전 최종 갱신: **2026-08-26 (A) — 펫 화면 IA를 정리하고(카드 9장 → 5장) 역할별 인계 문서를 썼다. `docs/인계-2026-08-26.md`.**
 
 이전 갱신: **2026-08-24 (E) — D의 요청으로 커뮤니티 글 이미지 업로드 경로를 열었다.** `POST /api/upload/community/presign`(신규) + `lib/uploads.ts`(신규) + `npm run check:uploads`(신규). 키는 `community/{userId}/{랜덤16}.{ext}`, 상한 5MB·jpg·png·webp다. **미션용 `lib/missions/upload.ts`는 한 줄도 고치지 않았다** — 그 파일의 `ALLOWED_TYPES`·`MAX_SIZE`가 모듈 상수이고 `verifyS3Object()`가 같은 값을 읽어서, 커뮤니티에 맞춰 올리면 비전 모델에 넘어가는 미션 사진 검증까지 함께 느슨해진다. `check:uploads`가 그 분리를 못 박는다(미션은 webp 거부·3MB 유지). 덤으로 확정한 것 2건: ① **글 이미지에 presigned GET은 필요 없다** — 버킷 `welli-uploads-185236887369`이 CloudFront(`diros91hbap9v`) origin과 같고 버킷 정책이 `/*` 전체를 OAC에 읽기 허용, 배포에 path pattern 제한도 없다(실측). `lib/assets.ts:cdnUrl()`로 그대로 보인다. **뒷면도 같이 적는다: 그래서 `missions/`의 미션 사진도 URL만 알면 누구나 읽는다** — prefix 단위 접근 제어가 없다. ② **배포 환경변수는 비어 있지 않다**(아래 차단 절 정정). D가 이어서 할 일은 `Post.imageKey` 수신·표시와 `WriteModal` 첨부 UI이고, 클라이언트가 보낸 키를 저장하기 전에 `isOwnCommunityKey()`를 반드시 통과시켜야 한다(안 하면 남의 미션 사진을 자기 글 이미지로 걸 수 있다). `DEV_AUTH_BYPASS=false npm run build` exit 0, `tsc`·`lint`·`check:*` 10종 통과.**
 
@@ -214,29 +218,12 @@
 
 지금 프로젝트를 멈춰 세우는 것만 적는다. 해결되면 즉시 지운다.
 
-**31. 위기 신호와 타인 공격이 함께 있는 글은 도움 안내 없이 400이다 (D 담당, 2026-08-25 A 실측)** — **차단 30번은 해소됐다**(D가 `blocksPosting()`을 `moderate()` 앞으로 넣었다). 그런데 **같은 모양의 역전이 다른 관문에 남았다.** `containsAbuse`가 위기 판정보다 앞이라 그쪽으로 빠지는 글은 109 안내를 못 받는다.
+**차단 31·32번은 2026-08-26에 해소됐다** (A, 사용자 지시). 두 건 다 `app/community/`(D 소유)를 고쳤다 — 세부와 되돌릴 지점은 `docs/dev/community.md` 맨 아래 절에 있다.
 
-```
-너 병신이냐 나는 죽고 싶다          abuse=T crisis=T blocks=T → 400 ABUSIVE_CONTENT
-너 같은 새끼 때문에 죽고 싶다        abuse=T crisis=T blocks=T → 400 ABUSIVE_CONTENT
-너 진짜 미친놈이야 나 자살할까 생각했다  abuse=T crisis=T blocks=T → 400 ABUSIVE_CONTENT
-다 씨발 그냥 사라지고 싶어           abuse=. crisis=T blocks=T → 200 도움 안내 ✓  (30번이 고쳐진 부분)
-```
-
-- **차단 30번보다 훨씬 좁고, 공격 글을 올리자는 얘기가 아니다.** 올리지 않는 것은 맞고 **109 안내가 함께 나가야 한다**는 것이다
-- **조치 방향**: `blocksPosting()`을 `containsAbuse` 앞으로 올리거나, 공격 차단 응답에도 안내를 실어 보낸다. 어느 쪽이든 D 판단이다
-- **이것이 구조 문제의 증거다.** "위기가 다른 판정을 이긴다"는 규칙이 `lib/safety.ts`·`moderation.ts`·`crisis.ts` 어디에도 없고 **라우트의 줄 순서에만** 있다. 그래서 한 관문을 고쳐도 다음 관문에 같은 역전이 남는다. 처방은 `docs/모듈-재배치-계획.md` 1번(8/28 이후)
-- `npm run e2e`도 이 케이스는 아직 못 잡는다 — 고칠 때 단정을 함께 넣는다
-- A가 고치지 않은 이유: `app/community/`는 D 소유다(`CLAUDE.md` 2절)
-
-**32. 모임 신청이 진단 완료를 요구하지 않는다 (D 담당, 2026-08-25 A 실측)** — `app/api/community/meetups/[id]/join/route.ts`가 `typeCode`를 **한 번도 참조하지 않는다.** 다른 쓰기·조회 라우트 10개(`posts`·`posts/[id]`·`comments`·`like`·`topics`·`missions`·`missions/[missionId]/complete`·`pet`·`pet/skins`·`pet/skins/buy`)는 전부 참조한다. `app/community/meetups/page.tsx`도 안 본다(`app/community/page.tsx`는 본다).
-
-가입 → 진단 건너뛰고 `/community/meetups` 직접 입력 → 신청 → 오프라인에서 사람을 만난다. 사이드바는 `profile.diagnosed`로 막히지만 **미들웨어는 세션만 보고 통과시킨다**(`PUBLIC_PATHS` 외에는 "로그인했으면 통과"). 크래시가 안 나서 지금까지 안 보였다 — 화면에 뜨는 닉네임이 개설자 것이라 그려진다.
-
-- **왜 다른 게이트보다 중요한가**: 오프라인 모임은 100단계 사다리의 **8구간("대화와 모임")**에 놓인 행동이다. 사다리를 한 칸도 오르지 않은 사람이 서비스에서 위험도가 가장 높은 행동에 바로 닿는다. 심사에서 "검증 없이 오프라인 만남이 되나요"에 답할 것이 없다
-- **조치**: `join` 라우트에 3줄 — `if (!user.typeCode || !user.adjective) return fail("NOT_DIAGNOSED", "먼저 진단을 마치면 모임에 신청할 수 있어요", 400)`. 페이지도 `app/community/page.tsx`와 같은 방식으로 막는다. **라우트를 먼저** — 페이지만 막으면 API는 열려 있다
-- 세부는 `docs/dev/community.md` ③. 근본 원인(게이트가 라우트마다 손으로 반복됨) 처방은 `docs/모듈-재배치-계획.md` 3번
-
+- **31 (위기 + 타인 공격)**: `blocksPosting()`을 `containsAbuse()` **앞**으로 올렸다. 글·댓글 라우트 둘 다. 새 순서는 `이미지키 → blocksPosting → containsAbuse → moderate → 저장 → crisisNotice`다. **우회가 열리지 않는다** — `blocksPosting()`은 글을 저장하지 않으므로 공격 글에 "죽고 싶다"를 덧붙여도 게시되지 않고, 달라지는 것은 응답뿐이다(`400 ABUSIVE_CONTENT` → `200` + 109 안내)
+- **32 (모임 진단 게이트)**: `join` 라우트에 `NOT_DIAGNOSED` 게이트를 **모임 조회보다 앞**에 넣고 `meetups/page.tsx`도 `/community`로 보낸다. 라우트가 본체다 — 페이지만 막으면 API는 열려 있다
+- **e2e 단정 2건을 함께 넣었다**(80 → 82건). 32번 단정은 **없는 모임 id**를 쓴다 — 게이트가 조회보다 앞이라 `NOT_FOUND`가 아니라 `NOT_DIAGNOSED`가 와야 한다. 순서가 뒤집히면 단정이 깨진다. e2e 계정은 `isAdmin`이 아니라 실재하는 모임으로는 못 잰다
+- **근본 원인은 남아 있다.** "위기가 다른 판정을 이긴다"는 규칙이 여전히 모듈이 아니라 라우트의 줄 순서에 있다. 30번을 고치니 31번이 나왔고, 세 번째 관문이 생기면 같은 역전이 또 난다. 처방은 `docs/모듈-재배치-계획.md` 1번(8/28 이후)이고 **D 판단이다**
 
 인프라 차단은 해소됐다(RDS·Cognito·S3·Bedrock 완료). 단 **AWS 리소스 생성이 끝난 것과 `.env`에 값이 온 것은 다르다** — 2026-08-20 로컬 `.env` 확인 결과 채워진 값은 `DATABASE_URL`(+`AWS_REGION`·`BEDROCK_REGION`·`DEV_AUTH_BYPASS=true`)뿐이고 `COGNITO_USER_POOL_ID`·`COGNITO_CLIENT_ID`·`BEDROCK_MODEL_ID`·`BEDROCK_VISION_MODEL_ID`·`S3_BUCKET`·`CLOUDFRONT_DOMAIN`은 **전부 빈 문자열**이다. E에게 개별 공유받아야 한다. 코드가 실제로 읽는 키는 9개이고 `.env`에 다 있다(키 누락은 없다 — 값만 없다). 영향:
 - **빌드·DB·펫·미션·진단은 막히지 않는다.** `DEV_AUTH_BYPASS=true` + `lib/auth.ts` 지연 생성(차단 3) 덕이다
