@@ -27,6 +27,45 @@ const WALL_H = 210 // 300의 70%
 const STRIPE_COUNT = 13
 const PLANK_COUNT = 9
 
+// ── 책장 (2026-08-26 사용자 요청으로 화분을 갈았다) ────────────────────────────
+//
+// **x가 24 → 64로 옮겨 간 이유는 잘림이다.** 이 SVG는 preserveAspectRatio="xMidYMid slice"
+// 라서 방이 세로로 길어지면 좌우가 잘린다. 방 폭 352 · 높이 352일 때 배율이
+// max(352/400, 352/300) = 1.173이고 잘려 나가는 폭이 한쪽 (469 − 352) / 2 = 58.5px =
+// **50 좌표**다. 옛 화분(x 16~56)은 그 안에 거의 다 들어가서 화면에서는 왼쪽 끝에 초록
+// 조각만 보였다. 64에서 시작하면 그 폭에서도, 넓은 방(잘림 7좌표)에서도 온전히 보인다.
+// 벽에 붙여 세운 물건이라는 읽기는 그대로다 — 왼쪽 여백이 조금 늘어난 것뿐이다.
+const SHELF_X = 64
+const SHELF_W = 60
+const SHELF_TOP = 126
+const SHELF_BOTTOM = 204 // 걸레받이 윗선. 옛 화분 밑면과 같은 값이라 서는 자리가 안 바뀐다
+const SHELF_BOARD_H = 4
+// 선반 4장의 윗면 y. 첫 장이 천판, 마지막이 밑판이고 사이 두 장이 칸을 셋으로 가른다
+const SHELF_BOARDS = [SHELF_TOP, 152, 178, SHELF_BOTTOM - SHELF_BOARD_H]
+
+// 칸마다 책 5권. 폭을 조금씩 달리해 손으로 꽂은 것처럼 보이게 한다 —
+// 다 같은 폭이면 격자로 읽혀 책장이 아니라 표가 된다.
+// 좌우로 5씩 들여 시작하므로 안쪽 폭이 50이고, 폭 합(35) + 틈 4 = 39이라 오른쪽이
+// 11만큼 빈다. **꽉 채우지 않는 것이 의도다** — 다 채우면 책이 벽에 눌린 것으로 보인다.
+const SHELF_ROWS = [
+  { base: 152, widths: [7, 5, 9, 6, 8] },
+  { base: 178, widths: [6, 9, 5, 8, 7] },
+  { base: SHELF_BOTTOM - SHELF_BOARD_H, widths: [8, 6, 7, 5, 9] },
+]
+
+// 책 사각형을 미리 계산한다. JSX 안에서 x를 누적하면 map이 부수효과를 갖게 된다.
+// 높이는 18/16/14 셋을 돌린다 — 위 칸 높이가 가장 낮은 곳(밑칸 18)에서도 위 선반에
+// 닿지 않는 값이다(밑칸: 200 − 18 = 182, 그 위 선반 밑면이 182).
+const SHELF_BOOKS = SHELF_ROWS.flatMap((row, ri) => {
+  let x = SHELF_X + 5
+  return row.widths.map((w, bi) => {
+    const h = 18 - ((ri + bi) % 3) * 2
+    const book = { key: `${ri}-${bi}`, x, y: row.base - h, w, h, tone: (ri * 2 + bi) % 4 }
+    x += w + 1
+    return book
+  })
+})
+
 export default function PetRoom({ imageUrl }: { imageUrl?: string | null }) {
   return (
     <>
@@ -96,11 +135,50 @@ function RoomSvg() {
       <path className="pet-room__curtain" d="M 288 15 Q 296 72 288 129 L 280 129 L 280 15 Z" />
       <path className="pet-room__curtain" d="M 376 15 Q 368 72 376 129 L 384 129 L 384 15 Z" />
 
-      {/* 화분 */}
-      <rect className="pet-room__pot" x={24} y={180} width={24} height={24} rx={3} />
-      <ellipse className="pet-room__leaf" cx={36} cy={180} rx={20} ry={9} />
-      <ellipse className="pet-room__leaf" cx={28} cy={171} rx={12} ry={12} />
-      <ellipse className="pet-room__leaf" cx={44} cy={171} rx={12} ry={12} />
+      {/* 책장. 2026-08-26 사용자 요청으로 화분(pot + leaf 3장)을 갈았다.
+          뒷판을 먼저 깔고 선반 4장을 그 위에, 책을 맨 위에 둔다 — 순서를 바꾸면
+          불투명한 뒷판이 책을 덮는다 (파일 위 SHELF_* 상수의 좌표 근거 참고) */}
+      <rect
+        className="pet-room__shelf"
+        x={SHELF_X}
+        y={SHELF_TOP}
+        width={SHELF_W}
+        height={SHELF_BOTTOM - SHELF_TOP}
+        rx={2}
+      />
+      {SHELF_BOOKS.map((b) => (
+        <rect
+          className="pet-room__book"
+          data-tone={b.tone}
+          key={b.key}
+          x={b.x}
+          y={b.y}
+          width={b.w}
+          height={b.h}
+          rx={1}
+        />
+      ))}
+      {SHELF_BOARDS.map((y) => (
+        <rect
+          className="pet-room__shelf-board"
+          key={y}
+          x={SHELF_X}
+          y={y}
+          width={SHELF_W}
+          height={SHELF_BOARD_H}
+          rx={1}
+        />
+      ))}
+      {/* 책장 위 "일기장" 딱지 (2026-08-26 사용자 요청).
+          천판 위 6좌표에 baseline을 두고 책장 가로 가운데(SHELF_X + SHELF_W / 2)에 맞춘다 —
+          text-anchor: middle을 pet.css가 준다.
+          **이 SVG 전체가 aria-hidden이라 스크린리더는 이 글자를 읽지 않는다.** 가구에 붙은
+          장식 딱지이고 아직 어떤 기능도 가리키지 않으므로 그대로 둔다 — 나중에 이 글자가
+          일기 기능의 입구가 되면 <text>가 아니라 버튼·링크여야 하고, 그때 aria도 함께 온다
+          (파일 맨 위 "장식이므로 aria-hidden" 주석과 같은 기준) */}
+      <text className="pet-room__shelf-label" x={SHELF_X + SHELF_W / 2} y={SHELF_TOP - 6}>
+        일기장
+      </text>
 
       {/* 러그 */}
       <ellipse className="pet-room__rug" cx={200} cy={246} rx={120} ry={24} />

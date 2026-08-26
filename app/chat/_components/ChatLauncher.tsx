@@ -56,19 +56,16 @@ export function ChatLauncher({ diagnosed }: { diagnosed: boolean }) {
   // 패널이 열려 있는 동안에는 말풍선도 함께 사라진다 — 이미 말을 걸고 있는데 또 부를 이유가 없다.
   if (open) return <ChatPanel onClose={() => setOpen(false)} />
 
-  // 크기: 2026-08-24 사용자 요청("챗봇 아이콘의 크기를 1.5배 더 키워줘", 펫 화면에서 봤다).
-  // 이 버튼은 전역 오버레이라 네 화면(홈·미션·펫·커뮤니티)에서 함께 커진다 — 펫 화면만
-  // 키우려면 펫 CSS에 예외를 두어야 하고, 그러면 화면을 옮길 때 아이콘 크기가 바뀌어
-  // 보인다. 사용자가 네 화면 다 키우는 쪽으로 결정했다.
-  // h-12/w-12(48px) → 4.5rem(72px), 이모지 text-xl(20px) → text-3xl(30px)로 둘 다 1.5배다
-  // (원만 키우면 여백만 늘고, 이모지만 키우면 원에 꽉 찬다).
-  // 챗봇은 D 담당이고 이 파일도 D의 것이다 — className 한 줄만 바꿨고 D에게 알린다.
+  // 크기: **2026-08-26 사용자 요청으로 1.5배를 되돌렸다.** h-12 w-12 text-xl(48px·20px)이
+  // 원래 값이고 D가 쓴 그대로다.
   //
-  // 머지(2026-08-24, C): develop이 같은 날 이 컴포넌트에 말풍선을 넣었다(c31f802).
-  // **말풍선 구조는 develop 것을 그대로 쓰고, 크기만 위 결정대로 얹었다.** 말풍선은 D가
-  // 만든 기능이고 크기는 사용자 요청이라 둘 중 하나를 버릴 이유가 없다. 바뀐 것은
-  // 아래 버튼의 h-12 w-12 text-xl → h-[4.5rem] w-[4.5rem] text-3xl 한 줄뿐이고,
-  // develop이 새로 넣은 shrink-0·바깥 div·gap-2는 손대지 않았다
+  // 내력: 2026-08-24에 사용자 요청("챗봇 아이콘의 크기를 1.5배 더 키워줘")으로
+  // h-[4.5rem] w-[4.5rem] text-3xl(72px·30px)로 키웠다(08c054e). 전역 오버레이라 네 화면
+  // (홈·미션·펫·커뮤니티)이 함께 커졌고, 같은 사용자가 08-26에 되돌리기로 결정했다.
+  // **되돌린 것은 이 className 한 줄뿐이다** — develop이 같은 날 넣은 말풍선 구조
+  // (c31f802의 바깥 div·gap-2·shrink-0)는 그때도 손대지 않았고 지금도 그대로다.
+  //
+  // 챗봇은 D 담당이고 이 파일도 D의 것이다 — 키울 때도 되돌릴 때도 D에게 알린다.
   return (
     <div className="fixed top-4 right-4 z-40 flex items-center gap-2">
       {bubble && !dismissed && (
@@ -103,7 +100,7 @@ export function ChatLauncher({ diagnosed }: { diagnosed: boolean }) {
         type="button"
         onClick={() => setOpen(true)}
         aria-label="마음 친구 열기"
-        className="flex h-[4.5rem] w-[4.5rem] shrink-0 items-center justify-center rounded-full bg-white text-3xl shadow-lg transition hover:bg-neutral-50"
+        className="flex h-12 w-12 shrink-0 items-center justify-center rounded-full bg-white text-xl shadow-lg transition hover:bg-neutral-50"
       >
         💬
       </button>

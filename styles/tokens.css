@@ -42,6 +42,11 @@
      globals.css에 있으므로 이 파일을 import하는 화면에서 늘 정의돼 있다 */
   --font-display: var(--font-gowun-dodum), var(--font-korean-system, sans-serif);
   --font-body: var(--font-korean-system, sans-serif);
+  /* 손글씨. **지금 쓰는 곳은 펫 외출 쪽지 한 곳뿐이고 늘리지 않는다** —
+     본문·제목에 쓰면 받는 unicode-range 조각이 사실상 전부가 되어 전송량 계산이
+     무너진다(근거는 app/layout.tsx의 gaegu 주석). 폴백은 고딕이라 서체가 못 오면
+     문장만 남는다 — 읽히기는 하므로 쪽지가 깨지지는 않는다 */
+  --font-crayon: var(--font-gaegu), var(--font-korean-system, sans-serif);
 
   /* 4pt 9단 */
   --space-3xs: 0.25rem;
