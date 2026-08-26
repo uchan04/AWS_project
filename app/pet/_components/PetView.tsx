@@ -913,67 +913,45 @@ export default function PetView({ initial }: { initial: PetState }) {
                 DOM 순서만으로도 위에 그려지고, .pet-room이 overflow: hidden이라
                 어느 폭에서도 방 밖으로 새지 않는다 */}
 
-            {/* 상태판. 옛 "🍎 경험치" 카드가 여기로 왔고, **2026-08-26 사용자 요청으로 재화
-                3종까지 이 안으로 합쳤다**("재화 세개 레벨 창에다가 가로로 합쳐주고"). 그래서
-                방 위에 뜨는 오버레이가 둘에서 하나가 됐다 — 옛 재화 알약(.pet-bar)은 지웠다.
+            {/* 상태판 알약 바. **자리가 세 번 바뀌었다** — 좌상단 세로 카드(경험치 카드 +
+                재화 알약을 합친 것) → 재화를 게이지 오른쪽 세로로 → **가로 알약 바 하나**
+                (2026-08-26 사용자 요청 "레벨 카드 제거하고 첨부한 이미지를 새로운 알약 형태의
+                카드로 만들어서 테두리 색 통일해서").
 
-                구성은 사용자가 준 두 번째 시안(육성 게임 상태판)을 따른다:
-                  1줄  Lv + 펫 이름
-                  2줄  경험치 게이지 — **숫자가 게이지 안**에 있다
-                  3줄  재화 3종 가로
+                시안 구성: `( Lv.26 )` `( 게이지 )` … `( 🌱 2,994 )( 💗 2,000 )( ⭐ 5,576 )`.
+                바깥이 알약이고 안쪽 넷도 각각 알약이며, **테두리 색이 전부 같다**
+                (--pet-chip-ring — 버튼 배지와도 같은 선이다).
 
-                **게이지 안 숫자는 2026-08-23에 지운 것을 되살린 것이다.** 그때 지운 이유는
-                "움직이는 그라디언트 위 글자라 대비가 채움률에 따라 변한다"였고 그 지적은
-                옳았다. 시안이 그 자리에 숫자를 두므로 되살리되, **글자에 어두운 테두리를
-                입혀** 채움 위·트랙 위 어디서나 같은 대비가 나오게 했다(pet.css
-                .pet-gauge__inline 주석에 그 값이 있다). 그러니까 옛 결정을 뒤집은 것이 아니라
-                그 결정의 근거를 없앤 것이다.
-
-                진화 임박 각주("다음 단계까지 씨앗 N개")는 여기 두지 않는다 — 펫 정보 모달에
-                있고, 방 위 오버레이에 네 번째 줄을 붙이면 방을 그만큼 더 가린다 */}
-            <div className="pet-hud-lv">
-              <p className="pet-hud-lv__head">
-                <span className="pet-hud-lv__level">Lv.{pet.level}</span>
-                {/* 시안의 이름 자리다. 이 앱에는 펫 이름 컬럼이 없어(2026-08-23 기록) 스킨
-                    이름을 쓴다 — 방 안에서 이 캐릭터가 무엇인지 알려 주는 유일한 글자였고
-                    지금까지 sr-only로만 있었다(.pet-char 안) */}
-                <span className="pet-hud-lv__name">{pet.skinName}</span>
-              </p>
-              {/* **2026-08-26 사용자 요청으로 게이지와 재화가 한 줄에 나란히 선다** —
-                  "재화 3개의 정보를 세로로 세개를 배치해서 게이지 오른쪽에". 전에는 게이지가
-                  한 줄, 재화 3종이 그 아래 가로 한 줄이었다.
-                  이 래퍼가 그 두 칸을 가르고, 재화 쪽이 세로로 쌓인다 */}
-              <div className="pet-hud-lv__row">
-                <div
-                  className="pet-gauge pet-gauge--inline"
-                  role="progressbar"
-                  aria-label="다음 레벨까지 경험치"
-                  aria-valuemin={0}
-                  aria-valuemax={need}
-                  aria-valuenow={pet.exp}
-                >
-                  <div className="pet-gauge__fill" style={{ width: `${progress * 100}%` }} />
-                  {/* 게이지 위에 얹는 글자. aria는 위 progressbar가 이미 값을 말하므로
-                      이 글자는 눈으로 보는 쪽 전용이다(중복해서 읽히지 않게 aria-hidden) */}
-                  <span className="pet-gauge__inline-text" aria-hidden="true">
-                    {ko(pet.exp)} / {ko(need)}
-                  </span>
-                </div>
-
-                {/* 재화 3종 세로. 이름을 sr-only로 남기는 처리는 옛 재화 알약에서 그대로
-                    가져왔다 — 아이콘과 숫자만 두면 스크린리더에 아무것도 안 남는다 */}
-                <ul className="pet-hud-lv__wallet">
-                  {wallet.map((row) => (
-                    <li className="pet-hud-lv__coin" key={row.name}>
-                      <span className="pet-hud-lv__coin-icon" aria-hidden="true">
-                        {row.icon}
-                      </span>
-                      <span className="sr-only">{row.name}</span>
-                      <span className="pet-hud-lv__coin-value">{ko(row.value)}</span>
-                    </li>
-                  ))}
-                </ul>
+                **시안에 없어서 뺀 것 둘**:
+                ① 펫 이름 — .pet-char 안 sr-only로 남아 있다
+                ② 게이지 안 숫자 — 대신 펫 정보 모달의 "현재 Lv.N" 줄에 붙였다. 정보를
+                   화면에서 없애지 않으려는 것이고, progressbar의 aria 값은 그대로다 */}
+            <div className="pet-hud-bar">
+              <span className="pet-hud-bar__level">Lv.{pet.level}</span>
+              <div
+                className="pet-gauge"
+                role="progressbar"
+                aria-label="다음 레벨까지 경험치"
+                aria-valuemin={0}
+                aria-valuemax={need}
+                aria-valuenow={pet.exp}
+              >
+                <div className="pet-gauge__fill" style={{ width: `${progress * 100}%` }} />
               </div>
+
+              {/* 재화 알약 셋. 이름을 sr-only로 남기는 처리는 옛 재화 알약에서 그대로
+                  가져왔다 — 아이콘과 숫자만 두면 스크린리더에 아무것도 안 남는다 */}
+              <ul className="pet-hud-bar__wallet">
+                {wallet.map((row) => (
+                  <li className="pet-hud-bar__coin" key={row.name}>
+                    <span className="pet-hud-bar__coin-icon" aria-hidden="true">
+                      {row.icon}
+                    </span>
+                    <span className="sr-only">{row.name}</span>
+                    <span className="pet-hud-bar__coin-value">{ko(row.value)}</span>
+                  </li>
+                ))}
+              </ul>
             </div>
 
           </div>
@@ -1271,11 +1249,18 @@ export default function PetView({ initial }: { initial: PetState }) {
               </div>
             </section>
 
-            {/* 옛 "🍎 경험치" 카드의 각주다. 좌상단 오버레이(.pet-hud-lv)는 Lv과 게이지만
-                갖고 이 문장은 여기로 왔다 — "다음 단계까지 씨앗 N개"는 진화 4칸 바로 옆에서
-                읽는 것이 맞고, 오버레이에 세 번째 줄을 붙이면 방 위 글자가 늘어난다 */}
+            {/* 옛 "🍎 경험치" 카드의 각주다. 방 위 상태판은 Lv과 게이지만 갖고 이 문장은
+                여기로 왔다 — "다음 단계까지 씨앗 N개"는 진화 4칸 바로 옆에서 읽는 것이 맞고,
+                방 위 오버레이에 줄을 더 붙이면 방을 그만큼 더 가린다.
+
+                **경험치 숫자도 2026-08-26에 여기로 왔다.** 상태판이 알약 바가 되면서 시안대로
+                게이지 안 숫자를 걷었는데, 그러면 `2,240 / 2,600`이 화면에서 완전히 사라진다 —
+                progressbar의 aria 값만 남아 눈으로 보는 사람이 잃는다. 현재 Lv 옆이 그 값을
+                읽을 자리로 가장 자연스럽다 */}
             <p className="pet-card__foot">
-              <span>현재 Lv.{pet.level}</span>
+              <span>
+                현재 Lv.{pet.level} · 경험치 {ko(pet.exp)} / {ko(need)}
+              </span>
               <span>
                 {nextStage
                   ? `${STAGE_NAME[nextStage.stage - 1] ?? `${nextStage.stage}단계`}까지 씨앗 ${ko(nextStage.seeds)}개`

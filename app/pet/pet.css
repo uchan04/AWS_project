@@ -254,106 +254,87 @@
    그대로다. 옮기면서 지운 것은 "한 줄에 들어가려고" 좁혔던 좌우 여백뿐이다 —
    모달 안에서는 두 버튼이 세로로 쌓이므로 그 제약이 없다 */
 
-/* ── 상태판 (2026-08-26 사용자 시안 2번: 육성 게임 상태판) ────────────────────── */
+/* ── 상태판 알약 바 (2026-08-26 사용자 시안 3번) ─────────────────────────────── */
 
-/* 옛 "🍎 경험치" 카드 + 옛 재화 알약(.pet-bar)이 **한 상자로 합쳐졌다** (사용자 요청
-   "재화 세개 레벨 창에다가 가로로 합쳐주고"). 방 위에 뜨는 오버레이가 둘에서 하나가 됐고,
-   그만큼 방이 덜 가려진다.
+/* **자리가 이 화면에서 세 번째로 바뀌었다.**
+   ① 옛 "🍎 경험치" 카드 + 옛 재화 알약이 좌상단 세로 상자로 합쳐졌고(.pet-hud-lv)
+   ② 같은 날 재화가 게이지 오른쪽 세로 3줄로 옮겨졌고
+   ③ 지금은 **그 카드를 걷고 가로 알약 바 하나**가 됐다(사용자 요청 "레벨 카드 제거하고
+      첨부한 이미지를 새로운 알약 형태의 카드로").
 
-   구성은 시안 그대로 세 줄이다: Lv + 이름 / 게이지(숫자 안쪽) / 재화 3종 가로.
+   시안 구성: `( Lv.26 )` `( 게이지 )` … `( 🌱 2,994 )( 💗 2,000 )( ⭐ 5,576 )`
+   — 바깥이 알약이고 그 안의 넷도 각각 알약이다.
 
-   면·링은 원형 버튼과 같은 크림 칩(--pet-chip-*)이다 — 방 안에 뜨는 물건이 같은 재질이어야
-   하나가 UI, 하나가 가구로 갈리지 않는다. 시안의 테두리가 더 굵고 이중이라 **안쪽 선을
-   한 겹 더** 얹었다(--pet-inner-line): 상자가 커진 만큼 링 하나로는 얇아 보인다.
+   **"테두리 색 통일"이 이 절의 요점이다.** 바깥 바·안쪽 알약·게이지가 전부 같은
+   --pet-chip-ring(종족색 48% 희석 3px)을 쓴다. 그래서 이 화면의 버튼 배지와도 같은 선이 된다 —
+   방 위에 뜨는 물건의 테두리가 한 색이면 여러 조각이 한 벌로 읽힌다.
 
-   폭은 고정하지 않고 하한만 준다. 안쪽에서 폭을 정하는 것은 재화 줄이고 그 자릿수가
-   재화량에 따라 늘어난다 — 고정하면 적을 때 오른쪽이 비고 많을 때 넘친다. */
-.pet-hud-lv {
+   되살릴 값(옛 세로 카드): 상자는 grid + gap --space-3xs + min-width 11rem이었고,
+   1줄이 `Lv + 이름`(flex, space-between), 2줄이 `.pet-hud-lv__row`(게이지 flex:1 + 재화 세로),
+   레벨은 --font-display --text-body --tribe-cta였다.
+
+   **펫 이름(스킨 이름)이 빠졌다** — 시안에 없다. 그 글자는 .pet-char 안 sr-only로 남아 있다. */
+.pet-hud-bar {
   position: absolute;
   top: var(--space-2xs);
+  /* 좌우로 벌려 방 폭을 쓴다. 알약 바라서 안쪽 여백이 좌우로 넉넉해야 한다 */
   left: var(--space-2xs);
+  right: var(--space-2xs);
   z-index: calc(var(--z-raised) + 2);
-  display: grid;
-  gap: var(--space-3xs);
-  min-width: 11rem;
-  padding: var(--space-2xs);
-  border: var(--pet-chip-ring);
-  border-radius: var(--radius-card);
-  background: var(--pet-chip-face);
-  box-shadow: var(--pet-inner-line), var(--pet-chip-lift);
-}
-
-/* 1줄: Lv + 이름. 시안이 레벨을 왼쪽, 이름을 가운데에 둔다 */
-.pet-hud-lv__head {
-  display: flex;
-  align-items: baseline;
-  justify-content: space-between;
-  gap: var(--space-2xs);
-  margin: 0;
-}
-
-/* 레벨은 이 상자에서 가장 큰 글자다. 알약을 씌우지 않은 이유: 상자 자체가 이미 크림 면이고
-   그 안에 또 면을 넣으면 배지 안 배지가 된다 */
-.pet-hud-lv__level {
-  font-family: var(--font-display);
-  /* **2026-08-26 사용자 요청으로 --text-md(20px) → --text-body(16px).** 시안의 상태판은
-     레벨이 가장 큰 글자인데, 이 앱의 상태판은 그 옆에 펫 이름이 붙고 아래에 게이지와
-     재화 줄까지 셋이 더 있어서 20px이 상자를 눌렀다.
-     스케일 밖 값(예: 18px)을 쓰지 않는다 — tokens.css의 1.25배 계단에서 한 칸 내린 것이다 */
-  font-size: var(--text-body);
-  color: var(--tribe-cta);
-  line-height: 1.1;
-}
-
-/* 이름. 시안은 레벨과 같은 크기지만 여기서는 한 단 작다 — 스킨 이름이 "북극여우"처럼
-   길어질 수 있고(시안의 "에이프릴"은 4자다) 레벨과 같은 크기면 줄이 넘친다 */
-.pet-hud-lv__name {
-  font-size: var(--text-label);
-  /* 2026-08-26 사용자 요청("레벨 카드의 볼드체 제거")으로 700 → 400 */
-  font-weight: 400;
-  color: var(--color-ink-2);
-  white-space: nowrap;
-}
-
-/* 재화 3종의 자리는 **두 번 바뀌었다.** 처음 합칠 때는 게이지 아래 가로 한 줄이었고
-   (사용자 요청 "가로로 합쳐"), 같은 날 두 번째 요청으로 게이지 오른쪽 세로 세 줄이 됐다.
-   구분선은 그때도 지금도 두지 않는다 — 아이콘이 셋을 이미 가르고, 좁은 상자에서 선까지
-   넣으면 빽빽해진다 */
-
-/* **2026-08-26: 게이지와 재화를 한 줄에 나란히 세운다** (사용자 요청 "재화 3개의 정보를
-   세로로 세개를 배치해서 게이지 오른쪽에"). 게이지가 남는 폭을 먹고 재화 칸은 내용 폭이다.
-   align-items: center인 이유: 게이지는 한 줄(28px)이고 재화는 세 줄(약 54px)이라
-   위나 아래로 맞추면 게이지가 한쪽에 붙어 보인다 */
-.pet-hud-lv__row {
   display: flex;
   align-items: center;
   gap: var(--space-2xs);
+  padding: var(--space-3xs) var(--space-2xs);
+  border: var(--pet-chip-ring);
+  border-radius: var(--radius-pill);
+  background: var(--pet-chip-face);
+  box-shadow: var(--pet-chip-lift);
 }
 
-/* 세로 세 줄. 전에는 가로 한 줄이었다(위 __row 주석) */
-.pet-hud-lv__wallet {
-  display: grid;
-  gap: 0.1rem;
+/* 레벨 알약. 시안에서 가장 왼쪽이고 폭이 내용에 맞는다 */
+.pet-hud-bar__level {
+  flex-shrink: 0;
+  padding: 0.1rem var(--space-2xs);
+  border: var(--pet-chip-ring);
+  border-radius: var(--radius-pill);
+  background: color-mix(in oklch, var(--tribe) 16%, var(--color-card));
+  font-family: var(--font-display);
+  font-size: var(--text-label);
+  color: var(--color-ink);
+  white-space: nowrap;
+}
+
+/* 재화 알약 셋. 시안은 바 오른쪽 끝에 붙으므로 이 묶음이 오른쪽으로 밀린다
+   (게이지가 flex: 1로 남는 폭을 먹는 것과 짝이다) */
+.pet-hud-bar__wallet {
+  display: flex;
+  align-items: center;
+  gap: var(--space-3xs);
   margin: 0;
   padding: 0;
   list-style: none;
 }
 
-.pet-hud-lv__coin {
+.pet-hud-bar__coin {
   display: flex;
   align-items: center;
   gap: 0.15rem;
+  padding: 0.1rem var(--space-2xs) 0.1rem 0.2rem;
+  border: var(--pet-chip-ring);
+  border-radius: var(--radius-pill);
+  background: var(--color-card);
+  white-space: nowrap;
 }
 
-.pet-hud-lv__coin-icon {
+.pet-hud-bar__coin-icon {
   font-size: 0.95rem;
   line-height: 1;
 }
 
-/* tabular-nums는 값이 오를 때 자릿수가 바뀌어도 옆 칸이 밀리지 않게 한다 */
-.pet-hud-lv__coin-value {
+/* tabular-nums는 값이 오를 때 자릿수가 바뀌어도 옆 알약이 밀리지 않게 한다.
+   굵기는 400이다 — 같은 날 "레벨 카드의 볼드체 제거" 요청을 이 카드도 물려받는다 */
+.pet-hud-bar__coin-value {
   font-size: var(--text-label);
-  /* 같은 요청으로 700 → 400 */
   font-weight: 400;
   color: var(--color-ink);
   font-variant-numeric: tabular-nums;
@@ -370,6 +351,10 @@
    방을 덮지 않고, 펫 쓰다듬기 클릭을 막지 않는다 */
 .pet-actions {
   position: absolute;
+  /* **2026-08-26: align-items를 center로 통일.** 사용자 지적 —
+     우측 스택이 flex-end라 라벨 폭이 다른 버튼들의 **오른쪽 끝**만 맞고 원의 가운데가
+     들쭉날쭉했다. 가운데로 맞추면 원 다섯 개가 한 축에 선다 */
+  align-items: center;
   /* Lv 오버레이 아래에서 시작한다. 그 상자가 8px(top) + 88px(높이) = 96px을 쓰므로
      6.5rem(104px)이면 8px 여유가 남는다 — 6rem이면 정확히 맞닿아 붙어 보인다 */
   top: 6.5rem;
@@ -379,14 +364,18 @@
   gap: var(--space-2xs);
 }
 
+/* **좌측 스택만 더 내린다** (2026-08-26 사용자 요청 "화면 왼쪽의 버튼들은 너무 위에
+   있으니까 위치를 좀 더 내려줘"). 좌측은 3개, 우측은 5개라 같은 top에서 시작하면 좌측이
+   위쪽에 몰려 보인다. 두 스택의 **가운데 높이**를 맞추는 값이다:
+   버튼 하나가 약 105px(1.3배 뒤) + 간격 8px이라 3개는 331px, 5개는 557px이고
+   그 차이의 절반이 113px ≈ 7rem이다 */
 .pet-actions--left {
   left: var(--space-2xs);
+  top: calc(6.5rem + 7rem);
 }
 
 .pet-actions--right {
   right: var(--space-2xs);
-  /* 라벨을 오른쪽 끝에 맞춘다 — 왼쪽 스택은 왼쪽 정렬이라 두 스택이 방 바깥쪽을 향한다 */
-  align-items: flex-end;
 }
 
 /* 버튼 하나. 아이콘 원 + 라벨 알약이고 둘이 세로로 붙는다(시안 구조).
@@ -435,8 +424,9 @@
 .pet-circle__icon {
   display: grid;
   place-items: center;
-  width: 3.25rem;
-  height: 3.25rem;
+  /* 2026-08-26 사용자 요청: 버튼 1.3배. 3.25 × 1.3 = 4.225 → 4.25rem */
+  width: 4.25rem;
+  height: 4.25rem;
   border: var(--pet-chip-ring);
   border-radius: var(--radius-pill);
   background: var(--pet-chip-face);
@@ -516,7 +506,9 @@
   border-radius: var(--radius-pill);
   background: var(--pet-chip-face);
   box-shadow: var(--pet-chip-lift);
-  font-size: var(--text-label);
+  /* 버튼이 1.3배가 됐으므로 라벨도 한 단 올린다(--text-label 0.8 → --text-body 1rem).
+     원만 키우면 라벨판이 원에 비해 얇아져 배지 실루엣이 깨진다 */
+  font-size: var(--text-body);
   font-weight: 700;
   color: var(--color-ink);
   text-align: center;
@@ -540,8 +532,10 @@
  * 적용된다. 채도는 낮게 유지한다 — design.md의 "채도 높은 색은 종족색 하나뿐"에 걸리지 않게
  * 방 배경이 이미 쓰는 톤(#c8a878 계열)의 이웃 값들로 골랐다. */
 .pet-icon {
-  width: 1.65rem;
-  height: 1.65rem;
+  /* 원이 1.3배가 됐으므로 아이콘도 같이 올린다(1.65 × 1.3 = 2.145 → 2.15rem).
+     원만 키우면 아이콘이 가운데에 작게 떠 있는 것으로 보인다 */
+  width: 2.15rem;
+  height: 2.15rem;
   fill: none;
   stroke: var(--tribe-cta);
   stroke-width: 1.7;
@@ -923,6 +917,10 @@
      것**이고(482 → 430px, 약 11%), 이 배율 값은 좁고 높은 창에서만 드러난다.
      크기를 더 만지려면 배율이 아니라 vh 상한을 본다 */
   --pet-char-scale: 2;
+  /* 상단 알약 바가 방 위쪽에서 쓰는 높이. 말풍선 상한식이 이 값을 빼야 말풍선이 바 아래에
+     선다 — 2026-08-26 실측에서 그 몫이 빠져 있어 말풍선 글자가 바에 가려졌다.
+     한 줄일 때 약 2.6rem이고 좁은 화면에서는 접혀서 더 높아진다(그 절에서 다시 준다) */
+  --pet-hud-h: 3.2rem;
   /* 78vw 상한은 좁은 화면에서 그림이 방 폭보다 커지는 것을 막는다 — 방이
      overflow: hidden이라 넘치면 좌우가 잘린다. 좁은 화면에는 방 높이(19.5rem) 때문에
      세로 상한이 하나 더 붙는다(파일 끝 "좁은 화면" 절).
@@ -935,7 +933,7 @@
      56vh는 832px 창에서 466px이라 그 두 경우 다 아래에 있다 — **걸리면 말풍선이 머리로
      내려앉는다**(이 파일이 8/24에 고친 그 버그다).
      그래서 **2.3배는 좁은 창에서 상한에 잡힌다** — 방이 그만큼 크지 않다 */
-  --pet-char-w: min(calc(var(--pet-char-size) * var(--pet-char-scale)), 78vw, 50vh);
+  --pet-char-w: min(calc(var(--pet-char-size) * var(--pet-char-scale)), 78vw, 36vh);
   /* 그림 상자를 방 바닥선 **아래로** 내리는 몫이다(폭 비례). 단계마다 값이 다른 이유는
      그림 아래 남는 투명 여백이 단계마다 다르기 때문이다 — 근거는 아래 :has() 네 줄의 주석과
      .pet-char__img의 object-position 주석에 있는 24장 실측이다.
@@ -1014,6 +1012,36 @@
 .pet-room__curtain {
   fill: color-mix(in oklch, var(--tribe) 72%, var(--color-card));
   opacity: 0.75;
+}
+
+/* 커튼 봉과 마감 구슬 (2026-08-26). 나무 물건이라 창틀(.pet-room__frame)과 같은 색이다 —
+   방 안의 나무를 두 색으로 쓰지 않는다(책장 주석과 같은 근거) */
+.pet-room__rod {
+  fill: #c89060;
+}
+
+.pet-room__rod-cap {
+  fill: #b07a4e;
+}
+
+/* 창틀 선반. 걸레받이(.pet-room__trim)와 같은 색이다 — 둘 다 벽에서 튀어나온 널이다 */
+.pet-room__sill {
+  fill: #b09070;
+}
+
+/* 창틀 화분 (2026-08-26). 화분은 옛 방 화분이 쓰던 테라코타(#c87050)를 그대로 되쓴다 —
+   그 색은 책장으로 갈면서 쓰는 곳이 없어졌고, 같은 방에 다시 같은 재질이 생긴 자리다.
+   잎은 아이콘의 잎(#7fb069)과 같은 초록이다 */
+.pet-room__pot {
+  fill: #c87050;
+}
+
+.pet-room__pot-rim {
+  fill: #b0603f;
+}
+
+.pet-room__sprout {
+  fill: #7fb069;
 }
 /* 여기에 화분이 있었다(.pet-room__pot #c87050 + .pet-room__leaf var(--pet-seed-fill)).
    **2026-08-26 사용자 요청으로 책장으로 갈았다.** 되살릴 값은 그 두 줄이고, 좌표는
@@ -1190,7 +1218,7 @@
      말풍선 자체의 크기(14 × 7rem)는 이 요청에서 건드리지 않았다 */
   bottom: min(
     calc(var(--pet-char-w) * 0.81),
-    100% - var(--pet-bubble-min-h) - var(--space-2xs)
+    100% - var(--pet-bubble-min-h) - var(--pet-hud-h) - var(--space-2xs)
   );
   left: 50%;
   transform: translateX(-50%);
@@ -1303,7 +1331,11 @@
   text-align: center;
   margin: 0;
   color: var(--color-ink);
-  font-size: var(--text-label);
+  /* **2026-08-26 사용자 요청: 1.3배.** 0.8 → 1rem(--text-body)이다.
+     정확히 1.3배는 1.04rem이고 스케일 밖 값인데, 차이가 0.04rem(0.64px)이라 눈에 보이지
+     않으므로 tokens.css의 계단에 남는 쪽을 골랐다.
+     상자는 같은 날 1.3배가 됐으므로(18.2 × 9.1rem) 글자가 커져도 줄 수가 늘지 않는다 */
+  font-size: var(--text-body);
   /* 두 줄 이상이 되므로 줄 간격을 조금 넓힌다. 위로하는 문장을 빽빽하게 쓰지 않는다 */
   line-height: 1.6;
   /* 대사가 "왔어? 나 방금 네 생각하고 있었어!"처럼 두 마디로 되어 있어서
@@ -1386,7 +1418,12 @@
      이 값은 그보다 낮다(0.55) — 말풍선은 펫 머리 위, 쪽지는 펫이 서던 바닥 쪽이다.
      펫이 없는 상태(AWAY)라 --pet-char-w가 가리키는 그림은 없지만, 값 자체는 방이 아는
      "펫 한 마리 크기"이고 단계에 따라 함께 움직이는 것이 맞다 */
-  bottom: calc(var(--pet-char-w) * 0.55);
+  /* **9rem 상한이 2026-08-26에 붙었다.** 캐릭터가 커지면서(--pet-char-w가 50vh까지 간다)
+     0.55배가 302px이 되고, 방이 520px일 때 쪽지 윗변이 방 위에서 53px에 앉아 **상단 알약
+     바(8~108px)와 겹쳤다**(실측). 쪽지는 "펫이 서던 자리에 놓인 물건"이고 그 자리는 캐릭터가
+     아무리 커져도 바닥 근처다 — 그래서 비례를 유지하되 위로는 144px에서 멈춘다.
+     520px 방에서 쪽지 윗변이 211px, 730px 방에서 421px이라 두 경우 다 바 아래에 남는다 */
+  bottom: min(calc(var(--pet-char-w) * 0.55), 9rem);
   left: 50%;
   /* 회전이 뒤에 온다: 먼저 자기 폭의 절반만큼 왼쪽으로 옮겨 가운데에 서고, 그 자리에서
      자기 중심을 축으로 돈다. 순서를 바꾸면 회전한 좌표계에서 옮겨져 가운데를 벗어난다.
@@ -1994,44 +2031,31 @@
   transition: width var(--dur-long) var(--ease-out);
 }
 
-/* ── 게이지 안에 숫자를 얹는 변형 (2026-08-26 사용자 시안 2번) ─────────────────
- *
- * 시안의 상태판이 `250 / 300`을 게이지 **안**에 둔다. 이 화면은 2026-08-23에 같은 것을
- * 지웠고 그때 이유는 **"움직이는 그라디언트 위 글자라 대비가 채움률에 따라 변한다"** 였다.
- * 그 지적은 옳았다 — 그래서 되살리되 그 근거를 없앤다.
- *
- * **글자에 어두운 테두리를 입힌다.** text-shadow 네 방향이 1px 윤곽을 만들어, 글자가
- * 밝은 채움 위에 있든 어두운 트랙 위에 있든 **같은 대비**가 나온다. 채움률과 무관해지는
- * 것이 요점이다. (-webkit-text-stroke는 획을 글자 안쪽으로도 먹어 작은 글씨를 뭉갠다.)
- *
- * 게이지 자체도 시안처럼 조금 높아진다(1.5rem → 1.75rem) — 12.8px 글자가 앉을 자리다.
- * 트랙 색은 그대로 --color-paper다: 시안은 진한 갈색 트랙이지만 그러면 이 화면의 게이지
- * 넷(경험치·외출·방치형·배경 수집)이 서로 다른 트랙을 갖게 된다. 변형은 이 한 곳뿐이다. */
-.pet-gauge--inline {
-  height: 1.75rem;
-  /* 재화 칸 옆에서 남는 폭을 먹는다. min-width: 0이 없으면 flex 자식이 내용 폭 아래로
-     못 줄어들어 상태판이 넓어진다 */
-  flex: 1;
-  min-width: 0;
-}
+/* 여기에 **게이지 안에 숫자를 얹는 변형**(.pet-gauge--inline · .pet-gauge__inline-text)이
+   있었다. 2026-08-26 시안 2번이 `250 / 300`을 게이지 안에 두어서 만든 것이고,
+   **같은 날 시안 3번(알약 바)에 그 숫자가 없어 걷었다.** 경험치 숫자는 펫 정보 모달의
+   "현재 Lv.N" 줄로 갔다.
 
-.pet-gauge__inline-text {
-  position: absolute;
-  inset: 0;
-  display: grid;
-  place-items: center;
-  font-size: var(--text-label);
-  /* 2026-08-26 사용자 요청("레벨 카드의 볼드체 제거")으로 700 → 400.
-     굵기가 내려가면 아래 text-shadow 윤곽(1px)이 획을 먹을 수 있으므로 윤곽은 그대로 두고
-     굵기만 내린다 — 대비는 글자색과 윤곽색 사이의 값이라 굵기와 무관하다(실측 5.09) */
-  font-weight: 400;
-  color: var(--color-card);
-  font-variant-numeric: tabular-nums;
-  text-shadow:
-    0 1px 0 var(--tribe-cta),
-    0 -1px 0 var(--tribe-cta),
-    1px 0 0 var(--tribe-cta),
-    -1px 0 0 var(--tribe-cta);
+   되살릴 값:
+   - --inline — height 1.75rem · flex: 1 · min-width: 0
+   - __inline-text — absolute inset 0 · grid place-items center · --text-label · 400 ·
+     color --color-card · tabular-nums ·
+     text-shadow 네 방향 1px --tribe-cta
+
+   **text-shadow 네 방향이 이 변형의 핵심이었다.** 이 화면은 2026-08-23에 같은 표시를
+   "움직이는 그라디언트 위 글자라 대비가 채움률에 따라 변한다"는 이유로 지웠는데, 1px 윤곽이
+   그 근거를 없앤다(채움 위·트랙 위 어디서나 5.09:1 실측). 숫자를 게이지 안에 다시 넣게 되면
+   그 윤곽을 함께 되살린다 — 윤곽 없이 넣으면 옛 문제가 그대로 돌아온다.
+
+   게이지 하나가 상태판 알약 바 안에서 남는 폭을 먹는 것은 아래 .pet-hud-bar .pet-gauge가
+   대신 한다 */
+
+/* 상태판 알약 바 안의 게이지. 남는 폭을 먹고, 알약 바의 다른 알약들과 같은 테두리를 쓴다 */
+.pet-hud-bar .pet-gauge {
+  flex: 1;
+  min-width: 3rem;
+  height: 1.4rem;
+  border: var(--pet-chip-ring);
 }
 
 /* 씨앗 게이지 (2026-08-24 사용자 요청 "게이지 색을 씨앗줍기버튼과 같은 초록색으로 교체").
@@ -3730,18 +3754,37 @@
      이고, 이 버튼은 아이콘 원 아래 라벨 알약까지가 한 <button>이라 실제 높이가
      40 + 라벨 약 20 = 60px이다. 폭은 라벨 쪽이 더 넓어 44px을 넘는다 */
   .pet-circle__icon {
-    width: 2.5rem;
-    height: 2.5rem;
+    /* 넓은 화면과 같은 1.3배(2.5 × 1.3 = 3.25rem) */
+    width: 3.25rem;
+    height: 3.25rem;
     font-size: var(--text-body);
   }
 
-  /* **이 폭에서는 상태판을 조금 내린다.** 전에는 여기서 Lv 상자와 재화 알약을 세로로
-     쌓았는데(둘이 한 줄에 못 섰다), 2026-08-26에 **둘이 한 상자로 합쳐져** 그 처리가
-     필요 없어졌다 — 상태판 하나만 남았으므로 폭 다툼이 없다.
-     3.25rem은 위쪽 여백만 두는 값이다: 이 폭에서는 상태판이 방 폭의 절반을 넘으므로
-     기본값(--space-2xs)이면 방 천장에 붙어 보인다 */
-  .pet-hud-lv {
-    top: 3.25rem;
+  /* **이 폭에서는 상태판 알약 바가 두 줄로 접힌다.** 방 안쪽이 240~279px인데 안에 든 것이
+     레벨 알약 + 게이지 + 재화 알약 셋이라 한 줄에 못 선다. flex-wrap으로 접고 게이지가
+     한 줄을 다 쓰게 둔다 — 접힌 줄에서 게이지가 재화 알약 옆에 끼면 20px짜리 막대가 된다.
+     `top`은 기본값(--space-2xs)을 그대로 쓴다: 옛 세로 카드는 방 폭의 절반을 넘어 천장에
+     붙어 보였지만, 알약 바는 좌우로 벌려 있어 그 문제가 없다 */
+  .pet-hud-bar {
+    flex-wrap: wrap;
+    row-gap: var(--space-3xs);
+  }
+
+  /* 바가 두 줄로 접히므로 말풍선 상한이 빼야 하는 몫도 커진다 — 접힌 바가 약 5.6rem이다.
+     이 값이 작으면 말풍선 글자가 바에 가려진다(넓은 화면에서 실제로 그랬다) */
+  .pet-room {
+    /* 두 줄 바(약 66px)에 여유를 더한 값이다. 이 값이 실제 바 높이보다 작으면
+       말풍선이 바 위로 올라가 글자가 가려진다 — 처음에 5.8rem으로 뒀다가 3줄 바(100px)에
+       7px 모자라 겹치는 것을 실측했다 */
+    --pet-hud-h: 4.8rem;
+  }
+
+  /* **두 줄로만 접히게 한다.** 100%로 두면 게이지가 한 줄을 통째로 써서 바가 3줄(100px)이
+     되고, 방이 22rem(352px)뿐인 이 폭에서 말풍선(146px)까지 앉으면 캐릭터 자리가 106px밖에
+     남지 않는다(실측). 60%면 레벨 알약과 게이지가 한 줄, 재화 알약 셋이 다음 줄이라
+     바가 약 66px이다 */
+  .pet-hud-bar .pet-gauge {
+    min-width: 60%;
   }
 
   /* **이 폭에서는 스택을 방 위에 얹지 않는다.** 방이 240~279px인데 좌우 스택이 가로로
@@ -3800,7 +3843,10 @@
        캐릭터가 272px에 머물렀다.
        17rem 고정 상한은 걷고 56vh로 갈았다(위 본체와 같은 값·같은 근거). 이 폭에서는 버튼
        스택이 방 밖으로 내려가 방이 오히려 짧아지므로(실측 523px) vh 상한이 실제로 일한다 */
-    --pet-char-w: min(calc(var(--pet-char-size) * var(--pet-char-scale)), 78vw, 50vh);
+    /* 이 폭에서는 방이 22rem 고정에 가깝고 바 + 말풍선이 그 절반을 먹으므로 캐릭터 상한을
+       한 번 더 내린다. 24vh면 719px 창에서 172px이고, 바 66 + 말풍선 146 + 0.81 × 172 = 351로
+       352px 방에 겨우 들어간다 — **이 폭에서 캐릭터가 작은 것은 방이 짧기 때문이다** */
+    --pet-char-w: min(calc(var(--pet-char-size) * var(--pet-char-scale)), 78vw, 24vh);
   }
 
   /* 말풍선 크기를 여기서 따로 줄이던 규칙(12.5 × 6.25rem)은 **없어졌다.**

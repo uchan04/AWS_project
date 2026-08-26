@@ -305,7 +305,12 @@ export default function CosmeticList({
           </div>
 
           <span className="pet-hero__badge">
-            꾸미는 중 <span aria-hidden="true">✨</span>
+            {/* 2026-08-26 사용자 요청("외형상점과 배경 상점의 버튼 아이콘을 동일하게 통일")으로
+                ✨ → 🐾. 외형 상점의 같은 배지가 🐾를 쓰고, 두 화면의 "펫으로" 링크도 둘 다
+                🐾다 — 🐾가 이미 두 화면이 공유하는 글자이고 ✨는 배경 상점에만 있었다.
+                라벨("꾸미는 중" / "함께하는 중")은 그대로다 — 요청이 아이콘이었고, 두 화면이
+                가리키는 것이 배경과 외형으로 다르다 */}
+            꾸미는 중 <span aria-hidden="true">🐾</span>
           </span>
         </div>
       ) : null}
