@@ -309,8 +309,14 @@ export function WriteModal({ gallery, myTypeCode }: { gallery: GalleryTab; myTyp
               </button>
             </div>
 
-            {/* 본문: **여기만 스크롤한다.** 위기 안내·주제 추천·입력·글자 수·사진 첨부·에러가 들어간다 */}
-            <div className="flex-1 overflow-y-auto px-8">
+            {/* 본문: **여기만 스크롤한다.** 위기 안내·주제 추천·입력·글자 수·사진 첨부·에러가 들어간다.
+                py-1·scroll-py-2는 **포커스 링 자리다(2026-08-26).** 화면에 보이는 초점 표시는
+                입력이 가진 것이 아니라 globals.css의 `:focus-visible { outline: 2px; outline-offset: 2px }`이고
+                (입력의 outline-none은 이걸 못 끈다 — 유틸리티는 @layer 안, 저 규칙은 레이어 밖이라 항상 이긴다),
+                테두리 바깥으로 4px 튀어나온다. overflow-y-auto는 overflow-x도 auto로 만들어 padding box에서
+                자르므로, 좌우는 px-8이 받아주지만 상하는 padding이 0이면 그 4px이 잘렸다.
+                scroll-py-2는 포커스로 스크롤될 때 입력이 경계에 딱 붙지 않게 한다. */}
+            <div className="flex-1 scroll-py-2 overflow-y-auto px-8 py-1">
             {/* 저장되지 않았을 때의 안내. **입력 폼을 걷어내지 않는다** — 쓴 글이 그대로 남아
                 있어야 한다(_lib/crisis.ts 조건 2). 안내를 폼 위에 얹고, 아래 폼은 그대로 둔다.
                 거절이 아니라 다른 길을 알려주는 자리다. */}
