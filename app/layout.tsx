@@ -4,6 +4,7 @@ import "./globals.css";
 import { getSidebarProfile } from "@/lib/profile";
 import { Sidebar } from "./components/Sidebar";
 import { ChatLauncher } from "./chat/_components/ChatLauncher";
+import { DeletedNoticeDialog } from "./community/_components/DeletedNoticeDialog";
 
 // 서체는 next/font로 자기 도메인에서 낸다(2026-08-22).
 //
@@ -102,6 +103,8 @@ export default async function RootLayout({ children }: LayoutProps<"/">) {
           {children}
         </div>
         <ChatLauncher diagnosed={profile?.diagnosed ?? false} />
+        {/* profile 없으면(미인증) 아예 마운트하지 않는다 — GET이 안 나간다 (D 요청) */}
+        {profile && <DeletedNoticeDialog />}
       </body>
     </html>
   );
