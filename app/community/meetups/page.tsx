@@ -32,7 +32,25 @@ export default async function MeetupsPage() {
     const now = new Date()
     nowMs = now.getTime()
 
-    joined = await myJoinedMeetups(user.id)
+    // **셋 중 둘만 묶는다.** 아래 `meetup.findMany`는 `joined`의 id를 `notIn`으로 쓰므로
+    // **진짜 의존**이다 — 셋을 함께 묶으면 이미 신청한 모임이 아래 목록에 다시 나와
+    // 같은 카드가 두 번 보인다. 그 순서를 깨지 마라.
+    // `pendingMeetupNotices`는 `user.id`만 쓰므로 `joined`를 기다릴 이유가 없어 여기 올렸다.
+    //
+    // **allSettled가 아니라 all이다.** 여기는 검열이 아니라 화면 조회다 — 한쪽이 실패하면
+    // 화면을 그릴 수 없고, 바깥 try/catch가 안내 화면으로 받는 기존 동작이 맞다(위 주석).
+    //
+    // 무산된 모임은 아래 목록(status OPEN)에 없다. 신청해 뒀던 사람에게는 배너로만 알린다.
+    //
+    // `Promise.all`이 왕복 1회를 **보장하지는 않는다** — Postgres의 prepare 캐시가 연결마다
+    // 따로라 병렬 묶음의 벽시계가 왕복 1~4회를 오간다(`docs/dev/perf.md` "고친 것 4번째").
+    // 그래도 순차 두 번보다 나쁠 수는 없다.
+    const [joinedRows, pendingNotices] = await Promise.all([
+      myJoinedMeetups(user.id),
+      pendingMeetupNotices(user.id),
+    ])
+    joined = joinedRows
+    notices = pendingNotices
 
     // 조회 조건은 GET /api/community/meetups의 OPEN 기본 동작과 같다.
     // 목록을 API로 다시 받아오지 않고 여기서 직접 읽는다(posts와 같은 방식).
@@ -62,9 +80,6 @@ export default async function MeetupsPage() {
     })
 
     meetups = rows.map(({ participants, ...meetup }) => ({ ...meetup, joined: participants.length > 0 }))
-
-    // 무산된 모임은 위 목록(status OPEN)에 없다. 신청해 뒀던 사람에게는 배너로만 알린다.
-    notices = await pendingMeetupNotices(user.id)
   } catch (error) {
     console.error("[/community/meetups]", error)
     return (

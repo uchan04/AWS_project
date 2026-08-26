@@ -23,9 +23,9 @@ const NEUTRAL_COLOR = "#9CA3AF"
  * 화면에서 먼저 거르는 이유는 서버 왕복 없이 즉시 알려주는 편이 낫기 때문이다 —
  * 5MB짜리를 올려보고 나서 거절당하면 그 시간이 통째로 낭비된다.
  */
-const ACCEPT_TYPES = ["image/jpeg", "image/png", "image/webp"]
+const ACCEPT_TYPES = ["image/jpeg", "image/png"]
 const ACCEPT_ATTR = ACCEPT_TYPES.join(",")
-const MAX_FILE_SIZE = 5 * 1024 * 1024
+const MAX_FILE_SIZE = 4 * 1024 * 1024
 
 /** 업로드 결과. 실패를 예외가 아니라 값으로 돌려 호출부가 문구를 그대로 쓰게 한다. */
 type UploadOutcome = { ok: true; s3Key: string } | { ok: false; message: string }
@@ -55,6 +55,14 @@ export function WriteModal({ gallery, myTypeCode }: { gallery: GalleryTab; myTyp
   const [file, setFile] = useState<File | null>(null)
   const [previewUrl, setPreviewUrl] = useState<string | null>(null)
   const [uploading, setUploading] = useState(false)
+  /*
+   * 사진이 **다 올라간 뒤** 서버가 검열·가드레일 판정을 도는 구간(실측 2.2초).
+   * 그때도 "사진 올리는 중…"이라고 말하면 이미 끝난 일을 하고 있다고 알리는 셈이다.
+   *
+   * uploading을 대체하지 않는다 — 두 단계가 서로 다른 구간이고, 사진이 없으면
+   * 이 단계 자체가 없어야 한다(문구를 나누지 않고 지금 동작 그대로 둔다).
+   */
+  const [checking, setChecking] = useState(false)
   // presign이 500 UPLOAD_NOT_CONFIGURED를 주면 첨부만 잠근다. 글쓰기는 계속 된다.
   const [attachDisabled, setAttachDisabled] = useState(false)
   const fileInputRef = useRef<HTMLInputElement>(null)
@@ -95,12 +103,12 @@ export function WriteModal({ gallery, myTypeCode }: { gallery: GalleryTab; myTyp
     setError(null)
 
     if (!ACCEPT_TYPES.includes(picked.type)) {
-      setError("JPG·PNG·WEBP 이미지만 올릴 수 있어요")
+      setError("JPG·PNG 이미지만 올릴 수 있어요")
       resetFileInput()
       return
     }
     if (picked.size > MAX_FILE_SIZE) {
-      setError("파일 크기는 5MB 이하여야 해요")
+      setError("파일 크기는 4MB 이하여야 해요")
       resetFileInput()
       return
     }
@@ -185,6 +193,9 @@ export function WriteModal({ gallery, myTypeCode }: { gallery: GalleryTab; myTyp
           return
         }
         imageKey = outcome.s3Key
+        // 여기서 S3 PUT은 끝났다. 남은 대기는 서버 판정이라 문구를 바꾼다.
+        setUploading(false)
+        setChecking(true)
       }
 
       const res = await fetch("/api/community/posts", {
@@ -221,6 +232,7 @@ export function WriteModal({ gallery, myTypeCode }: { gallery: GalleryTab; myTyp
     } finally {
       setPending(false)
       setUploading(false)
+      setChecking(false)
     }
   }
 
@@ -393,7 +405,7 @@ export function WriteModal({ gallery, myTypeCode }: { gallery: GalleryTab; myTyp
                   disabled={pending}
                   className="hidden"
                 />
-                📷 사진 첨부 · 선택 (JPG·PNG·WEBP, 5MB 이하)
+                📷 사진 첨부 · 선택 (JPG·PNG, 4MB 이하)
               </label>
             )}
 
@@ -411,7 +423,7 @@ export function WriteModal({ gallery, myTypeCode }: { gallery: GalleryTab; myTyp
                 className="rounded-xl px-6 py-2.5 text-sm font-bold text-white transition disabled:cursor-not-allowed disabled:opacity-40"
                 style={{ backgroundColor: tribeColor }}
               >
-                {uploading ? "사진 올리는 중…" : "게시하기"}
+                {uploading ? "사진 올리는 중…" : checking ? "확인하는 중…" : "게시하기"}
               </button>
             </div>
             </>
