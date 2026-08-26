@@ -5,7 +5,7 @@ import { ok, fail } from "@/lib/api"
 import { GalleryType } from "@prisma/client"
 import { resolveGallery, canAccessGallery, listGalleryPosts } from "@/app/community/_lib/gallery"
 import { TITLE_MAX, BODY_MAX, IMAGE_KEY_MAX } from "@/app/community/_lib/limits"
-import { isOwnCommunityKey } from "@/app/community/_lib/imageKey"
+import { isAttachableImageKey } from "@/app/community/_lib/imageKey"
 import { grantAffinity, POST_AFFINITY } from "@/app/community/_lib/affinity"
 import { completeMissionByCode } from "@/lib/missions/completion"
 import { recordAttempt, retryAfter } from "@/lib/ratelimit"
@@ -83,7 +83,7 @@ export async function POST(request: NextRequest) {
       }
       // 빈 문자열은 "첨부 안 함"과 같게 본다. 화면이 제거 버튼으로 비운 경우다.
       const trimmed = rawImageKey.trim()
-      if (trimmed && !isOwnCommunityKey(trimmed, user.id)) {
+      if (trimmed && !isAttachableImageKey(trimmed, user.id)) {
         return fail("INVALID_IMAGE", "잘못된 이미지예요", 400)
       }
       imageKey = trimmed || null

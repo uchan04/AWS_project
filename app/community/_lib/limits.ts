@@ -22,7 +22,7 @@ export const COMMENT_MAX = 500
  * 여기서 막는 것은 길이뿐이다 — 무제한이면 API를 직접 부르는 쪽이 목록 응답에
  * 임의 길이 문자열을 실을 수 있다.
  *
- * **형식과 소유 판정은 `_lib/imageKey.ts`의 `isOwnCommunityKey()`가 한다.** 전에 이 자리에
+ * **형식과 소유 판정은 `_lib/imageKey.ts`의 `isAttachableImageKey()`가 한다**(소유권은 그 함수가 `lib/uploads.ts`에 위임한다). 전에 이 자리에
  * "키 형식은 검사하지 않는다(presign이 만든 값이므로)"고 적혀 있었으나 그것은 틀렸다 —
  * 이 값은 presign이 아니라 **요청 본문**에서 온다. 근거는 그 파일 주석에 있다.
  */

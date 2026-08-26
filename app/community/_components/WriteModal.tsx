@@ -1,6 +1,6 @@
 "use client"
 
-import { useRef, useState } from "react"
+import { useRef, useState, type ChangeEvent } from "react"
 import { useRouter } from "next/navigation"
 import type { TypeCode } from "@prisma/client"
 import { TRIBE } from "@/lib/types"
@@ -14,6 +14,21 @@ import { CRISIS_BLOCKED_HOTLINE } from "../_lib/crisis"
 // 전체 갤러리는 종족이 없어 TRIBE에 키가 없다. lib/types.ts는 A 소유 공유 파일이라
 // 건드리지 않고, ChatPanel이 NEUTRAL_COLOR를 자기 파일에 둔 것과 같은 방식으로 여기 둔다.
 const NEUTRAL_COLOR = "#9CA3AF"
+
+/*
+ * 첨부 사진. 값은 발급 쪽(`lib/uploads.ts`)과 같아야 한다 — 여기서 거르는 것은 편의이고
+ * **신뢰 경계는 서버다.** presign이 같은 타입·크기를 다시 검사하고, 저장 직전에
+ * `isAttachableImageKey()`가 키를 한 번 더 본다.
+ *
+ * 화면에서 먼저 거르는 이유는 서버 왕복 없이 즉시 알려주는 편이 낫기 때문이다 —
+ * 5MB짜리를 올려보고 나서 거절당하면 그 시간이 통째로 낭비된다.
+ */
+const ACCEPT_TYPES = ["image/jpeg", "image/png", "image/webp"]
+const ACCEPT_ATTR = ACCEPT_TYPES.join(",")
+const MAX_FILE_SIZE = 5 * 1024 * 1024
+
+/** 업로드 결과. 실패를 예외가 아니라 값으로 돌려 호출부가 문구를 그대로 쓰게 한다. */
+type UploadOutcome = { ok: true; s3Key: string } | { ok: false; message: string }
 
 /**
  * @param myTypeCode 내 종족. 갤러리(gallery)와 다르다 — 전체 탭에서도 추천은 내 성향으로 뽑는다.
@@ -35,6 +50,14 @@ export function WriteModal({ gallery, myTypeCode }: { gallery: GalleryTab; myTyp
   const [crisisSaved, setCrisisSaved] = useState(false)
   // 모달을 열 때 정한다. 입력 중에는 목록이 바뀌지 않는다.
   const [topics, setTopics] = useState<string[]>([])
+  // 첨부 사진. 고른 파일은 **미리 올리지 않는다** — 글을 안 쓰고 닫으면 고아 객체가 쌓인다.
+  // 실제 업로드는 "게시하기"를 누른 뒤 handleSubmit에서 한 번만 일어난다.
+  const [file, setFile] = useState<File | null>(null)
+  const [previewUrl, setPreviewUrl] = useState<string | null>(null)
+  const [uploading, setUploading] = useState(false)
+  // presign이 500 UPLOAD_NOT_CONFIGURED를 주면 첨부만 잠근다. 글쓰기는 계속 된다.
+  const [attachDisabled, setAttachDisabled] = useState(false)
+  const fileInputRef = useRef<HTMLInputElement>(null)
 
   const isAll = gallery === "ALL"
   const tribeColor = isAll ? NEUTRAL_COLOR : TRIBE[gallery].colorHex
@@ -49,10 +72,90 @@ export function WriteModal({ gallery, myTypeCode }: { gallery: GalleryTab; myTyp
     setTopics(pickTopics(gallery, myTypeCode))
   }
 
+  // 같은 파일을 다시 고를 수 있게 값을 비운다. 안 비우면 change가 안 뜬다.
+  function resetFileInput() {
+    if (fileInputRef.current) fileInputRef.current.value = ""
+  }
+
+  // objectURL은 만든 만큼 해제한다. 바꿔 끼울 때마다 이전 것을 먼저 놓는다.
+  function replacePreview(next: File | null) {
+    if (previewUrl) URL.revokeObjectURL(previewUrl)
+    setPreviewUrl(next ? URL.createObjectURL(next) : null)
+    setFile(next)
+  }
+
+  function clearFile() {
+    replacePreview(null)
+    resetFileInput()
+  }
+
+  function handlePickFile(event: ChangeEvent<HTMLInputElement>) {
+    const picked = event.target.files?.[0] ?? null
+    if (!picked) return
+    setError(null)
+
+    if (!ACCEPT_TYPES.includes(picked.type)) {
+      setError("JPG·PNG·WEBP 이미지만 올릴 수 있어요")
+      resetFileInput()
+      return
+    }
+    if (picked.size > MAX_FILE_SIZE) {
+      setError("파일 크기는 5MB 이하여야 해요")
+      resetFileInput()
+      return
+    }
+
+    replacePreview(picked)
+  }
+
+  /**
+   * presign → PUT. 성공하면 s3Key를 돌려준다.
+   *
+   * 문구는 서버 응답(`error.message`)을 그대로 쓴다 — E가 이미 한국어 문장으로 써 뒀고,
+   * 여기서 새로 지으면 같은 실패가 두 가지 말로 보인다. 예외는 UPLOAD_NOT_CONFIGURED 하나다.
+   */
+  async function uploadImage(picked: File): Promise<UploadOutcome> {
+    const presignRes = await fetch("/api/upload/community/presign", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ contentType: picked.type, fileSize: picked.size }),
+    })
+    const presignJson = await presignRes.json().catch(() => null)
+
+    if (!presignJson || presignJson.error) {
+      const code = presignJson?.error?.code
+      // 설정 오류는 다시 눌러도 안 된다. 첨부 자체를 잠그고 글만 올릴 수 있게 둔다.
+      if (code === "UPLOAD_NOT_CONFIGURED") {
+        setAttachDisabled(true)
+        clearFile()
+        return { ok: false, message: "지금은 사진을 올릴 수 없어요. 글만 올려주세요." }
+      }
+      // TOO_MANY_ATTEMPTS 포함. **고른 파일은 그대로 둔다** — 재시도할 수 있어야 한다.
+      return { ok: false, message: presignJson?.error?.message ?? "사진을 올리지 못했어요" }
+    }
+
+    const { uploadUrl, s3Key } = presignJson.data
+
+    // 헤더는 Content-Type **하나만** 보낸다. 값은 presign에 보낸 contentType과 정확히 같아야
+    // 한다 — 서명에 들어가 있어서 다른 헤더를 얹거나 값이 다르면 403이 난다.
+    // FormData로 감싸지 않는다. 본문은 File 객체 그대로다.
+    const putRes = await fetch(uploadUrl, {
+      method: "PUT",
+      headers: { "Content-Type": picked.type },
+      body: picked,
+    })
+    if (!putRes.ok) {
+      return { ok: false, message: "사진을 올리지 못했어요. 잠시 후 다시 시도해 주세요" }
+    }
+
+    return { ok: true, s3Key }
+  }
+
   function close() {
     setIsOpen(false)
     setTitle("")
     setBody("")
+    clearFile()
     setError(null)
     setCrisisNotice(null)
     setCrisisSaved(false)
@@ -71,10 +174,23 @@ export function WriteModal({ gallery, myTypeCode }: { gallery: GalleryTab; myTyp
     setPending(true)
     setError(null)
     try {
+      // 사진이 있으면 **먼저** 올린다. 실패하면 글도 올리지 않는다 —
+      // 사진만 빠진 채 글이 올라가면 사용자는 무엇을 다시 해야 하는지 알 수 없다.
+      let imageKey: string | null = null
+      if (file) {
+        setUploading(true)
+        const outcome = await uploadImage(file)
+        if (!outcome.ok) {
+          setError(outcome.message)
+          return
+        }
+        imageKey = outcome.s3Key
+      }
+
       const res = await fetch("/api/community/posts", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ title: trimmedTitle, body: trimmedBody, galleryType: gallery }),
+        body: JSON.stringify({ title: trimmedTitle, body: trimmedBody, galleryType: gallery, imageKey }),
       })
       const json = await res.json()
       if (json.error) {
@@ -104,6 +220,7 @@ export function WriteModal({ gallery, myTypeCode }: { gallery: GalleryTab; myTyp
       close()
     } finally {
       setPending(false)
+      setUploading(false)
     }
   }
 
@@ -243,6 +360,43 @@ export function WriteModal({ gallery, myTypeCode }: { gallery: GalleryTab; myTyp
               {body.length} / {BODY_MAX}자
             </p>
 
+            {/* 사진 첨부(선택). 없어도 글은 올라간다.
+                흐름은 "게시하기" → presign → uploadUrl에 PUT → 받은 s3Key를 글 POST의
+                imageKey로. 고르는 시점에는 아무것도 올리지 않는다(고아 객체 방지). */}
+            {attachDisabled ? (
+              <p className="mb-3 text-xs text-neutral-400">사진 첨부는 지금 이용할 수 없어요</p>
+            ) : previewUrl ? (
+              <div className="relative mb-3">
+                {/* next/image를 쓰지 않는 이유는 목록 카드와 같다. 여기는 blob: URL이라 더 그렇다 */}
+                {/* eslint-disable-next-line @next/next/no-img-element */}
+                <img
+                  src={previewUrl}
+                  alt="첨부한 사진 미리보기"
+                  className="max-h-56 w-full rounded-xl border border-neutral-200 object-cover"
+                />
+                <button
+                  type="button"
+                  onClick={clearFile}
+                  disabled={pending}
+                  className="absolute top-2 right-2 rounded-lg bg-black/60 px-3 py-1.5 text-xs font-semibold text-white transition hover:bg-black/75 disabled:opacity-40"
+                >
+                  제거
+                </button>
+              </div>
+            ) : (
+              <label className="mb-3 flex cursor-pointer items-center justify-center gap-2 rounded-xl border border-dashed border-neutral-300 px-4 py-3 text-xs text-neutral-500 transition hover:border-neutral-400 hover:bg-neutral-50">
+                <input
+                  ref={fileInputRef}
+                  type="file"
+                  accept={ACCEPT_ATTR}
+                  onChange={handlePickFile}
+                  disabled={pending}
+                  className="hidden"
+                />
+                📷 사진 첨부 · 선택 (JPG·PNG·WEBP, 5MB 이하)
+              </label>
+            )}
+
             {error && (
               <p role="alert" className="mb-3 text-xs text-red-500">
                 {error}
@@ -253,11 +407,11 @@ export function WriteModal({ gallery, myTypeCode }: { gallery: GalleryTab; myTyp
               <button
                 type="button"
                 onClick={handleSubmit}
-                disabled={pending || !title.trim() || !body.trim()}
+                disabled={pending || uploading || !title.trim() || !body.trim()}
                 className="rounded-xl px-6 py-2.5 text-sm font-bold text-white transition disabled:cursor-not-allowed disabled:opacity-40"
                 style={{ backgroundColor: tribeColor }}
               >
-                게시하기
+                {uploading ? "사진 올리는 중…" : "게시하기"}
               </button>
             </div>
             </>

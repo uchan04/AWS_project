@@ -19,19 +19,22 @@ D 쪽 기능 구현은 끝났고, 외부 대기 항목도 없다. AWS 계정·`B
   켠 뒤에는 그 계정으로 모임에 **신청할 수 없다**(관리자의 역할은 개설·결성확인·무산뿐이다). 신청 흐름을 확인하려면 일반 계정이 따로 필요하다
 - **모임은 전체 갤러리 하나로만 운영한다.** `Meetup.galleryType` 컬럼과 API의 검증은 그대로 살아 있고 개설 화면에서만 `ALL`로 고정한다. 종족 모임을 열기로 하면 `MeetupCreateModal`의 선택지를 되살리고 **소속 검사(`canAccessGallery`)를 신청 라우트와 목록 조회에 다시 넣어야 한다** — 한 번 넣었다가 "전체 모임 하나로 통합" 결정으로 되돌렸다
 
-### 0. 글 사진 첨부 — 표시·저장만 완료, 업로드 화면은 **보류** (2026-08-25)
+### 0. 글 사진 첨부 — 완료 (2026-08-26)
 
-`Post.imageKey`를 저장하고 목록·상세에 그리는 데까지 했다. **글쓰기 화면의 첨부 UI는 만들지 않았다** — 올릴 곳이 없기 때문이다. 재개할 때 이 항목부터 본다.
+글쓰기 화면에서 사진을 붙여 올린다. 로컬에서 presign → PUT → 목록·상세 표시까지 확인했다.
 
-- **커뮤니티용 presign이 레포에 없다.** 지시서가 가리킨 `lib/uploads.ts`·`app/api/upload/community/presign/route.ts`·`isOwnCommunityKey()`는 **어느 브랜치에도, 히스토리에도 없다**(2026-08-25 확인). 존재하는 presign은 `app/api/upload/presign` 하나뿐이고 `missionId` + `requiresPhoto` 미션 + 진단 완료를 강제하므로 커뮤니티에 쓸 수 없다. E가 그 파일을 올리기 전에는 `WriteModal`을 만들어도 404다 (사용자 결정으로 [1] 보류)
-- **`S3_BUCKET`이 빈 값이다**(`docs/STATUS.md`). presign이 생겨도 실제 업로드는 그다음 문제다
-- `CLOUDFRONT_DOMAIN`이 비면 `cdnUrl()`이 null을 주고 `postImageUrl()`도 null이라 **사진 영역 자체가 안 그려진다.** 글은 정상이다 — 첨부가 안 보이면 먼저 이 환경변수를 본다
+흐름은 "게시하기"를 누른 시점에 시작한다. 고르는 시점에는 아무것도 올리지 않는다 — 글을 안 쓰고 닫으면 고아 객체가 쌓이기 때문이다. `POST /api/upload/community/presign`으로 발급받고(5MB·jpg/png/webp, 키 `community/{userId}/{랜덤16}.{ext}`), `uploadUrl`에 File을 그대로 PUT한 뒤 받은 `s3Key`를 글 작성 POST의 `imageKey`로 보낸다. PUT 헤더는 `Content-Type` 하나뿐이고 값이 presign에 보낸 것과 정확히 같아야 한다 — 서명에 들어가서 어긋나면 403이다. FormData로 감싸면 안 된다.
 
-**소유 검증은 커뮤니티 쪽에 뒀다** — `app/community/_lib/imageKey.ts`의 `isOwnCommunityKey(key, userId)`. E의 `lib/uploads.ts`가 없고 `app/api/upload/`는 수정 금지 영역이라 판정만 이쪽에 만들었다. **E의 파일이 생기면 이 파일을 지우고 그쪽으로 갈아탄다**(규칙이 두 벌이면 갈라진다).
+**소유 검증은 `lib/uploads.ts`의 `isOwnCommunityKey()`가 정본이다.** 8/25에 그 파일이 없어 이쪽에 직접 구현했으나, 8/26에 E가 올린 뒤 걷고 갈아탔다. `_lib/imageKey.ts`에는 확장자 층만 남아 `isAttachableImageKey()`로 둘을 잇는다.
 
-이 검사를 빼면 안 되는 이유는 구멍이 실재하기 때문이다. `POST /api/community/posts`는 본문의 `imageKey`를 그대로 저장하고 목록·상세가 그 값을 `cdnUrl()`에 넣어 그린다. 검사가 없으면 본문에 `missions/<남의 userId>/….jpg`를 직접 넣는 것만으로 **남이 올린 미션 사진이 자기 글 이미지로 커뮤니티에 걸린다.** 글쓰기 권한 말고는 아무것도 필요 없다. 통과 조건은 `community/<본인 userId>/<파일명>` 정확히 세 조각이고, 확장자는 jpg·jpeg·png·webp뿐이다(CloudFront가 `.html`·`.svg`를 원본으로 내려주면 그 도메인에서 스크립트가 도는 XSS가 된다). `verifyCommunityObject()`류의 HeadObject 확인은 붙이지 않았다 — 키 소유 검증만으로 노출 문제는 막힌다.
+확장자 검사가 E 쪽에 없어서 여기 남긴 것이다. `isOwnCommunityKey()`만 쓰면 `community/{본인id}/x.html`이 통과한다. 지금은 presign이 이미지 확장자만 발급해서 그 이름의 객체가 존재할 수 없어 무해하지만, **막고 있는 것이 저장 쪽이 아니라 발급 쪽 형태다.** presign의 `COMMUNITY_EXT` map이 늘면 CloudFront가 원본을 그대로 내려주므로 같은 도메인에서 스크립트가 도는 XSS가 된다. E에게 `lib/uploads.ts`로 옮기는 건을 넘겼다 — 옮겨지면 이 층은 걷는다.
 
-`_lib/limits.ts`에 있던 "키 형식은 검사하지 않는다(presign이 만든 값이므로)"는 주석은 **틀려서 걷었다.** 이 값은 presign이 아니라 요청 본문에서 온다.
+소유 검증 자체를 빼면 안 되는 이유는 구멍이 실재하기 때문이다. `imageKey`는 presign이 아니라 요청 본문에서 온다. 검사가 없으면 본문에 `missions/<남의 userId>/….jpg`를 넣는 것만으로 **남이 올린 미션 사진이 자기 글 이미지로 걸린다.** 글쓰기 권한 말고는 아무것도 필요 없다. `verifyCommunityObject()`(HeadObject)는 붙이지 않았다 — 키 소유 검증만으로 노출은 막힌다.
+
+- `CLOUDFRONT_DOMAIN`이 비면 `cdnUrl()`이 null이라 **사진 영역 자체가 안 그려진다.** 글은 정상이다 — 첨부가 안 보이면 먼저 이 환경변수를 본다
+- `S3_BUCKET`이 비면 presign이 500 `UPLOAD_NOT_CONFIGURED`다. 화면은 첨부만 잠그고 글 작성은 계속되게 한다
+- presign은 사용자당 10분 20건 제한이다. 디버깅 중 `TOO_MANY_ATTEMPTS`가 뜨면 버그가 아니다
+- **배포 환경 확인은 아직이다.** 로컬과 CORS·CSP·CloudFront 캐시가 달라 로컬 성공이 배포 성공을 보장하지 않는다
 
 ### 1. Bedrock 스트리밍 응답 — 완료 (2026-08-19)
 `POST /api/chat/stream`을 새로 만들어 `ConverseStreamCommand`로 응답을 스트리밍하고, 스트림이 `messageStop`까지 정상 종료된 경우에만 `ChatRole.ASSISTANT`로 저장한다. 기존 `app/api/chat/messages/route.ts`(사용자 발화 저장 + 친밀도 지급)는 건드리지 않았다. 자세한 내용은 아래 "구현한 파일"·"결정한 것과 이유" 참고.
@@ -78,8 +81,7 @@ D 쪽 기능 구현은 끝났고, 외부 대기 항목도 없다. AWS 계정·`B
 ## 현재 상태
 - 완료: 갤러리 목록 화면, 상세 오버레이, 좋아요 토글, 댓글 작성, 글쓰기 모달, **전체 탭 글쓰기**, 본인 글 삭제, 본인 댓글 삭제, 친밀도 지급 헬퍼, 챗봇 시스템 프롬프트, 챗봇 메시지 저장 API(GET/POST, 친밀도 지급까지), 챗봇 패널 UI, Bedrock 스트리밍 응답 연결(`POST /api/chat/stream`), 타이핑 인디케이터, 유형별 챗봇 추천 문구 6개씩·3개 랜덤 노출(LLM 아님, 정적 상수), **챗봇 전역 오버레이 이전(`ChatLauncher` + `layout.tsx`, 임시 `/chat` 라우트 폐기)**, **희망 문구 배너(SPEC.md 9절)**, **좋아요 낙관적 갱신(1281ms 대기 제거)**, **오프라인 모임(2026-08-24 — API 6종, 목록·개설·신청·취소 화면, 결성·무산 알림, "내가 신청한 모임" 구역, 같은 날 중복 신청 제한)**
 - 진행 중: 없음
-- 미착수: 이미지 업로드, LLM 주제 추천(2026-08-22에 붙였다가 2026-08-25에 해제 — 상수 문구로 되돌렸다. 아래 "결정한 것과 이유" 참고)
-  - 이미지 업로드 세부: 표시·저장은 됐다(`Post.imageKey` + `_lib/imageKey.ts` 소유 검증). 없는 것은 **커뮤니티용 presign 라우트**이고 그래서 첨부 UI를 만들지 않았다 — 위 0절 참고
+- 미착수: LLM 주제 추천(2026-08-22에 붙였다가 2026-08-25에 해제 — 상수 문구로 되돌렸다. 아래 "결정한 것과 이유" 참고)
   - **LLM 주제 추천 해제에 맞춰 `SPEC.md` 8절을 고쳤다(2026-08-25, A).** "LLM이 주제·초안을 3가지 이상 추천" → "상수 제목 추천". D가 요청한 통보를 명세 쪽에서 처리한 것이다. 그리고 고아가 된 `lib/community/topics.ts`는 **A가 지웠다** — 살아 있는 대비책으로 오해할 여지를 없앴다
 - 보류(다음 세션 이전 필요 조건): 글쓰기 시 일일 미션(`DAILY_COMMUNITY_POST`) 완료 처리(B와 협의 필요), `ChatPanel`의 `layout.tsx` 이전(E 소유 파일이라 D가 직접 못 건드림) — 전부 아래 "결정한 것과 이유"에 근거 남김
 
