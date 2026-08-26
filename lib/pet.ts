@@ -1125,6 +1125,45 @@ export const OUTING_LOCK_MESSAGE = `아기(Lv.${EVOLUTION_LEVEL.STAGE2})가 되�
 /** 잠긴 카드 각주의 왼쪽 줄. 위 문장보다 짧아야 한 줄에 들어온다 */
 export const OUTING_LOCK_FOOT = "지금은 알이라 방에서 지내요"
 
+/**
+ * 여행일기 제목의 뒷말. 인덱스가 **결과 인덱스**(0 좋음 / 1 보통 / 2 덤덤)다.
+ *
+ * 2026-08-26 사용자가 준 화면 시안에 본문 위 제목이 한 줄 있다("빵집 앞에서 찾은 작은 행운").
+ * 그 자리가 비어 있었다 — 일기는 문장 배열뿐이었다.
+ *
+ * **새 축을 만들지 않았다.** 이미 저장된 `legs`에서 계산한다(`outingTitle`) — 그래서
+ *   ① DB 변경이 없고 ② 지금까지 쌓인 외출도 제목을 갖고 ③ 같은 외출을 다시 열어도
+ *   같은 제목이 나온다. 난수를 쓰면 ③이 깨져 새로고침마다 제목이 바뀐다.
+ *
+ * 앞말은 장소의 `where`가 붙는다(`문 앞`·`강가`…). 조사가 `에서`·`까지`뿐이라
+ * 받침 유무와 무관하다 — `이/가`·`은/는`을 쓰면 15곳마다 갈라진다.
+ */
+export const OUTING_TITLE_SUFFIX = [
+  "에서 만난 작은 행운",
+  "까지 다녀온 하루",
+  "에서 보낸 조용한 시간",
+] as const
+
+/**
+ * 일기 제목. **가장 좋았던 구간의 장소**를 쓴다 — 세 곳을 다녀왔을 때 제목이 가리켜야
+ * 하는 곳은 뭔가 있었던 곳이다. 같은 값이면 먼저 간 곳을 쓴다.
+ *
+ * `legs`가 비면(옛 3컬럼 기록) 호출부가 `fallbackWhere`를 준다. 그때는 결과를 모르므로
+ * 가운데(`까지 다녀온 하루`)로 간다 — 없는 사건을 좋았다고 말하지 않는다.
+ */
+export function outingTitle(legs: readonly OutingLeg[], fallbackWhere?: string): string {
+  if (legs.length === 0) {
+    return fallbackWhere ? `${fallbackWhere}${OUTING_TITLE_SUFFIX[1]}` : "조용한 하루"
+  }
+  let best = 0
+  for (let i = 1; i < legs.length; i += 1) {
+    if (legs[i].result < legs[best].result) best = i
+  }
+  const where = OUTING_PLACES.find((p) => p.key === legs[best].place)?.where ?? "밖"
+  const idx = Math.min(OUTING_TITLE_SUFFIX.length - 1, Math.max(0, Math.floor(legs[best].result)))
+  return `${where}${OUTING_TITLE_SUFFIX[idx]}`
+}
+
 /** 한 장소에서 한 일. DB에 저장하는 단위다 — 문장이 아니라 키만 담는다 */
 export type OutingLeg = {
   place: string

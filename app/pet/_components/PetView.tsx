@@ -253,6 +253,10 @@ export default function PetView({ initial }: { initial: PetState }) {
    * 받은 재화를 함께 담으므로 토스트는 띄우지 않는다 (같은 값을 두 번 말하지 않는다).
    */
   const [diary, setDiary] = useState<{
+    /** 본문 위 제목. 서버가 저장된 legs에서 계산해 준다(lib/outing.ts outingTitleFor) */
+    title: string
+    /** 상단 날짜(ISO). 화면이 `YYYY. MM. DD`로 만든다 */
+    returnedAt: string
     episode: string[]
     gained: { seeds: number; starShards: number }
   } | null>(null)
@@ -770,7 +774,12 @@ export default function PetView({ initial }: { initial: PetState }) {
       // 사용자가 쓴 20문구와 먹이기 답뿐이라는 규칙을 지킨다(위 pat·react 주석)
       react(null)
       // 토스트를 띄우지 않는다 — 아래 여행일기 팝업이 같은 재화를 하단에 담는다
-      setDiary({ episode: next.episode, gained: next.gained })
+      setDiary({
+        title: next.title,
+        returnedAt: next.returnedAt,
+        episode: next.episode,
+        gained: next.gained,
+      })
       window.dispatchEvent(new CustomEvent("user-stats-changed"))
     } catch {
       setToast({ text: "네트워크 연결을 확인해 주세요", error: true })
@@ -1705,8 +1714,9 @@ export default function PetView({ initial }: { initial: PetState }) {
 
       {diary ? (
         <OutingDiaryModal
-          art={petFace}
           skinName={pet.skinName}
+          title={diary.title}
+          returnedAt={diary.returnedAt}
           episode={diary.episode}
           gained={diary.gained}
           onClose={() => setDiary(null)}
@@ -1778,29 +1788,58 @@ function WalletInfoModal({
 }
 
 /**
- * 여행일기 팝업 (2026-08-26 사용자 결정).
+ * 여행일기 팝업.
  *
- * 구성이 고정이다 — **펫 모습(상단) · 이야기(중단) · 수집한 재화(하단).**
- * 이 순서인 이유: 누가 다녀왔는지를 먼저 세우고(화자), 무슨 일이 있었는지를 읽고(내용),
- * 그래서 무엇이 들어왔는지로 닫는다(결과). 재화를 위에 두면 일기가 영수증 부록이 된다.
+ * 2026-08-26 사용자가 준 화면 시안에 맞춰 다시 짰다. 시안은 **종이 한 장**이다 —
+ * 마스킹 테이프 두 조각, 클립, 겹친 종이 그림자, 점선 구분선, 형광펜 밑줄.
  *
- * 펫 그림은 `petFace`를 그대로 받는다 — 방에 있는 것과 다른 그림을 쓰면 같은 펫으로 안 읽힌다.
- * Escape·초점 가두기는 지갑 팝업과 같은 `useModalA11y`다.
+ * 앞 판(펫 초상 상단 + 이야기 중단 + 재화 하단, 넓은 화면 2단)에서 바뀐 것 4개:
+ *   ① 펫 초상이 빠지고 그 자리에 발자국 + 날짜 + 제목이 온다 (시안에 초상이 없다)
+ *   ② 본문 위에 **제목 한 줄**이 생겼다 — 서버가 저장된 legs에서 계산해 준다
+ *   ③ 재화가 줄 목록에서 **선물 타일**이 됐다(그림 + 수량 배지 + 이름)
+ *   ④ 닫기 버튼이 `{펫 이름} 맞이하기`가 됐다 — 끝내는 말이 아니라 만나러 가는 말이다
+ *
+ * **시안의 세 번째 선물(쿠키 조각)은 넣지 않았다.** 우리 경제에 없는 재화다 —
+ * 만들려면 스키마와 `calculateReward()`를 함께 고쳐야 하고 그건 전원 합의 사항이다
+ * (`CLAUDE.md` 1·2절). 시안의 `친밀도 +3`도 넣지 않았다: 외출은 친밀도를 **쓴다**(200).
+ * "가져온 선물"에 쓴 재화를 놓으면 거짓이 된다. 그래서 타일은 씨앗·별조각 둘이다.
+ *
+ * 넓은 화면 2단 배치는 걷었다. 시안이 세로로 긴 종이 한 장이라 두 규칙이 서로 싸운다.
  */
 function OutingDiaryModal({
-  art,
   skinName,
+  title,
+  returnedAt,
   episode,
   gained,
   onClose,
 }: {
-  art: React.ReactNode
   skinName: string
+  title: string
+  returnedAt: string
   episode: string[]
   gained: { seeds: number; starShards: number }
   onClose: () => void
 }) {
   const boxRef = useModalA11y(onClose)
+
+  // `2026. 08. 26`. toLocaleDateString을 쓰지 않는다 — 로케일에 따라 `2026/8/26`이나
+  // `26. 8. 26.`이 나와 시안의 자리 폭이 흔들린다. ISO에서 직접 자른다.
+  const d = new Date(returnedAt)
+  const dateLabel = Number.isNaN(d.getTime())
+    ? ""
+    : `${d.getFullYear()}. ${String(d.getMonth() + 1).padStart(2, "0")}. ${String(d.getDate()).padStart(2, "0")}`
+
+  const gifts = [
+    { key: "seed", currency: "seed" as const, label: "씨앗", amount: gained.seeds, badge: `x${ko(gained.seeds)}` },
+    {
+      key: "shard",
+      currency: "starShard" as const,
+      label: "별조각",
+      amount: gained.starShards,
+      badge: `x${ko(gained.starShards)}`,
+    },
+  ]
 
   return (
     <div className="pet-diary-pop" onClick={onClose}>
@@ -1810,48 +1849,91 @@ function OutingDiaryModal({
         aria-modal="true"
         aria-labelledby="diary-title"
         tabIndex={-1}
-        /* --diary 수식자는 **넓은 화면 2단 배치를 이 팝업에만** 걸기 위한 것이다.
-           `pet-diary-pop__box` 골격을 진화 단계 팝업(`.pet-evo-pop`)이 함께 쓰는데,
-           그쪽 자식들은 grid-area를 갖고 있지 않아서 공용 클래스에 배치를 넣으면
-           암시적 행으로 흩어진다 */
         className="pet-diary-pop__box pet-diary-pop__box--diary screen-enter"
         onClick={(e) => e.stopPropagation()}
       >
-        {/* ── 상단: 펫 모습 ── */}
-        <div className="pet-diary__top">
-          <div className="pet-diary__art">{art}</div>
-          <p className="pet-diary__title" id="diary-title">
-            {skinName}의 여행일기
-          </p>
-          <p className="pet-diary__sub">다녀왔어요</p>
+        {/* 종이 장식. 전부 aria-hidden이다 — 스크린리더에 읽을 내용이 없다.
+            테이프·클립·겹친 종이는 이미지가 아니라 CSS 도형이다(새 에셋을 넣지 않았다) */}
+        <span className="pet-diary__clip" aria-hidden="true" />
+        <span className="pet-diary__tape pet-diary__tape--tl" aria-hidden="true" />
+        <span className="pet-diary__tape pet-diary__tape--br" aria-hidden="true" />
+        <span className="pet-diary__dots" aria-hidden="true" />
+
+        {/* 닫기는 오른쪽 위 하나다. 맨 아래 `맞이하기` 버튼도 같은 onClose를 부르는데,
+            둘을 둔 것은 시안 그대로다 — 위는 그만 보기, 아래는 다 읽고 나가기다 */}
+        <button
+          type="button"
+          className="pet-diary__x"
+          onClick={onClose}
+          aria-label="여행일기 닫기"
+        >
+          ✕
+        </button>
+
+        <div className="pet-diary__head">
+          <span className="pet-diary__paw" aria-hidden="true">
+            🐾
+          </span>
+          {dateLabel ? (
+            <p className="pet-diary__date">
+              <span aria-hidden="true" className="pet-diary__date-rule" />
+              <time dateTime={returnedAt}>{dateLabel}</time>
+              <span aria-hidden="true" className="pet-diary__date-rule" />
+            </p>
+          ) : null}
+          {/* 제목에 형광펜 밑줄이 깔린다. text-decoration이 아니라 배경 그라디언트다 —
+              밑줄은 글자에 붙지만 형광펜은 글자를 가로지르며 조금 넘쳐야 한다 */}
+          <h2 className="pet-diary__name" id="diary-title">
+            {skinName}의 외출 이야기
+          </h2>
         </div>
 
-        {/* ── 중단: 이야기 ──
-            줄 수가 5축 구조에서 최대 11줄까지 늘어난다. 여기서만 스크롤되고 팝업 자체는
-            화면을 넘지 않는다 — 상단 펫과 하단 재화는 항상 보여야 한다 */}
+        <span className="pet-diary__rule" aria-hidden="true" />
+
+        {/* 제목 양옆 반짝임 세 줄. ✨ 이모지가 아니라 CSS 선이다 — 이모지는 폰트마다
+            크기가 달라 좌우 대칭이 깨진다 */}
+        <p className="pet-diary__lead">
+          <span className="pet-diary__spark pet-diary__spark--l" aria-hidden="true" />
+          <span className="pet-diary__lead-text">{title}</span>
+          <span className="pet-diary__spark pet-diary__spark--r" aria-hidden="true" />
+        </p>
+
+        {/* 본문. 5축 일기가 최대 11줄이라 여기만 스크롤한다 — 종이 높이가 화면을 넘지
+            않아야 하고, 위 제목과 아래 선물은 늘 보여야 한다. 불릿을 쓰지 않는다(글이다) */}
         <ul className="pet-diary__story">
           {episode.map((line, i) => (
             <li key={`${i}-${line}`}>{line}</li>
           ))}
         </ul>
 
-        {/* ── 하단: 수집한 재화 ──
-            실지급액이다(서버가 calculateReward()를 통과시킨 값). 0이어도 칸을 지우지 않는다 —
-            "여기에 재화가 들어온다"는 자리로 읽히는 편이 낫다(지갑 카드와 같은 판단) */}
-        <div className="pet-diary__loot">
-          <p className="pet-diary__loot-head">가져온 것</p>
-          <ul className="pet-diary__loot-list">
-            <li>
-              <span aria-hidden="true">🌱</span> 씨앗 <strong>+{ko(gained.seeds)}</strong>
-            </li>
-            <li>
-              <span aria-hidden="true">⭐</span> 별조각 <strong>+{ko(gained.starShards)}</strong>
-            </li>
-          </ul>
-        </div>
+        <span className="pet-diary__rule" aria-hidden="true" />
 
-        <button type="button" className="pet-btn pet-btn--block" onClick={onClose}>
-          닫기
+        {/* 실지급액이다(서버가 calculateReward()를 통과시킨 값). 0이어도 칸을 지우지 않는다 —
+            "여기에 재화가 들어온다"는 자리로 읽히는 편이 낫다(지갑 카드와 같은 판단) */}
+        <p className="pet-diary__gift-head">
+          <span aria-hidden="true" className="pet-diary__gift-rule" />
+          <span className="pet-diary__gift-chip">가져온 선물</span>
+          <span aria-hidden="true" className="pet-diary__gift-rule" />
+        </p>
+        <ul className="pet-diary__gifts">
+          {gifts.map((g) => (
+            <li key={g.key} className="pet-diary__gift">
+              <span className="pet-diary__gift-art">
+                <CurrencyIcon currency={g.currency} size={56} />
+                <span className="pet-diary__gift-badge" aria-hidden="true">
+                  {g.badge}
+                </span>
+              </span>
+              <span className="pet-diary__gift-name">
+                {g.label} {g.badge}
+              </span>
+            </li>
+          ))}
+        </ul>
+
+        <button type="button" className="pet-btn pet-diary__go" onClick={onClose}>
+          <span aria-hidden="true">🐾</span> {skinName} 맞이하기{" "}
+          <span aria-hidden="true">🐾</span>
         </button>
       </div>
     </div>

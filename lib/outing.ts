@@ -21,6 +21,8 @@ import {
   OUTING_RECENT_AVOID,
   OUTING_LOCK_MESSAGE,
   outingPlacesForStage,
+  outingTitle,
+  OUTING_PLACES,
   type OutingLeg,
   outingProgress,
   outingRemainingLabel,
@@ -113,25 +115,46 @@ export async function findOpenOuting(userId: string): Promise<PetOuting | null |
  *
  * Json 컬럼이라 타입이 보장되지 않는다 — 모양을 직접 확인하고, 아니면 폴백으로 내려간다.
  */
+/**
+ * 저장된 `legs`(JSONB)를 신뢰하지 않고 걸러 낸다. **문장과 제목이 같은 파서를 써야 한다** —
+ * 두 벌로 두면 한쪽만 옛 기록을 처리해서 제목은 나오는데 본문이 옛 문장이 되는 상태가 생긴다.
+ *
+ * 표에 `legs`가 없거나(마이그레이션 전 DB) null이면 빈 배열이다 — 호출부가 옛 3컬럼으로 간다.
+ */
+function parseLegs(legs: unknown): OutingLeg[] {
+  if (!Array.isArray(legs)) return []
+  return legs.filter(
+    (l): l is OutingLeg =>
+      typeof l === "object" &&
+      l !== null &&
+      typeof (l as OutingLeg).place === "string" &&
+      typeof (l as OutingLeg).deed === "string" &&
+      typeof (l as OutingLeg).sight === "string",
+  )
+}
+
 function outingLines(outing: {
   legs?: unknown
   placeKey: string
   metKey: string
   moodKey: string
 }): string[] {
-  const legs = outing.legs
-  if (Array.isArray(legs) && legs.length > 0) {
-    const parsed = legs.filter(
-      (l): l is OutingLeg =>
-        typeof l === "object" &&
-        l !== null &&
-        typeof (l as OutingLeg).place === "string" &&
-        typeof (l as OutingLeg).deed === "string" &&
-        typeof (l as OutingLeg).sight === "string",
-    )
-    if (parsed.length > 0) return outingDiary(parsed, outing.moodKey)
-  }
+  const parsed = parseLegs(outing.legs)
+  if (parsed.length > 0) return outingDiary(parsed, outing.moodKey)
   return outingEpisode(outing.placeKey, outing.metKey, outing.moodKey)
+}
+
+/**
+ * 일기 제목 (2026-08-26 화면 시안). 계산은 `lib/pet.ts` `outingTitle`이 한다 —
+ * 여기서는 저장 형태(신 `legs` / 옛 3컬럼)를 고르는 일만 한다.
+ *
+ * 옛 기록에는 결과 인덱스가 없으므로 장소의 `where`만 넘긴다.
+ */
+function outingTitleFor(outing: { legs?: unknown; placeKey: string }): string {
+  const parsed = parseLegs(outing.legs)
+  if (parsed.length > 0) return outingTitle(parsed)
+  const where = OUTING_PLACES.find((p) => p.key === outing.placeKey)?.where
+  return outingTitle([], where)
 }
 
 export function toOutingView(
@@ -316,6 +339,10 @@ export async function startOuting(
 export type ClaimOutingResult =
   | {
       ok: true
+      /** 본문 위 제목. 저장된 legs에서 계산한다 — 같은 외출은 늘 같은 제목이다 */
+      title: string
+      /** 일기 상단 날짜. 돌아온 시각(ISO)이고 화면이 `YYYY. MM. DD`로 만든다 */
+      returnedAt: string
       episode: string[]
       gained: { seeds: number; starShards: number }
       seeds: number
@@ -385,6 +412,8 @@ export async function claimOuting(
 
     return {
       ok: true,
+      title: outingTitleFor(open),
+      returnedAt: open.returnsAt.toISOString(),
       episode: outingLines(open),
       gained: { seeds, starShards },
       seeds: result.seeds,
