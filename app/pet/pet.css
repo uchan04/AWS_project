@@ -3451,3 +3451,59 @@
   font-variant-numeric: tabular-nums;
   color: var(--color-ink);
 }
+
+/* ─────────────────────────────────────────────────────────────────────
+   2026-08-26 IA 정리 (사용자 결정)
+   ───────────────────────────────────────────────────────────────────── */
+
+/* 진화 단계 팝업 입구. 방 오른쪽 위에 각주 크기로 얹는다 — 방의 주인공은 펫이다.
+   .pet-room이 position: relative가 아니면 방 밖으로 나가므로 함께 지정한다 */
+.pet-room {
+  position: relative;
+}
+
+.pet-room__evo {
+  position: absolute;
+  top: var(--space-2xs);
+  right: var(--space-2xs);
+  z-index: 2;
+  display: grid;
+  place-items: center;
+  width: 2rem;
+  height: 2rem;
+  border: 0;
+  border-radius: 999px;
+  background: color-mix(in oklch, #fdfbf5 82%, transparent);
+  box-shadow: 0 2px 6px rgba(42, 31, 20, 0.14);
+  font-size: var(--text-label);
+  line-height: 1;
+  cursor: pointer;
+}
+
+.pet-room__evo:hover {
+  background: #fdfbf5;
+}
+
+/* 진화 단계 팝업. 카드 4장이 가로로 서므로 지갑·일기 팝업보다 넓다 */
+.pet-evo-pop {
+  max-width: 30rem;
+  display: grid;
+  gap: var(--space-2xs);
+  max-height: min(90dvh, 40rem);
+  overflow-y: auto;
+}
+
+/* 경험치 카드는 이제 씨앗 투입 시에만 나타난다(PetView expShow 주석).
+   채워지는 모습은 .pet-gauge__fill의 transition이 만든다 — JS 애니메이션이 없다.
+   전환 시간을 여기서 늘려 잡는다: 기본값은 즉시에 가까워서 올라가는 게 안 보인다 */
+.pet-card--exp .pet-gauge__fill {
+  transition: width 0.8s cubic-bezier(0.22, 0.61, 0.36, 1);
+}
+
+/* 모션을 끈 사용자에게는 채워지는 연출을 주지 않는다. 카드는 그대로 나타나고
+   게이지가 **최종값으로 바로** 보인다 — 애니메이션 없이도 정보는 전달돼야 한다 */
+@media (prefers-reduced-motion: reduce) {
+  .pet-card--exp .pet-gauge__fill {
+    transition: none;
+  }
+}
