@@ -169,16 +169,11 @@ function RoomSvg() {
           rx={1}
         />
       ))}
-      {/* 책장 위 "일기장" 딱지 (2026-08-26 사용자 요청).
-          천판 위 6좌표에 baseline을 두고 책장 가로 가운데(SHELF_X + SHELF_W / 2)에 맞춘다 —
-          text-anchor: middle을 pet.css가 준다.
-          **이 SVG 전체가 aria-hidden이라 스크린리더는 이 글자를 읽지 않는다.** 가구에 붙은
-          장식 딱지이고 아직 어떤 기능도 가리키지 않으므로 그대로 둔다 — 나중에 이 글자가
-          일기 기능의 입구가 되면 <text>가 아니라 버튼·링크여야 하고, 그때 aria도 함께 온다
-          (파일 맨 위 "장식이므로 aria-hidden" 주석과 같은 기준) */}
-      <text className="pet-room__shelf-label" x={SHELF_X + SHELF_W / 2} y={SHELF_TOP - 6}>
-        일기장
-      </text>
+      {/* 여기에 책장 위 "일기장" 딱지(`.pet-room__shelf-label`)가 있었다 —
+          천판 위 6좌표, 책장 가로 가운데, --font-body 10좌표였다.
+          **2026-08-26 같은 날 사용자 요청으로 지웠다.** 되살릴 값은 그 한 줄이고
+          자리는 `x={SHELF_X + SHELF_W / 2} y={SHELF_TOP - 6}`이다.
+          CSS 규칙도 함께 걷었다(pet.css의 그 자리 주석) */}
 
       {/* 러그 */}
       <ellipse className="pet-room__rug" cx={200} cy={246} rx={120} ry={24} />

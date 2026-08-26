@@ -296,7 +296,11 @@
    그 안에 또 면을 넣으면 배지 안 배지가 된다 */
 .pet-hud-lv__level {
   font-family: var(--font-display);
-  font-size: var(--text-md);
+  /* **2026-08-26 사용자 요청으로 --text-md(20px) → --text-body(16px).** 시안의 상태판은
+     레벨이 가장 큰 글자인데, 이 앱의 상태판은 그 옆에 펫 이름이 붙고 아래에 게이지와
+     재화 줄까지 셋이 더 있어서 20px이 상자를 눌렀다.
+     스케일 밖 값(예: 18px)을 쓰지 않는다 — tokens.css의 1.25배 계단에서 한 칸 내린 것이다 */
+  font-size: var(--text-body);
   color: var(--tribe-cta);
   line-height: 1.1;
 }
@@ -883,10 +887,24 @@
      (9 → 18 → 14.4 → 15.4rem). 단계별 값은 아래 :has() 네 줄에 있고, 여기서 한 번 상한을
      씌워 아래 세 곳(.pet-char__img·.pet-char__shadow·말풍선 자리)이 같은 값을 읽는다 */
   --pet-char-size: 15.4rem;
+  /* **2026-08-26 사용자 요청: 캐릭터를 2.3배.** 단계별 값(아래 :has() 네 줄)을 넷 다 고치는
+     대신 배율 한 칸을 둔다 — 그 넷은 그림 파일의 성질에서 나온 값이라(투명 여백 실측)
+     비율끼리의 관계를 건드리지 않는 편이 안전하다. 되돌리려면 이 줄만 1로 바꾼다.
+     **말풍선과의 간격은 배율을 따라가지 않는다** — 아래 .pet-welcome의 bottom 식 참고 */
+  --pet-char-scale: 2.3;
   /* 78vw 상한은 좁은 화면에서 그림이 방 폭보다 커지는 것을 막는다 — 방이
      overflow: hidden이라 넘치면 좌우가 잘린다. 좁은 화면에는 방 높이(19.5rem) 때문에
-     세로 상한이 하나 더 붙는다(파일 끝 "좁은 화면" 절) */
-  --pet-char-w: min(var(--pet-char-size), 78vw);
+     세로 상한이 하나 더 붙는다(파일 끝 "좁은 화면" 절).
+     **56vh 상한은 2.3배와 함께 들어왔고, 값의 근거는 말풍선이다.** 4단 그림이
+     19.7 × 2.3 = 45.3rem(725px)인데 방 높이는 창에 따라 520~670px이라 상한이 없으면
+     그림 위쪽이 방 밖으로 잘린다(방은 overflow: hidden이고 그림은 바닥 기준이다).
+     상한을 얼마로 두느냐는 말풍선이 정한다: 말풍선이 자기 상한
+     (`100% − 7rem − 0.5rem`)에 걸리지 않으려면 `0.81 × 그림 폭 + 120px ≤ 방 높이`,
+     즉 그림 폭 ≤ (방 높이 − 120) / 0.81이어야 한다. 방 523px에서 497px, 672px에서 681px이다.
+     56vh는 832px 창에서 466px이라 그 두 경우 다 아래에 있다 — **걸리면 말풍선이 머리로
+     내려앉는다**(이 파일이 8/24에 고친 그 버그다).
+     그래서 **2.3배는 좁은 창에서 상한에 잡힌다** — 방이 그만큼 크지 않다 */
+  --pet-char-w: min(calc(var(--pet-char-size) * var(--pet-char-scale)), 78vw, 56vh);
   /* 그림 상자를 방 바닥선 **아래로** 내리는 몫이다(폭 비례). 단계마다 값이 다른 이유는
      그림 아래 남는 투명 여백이 단계마다 다르기 때문이다 — 근거는 아래 :has() 네 줄의 주석과
      .pet-char__img의 object-position 주석에 있는 24장 실측이다.
@@ -1000,24 +1018,12 @@
   fill: #d8bc86;
 }
 
-/* 책장 위 "일기장" 딱지 (2026-08-26 사용자 요청).
-   **서체가 --font-body(기기 한국어 시스템 서체)인 이유는 전송량이다.** --font-crayon은
-   app/layout.tsx가 "펫 외출 쪽지 한 곳뿐이고 늘리지 않는다"고 못 박아 둔 서체이고,
-   --font-display(Gowun Dodum)는 웹폰트라 이 세 글자 때문에 unicode-range 조각을 더 받을
-   수 있다. 13px짜리 가구 딱지에 그 값을 치를 이유가 없다 — 시스템 서체는 0KB다.
-
-   font-size가 10(좌표)인 것은 화면에서 약 12~15px이 되는 값이다: 이 SVG는 slice로
-   방을 덮으므로 배율이 방 크기에 따라 1.17~1.48로 변한다(10 × 1.17 = 11.7px,
-   10 × 1.48 = 14.8px). px로 주면 배율을 두 번 먹어 방이 커질 때 글자만 작아 보인다.
-
-   색은 --color-muted다. 벽(--tribe 22% + #fffaf2)이 밝은 면이라 잉크색은 딱지가 아니라
-   제목처럼 무거워지고, 이 글자는 가구에 붙은 메모여야 한다 */
-.pet-room__shelf-label {
-  fill: var(--color-muted);
-  font-family: var(--font-body);
-  font-size: 10px;
-  text-anchor: middle;
-}
+/* 여기에 책장 위 "일기장" 딱지(.pet-room__shelf-label)가 있었다 —
+   --color-muted · --font-body · font-size 10(SVG 좌표) · text-anchor: middle.
+   **2026-08-26 같은 날 사용자 요청으로 지웠다.** 되살릴 값은 위 네 줄이고, 서체를
+   --font-body로 둔 근거는 전송량이었다(--font-crayon은 쪽지 전용이고 --font-display는
+   웹폰트라 조각을 더 받는다). font-size를 px가 아니라 좌표로 준 이유는 이 SVG가 slice로
+   방을 덮어 배율이 1.17~1.48로 변하기 때문이다 */
 .pet-room__rug {
   fill: color-mix(in oklch, var(--tribe) 48%, var(--color-card));
   opacity: 0.55;
@@ -1143,6 +1149,14 @@
      22 − 7 − 0.5 = 14.5rem이 되어 4단 자리(그림이 세로 상한 17rem에 잡혀 13.8rem)와
      3단 자리(13.5rem)가 둘 다 들어온다 — 방이 19.5rem일 때는 상한이 12rem이라 3·4단
      말풍선이 20~24px 낮게 앉아 머리에 8~11px 겹쳤다. 그것이 이번 요청의 절반이었다 */
+  /* **이 비례식이 "간격 유지"의 정답이다** (2026-08-26 확인).
+     사용자 요청이 "말풍선의 크기와 캐릭터 간의 간격을 유지한 채 캐릭터를 2.3배"였고, 처음에
+     `그림 폭 − 고정 몫`으로 바꿨다가 **되돌렸다.** 이유:
+     0.81은 그림 상자 위쪽 투명 여백(약 19%)의 반대값이라 `0.81 × 그림 폭`이 곧
+     **보이는 머리 끝**이다. 머리 끝도 상자에 비례하므로, 상자가 2.3배가 되면 이 자리도
+     2.3배가 되어 **말풍선과 머리 사이 간격은 그대로 0에 가깝게 남는다.**
+     고정 몫을 빼는 식은 오히려 간격을 벌린다 — 실측에서 2.3배일 때 29px이 벌어졌다.
+     말풍선 자체의 크기(14 × 7rem)는 이 요청에서 건드리지 않았다 */
   bottom: min(
     calc(var(--pet-char-w) * 0.81),
     100% - var(--pet-bubble-min-h) - var(--space-2xs)
@@ -1549,37 +1563,19 @@
    그때 말풍선 자리(.pet-welcome의 bottom 식 "그림 폭의 0.78배")를 배지 높이만큼 다시
    올려야 한다 — 2026-08-24부터 네 값이 아니라 식 하나다 */
 
-/* 펫 주위 반짝임 3개(✨⭐✨).
+/* 여기에 **펫 주위 반짝임 3개(✨⭐✨)** 규칙 4벌이 있었다(.pet-char__sparkle + data-i 셋).
  *
- * 2026-08-24 사용자 요청("주위에 둥둥 떠다니는 이모티콘들 지워줘")으로 이 규칙과 petSparkle
- * 키프레임을 지웠다가, **같은 날 develop 병합에서 사용자 결정으로 되살렸다** — develop이
- * 같은 자리에 쓰다듬기 버튼과 반응 파티클을 붙여 놓았고, 그 셋을 한 벌로 가져오는 쪽을
- * 골랐다. 방의 떠다니는 씨앗(.pet-room__seeds 주석)은 되살리지 않았다 — 그쪽은 develop에도
- * 새 기능이 붙지 않아 지운 상태가 그대로다. 그래서 아래 prefers-reduced-motion 목록에도
- * .pet-room__seed가 없다.
+ * 내력: 2026-08-24 사용자 요청("주위에 둥둥 떠다니는 이모티콘들 지워줘")으로 지웠다가 같은 날
+ * develop 병합에서 되살렸고, **2026-08-26 사용자 요청으로 다시 지웠다**("캐릭터 옆에 반짝거리는
+ * 이모티콘들 다 지워줘"). 두 번째 삭제이므로 되살리지 않는다.
  *
- * data-i로 구분하는 이유는 .pet-char 안의 형제가 전부 span이라 nth-of-type이 그림자까지
- * 세기 때문이다 */
-.pet-char__sparkle {
-  position: absolute;
-  pointer-events: none;
-}
-.pet-char__sparkle[data-i="1"] {
-  top: -1rem;
-  left: -1.5rem;
-  animation: petSparkle 2s var(--ease-in-out) infinite;
-}
-.pet-char__sparkle[data-i="2"] {
-  top: -0.5rem;
-  right: 0;
-  animation: petSparkle 2.5s var(--ease-in-out) 0.5s infinite;
-}
-.pet-char__sparkle[data-i="3"] {
-  top: 1rem;
-  right: -1.5rem;
-  animation: petSparkle 3s var(--ease-in-out) 1s infinite;
-}
-
+ * 되살릴 값: 상자는 position: absolute + pointer-events: none이고 셋의 자리·타이밍이
+ * (top -1rem / left -1.5rem / 2s) · (top -0.5rem / right 0 / 2.5s 0.5s 지연) ·
+ * (top 1rem / right -1.5rem / 3s 1s 지연)이었다. 애니메이션은 petSparkle 키프레임(파일 끝)이고
+ * 그것도 함께 걷었다. data-i로 구분한 이유는 .pet-char 안의 형제가 전부 span이라
+ * nth-of-type이 그림자까지 세기 때문이다.
+ *
+ * 방의 떠다니는 씨앗(.pet-room__seeds)은 2026-08-24에 지운 상태 그대로다 */
 /* 쓰다듬기. 그림 자체가 버튼이라 자체 상자를 만들지 않는다 */
 .pet-char__touch {
   display: grid;
@@ -1848,7 +1844,8 @@
 
 .pet-card__foot em {
   font-style: normal;
-  font-weight: 600;
+  /* 2026-08-26 사용자 요청("카드 내의 볼드체 없애줘")으로 굵기를 걷었다 */
+  font-weight: 400;
   color: var(--tribe-cta);
 }
 
@@ -2030,7 +2027,8 @@
   display: grid;
   place-items: center;
   font-size: var(--text-label);
-  font-weight: 600;
+  /* 2026-08-26 사용자 요청("카드 내의 볼드체 없애줘")으로 굵기를 걷었다 */
+  font-weight: 400;
   color: var(--color-ink);
 }
 
@@ -2149,7 +2147,8 @@
   color: var(--tribe-cta);
   font-family: var(--font-body);
   font-size: var(--text-md);
-  font-weight: 600;
+  /* 2026-08-26 사용자 요청("카드 내의 볼드체 없애줘")으로 굵기를 걷었다 */
+  font-weight: 400;
   font-variant-numeric: tabular-nums;
 }
 
@@ -2536,7 +2535,8 @@
 .pet-log__value {
   margin: 0;
   font-size: var(--text-md);
-  font-weight: 700;
+  /* 2026-08-26 사용자 요청("카드 내의 볼드체 없애줘")으로 굵기를 걷었다 */
+  font-weight: 400;
   color: var(--color-ink);
 }
 
@@ -2641,7 +2641,8 @@
   border-radius: var(--radius-input);
   background: color-mix(in oklch, var(--tribe) 18%, var(--color-card));
   font-size: var(--text-label);
-  font-weight: 600;
+  /* 2026-08-26 사용자 요청("카드 내의 볼드체 없애줘")으로 굵기를 걷었다 */
+  font-weight: 400;
   color: var(--tribe-cta);
 }
 
@@ -3281,7 +3282,8 @@
   border-radius: var(--radius-input);
   background: var(--color-card);
   font-size: var(--text-label);
-  font-weight: 600;
+  /* 2026-08-26 사용자 요청("카드 내의 볼드체 없애줘")으로 굵기를 걷었다 */
+  font-weight: 400;
   color: var(--tribe-cta);
 }
 
@@ -3385,19 +3387,10 @@
 
 /* petFloatSeed(방의 떠다니는 씨앗) — 2026-08-24 삭제. 쓰던 요소(.pet-room__seeds)가
    사용자 요청으로 걷혔다. 값은 translateY(0 → -12px) + rotate(15deg) + opacity(0.7 → 1)였다.
-   petSparkle은 같은 날 지웠다가 develop 병합에서 되살렸다 — 아래에 있다 */
-
-@keyframes petSparkle {
-  0%,
-  100% {
-    opacity: 0;
-    transform: scale(0.5) rotate(0deg);
-  }
-  50% {
-    opacity: 1;
-    transform: scale(1) rotate(180deg);
-  }
-}
+   petSparkle은 같은 날 지웠다가 develop 병합에서 되살렸고, **2026-08-26 사용자 요청으로
+   다시 지웠다** — 쓰던 요소(.pet-char__sparkle)가 함께 걷혔다.
+   값은 0%/100%에서 opacity 0 + scale(0.5) rotate(0), 50%에서 opacity 1 + scale(1)
+   rotate(180deg)였다 */
 
 @keyframes petSlideIn {
   from {
@@ -3445,10 +3438,10 @@
    .pet-char__burst는 animation: none으로 두면 파티클이 그 자리에 3초간 그대로 보인다.
    움직임 없이 "반응했다"는 신호는 남으므로 의도한 결과다.
    .pet-room__seed는 이 목록에 없다 — 그 요소가 2026-08-24에 삭제됐다
-   (.pet-room__seeds 자리의 주석). .pet-char__sparkle은 같은 날 지웠다가 되살렸다 */
+   (.pet-room__seeds 자리의 주석). **.pet-char__sparkle도 2026-08-26에 삭제되어 빠졌다** —
+   8/24에 지웠다가 되살렸고 이번이 두 번째 삭제다 */
 @media (prefers-reduced-motion: reduce) {
   .pet-char__body,
-  .pet-char__sparkle,
   .pet-char__burst span,
   .pet-toast,
   .pet-welcome,
@@ -3759,7 +3752,12 @@
      머리가 잘린다"였는데, 22rem은 그 요구를 이미 만족한다(더 크다) */
   .pet-room {
     min-height: 22rem;
-    --pet-char-w: min(var(--pet-char-size), 78vw, 17rem);
+    /* **2026-08-26: 이 자리에도 배율을 넣었다.** 넣지 않으면 이 폭에서 2.3배가 통째로
+       무시된다 — 실측에서 740px 창의 --pet-char-w가 `min(19.7rem, 78vw, 17rem)`으로 잡혀
+       캐릭터가 272px에 머물렀다.
+       17rem 고정 상한은 걷고 56vh로 갈았다(위 본체와 같은 값·같은 근거). 이 폭에서는 버튼
+       스택이 방 밖으로 내려가 방이 오히려 짧아지므로(실측 523px) vh 상한이 실제로 일한다 */
+    --pet-char-w: min(calc(var(--pet-char-size) * var(--pet-char-scale)), 78vw, 56vh);
   }
 
   /* 말풍선 크기를 여기서 따로 줄이던 규칙(12.5 × 6.25rem)은 **없어졌다.**

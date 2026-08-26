@@ -857,16 +857,15 @@ export default function PetView({ initial }: { initial: PetState }) {
                 .pet-char가 display: grid를 갖고 있어 UA의 [hidden] 규칙을 덮으므로
                 pet.css에 .pet-char[hidden] 한 줄이 함께 있다 */}
             <div className="pet-char" data-stage={stage} hidden={away}>
-              {/* 반짝임 3개. 위치·타이밍이 각각 달라 pet.css가 data-i로 구분한다 */}
-              <span className="pet-char__sparkle" data-i="1" aria-hidden="true">
-                ✨
-              </span>
-              <span className="pet-char__sparkle" data-i="2" aria-hidden="true">
-                ⭐
-              </span>
-              <span className="pet-char__sparkle" data-i="3" aria-hidden="true">
-                ✨
-              </span>
+              {/* 여기에 반짝임 3개(✨⭐✨)가 있었다. `.pet-char__sparkle` + `data-i`로
+                  자리와 타이밍을 각각 달리했다.
+                  **2026-08-26 사용자 요청으로 다시 지웠다**("캐릭터 옆에 반짝거리는
+                  이모티콘들 다 지워줘"). 2026-08-24에 한 번 지웠다가 같은 날 develop 병합에서
+                  되살린 이력이 있고, 이번이 두 번째 삭제다 — **되살리지 않는다.**
+                  CSS(.pet-char__sparkle[data-i] 4벌)와 petSparkle 키프레임,
+                  prefers-reduced-motion 목록의 항목도 pet.css에서 함께 걷었다.
+                  먹이기·쓰다듬기 반응 파티클(.pet-char__burst)은 남는다 — 그쪽은 장식이
+                  아니라 "눌렸다"는 응답이다 */}
 
               {/* 눌러서 쓰다듬는다. span이던 것을 button으로 감쌌다 —
                   키보드로도 닿아야 하고, 그림 자체는 aria-hidden이라 라벨을 여기 붙인다 */}
