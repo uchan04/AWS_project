@@ -77,6 +77,31 @@
   --pet-drop: 0 3px 0 color-mix(in oklch, var(--tribe-cta) 22%, transparent),
     0 6px 16px rgb(42 31 20 / 0.14);
 
+  /* ── 크림 칩 (2026-08-26 사용자 시안: 원형 버튼 그림) ────────────────────────
+   *
+   * 사용자가 준 그림의 원은 **크림 면 + 따뜻한 탠 링**이고, 안에서 색을 갖는 것은 아이콘
+   * 하나뿐이다. 종족색으로 채운 원 위에 이모지를 얹으면 둘 다 진해 아이콘이 면에 묻힌다.
+   *
+   * 링 색이 --tribe-cta 원색이 아니라 **48% 희석**인 이유: 원색은 이 화면의 윤곽선 체계가
+   * 쓰는 값이고(카드·모달·게이지), 그 두께로 원을 두르면 버튼이 카드처럼 무거워진다.
+   * 그림의 링은 면보다 두어 단 진한 정도다.
+   *
+   * 면에 아주 옅은 세로 그라디언트를 준다 — 그림의 원이 위가 밝고 아래가 살짝 따뜻하다.
+   * 방사 그라디언트(구슬)와 다르다: 이쪽은 종이 재질이고 광택이 없다.
+   *
+   * **그림자가 이 체계에서 필수다.** 배경 그림 6종 중 셋(눈꽃 마을·푸른 빙해·오로라 들판)이
+   * 크림에 가까워서, 링만으로는 원이 배경에 녹는다. 링 + 그림자 둘이 함께 경계를 만든다.
+   *
+   * 레벨 상자(.pet-hud-lv)도 같은 세 값을 쓴다 — 사용자 요청("레벨 이미지도 비슷한 스타일로").
+   * 한 벌로 묶어 둔 이유는 한쪽만 고치면 방 안에서 재질이 갈리기 때문이다. */
+  --pet-chip-ring: 3px solid color-mix(in oklch, var(--tribe-cta) 48%, var(--color-card));
+  --pet-chip-face: linear-gradient(
+    180deg,
+    var(--color-card),
+    color-mix(in oklch, var(--tribe) 9%, var(--color-card))
+  );
+  --pet-chip-lift: 0 2px 6px rgb(42 31 20 / 0.2);
+
   /* 2026-08-23 사용자 요청(광택 버튼 시안 2차): 머리 위 레벨 배지를 광택 있는 연한 칩으로
      바꿨다. "시안보다 연한 색을 원한다, 종족색을 따르되 투명도를 높이든 흰색을 섞든 알아서
      연하게" — 흰색(카드색)을 섞는 쪽을 골랐다. 반투명으로 연하게 만들면 배지 뒤가 방 배경
@@ -344,14 +369,16 @@
   display: grid;
   gap: var(--space-3xs);
   padding: var(--space-2xs);
-  /* 2026-08-26 시안: 참고 이미지의 좌상단 상태판이 **크림 면 + 진한 윤곽선**이다.
-     재화 알약과 반대로 이쪽은 밝은 면을 유지한다 — 두 오버레이가 같은 어두운 면이면
-     방 위쪽이 띠 두 개로 막히고, 참고 이미지도 상태판은 밝고 재화 알약만 어둡다.
-     반투명 + 흐림을 걷은 이유는 알약과 같다: 배경 그림 6종 위에서 대비를 고정한다 */
-  border: var(--pet-outline-thin);
+  /* **원형 버튼과 같은 크림 칩이다** (2026-08-26 사용자 요청 "레벨 이미지도 비슷한
+     스타일로"). 값 세 개를 --pet-chip-* 그대로 물려받는다 — 방 안에 뜨는 두 물건이
+     같은 재질이어야 하나가 UI, 하나가 가구로 갈리지 않는다.
+     모양만 다르다: 버튼은 원, 이쪽은 --radius-card 사각형이다(안에 게이지와 두 줄이
+     들어가므로 원이 될 수 없다).
+     반투명 + 흐림은 걷은 상태 그대로다 — 배경 그림 6종 위에서 대비를 고정한다 */
+  border: var(--pet-chip-ring);
   border-radius: var(--radius-card);
-  background: var(--color-card);
-  box-shadow: var(--pet-inner-line), var(--pet-drop);
+  background: var(--pet-chip-face);
+  box-shadow: var(--pet-chip-lift);
 }
 
 /* 레벨은 이 오버레이에서 가장 큰 글자다. 알약을 씌우지 않은 이유: 이 상자 자체가 이미
@@ -437,37 +464,59 @@
 /* 아이콘 원. 면·번짐은 이 화면의 주 버튼(.pet-btn)과 같은 종족색 계열이다 —
    새 색을 만들지 않는다. 3rem(48px)은 design.md의 44px 터치 하한 위이고, 라벨까지
    합치면 한 버튼이 약 68px이라 좌측 5개가 340px 안에 들어간다(방 높이 하한 432px) */
-/* 2026-08-26 시안: **진한 링 + 안쪽 방사 그라디언트.** 참고 이미지의 원형 버튼이
-   "위쪽이 밝고 아래로 어두워지는 알" 모양이고 그 인상의 절반이 3px 링이다.
-   135deg 선형에서 `circle at 30% 25%` 방사로 바꾼 이유: 선형은 대각선 띠라 원 안에서
-   방향이 보이고, 방사는 한 점에서 퍼져 구슬처럼 보인다.
-   border가 3px 늘어난 만큼 안쪽이 좁아지므로 상자는 3.25rem이다 — 아이콘이 앉는 칸
-   (52 − 6 = 46px)이 옛 48px과 거의 같아 이모지 크기를 다시 잡을 필요가 없다 */
+/* **크림 칩** (2026-08-26 사용자 시안). 값 세 개는 파일 앞 --pet-chip-* 주석에 근거가 있다.
+   그전에는 종족색 방사 그라디언트(구슬)였고, 사용자가 크림 원 그림을 주며 교체를 요청했다.
+   상자는 3.25rem 그대로다 — 링이 3px이라 아이콘이 앉는 칸이 46px이고, 크기를 다시 잡으면
+   라벨 폭과 스택 폭까지 따라 움직인다 */
 .pet-circle__icon {
   display: grid;
   place-items: center;
   width: 3.25rem;
   height: 3.25rem;
-  border: var(--pet-outline);
+  border: var(--pet-chip-ring);
   border-radius: var(--radius-pill);
-  background:
-    radial-gradient(circle at 30% 25%, color-mix(in oklch, var(--tribe-face) 72%, #fff), var(--tribe) 70%);
-  box-shadow: var(--pet-inner-line), var(--pet-drop);
+  background: var(--pet-chip-face);
+  box-shadow: var(--pet-chip-lift);
   font-size: var(--text-md);
   line-height: 1;
 }
 
-/* 열려 있는 모달의 버튼. 면을 한 단 어둡게 해 "지금 이걸 보고 있다"를 남긴다 */
+/* 열려 있는 모달의 버튼. 사용자가 준 그림에서 여섯 칸 중 하나(고양이 얼굴)가 **따뜻하게
+   물든 원**이고 그것이 이 상태다. 금색을 새로 들이지 않고 크림에 종족색을 24% 섞어 같은
+   인상을 만든다 — 크림보다 진하고 링보다 밝아서 "켜져 있는 칸"으로 읽힌다.
+   링도 한 단 진하게 해 그 칸만 또렷하다(면만 물들이면 그림의 대비가 안 나온다) */
 .pet-circle[data-active="true"] .pet-circle__icon {
-  background: radial-gradient(circle at 30% 25%, var(--tribe), var(--tribe-cta) 75%);
+  border-color: color-mix(in oklch, var(--tribe-cta) 72%, var(--color-card));
+  background: linear-gradient(
+    180deg,
+    color-mix(in oklch, var(--tribe) 16%, var(--color-card)),
+    color-mix(in oklch, var(--tribe) 30%, var(--color-card))
+  );
 }
 
 /* 못 누르는 버튼(외출 중, 친밀도 부족, 요청 진행 중)은 뜨지 않는다 —
-   .pet-btn:disabled와 같은 처리다(번짐이 남으면 누를 수 있어 보인다) */
+   .pet-btn:disabled와 같은 처리다(번짐이 남으면 누를 수 있어 보인다).
+
+   **`opacity: 0.7`을 걷었다.** 크림 칩으로 바뀐 뒤 실측에서 비활성 원이 배경 그림에 거의
+   묻혔다 — 투명도는 면뿐 아니라 링과 그림자까지 함께 지우므로, 링과 그림자로 경계를 만드는
+   이 체계에서는 원이 통째로 사라진다(기본 방의 책장이 원을 통과해 보였다).
+   대신 **면과 링만 죽이고 채도를 뺀다** — 원의 자리는 남고 "지금은 아니다"만 전해진다.
+
+   `filter: grayscale`을 **원 자체에** 거는 이유: 이모지는 자식 요소가 아니라 텍스트 노드라
+   `> *`로 잡히지 않는다(`color`로도 죽일 수 없다). 원에 걸면 면·링까지 함께 채도가 빠지는데
+   그게 오히려 맞다 — 면은 크림이라 거의 그대로고, 링만 회색 쪽으로 넘어간다 */
 .pet-circle:disabled .pet-circle__icon {
+  border-color: color-mix(in oklch, var(--color-rule-2) 55%, var(--color-card));
   background: var(--color-paper-2);
   box-shadow: none;
-  opacity: 0.7;
+  filter: grayscale(0.7);
+}
+
+/* 라벨도 함께 죽인다 — 원만 흐리고 라벨이 또렷하면 어느 쪽이 상태인지 갈리지 않는다.
+   면(알약)은 그대로 둔다: 그것이 방 그림 위에서 글자를 읽히게 하는 유일한 근거다 */
+.pet-circle:disabled .pet-circle__label {
+  border-color: color-mix(in oklch, var(--color-rule-2) 55%, var(--color-card));
+  color: var(--color-muted);
 }
 
 /* 라벨 알약. 방 그림 위에 글자만 두면 배경 6종 중 밝은 셋에서 읽히지 않으므로 면을 깐다.
@@ -491,8 +540,19 @@
   white-space: nowrap;
 }
 
-/* 라벨 아래 한 줄. 지금은 외출 버튼의 "친밀도 N 부족" 하나뿐이다 */
+/* 라벨 아래 한 줄. 지금은 외출 버튼의 "친밀도 N 부족" 하나뿐이다.
+
+   **라벨과 같은 알약을 준다** (2026-08-26). 전에는 면 없는 맨 글자였고, 실측에서 기본 방의
+   책장 위에 겹쳐 읽히지 않았다 — 라벨은 알약이 있어 읽히는데 이 줄만 없어서, 같은 버튼 안에서
+   한 줄은 보이고 한 줄은 안 보였다.
+   글자색은 --color-strong 그대로다(카드색 면 위에서 AA를 맞춘 값이고, 이 줄은 "막혔다"는
+   신호라 라벨과 색이 달라야 한다). 테두리도 그 색으로 두면 알약 두 개가 위아래로 붙었을 때
+   아래쪽이 경고로 갈린다 */
 .pet-circle__note {
+  padding: 0 var(--space-3xs);
+  border: 1px solid color-mix(in oklch, var(--color-strong) 55%, var(--color-card));
+  border-radius: var(--radius-pill);
+  background: var(--color-card);
   font-size: 0.64rem;
   color: var(--color-strong);
   white-space: nowrap;
