@@ -20,6 +20,7 @@
     "check:community": "tsx scripts/check-community.ts",
     "check:safety": "tsx scripts/check-safety.ts",
     "check:optimistic": "tsx scripts/check-optimistic.ts",
+    "check:uploads": "tsx scripts/check-uploads.ts",
     "e2e": "tsx scripts/e2e-scenario.ts"
   },
   "prisma": {
