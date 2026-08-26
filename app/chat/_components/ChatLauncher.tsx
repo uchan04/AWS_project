@@ -80,7 +80,6 @@ export function ChatLauncher({ diagnosed }: { diagnosed: boolean }) {
   //
   // 정확히 "/pet"만이다. `/pet/skins`·`/pet/cosmetics`·`/pet/rest`에는 HUD가 없으므로
   // 접두사로 감추면 그 세 화면에서 챗봇에 닿을 길이 사라진다.
-  if (pathname === "/pet") return null
 
   // 크기: **2026-08-26 사용자 요청으로 1.5배를 되돌렸다.** h-12 w-12 text-xl(48px·20px)이
   // 원래 값이고 D가 쓴 그대로다.
@@ -93,7 +92,7 @@ export function ChatLauncher({ diagnosed }: { diagnosed: boolean }) {
   //
   // 챗봇은 D 담당이고 이 파일도 D의 것이다 — 키울 때도 되돌릴 때도 D에게 알린다.
   return (
-    <div className="fixed top-4 right-4 z-40 flex items-center gap-2">
+    <div className="fixed top-4 right-4 z-[200] flex items-center gap-2">
       {bubble && !dismissed && (
         // 버튼 왼쪽에 붙는다. 나타날 때 버튼 쪽에서 밀려나오도록 오른쪽에서 들어온다.
         <div
