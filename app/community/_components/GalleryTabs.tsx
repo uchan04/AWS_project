@@ -11,12 +11,11 @@ import type { GalleryTab } from "../_lib/gallery"
  * **관리자는 종족 3종을 모두 본다(2026-08-26).** 읽기뿐 아니라 글·댓글·좋아요도 된다
  * (`_lib/gallery.ts`의 `canAccessGallery()`).
  *
- * **관리자에게는 "나의 종족"이라는 개념을 쓰지 않는다.** 세 탭이 전부 실제 이름
- * (고양잇과·개과·곰과)으로 보이고 알약도 붙지 않는다 — 탭 이름을 "관리자"로 만들면 그 탭이
- * 여는 것(본인 종족 갤러리)과 이름이 어긋나고, 모든 탭이 관리자 전용인데 탭마다 배지를 달면
- * 같은 말을 세 번 하는 것이 된다.
+ * 탭 이름은 종족 이름 그대로다(고양잇과·개과·곰과 갤러리). **"나의 종족" 알약은 뗐다
+ * (2026-08-26).** 비관리자에게는 자기 종족 탭 하나뿐이라 알약이 더 알려주는 것이 없었고,
+ * 관리자에게는 세 탭이 전부 남의 종족이라 애초에 붙지 않았다.
  *
- * 대신 **탭 줄 끝에 한 번만** 관리자 상태를 알린다. 표시가 없으면 시연 중에 누구나 쓸 수
+ * 관리자 상태는 **탭 줄 끝에 한 번만** 알린다. 표시가 없으면 시연 중에 누구나 쓸 수
  * 있는 기능으로 오해된다.
  */
 export function GalleryTabs({
@@ -74,7 +73,7 @@ export function GalleryTabs({
             key={tribe}
             href={mine ? "/community?tab=mine" : `/community?tab=${tribe}`}
             className={
-              "flex items-center gap-2 rounded-xl border px-5 py-2.5 text-sm font-semibold transition duration-150 " +
+              "rounded-xl border px-5 py-2.5 text-sm font-semibold transition duration-150 " +
               FOCUS_RING +
               (selected ? "" : " " + INACTIVE_HOVER)
             }
@@ -85,15 +84,6 @@ export function GalleryTabs({
             }
           >
             {TRIBE[tribe].animal} 갤러리
-            {/* 알약은 비관리자에게만 붙는다. 관리자는 탭 줄 끝의 한 줄이 대신한다 */}
-            {!isAdmin && (
-              <span
-                className="rounded-full px-2 py-0.5 text-[10px] font-bold"
-                style={{ backgroundColor: selected ? "rgba(255,255,255,0.25)" : `${TRIBE[tribe].colorHex}22` }}
-              >
-                나의 종족
-              </span>
-            )}
           </Link>
         )
       })}
