@@ -6,6 +6,7 @@ import { GalleryTabs } from "./_components/GalleryTabs"
 import { HopeBanner } from "./_components/HopeBanner"
 import { PostList } from "./_components/PostList"
 import { WriteModal } from "./_components/WriteModal"
+import { RulesModal } from "./_components/RulesModal"
 import { resolveGallery, listGalleryPosts, type GalleryTab, type GalleryPost } from "./_lib/gallery"
 import { MeetupNotice } from "./meetups/_components/MeetupNotice"
 import { pendingMeetupNotices, type MeetupNoticeItem } from "./meetups/_lib/notice"
@@ -63,7 +64,10 @@ export default async function CommunityPage(props: PageProps<"/community">) {
               : `${TRIBE[gallery].animal} 종족 전용 공간이에요 · 나만 볼 수 있어요`}
           </p>
         </div>
-        <WriteModal gallery={gallery} myTypeCode={myTypeCode} />
+        <div className="flex items-center gap-2">
+          <RulesModal />
+          <WriteModal gallery={gallery} myTypeCode={myTypeCode} />
+        </div>
       </div>
 
       <GalleryTabs active={gallery} myTypeCode={myTypeCode} />
