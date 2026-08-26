@@ -65,7 +65,7 @@ export async function POST(request: NextRequest) {
 
     // 친밀도는 사용자가 메시지를 보낸 이 시점에만 지급한다 — Bedrock 응답 저장 시점
     // (/api/chat/stream)에서 다시 지급하지 않는다(1턴 = 사용자 발화 기준, 중복 지급 금지).
-    const granted = await grantAffinity(user, CHAT_TURN_AFFINITY, "CHAT", beforeThisTurn)
+    const granted = await grantAffinity(user, CHAT_TURN_AFFINITY, "CHAT")
 
     // 미션 완료는 본 동작이 끝난 뒤에 별도 try/catch로 부른다.
     // 트랜잭션에 넣지 않는다 — 미션 실패가 메시지 저장을 롤백시키면 안 된다.

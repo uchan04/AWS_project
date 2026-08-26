@@ -155,7 +155,7 @@ export async function POST(request: NextRequest) {
       include: { user: { select: { nickname: true, typeCode: true } } },
     })
 
-    const granted = await grantAffinity(user, POST_AFFINITY)
+    const granted = await grantAffinity(user, POST_AFFINITY, "COMMUNITY")
 
     // 미션 완료는 본 동작이 끝난 뒤에 별도 try/catch로 부른다.
     // 트랜잭션에 넣지 않는다 — 미션 실패가 글 작성을 롤백시키면 안 된다.

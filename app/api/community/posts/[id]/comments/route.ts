@@ -80,7 +80,7 @@ export async function POST(request: NextRequest, ctx: RouteContext<"/api/communi
       prisma.post.update({ where: { id: post.id }, data: { commentCount: { increment: 1 } } }),
     ])
 
-    const granted = await grantAffinity(user, COMMENT_AFFINITY)
+    const granted = await grantAffinity(user, COMMENT_AFFINITY, "COMMUNITY")
 
     // 작성 직후 목록에 바로 붙는 구조라 GET 상세의 댓글 형태와 똑같이 맞춘다(userId 미노출 + isOwn).
     return ok({

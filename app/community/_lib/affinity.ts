@@ -21,8 +21,15 @@ export const MEETUP_JOIN_AFFINITY = 10
  * 두 값의 합이 총 상한 100과 같다(`AFFINITY_DAILY_CAP`). 그래서 총 상한이
  * 출처 상한보다 먼저 걸리는 일이 없고, 아래 "출처별 기지급량" 계산이 정확해진다.
  */
-export const AFFINITY_CAP_BY_SOURCE = { CHAT: 40, COMMUNITY: 60 } as const
-export type AffinitySource = keyof typeof AFFINITY_CAP_BY_SOURCE
+export type AffinitySource = "CHAT" | "COMMUNITY"
+export const CHAT_DAILY_CAP = 40
+export const COMMUNITY_DAILY_CAP = 60
+
+/** 화면용 묶음. PetView·ChatPanel이 `.CHAT`/`.COMMUNITY`로 읽는다. 값의 출처는 위 두 상수다. */
+export const AFFINITY_CAP_BY_SOURCE = {
+  CHAT: CHAT_DAILY_CAP,
+  COMMUNITY: COMMUNITY_DAILY_CAP,
+} as const
 
 type UserWithSkin = User & { activePetSkin: PetSkin | null }
 
@@ -35,11 +42,26 @@ function todayStart(): Date {
   return new Date(`${todayKey(new Date())}T00:00:00.000Z`)
 }
 
-/** affinityTodayDate가 오늘이 아니면 affinityToday를 0으로 리셋한 값을 돌려준다. DB는 아직 건드리지 않는다. */
+/**
+ * 날짜가 바뀌었으면 오늘 누계를 0으로 리셋한 값을 돌려준다. DB는 아직 건드리지 않는다.
+ *
+ * 두 날짜 마커를 **독립적으로** 비교한다. affinityTodayDate는 미션·출석 경로도 갱신하므로
+ * affinitySourceDate와 어긋날 수 있고(schema.prisma User 주석), 한쪽만 오늘이어도
+ * 나머지 한쪽은 리셋되어야 한다.
+ */
 function resetIfNewDay(user: UserWithSkin): UserWithSkin {
+  const today = todayKey(new Date())
+  let next = user
+
   const savedDate = user.affinityTodayDate ? todayKey(user.affinityTodayDate) : null
-  if (savedDate === todayKey(new Date())) return user
-  return { ...user, affinityToday: 0 }
+  if (savedDate !== today) next = { ...next, affinityToday: 0 }
+
+  const savedSourceDate = user.affinitySourceDate ? todayKey(user.affinitySourceDate) : null
+  if (savedSourceDate !== today) {
+    next = { ...next, affinityTodayChat: 0, affinityTodayCommunity: 0 }
+  }
+
+  return next
 }
 
 /**
@@ -60,35 +82,28 @@ export async function chatAffinityToday(userId: string): Promise<number> {
 }
 
 /**
- * 친밀도를 지급한다. 순서: 날짜 리셋 → 배율 적용 → **출처 상한** → 총 상한 → 0보다 클 때만 저장.
- * 실제 지급된 양을 반환한다(상한에 걸리면 0).
+ * 친밀도를 지급한다. 순서: 날짜 리셋 → 배율 적용 → 총 상한 → **출처 상한** → 0보다 클 때만 저장.
+ * 실제 지급된 양을 반환한다(둘 중 어느 상한에든 걸리면 0).
  *
- * `source`를 넘기지 않으면 `COMMUNITY`다 — 글·댓글·모임이 전부 그쪽이고,
- * 챗봇 라우트 한 곳만 `"CHAT"`을 넘긴다.
- *
- * @param alreadyFromSource 이 출처로 오늘 이미 받은 양. 챗봇은 메시지를 만든 **뒤에**
- *   이 함수를 부르므로 방금 만든 1턴을 빼고 넘겨야 한다. 넘기지 않으면 여기서 계산한다.
+ * 총 상한(AFFINITY_DAILY_CAP = 100)과 출처 상한이 **함께** 걸리고, 더 빡빡한 쪽이 이긴다.
+ * 출처별 오늘 누계는 affinityTodayChat·affinityTodayCommunity 컬럼에서 읽는다.
  */
 export async function grantAffinity(
   user: UserWithSkin,
   base: number,
-  source: AffinitySource = "COMMUNITY",
-  alreadyFromSource?: number,
+  source: AffinitySource,
 ): Promise<number> {
   const resetUser = resetIfNewDay(user)
 
   const want = calculateReward(resetUser.activePetSkin, { affinity: base }).affinity ?? 0
+  const grantedByTotal = capAffinity(resetUser.affinityToday, want)
 
-  const earned =
-    alreadyFromSource ??
-    (source === "CHAT"
-      ? await chatAffinityToday(user.id)
-      : // 출처가 둘뿐이므로 커뮤니티 몫은 "전체 − 챗봇"이다. 컬럼을 늘리지 않는 대가로
-        // 여기서 챗봇 누계를 한 번 읽는다(인덱스 count 1회).
-        Math.max(0, resetUser.affinityToday - (await chatAffinityToday(user.id))))
+  const roomForSource =
+    source === "CHAT"
+      ? CHAT_DAILY_CAP - resetUser.affinityTodayChat
+      : COMMUNITY_DAILY_CAP - resetUser.affinityTodayCommunity
 
-  const room = Math.max(0, AFFINITY_CAP_BY_SOURCE[source] - earned)
-  const granted = capAffinity(resetUser.affinityToday, Math.min(want, room))
+  const granted = Math.max(0, Math.min(grantedByTotal, roomForSource))
 
   if (granted > 0) {
     await prisma.user.update({
@@ -97,6 +112,10 @@ export async function grantAffinity(
         affinity: { increment: granted },
         affinityToday: resetUser.affinityToday + granted,
         affinityTodayDate: new Date(),
+        affinitySourceDate: new Date(),
+        ...(source === "CHAT"
+          ? { affinityTodayChat: resetUser.affinityTodayChat + granted }
+          : { affinityTodayCommunity: resetUser.affinityTodayCommunity + granted }),
       },
     })
   }

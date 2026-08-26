@@ -116,7 +116,7 @@ export async function POST(_request: NextRequest, ctx: RouteContext<"/api/commun
     let granted = 0
     if (result.isNewJoin) {
       try {
-        granted = await grantAffinity(user, MEETUP_JOIN_AFFINITY)
+        granted = await grantAffinity(user, MEETUP_JOIN_AFFINITY, "COMMUNITY")
       } catch (error) {
         console.error("[MEETUP_JOIN] 친밀도 지급 실패", error)
       }
