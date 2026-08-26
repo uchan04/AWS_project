@@ -108,6 +108,21 @@ export async function POST(request: NextRequest) {
     //
     // 낙인 단어(BANNED)는 여기서 검사하지 않는다. 그 목록은 서비스가 사용자를 규정하는
     // 것을 막는 장치이고, 사용자가 자기 상태를 스스로 말하는 것은 막을 이유가 없다.
+    // ── 위기 신호를 **모든 차단보다 먼저** 본다 (2026-08-26, 차단 31번 해소) ──
+    //
+    // 전에는 containsAbuse() 뒤에 있었다. 그래서 위기 신호와 타인 공격이 함께 있는 글이
+    // 도움 안내 없이 400을 받았다 — 실측:
+    //   "너 병신이냐 나는 죽고 싶다"          abuse=T crisis=T blocks=T → 400 ABUSIVE_CONTENT
+    //   "너 같은 새끼 때문에 죽고 싶다"        abuse=T crisis=T blocks=T → 400
+    // 차단 30번(moderate 앞으로 옮긴 것)과 **같은 모양의 역전이 이 관문에 남아 있었다.**
+    //
+    // **우회가 열리지 않는다.** blocksPosting()은 글을 저장하지 않는다 — 공격 글에
+    // "죽고 싶다"를 덧붙여도 게시되지 않고, 달라지는 것은 응답뿐이다(400 + "표현을 고쳐주세요"
+    // → 200 + 도움 안내). 공격을 통과시키는 분기가 아니므로 D가 우려한 우회와 무관하다.
+    if (blocksPosting(`${title} ${body}`)) {
+      return ok(crisisBlockedPayload())
+    }
+
     if (containsAbuse(`${title} ${body}`)) {
       return fail("ABUSIVE_CONTENT", "다른 사람을 향한 말이 담겨 있어요. 표현을 고쳐서 다시 올려주세요", 400)
     }
@@ -141,9 +156,6 @@ export async function POST(request: NextRequest) {
     // 설계돼 있어(주석 명시) 사별·보도·비유까지 잡는다 — 안내를 띄우는 데는 맞지만
     // 저장을 막는 기준으로 쓰면 "친구가 자살했다는 소식을 들었다"가 안 올라간다.
     // blocksPosting()은 그중 1인칭 현재의 의도만 남긴다(_lib/crisis.ts).
-    if (blocksPosting(`${title} ${body}`)) {
-      return ok(crisisBlockedPayload())
-    }
 
     const mod = await moderate(`${title}\n\n${body}`, invokeBedrock)
     if (mod.verdict === "BLOCK") {

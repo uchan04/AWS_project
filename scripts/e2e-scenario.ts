@@ -315,6 +315,24 @@ async function main() {
       record("남의 댓글 작성", otherComment.status === 200, otherComment.body.error)
       const otherLike = await call("POST", `/api/community/posts/${postId}/like`, undefined, other)
       record("남의 좋아요", otherLike.status === 200, otherLike.body.error)
+
+      // 차단 32번 해소 확인 (2026-08-26). **관찰자 계정은 진단을 하지 않았다** —
+      // 이 시나리오에서 진단을 마치는 것은 `me` 하나뿐이라 미진단 상태를 이 계정으로 잰다.
+      //
+      // 없는 모임 id를 쓴다. 게이트가 모임 조회보다 **앞에** 있으므로 NOT_FOUND가 아니라
+      // NOT_DIAGNOSED가 와야 한다 — 순서가 뒤집히면 이 단정이 깨진다.
+      // e2e 계정은 isAdmin이 아니라 모임을 만들 수 없어서 실재하는 모임으로는 못 잰다.
+      const undiagnosedJoin = await call(
+        "POST",
+        "/api/community/meetups/no-such-meetup/join",
+        undefined,
+        other
+      )
+      record(
+        "진단 전에는 모임에 신청할 수 없다 (차단 32)",
+        undiagnosedJoin.body.error?.code === "NOT_DIAGNOSED",
+        undiagnosedJoin.body
+      )
       const otherView = await call("GET", `/api/community/posts/${postId}`, undefined, other)
       record("남도 이 글을 볼 수 있다", otherView.status === 200, otherView.body.error)
     }
@@ -423,6 +441,20 @@ async function main() {
       const commentData = crisisComment.body.data as
         | { crisisBlocked?: boolean; notice?: string; comment?: unknown }
         | undefined
+      // 차단 31번 해소 확인 (2026-08-26). **위기 + 타인 공격이 함께 있는 글**이다.
+      // 전에는 containsAbuse()가 먼저 걸려 도움 안내 없이 400을 받았다.
+      // 이 케이스를 단정하지 않으면 blocksPosting()을 다시 뒤로 옮겨도 아무도 모른다 —
+      // 위기 단정과 공격 단정이 각각 다른 글이라 둘이 섞인 글을 보내는 곳이 없었다
+      const crisisAbusive = await call("POST", `/api/community/posts/${postId}/comments`, {
+        body: "너 병신이냐 나는 죽고 싶다",
+      })
+      const caData = crisisAbusive.body.data as { crisisBlocked?: boolean; notice?: string } | undefined
+      record(
+        "위기 + 타인 공격이 함께면 400이 아니라 도움 안내다 (차단 31)",
+        crisisAbusive.status === 200 && caData?.crisisBlocked === true && Boolean(caData?.notice),
+        crisisAbusive.body,
+      )
+
       record(
         "위기 신호 댓글도 저장하지 않고 도움 안내를 준다",
         crisisComment.status === 200 &&

@@ -466,7 +466,9 @@ app/api/community/posts/[id]/comments/route.ts  54행 containsAbuse → 400 │ 
 같은 판단을 `/missions`에서 이미 했다(`docs/dev/perf.md` "고친 것 4번째") — 거기서도 손댈
 레버는 **직렬 단계의 개수**였다.
 
-### ③ 모임 신청이 진단 완료를 요구하지 않는다 (2026-08-25 추가, **미수정**)
+### ③ 모임 신청이 진단 완료를 요구하지 않는다 (2026-08-25 추가) — **2026-08-26 해소**
+
+> **정정: 고쳤다.** 아래 계측은 그대로 두되 조치는 이 문서 맨 아래 "A가 D 폴더를 고친 것 2건 더"에 있다. 계측을 지우지 않는 이유는 **왜 그게 위험한지가 거기에만** 적혀 있기 때문이다.
 
 `app/api/community/meetups/[id]/join/route.ts`가 `typeCode`를 **한 번도 참조하지 않는다.**
 다른 쓰기·조회 라우트 10개는 전부 참조한다 — `posts` · `posts/[id]` · `posts/[id]/comments` ·
@@ -557,3 +559,54 @@ grantAffinity(user, base, source = "COMMUNITY", alreadyFromSource?)
 ### 이것과 별개로 D가 볼 것 — 차단 31·32번
 
 `STATUS.md`에 있다. **31번**은 위기 + 타인 공격이 함께 있는 글이 도움 안내 없이 400인 것(차단 30번과 같은 모양의 역전이 `containsAbuse` 관문에 남았다), **32번**은 모임 신청이 진단 완료를 요구하지 않는 것이다.
+
+> **정정(2026-08-26): 둘 다 해소됐다.** 조치는 이 문서 맨 아래 절에 있다. 근본 원인(정책이 모듈이 아니라 라우트 줄 순서에 있는 것)은 **그대로 남았다.**
+
+## A가 D 폴더를 고친 것 2건 더 (2026-08-26, 사용자 지시) — **통보**
+
+차단 31·32번이다. **사용자 지시였고 `app/community/`는 D 소유다**(`CLAUDE.md` 2절). 되돌리려면 아래 두 줄만 되돌린다.
+
+### 31. 위기 + 타인 공격에 도움 안내가 안 나가던 것
+
+`blocksPosting()`을 `containsAbuse()` **앞**으로 옮겼다. 글(`app/api/community/posts/route.ts`)과 댓글(`.../posts/[id]/comments/route.ts`) 둘 다다.
+
+```
+전   containsAbuse → blocksPosting → moderate → 저장 → crisisNotice
+후   blocksPosting → containsAbuse → moderate → 저장 → crisisNotice
+```
+
+**우회가 열리지 않는다.** `blocksPosting()`은 글을 저장하지 않는다 — 공격 글에 "죽고 싶다"를 덧붙여도 게시되지 않고, 달라지는 것은 응답뿐이다.
+
+```
+너 병신이냐 나는 죽고 싶다     전 400 ABUSIVE_CONTENT  →  후 200 + 109 안내 (저장 안 함)
+너 병신이냐                  전 400 ABUSIVE_CONTENT  →  후 400 ABUSIVE_CONTENT (그대로)
+```
+
+D가 8/25에 우려한 "죽고싶다 덧붙이기 우회"와는 다른 자리다. 그 우회는 **저장 여부**의 문제이고 이건 **안내 여부**의 문제다.
+
+### 32. 모임 신청에 진단 게이트가 없던 것
+
+`app/api/community/meetups/[id]/join/route.ts`에 3줄을 넣었다. **모임 조회보다 앞이다.**
+
+```ts
+if (!user.typeCode || !user.adjective) {
+  return fail("NOT_DIAGNOSED", "먼저 진단을 마치면 모임에 신청할 수 있어요", 400)
+}
+```
+
+`app/community/meetups/page.tsx`도 `redirect("/community")`로 막았다. **라우트가 본체다** — 페이지만 막으면 API는 열려 있다.
+
+### e2e 단정 2건
+
+`scripts/e2e-scenario.ts`가 80 → **82건**이 됐다. 고쳤는데 못 잡는 상태로 두지 않는다.
+
+```
+ok   위기 + 타인 공격이 함께면 400이 아니라 도움 안내다 (차단 31)
+ok   진단 전에는 모임에 신청할 수 없다 (차단 32)
+```
+
+**32번 단정은 없는 모임 id(`no-such-meetup`)를 쓴다.** 게이트가 조회보다 앞이라 `NOT_FOUND`가 아니라 `NOT_DIAGNOSED`가 와야 한다 — 순서가 뒤집히면 단정이 깨진다. 실재하는 모임으로는 못 잰다(e2e 계정이 개설자가 아니다).
+
+### 남은 근본 원인 (미수정)
+
+"위기가 다른 판정을 이긴다"는 규칙이 여전히 **모듈이 아니라 라우트의 줄 순서**에 있다. 30번을 고치니 31번이 나왔고, 세 번째 관문이 생기면 같은 역전이 또 난다. 처방은 `docs/모듈-재배치-계획.md` 1번(8/28 이후)이고 **D 판단이다.**
