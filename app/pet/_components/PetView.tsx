@@ -939,35 +939,41 @@ export default function PetView({ initial }: { initial: PetState }) {
                     지금까지 sr-only로만 있었다(.pet-char 안) */}
                 <span className="pet-hud-lv__name">{pet.skinName}</span>
               </p>
-              <div
-                className="pet-gauge pet-gauge--inline"
-                role="progressbar"
-                aria-label="다음 레벨까지 경험치"
-                aria-valuemin={0}
-                aria-valuemax={need}
-                aria-valuenow={pet.exp}
-              >
-                <div className="pet-gauge__fill" style={{ width: `${progress * 100}%` }} />
-                {/* 게이지 위에 얹는 글자. aria는 위 progressbar가 이미 값을 말하므로
-                    이 글자는 눈으로 보는 쪽 전용이다(중복해서 읽히지 않게 aria-hidden) */}
-                <span className="pet-gauge__inline-text" aria-hidden="true">
-                  {ko(pet.exp)} / {ko(need)}
-                </span>
-              </div>
+              {/* **2026-08-26 사용자 요청으로 게이지와 재화가 한 줄에 나란히 선다** —
+                  "재화 3개의 정보를 세로로 세개를 배치해서 게이지 오른쪽에". 전에는 게이지가
+                  한 줄, 재화 3종이 그 아래 가로 한 줄이었다.
+                  이 래퍼가 그 두 칸을 가르고, 재화 쪽이 세로로 쌓인다 */}
+              <div className="pet-hud-lv__row">
+                <div
+                  className="pet-gauge pet-gauge--inline"
+                  role="progressbar"
+                  aria-label="다음 레벨까지 경험치"
+                  aria-valuemin={0}
+                  aria-valuemax={need}
+                  aria-valuenow={pet.exp}
+                >
+                  <div className="pet-gauge__fill" style={{ width: `${progress * 100}%` }} />
+                  {/* 게이지 위에 얹는 글자. aria는 위 progressbar가 이미 값을 말하므로
+                      이 글자는 눈으로 보는 쪽 전용이다(중복해서 읽히지 않게 aria-hidden) */}
+                  <span className="pet-gauge__inline-text" aria-hidden="true">
+                    {ko(pet.exp)} / {ko(need)}
+                  </span>
+                </div>
 
-              {/* 재화 3종 가로. 이름을 sr-only로 남기는 처리는 옛 재화 알약에서 그대로 가져왔다 —
-                  시안에는 아이콘과 숫자만 있는데 그렇게만 두면 스크린리더에 아무것도 안 남는다 */}
-              <ul className="pet-hud-lv__wallet">
-                {wallet.map((row) => (
-                  <li className="pet-hud-lv__coin" key={row.name}>
-                    <span className="pet-hud-lv__coin-icon" aria-hidden="true">
-                      {row.icon}
-                    </span>
-                    <span className="sr-only">{row.name}</span>
-                    <span className="pet-hud-lv__coin-value">{ko(row.value)}</span>
-                  </li>
-                ))}
-              </ul>
+                {/* 재화 3종 세로. 이름을 sr-only로 남기는 처리는 옛 재화 알약에서 그대로
+                    가져왔다 — 아이콘과 숫자만 두면 스크린리더에 아무것도 안 남는다 */}
+                <ul className="pet-hud-lv__wallet">
+                  {wallet.map((row) => (
+                    <li className="pet-hud-lv__coin" key={row.name}>
+                      <span className="pet-hud-lv__coin-icon" aria-hidden="true">
+                        {row.icon}
+                      </span>
+                      <span className="sr-only">{row.name}</span>
+                      <span className="pet-hud-lv__coin-value">{ko(row.value)}</span>
+                    </li>
+                  ))}
+                </ul>
+              </div>
             </div>
 
           </div>
@@ -977,8 +983,26 @@ export default function PetView({ initial }: { initial: PetState }) {
             풀려 방 아래로 흐른다 — pet.css .pet-actions 주석.
             방 **안**에 두면 좁은 화면에서 8개 버튼이 펫(272px)을 덮는다(실측). 방 밖으로
             빼면 그 폭에서 페이지가 조금 길어지는 대신 펫과 쪽지가 방을 온전히 쓴다 */}
-          {/* 좌측 = 이 화면에서 하는 것. 순서는 자주 누르는 것부터다 */}
+          {/* **좌측 = 다른 화면으로 가는 길** (2026-08-26 사용자 결정 → 같은 날 좌우 교체).
+              **이 목록은 사이드바(app/components/Sidebar.tsx의 TABS)와 같은 곳을 가리킨다.**
+              사용자가 "만들고 사이드바도 그대로 둔다"를 골라 중복을 감수한 자리다 —
+              메뉴가 늘거나 경로가 바뀌면 **두 곳을 같이 고쳐야 한다.**
+              그 파일에서 import하지 않는 이유: E 소유이고 TABS를 export하지 않는다.
+
+              챗봇이 없다. ChatLauncher의 열림 상태가 그 컴포넌트 내부 useState이고
+              외부에서 열 인터페이스가 없다(app/chat/_components/ChatLauncher.tsx) —
+              만들려면 D 소유 파일에 새 인터페이스가 필요하다. D의 전역 챗봇 버튼이
+              이미 우상단에 떠 있으므로 그것으로 갈음한다 */}
           <div className="pet-actions pet-actions--left">
+            <CircleBtn icon={<PetIcon name="community" />} label="커뮤니티" href="/community" />
+            <CircleBtn icon={<PetIcon name="mission" />} label="미션" href="/missions" />
+            <CircleBtn icon={<PetIcon name="meetup" />} label="모임" href="/community/meetups" />
+          </div>
+
+          {/* **우측 = 이 화면에서 하는 것.** 2026-08-26 사용자 요청으로 좌우를 맞바꿨다 —
+              전에는 조작이 왼쪽, 내비가 오른쪽이었다. 순서는 자주 누르는 것부터다.
+              DOM에서도 왼쪽(내비)이 먼저 온다 — 보이는 순서와 초점 순서를 같게 둔다 */}
+          <div className="pet-actions pet-actions--right">
             <CircleBtn
               icon={<PetIcon name="seed" />}
               label="씨앗 먹이기"
@@ -1022,22 +1046,6 @@ export default function PetView({ initial }: { initial: PetState }) {
               onClick={() => setModal("info")}
               active={modal === "info"}
             />
-          </div>
-
-          {/* 우측 = 다른 화면으로 가는 길 (2026-08-26 사용자 결정).
-              **이 목록은 사이드바(app/components/Sidebar.tsx의 TABS)와 같은 곳을 가리킨다.**
-              사용자가 "만들고 사이드바도 그대로 둔다"를 골라 중복을 감수한 자리다 —
-              메뉴가 늘거나 경로가 바뀌면 **두 곳을 같이 고쳐야 한다.**
-              그 파일에서 import하지 않는 이유: E 소유이고 TABS를 export하지 않는다.
-
-              챗봇이 없다. ChatLauncher의 열림 상태가 그 컴포넌트 내부 useState이고
-              외부에서 열 인터페이스가 없다(app/chat/_components/ChatLauncher.tsx) —
-              만들려면 D 소유 파일에 새 인터페이스가 필요하다. D의 전역 챗봇 버튼이
-              이미 우상단에 떠 있으므로 그것으로 갈음한다 */}
-          <div className="pet-actions pet-actions--right">
-            <CircleBtn icon={<PetIcon name="community" />} label="커뮤니티" href="/community" />
-            <CircleBtn icon={<PetIcon name="mission" />} label="미션" href="/missions" />
-            <CircleBtn icon={<PetIcon name="meetup" />} label="모임" href="/community/meetups" />
           </div>
         </div>
 
