@@ -23,14 +23,14 @@ import { isOwnCommunityKey } from "@/lib/uploads"
  */
 
 /**
- * 허용 확장자. presign이 발급하는 세 타입(`image/jpeg`·`image/png`·`image/webp`)에 대응한다.
- * `.jpg`는 `image/jpeg`의 흔한 표기라 함께 받는다 — 실제 발급값도 `jpg`다
+ * 허용 확장자. `.jpg`는 `image/jpeg`의 흔한 표기라 함께 받는다 — 실제 발급값도 `jpg`다
  * (`lib/uploads.ts`의 `COMMUNITY_EXT`).
  *
- * **발급 쪽이 정본이다.** 그쪽이 타입을 늘리면 여기도 함께 늘린다. 어긋나면 정상 업로드가
- * 여기서 400으로 떨어지므로, 그때 고칠 곳은 이 상수 하나다.
+ * **webp를 뺐다(2026-08-26).** Bedrock Guardrails가 판정하는 이미지 포맷이 PNG·JPEG
+ * 둘뿐이라(`GuardrailImageFormat`), webp는 `_lib/imageModeration.ts`가 어차피 차단한다.
+ * 이 층이 판정 층보다 느슨하면 백스톱 역할을 못 한다.
  */
-const ALLOWED_EXTENSIONS = ["jpg", "jpeg", "png", "webp"]
+const ALLOWED_EXTENSIONS = ["jpg", "jpeg", "png"]
 
 function hasAllowedExtension(key: string): boolean {
   const dot = key.lastIndexOf(".")

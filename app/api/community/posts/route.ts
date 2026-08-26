@@ -11,6 +11,7 @@ import { completeMissionByCode } from "@/lib/missions/completion"
 import { recordAttempt, retryAfter } from "@/lib/ratelimit"
 import { containsAbuse, isCrisis, CRISIS_POST_NOTICE } from "@/lib/safety"
 import { blocksPosting, crisisBlockedPayload } from "@/app/community/_lib/crisis"
+import { moderateImage, ImageModerationError } from "@/app/community/_lib/imageModeration"
 import { moderate, BLOCK_CODE } from "@/app/community/_lib/moderation"
 import { invokeBedrock } from "@/app/community/_lib/bedrock"
 
@@ -157,9 +158,54 @@ export async function POST(request: NextRequest) {
     // 저장을 막는 기준으로 쓰면 "친구가 자살했다는 소식을 들었다"가 안 올라간다.
     // blocksPosting()은 그중 1인칭 현재의 의도만 남긴다(_lib/crisis.ts).
 
-    const mod = await moderate(`${title}\n\n${body}`, invokeBedrock)
-    if (mod.verdict === "BLOCK") {
-      return fail(BLOCK_CODE, mod.message, 400)
+    /*
+     * 텍스트 검열과 사진 판정을 **동시에 시작한다.** 순차로 두면 사진 붙은 글이 5~6초다(실측).
+     * 둘 다 네트워크 왕복이고 서로의 결과를 쓰지 않는다.
+     *
+     * 두 검사 모두 위기 판정(blocksPosting)보다 뒤다 — 위기 신호가 있는 글은 109 안내를
+     * 받아야 하는데 그 사람에게 검열·사진 오류를 대신 띄우면 안 된다. 8/25에 moderate()와
+     * isCrisis() 사이에서, 8/26에 사진 쪽에서 같은 종류의 순서 버그를 고쳤다(차단 31번).
+     * 위쪽 blocksPosting()·containsAbuse()는 동기 함수라 여기 합칠 것이 없다.
+     *
+     * **Promise.all이 아니라 allSettled다.** all은 먼저 실패한 쪽에서 끊는다. 그러면
+     * 텍스트가 먼저 막혔을 때 사진 판정이 끝나지 않아 **유해한 사진이 S3에 남는다** —
+     * moderateImage()는 차단으로 판정한 객체를 지우므로 끝까지 가야 한다
+     * (_lib/imageModeration.ts). 버킷이 CloudFront로 공개라 글에 안 걸려도 URL이면 열린다.
+     *
+     * imageKey가 없으면 사진 쪽은 **시작조차 하지 않는다.**
+     */
+    const [textResult, imageResult] = await Promise.allSettled([
+      moderate(`${title}\n\n${body}`, invokeBedrock),
+      imageKey ? moderateImage(imageKey) : Promise.resolve(),
+    ])
+
+    /*
+     * **판정 순서는 텍스트 → 이미지 그대로다.** 둘 다 걸렸을 때 사용자가 보는 문구가
+     * 순차였던 오늘과 달라지면 안 된다. 동시에 "시작"만 할 뿐 우선순위는 그대로다.
+     */
+
+    // moderate()는 던지지 않는 계약이다(fail-open). 그래도 감추지 않는다 —
+    // 순차였을 때도 바깥 catch로 나가 500이 됐고, 계약이 깨진 것을 조용히 통과시키면 안 된다.
+    if (textResult.status === "rejected") throw textResult.reason
+    if (textResult.value.verdict === "BLOCK") {
+      return fail(BLOCK_CODE, textResult.value.message, 400)
+    }
+
+    /*
+     * 사진 판정(Bedrock Guardrails). **실패하면 막는다(fail-closed).** 이미지에는 정규식
+     * 백스톱이 없어서 판정 실패가 곧 노출이다. 근거는 _lib/imageModeration.ts 머리 주석에 있다.
+     *
+     * 차단 사유(어느 필터인지)는 로그에만 남긴다. 알려주면 우회 실험을 돕는다.
+     */
+    if (imageResult.status === "rejected") {
+      const error = imageResult.reason
+      if (error instanceof ImageModerationError) {
+        console.error("[imageModeration]", error.kind, imageKey, error.detail)
+        return error.kind === "BLOCKED"
+          ? fail("BLOCKED_IMAGE", "올릴 수 없는 사진이에요", 400)
+          : fail("IMAGE_CHECK_FAILED", "사진을 확인하지 못했어요. 잠시 후 다시 시도해 주세요", 400)
+      }
+      throw error
     }
 
     const post = await prisma.post.create({
