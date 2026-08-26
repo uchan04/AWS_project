@@ -131,9 +131,38 @@ function RoomSvg() {
       <line className="pet-room__frame-bar" x1={332} y1={15} x2={332} y2={129} />
       <line className="pet-room__frame-bar" x1={288} y1={72} x2={376} y2={72} />
 
-      {/* 커튼 */}
-      <path className="pet-room__curtain" d="M 288 15 Q 296 72 288 129 L 280 129 L 280 15 Z" />
-      <path className="pet-room__curtain" d="M 376 15 Q 368 72 376 129 L 384 129 L 384 15 Z" />
+      {/* 창틀 선반. 창 아래에 붙는 널이고 그 위에 화분이 앉는다 (2026-08-26 사용자 요청).
+          창 아래 끝이 y=129이므로 선반 윗면을 거기에 맞춘다. 좌우로 6씩 내밀어(282~382)
+          창틀보다 넓게 — 선반이 창과 같은 폭이면 벽에서 튀어나온 널로 안 읽힌다 */}
+      <rect className="pet-room__sill" x={282} y={129} width={100} height={6} rx={2} />
+
+      {/* 창틀 화분 (2026-08-26 사용자 요청 "창문틀에 화분도 올려줘").
+          선반 윗면(y=129)에 밑면을 붙인다. 자리는 창의 **왼쪽 3분의 1**이다 — 이 SVG는
+          slice로 잘려서 오른쪽이 먼저 사라지므로(좁은 방에서 보이는 x가 50~350) 창 안에서도
+          왼쪽에 두는 쪽이 오래 남는다.
+          화분은 아래가 좁은 사다리꼴 + 테두리 띠, 잎은 방 안 책장과 겹치지 않는 작은 셋이다 */}
+      <path className="pet-room__pot" d="M296 116h18l-2.5 13h-13z" />
+      <rect className="pet-room__pot-rim" x={294} y={113} width={22} height={4} rx={1.5} />
+      <ellipse className="pet-room__sprout" cx={299} cy={108} rx={5} ry={7} />
+      <ellipse className="pet-room__sprout" cx={311} cy={108} rx={5} ry={7} />
+      <ellipse className="pet-room__sprout" cx={305} cy={103} rx={5} ry={8} />
+
+      {/* 커튼 (2026-08-26 사용자 요청으로 다시 그렸다).
+          전에는 창 좌우에 8좌표짜리 얇은 조각 두 장이라 커튼으로 안 읽혔다.
+          지금은 봉 + 좌우 드레이프 두 장이고, 드레이프 안쪽 변에 주름 두 번을 넣었다
+          (Q 두 번 = 접힌 천). 폭은 22좌표씩이라 창 유리를 8좌표만 덮는다 — 창밖 하늘을
+          가리지 않으면서 천이 걸려 있는 것으로 보이는 최소 폭이다 */}
+      <rect className="pet-room__rod" x={272} y={9} width={120} height={4} rx={2} />
+      <circle className="pet-room__rod-cap" cx={274} cy={11} r={4} />
+      <circle className="pet-room__rod-cap" cx={390} cy={11} r={4} />
+      <path
+        className="pet-room__curtain"
+        d="M276 13h22c-6 14 6 26-2 40s4 26-2 40 4 20 0 27h-18z"
+      />
+      <path
+        className="pet-room__curtain"
+        d="M388 13h-22c6 14-6 26 2 40s-4 26 2 40-4 20 0 27h18z"
+      />
 
       {/* 책장. 2026-08-26 사용자 요청으로 화분(pot + leaf 3장)을 갈았다.
           뒷판을 먼저 깔고 선반 4장을 그 위에, 책을 맨 위에 둔다 — 순서를 바꾸면
@@ -169,16 +198,11 @@ function RoomSvg() {
           rx={1}
         />
       ))}
-      {/* 책장 위 "일기장" 딱지 (2026-08-26 사용자 요청).
-          천판 위 6좌표에 baseline을 두고 책장 가로 가운데(SHELF_X + SHELF_W / 2)에 맞춘다 —
-          text-anchor: middle을 pet.css가 준다.
-          **이 SVG 전체가 aria-hidden이라 스크린리더는 이 글자를 읽지 않는다.** 가구에 붙은
-          장식 딱지이고 아직 어떤 기능도 가리키지 않으므로 그대로 둔다 — 나중에 이 글자가
-          일기 기능의 입구가 되면 <text>가 아니라 버튼·링크여야 하고, 그때 aria도 함께 온다
-          (파일 맨 위 "장식이므로 aria-hidden" 주석과 같은 기준) */}
-      <text className="pet-room__shelf-label" x={SHELF_X + SHELF_W / 2} y={SHELF_TOP - 6}>
-        일기장
-      </text>
+      {/* 여기에 책장 위 "일기장" 딱지(`.pet-room__shelf-label`)가 있었다 —
+          천판 위 6좌표, 책장 가로 가운데, --font-body 10좌표였다.
+          **2026-08-26 같은 날 사용자 요청으로 지웠다.** 되살릴 값은 그 한 줄이고
+          자리는 `x={SHELF_X + SHELF_W / 2} y={SHELF_TOP - 6}`이다.
+          CSS 규칙도 함께 걷었다(pet.css의 그 자리 주석) */}
 
       {/* 러그 */}
       <ellipse className="pet-room__rug" cx={200} cy={246} rx={120} ry={24} />

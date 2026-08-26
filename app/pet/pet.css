@@ -88,6 +88,19 @@
   /* 위 1px 밝은 선 = 빛 닿는 모서리, 아래 어두운 번짐 = 두께. 두 줄이 면을 부풀린다 */
   --pet-gloss-edge: inset 0 1px 0 rgb(255 255 255 / 0.6), inset 0 -2px 3px rgb(42 31 20 / 0.14);
 
+  /* ── 방 위에 뜨는 조각의 공통 테두리·면·번짐 (C, 2026-08-26 시안) ─────────────
+   * 상태판 알약 바와 그 안의 알약 넷이 전부 이 세 값을 쓴다. **"테두리 색 통일"이
+   * 요점이다** — 방 위에 뜨는 물건의 선이 한 색이면 여러 조각이 한 벌로 읽힌다.
+   * 한 벌로 묶어 둔 이유는 한쪽만 고치면 방 안에서 재질이 갈리기 때문이다.
+   * 링은 종족색을 따른다(종족이 셋이라 한 색으로 고정하면 방 배경 6종과 어긋난다) */
+  --pet-chip-ring: 3px solid color-mix(in oklch, var(--tribe-cta) 48%, var(--color-card));
+  --pet-chip-face: linear-gradient(
+    180deg,
+    var(--color-card),
+    color-mix(in oklch, var(--tribe) 9%, var(--color-card))
+  );
+  --pet-chip-lift: 0 2px 6px rgb(42 31 20 / 0.2);
+
   /* 상점 두 화면(/pet/skins · /pet/cosmetics)의 흰 면 컨트롤용 번짐 (2026-08-24).
      홈은 8/22 광택 + 8/24 번짐을 받았는데 상점은 둘 다 못 받아 전부 box-shadow: none인
      평면으로 남아 있었다 — 같은 .pet 스코프인데 들어가면 다른 화면처럼 보인다.
@@ -180,297 +193,131 @@
   gap: var(--space-2xs);
 }
 
-/* ── 재화 바 (2026-08-26 사용자 제공 이미지) ──────────────────────────────── */
+/* ── 상태판 알약 바 (C의 2026-08-26 시안 3번 · 같은 날 머지에서 채택) ───────────
+ *
+ * **여기에 내 상단 HUD 세 벌이 있었다** — `.pet-bar`(재화 칩 3개) · `.pet-hud-lv`
+ * (Lv + 게이지 + exp 숫자) · `.pet-topbar`(둘을 앉히는 자리 틀). 2026-08-26 머지에서
+ * 사용자가 **C의 알약 바 하나**를 골라 셋을 전부 걷었다.
+ *
+ * 되살릴 값:
+ *  - `.pet-bar` — absolute · `left/right: 0` + `width: fit-content` + `margin-inline: auto`로
+ *    방 정중앙. **`left: 50%` + `translateX(-50%)`를 쓰면 안 된다** — 절대 요소의
+ *    shrink-to-fit 가용 폭이 `left` 오프셋부터라서 폭이 방의 절반으로 잡히고 알약이 두 줄로
+ *    접힌다(375px 실측). 칩은 `min-height: 1.9rem` · 2px 종족색 38% 테두리 · `--pet-gloss` ·
+ *    `0 2px 0` 굳은 아래선 · `box-sizing: border-box`였다
+ *  - `.pet-hud-lv` — flex 한 줄 · `width: fit-content`(**이게 없으면 flex 항목이 늘어나
+ *    다시 판이 된다**) · Lv은 2.1rem 원형 배지(종족색 채움 + 광택) · 게이지 4.5×0.9rem ·
+ *    exp 숫자는 `display: none`
+ *  - `.pet-topbar` — `height: 0` + `pointer-events: none`인 자리 틀. 안의 두 덩어리가 각자
+ *    absolute였다. **이름이 `.pet-hud`였다가 갈렸다**: 그 이름은 상점 두 화면
+ *    (`/pet/skins`·`/pet/cosmetics`)의 잔액 알약이 쓰고 있어서(이 파일 뒤쪽 `.pet-hud`,
+ *    `SkinList.tsx`·`CosmeticList.tsx`) 순서로 이겨 **291×44px 흰 알약이 Lv과 재화 셋을
+ *    통째로 감쌌다**(실측). 같은 이름을 다시 쓰면 그 사고가 그대로 돌아온다
+ *
+ * 여기에 **상점 입구 2개 규칙 3벌**(`.pet-bar__shops` · `.pet-bar .pet-bar__shop` · 그
+ * `--ghost` 변형)도 있었다. 시안 개편으로 펫꾸미기 모달로 갔다 — 같은 값이 아래
+ * `.pet-modal__shop`에 있고 모양(채운 `.pet-btn` / 테두리형 `.pet-btn--ghost`)은 그대로다.
+ */
 
-/* 지갑 카드(.pet-card--wallet)가 하던 일을 한 줄로 옮긴 것이다. 카드는 같은 요청에서
-   지웠다 — 자세한 사정은 PetView의 그 자리 주석.
+/* **자리가 이 화면에서 세 번째로 바뀐 것이다** (C의 기록):
+   ① 옛 "🍎 경험치" 카드 + 옛 재화 알약이 좌상단 세로 상자로 합쳐졌고
+   ② 같은 날 재화가 게이지 오른쪽 세로 3줄로 옮겨졌고
+   ③ 지금은 그 카드를 걷고 **가로 알약 바 하나**다.
 
-   **2026-08-26 시안 개편: 방 위의 블록 → 방 안 상단 중앙에 떠 있는 알약.**
-   같은 날 오전에 만든 마크업을 자리만 옮겼고 상점 버튼 2개가 빠졌다(펫꾸미기 모달로 갔다).
-   바뀐 값은 넷이다:
-   - position: absolute + top/left/translateX — 방 안에 뜬다
-   - 모서리가 --radius-card(20px) → --radius-pill. 상점 버튼이 빠져 높이가 44px 아래로
-     내려왔고, 그 높이에서 20px은 알약과 거의 같아 보이면서 각만 남는다. 시안도 알약이다
-   - justify-content: space-between을 지웠다 — 오른쪽에 밀어낼 상대(상점 묶음)가 없다
-   - 반투명 + 흐림. 방 그림 위에 뜨는 오버레이라 불투명 면이면 배경 그림을 가린다.
-     시안이 rgba(255,245,240,0.88) + blur(8px)이고, 여기서는 그 흰색을 이 앱의 카드색으로
-     바꿔 썼다(색을 새로 들이지 않는다). 88%면 배경 6종 위에서 숫자 명암비가 유지된다 */
-.pet-bar {
+   시안 구성: `( Lv.26 )` `( 게이지 )` … `( 🌱 2,994 )( 💗 2,000 )( ⭐ 5,576 )`
+   — 바깥이 알약이고 그 안의 넷도 각각 알약이다.
+
+   **"테두리 색 통일"이 이 절의 요점이다.** 바깥 바·안쪽 알약·게이지가 전부 같은
+   `--pet-chip-ring`을 쓴다. 방 위에 뜨는 물건의 테두리가 한 색이면 여러 조각이 한 벌로
+   읽힌다.
+
+   **펫 이름(스킨 이름)이 빠졌다** — 시안에 없다. 그 글자는 `.pet-char` 안 sr-only로 남아
+   있다. 게이지 안 숫자도 없다 — 펫 정보 모달의 "현재 Lv.N · 경험치 X / Y" 줄과 씨앗을
+   넣을 때 뜨는 유리 바(`.pet-exp-pop`)가 그 값을 말한다 */
+.pet-hud-bar {
   position: absolute;
   top: var(--space-2xs);
-  /* **`left: 50%` + `translateX(-50%)`로 가운데를 잡으면 안 된다.** 절대 위치 요소의 폭은
-     shrink-to-fit이고 그 "가용 폭"이 left 오프셋부터 오른쪽 끝까지, 즉 **방의 절반**이 된다.
-     transform은 그 뒤에 눈에 보이는 자리만 옮기므로 폭 계산에 끼지 않는다.
-     실측: 375px에서 알약이 137px로 잡혀 두 줄로 접혔다(내용은 196px이 필요했다).
-     left/right를 0으로 열어 가용 폭을 방 전체로 만들고, `width: fit-content` + `margin: auto`로
-     가운데를 잡는다 — 이 조합은 폭을 먼저 내용으로 정하고 나서 남는 공간을 반씩 나눈다 */
-  left: 0;
-  right: 0;
-  width: fit-content;
-  margin-inline: auto;
+  /* 좌우로 벌려 방 폭을 쓴다. 알약 바라서 안쪽 여백이 좌우로 넉넉해야 한다 */
+  left: var(--space-2xs);
+  right: var(--space-2xs);
   z-index: calc(var(--z-raised) + 2);
   display: flex;
-  flex-wrap: wrap;
   align-items: center;
-  gap: var(--space-2xs) var(--space-sm);
-  /* 방 안쪽 폭을 넘지 않는다. 좌우 여백은 Lv 오버레이(왼쪽)와 균형을 맞춘 값이다 */
-  max-width: calc(100% - var(--space-sm) * 2);
-  /* **면·radius·그림자를 걷었다** (2026-08-26 사용자 지적: "의미 없는 흰색 가로 바").
-     세 칸이 각자 칩이 되면서(.pet-bar__item) 그 뒤의 판은 아무것도 담지 않는 흰 띠가 됐다.
-     이제 이 요소는 칩을 줄 세우는 flex 컨테이너뿐이다 —
-     되살릴 값: `--color-card 88%` + `blur(8px)` + `--shadow-card` + `--radius-pill` */
-  padding: 0;
+  gap: var(--space-2xs);
+  padding: var(--space-3xs) var(--space-2xs);
+  border: var(--pet-chip-ring);
+  border-radius: var(--radius-pill);
+  background: var(--pet-chip-face);
+  box-shadow: var(--pet-chip-lift);
 }
 
-.pet-bar__wallet {
+/* 레벨 알약. 시안에서 가장 왼쪽이고 폭이 내용에 맞는다 */
+.pet-hud-bar__level {
+  flex-shrink: 0;
+  margin: 0;
+  padding: 0.1rem var(--space-2xs);
+  border: var(--pet-chip-ring);
+  border-radius: var(--radius-pill);
+  background: color-mix(in oklch, var(--tribe) 16%, var(--color-card));
+  font-family: var(--font-display);
+  font-size: var(--text-label);
+  color: var(--color-ink);
+  white-space: nowrap;
+}
+
+/* 바 안의 게이지. 남는 폭을 먹고, 다른 알약들과 같은 테두리를 쓴다.
+   `.pet-gauge` 기본 규칙이 이 파일 뒤쪽에 있지만 이쪽 선택자가 더 구체적이라 순서와
+   무관하게 이긴다 — 높이·테두리만 여기서 갈고 홈 그림자·전환은 기본값을 쓴다 */
+.pet-hud-bar .pet-gauge {
+  flex: 1;
+  min-width: 3rem;
+  height: 1.4rem;
+  border: var(--pet-chip-ring);
+}
+
+/* 재화 알약 셋. 시안은 바 오른쪽 끝에 붙으므로 이 묶음이 오른쪽으로 밀린다
+   (게이지가 flex: 1로 남는 폭을 먹는 것과 짝이다) */
+.pet-hud-bar__wallet {
   display: flex;
-  flex-wrap: wrap;
   align-items: center;
+  gap: var(--space-3xs);
   margin: 0;
   padding: 0;
   list-style: none;
 }
 
-/* 칸 사이의 세로 선. 제공된 이미지의 얇은 회색 구분선이다.
-   테두리로 그리고 **마지막 칸만 뺀다** — 가상 요소로 그리면 아이콘·숫자와 같은 줄에
-   또 하나의 flex 항목이 생겨 gap 계산이 어긋난다.
-   좌우 padding이 gap을 대신한다: 선이 두 칸 사이 가운데에 오려면 여백이 선을 기준으로
-   양쪽에 같아야 하고, gap을 쓰면 선이 오른쪽 칸에 붙는다 */
-/* 좌우 여백이 --space-sm(16px)이 아니라 --space-2xs(8px)인 것은 **한 줄에 들어가기 위한
-   값이다.** 제공된 이미지는 폭 2000px짜리 띠라 여백이 넉넉하지만, 이 화면의 실제 내용 폭은
-   사이드바를 뺀 약 534px(837px 창)이다. 16px이면 재화 3칸 + 상점 2개가 562px이 되어 8px
-   모자라 두 줄로 접힌다 — 8px로 내리면 514px이다. 눈대중이 아니라 그 48px 차이다 */
-/* 세 칸을 구분선으로 가르던 한 판이었다. **각자 칩이 된다** (2026-08-26, 게임 느낌).
-   구분선은 "표"로 읽히고 칩은 "모은 것"으로 읽힌다 — 재화는 후자다 */
-/* 세 칩의 **높이와 좌우 여백을 못 박는다** (2026-08-26 사용자 지적: "세로 길이가 다르다.
-   가로 여백도 다르다"). 원인 둘이었다:
-   ① `:first-child`에만 다른 `padding-inline-start`가 남아 있었다(옛 구분선 판의 값)
-   ② 높이를 내용에 맡겨서, 아이콘(22px)과 숫자의 line-height 합이 칸마다 미세하게 달랐다
-   → `min-height`로 고정하고 여백을 네 방향 다 같은 식으로 준다 */
-.pet-bar__item {
+.pet-hud-bar__coin {
   display: flex;
   align-items: center;
-  gap: var(--space-3xs);
-  min-height: 1.9rem;
-  padding-block: 0;
-  padding-inline: 0.2rem var(--space-2xs);
-  border: 2px solid color-mix(in oklch, var(--tribe) 38%, transparent);
+  gap: 0.15rem;
+  padding: 0.1rem var(--space-2xs) 0.1rem 0.2rem;
+  border: var(--pet-chip-ring);
   border-radius: var(--radius-pill);
-  background: var(--pet-gloss), color-mix(in oklch, var(--color-card) 92%, transparent);
-  box-shadow: var(--pet-gloss-edge), 0 2px 0 color-mix(in oklch, var(--tribe) 24%, transparent);
-  box-sizing: border-box;
+  background: var(--color-card);
+  white-space: nowrap;
 }
 
-/* 아이콘 그림이 줄 높이를 밀지 않게 블록으로 세운다 — 22px 이미지가 인라인이면
-   글꼴의 baseline만큼 칸이 높아지고, 그 값이 숫자 길이에 따라 달라 보였다 */
-.pet-bar__item img {
-  display: block;
-}
-
-/* 지갑 카드의 아이콘은 종족색 20% 면을 깐 2rem 사각형이었다(.pet-wallet__icon).
-   여기서는 **면을 주지 않는다** — 제공된 이미지가 맨 이모지이고, 한 줄에 색 면 3개가
-   붙으면 바로 옆 상점 버튼(채운 종족색 면)과 눈에 띄기를 다툰다 */
-.pet-bar__icon {
-  font-size: 1.15rem;
+.pet-hud-bar__coin-icon {
+  font-size: 0.95rem;
   line-height: 1;
 }
 
-/* 숫자는 --color-muted다. 이 바는 읽을 것이 아니라 참조하는 값이고, 이 화면의 주 동작은
-   먹이기·외출이다 — 잉크색으로 두면 제목줄과 같은 무게가 된다.
-   tabular-nums는 지갑 카드에서 그대로 가져온다. 값이 갱신될 때 자릿수가 바뀌어도
-   옆 칸이 밀리지 않는다 */
-/* --color-muted였다("참조하는 값"). 게임 HUD에서 모은 재화는 또렷하다 —
-   잉크색 + 굵기로 올린다(2026-08-26 사용자 지적) */
-.pet-bar__value {
-  color: var(--color-ink);
+/* 재화 아이콘이 PNG `<img>`다(2026-08-26, `CurrencyIcon`). 위 `font-size`는 이모지 한 자를
+   담던 값이라 `<img>`에는 아무 일도 하지 않는다 — 인라인 이미지는 baseline에 앉아 줄 높이를
+   칩마다 다르게 밀기 때문에(전에 칩 세로 길이가 서로 달랐던 원인) 블록으로 세운다 */
+.pet-hud-bar__coin-icon img {
+  display: block;
+}
+
+/* tabular-nums는 값이 오를 때 자릿수가 바뀌어도 옆 알약이 밀리지 않게 한다.
+   굵기는 400이다 — 같은 날 "레벨 카드의 볼드체 제거" 요청을 이 칩도 물려받는다 */
+.pet-hud-bar__coin-value {
   font-size: var(--text-label);
-  font-weight: 700;
+  font-weight: 400;
+  color: var(--color-ink);
   font-variant-numeric: tabular-nums;
 }
 
-/* 여기에 **상점 입구 2개 규칙 3벌**(.pet-bar__shops · .pet-bar .pet-bar__shop ·
-   그 --ghost 변형)이 있었다. **2026-08-26 시안 개편으로 펫꾸미기 모달로 갔다** —
-   같은 값이 아래 .pet-modal__shop에 있고, 모양(채운 .pet-btn / 테두리형 .pet-btn--ghost)은
-   그대로다. 옮기면서 지운 것은 "한 줄에 들어가려고" 좁혔던 좌우 여백뿐이다 —
-   모달 안에서는 두 버튼이 세로로 쌓이므로 그 제약이 없다 */
-
-/* ── 좌상단 Lv + 경험치 오버레이 (2026-08-26 시안) ─────────────────────────── */
-
-/* 옛 "🍎 경험치" 카드가 여기로 왔다. 카드에서 온 것은 게이지(.pet-gauge) 하나이고
-   제목·이모지·각주는 오지 않았다 — 방 위에 얹는 오버레이는 **한눈에 읽히는 두 줄**이어야
-   한다. 각주("다음 단계까지 씨앗 N개")는 펫 정보 모달로 보냈다.
-
-   면 처리는 재화 알약과 같다(반투명 카드색 + blur) — 같은 방 위에 뜨는 두 오버레이가
-   재질이 다르면 하나는 UI, 하나는 가구로 읽힌다.
-
-   폭을 고정하지 않는다. 안쪽에서 폭을 정하는 것은 "350 / 2,600"이고 그 자릿수가 레벨에
-   따라 늘어난다 — min-width로 못 박으면 낮은 레벨에서 오른쪽이 비고, 높은 레벨에서 넘친다.
-   대신 게이지에 하한을 준다(아래 --gauge-w) — 그게 없으면 숫자가 짧을 때 막대가 같이
-   짧아져 게이지로 안 보인다 */
-.pet-hud-lv {
-  --gauge-w: 7rem;
-  position: absolute;
-  top: var(--space-2xs);
-  left: var(--space-2xs);
-  z-index: calc(var(--z-raised) + 2);
-  display: grid;
-  gap: var(--space-3xs);
-  padding: var(--space-2xs);
-  /* **면·radius·그림자를 걷었다** (2026-08-26 사용자 지적). Lv 숫자가 배지가 되고
-     (.pet-topbar .pet-hud-lv__level) 게이지가 자기 테두리를 갖고 있어서, 이 상자의 판은
-     그 둘 뒤의 흰 띠가 됐다.
-     되살릴 값: `--color-card 88%` + `blur(8px)` + `--shadow-card` + `--radius-card` */
-  padding: 0;
-}
-
-/* 아래 주석은 낡았다 — "이 상자 자체가 알약 계열 면"이었을 때의 근거이고, 그 면을 위에서
-   걷었다. 지금은 이 숫자가 **배지**이고 그 값은 `.pet-topbar .pet-hud-lv__level`에 있다 */
-.pet-hud-lv__level {
-  margin: 0;
-  font-family: var(--font-display);
-  font-size: var(--text-body);
-  color: var(--color-ink);
-  line-height: 1.2;
-}
-
-.pet-hud-lv .pet-gauge {
-  min-width: var(--gauge-w);
-}
-
-/* 옛 카드의 .pet-card__meta와 같은 값(라벨 크기 + muted)이다. tabular-nums는 카운트가
-   오를 때 자릿수가 바뀌어도 게이지 오른쪽 끝이 흔들리지 않게 한다 */
-.pet-hud-lv__exp {
-  margin: 0;
-  text-align: right;
-  font-size: var(--text-label);
-  color: var(--color-muted);
-  font-variant-numeric: tabular-nums;
-}
-
-/* ── 좌우 원형 버튼 스택 (2026-08-26 시안) ─────────────────────────────────── */
-
-/* 방 안 좌우에 세로로 붙는다. 가운데(펫·말풍선·쪽지)를 피해 양 끝에 두는 것이 시안이고,
-   그래야 방 그림의 주인공이 가려지지 않는다.
-
-   **top: 50% + translateY(-50%)를 쓰지 않는다.** 시안은 그 방식인데, 버튼 수가 좌(5)·우(3)로
-   달라서 가운데 정렬하면 두 스택의 첫 버튼 높이가 어긋난다. 위에서부터 쌓되 Lv 오버레이
-   아래에서 시작하도록 top을 고정한다 — 두 스택의 첫 줄이 같은 높이에서 시작한다.
-
-   pointer-events는 건드리지 않는다. 이 상자는 버튼 크기만큼만 차지하므로(폭이 내용 폭)
-   방을 덮지 않고, 펫 쓰다듬기 클릭을 막지 않는다 */
-/* ── 상단 한 띠: Lv·경험치 + 재화 3종 (2026-08-26 사용자 지시) ────────────────
- *
- * 두 덩어리였다(.pet-hud-lv 좌상단 · .pet-bar 상단 중앙). 375px에서 방이 279×352인데
- * 말풍선 112 + 알약 29 + Lv 88 + 펫 274 = 503이라 셋이 서로를 덮었다 —
- * **자리를 옮겨 풀 문제가 아니라 방이 담을 수 없는 양이었다.** 한 줄로 합쳐 34px로 줄인다.
- *
- * 방 밖으로 내지 않는다(사용자 지시: "배경이 좁아지니까 답답함이 느껴짐").
- */
-/* **이름이 `.pet-hud`였다가 `.pet-topbar`가 됐다** (2026-08-26 사용자 지적:
-   "레벨/경험치 배경이 재화도 감싸고 있다").
-
-   `.pet-hud`는 **이미 상점 두 화면(`/pet/skins`·`/pet/cosmetics`)의 잔액 알약**이 쓰는
-   클래스다(이 파일 845행, `SkinList.tsx`·`CosmeticList.tsx`). 그 규칙이 이 파일 뒤쪽에
-   있어 순서로 이겨서, **흰 알약 면 + radius 999px + 테두리 + 그림자가 내 띠에 얹혔다** —
-   실측 291×44px 흰 알약 하나가 Lv과 재화 셋을 통째로 감쌌다.
-
-   같은 이름을 쓰면 한쪽을 고칠 때 다른 화면이 조용히 바뀐다. 이름을 갈랐다. */
-/* **flex 한 줄이었다가 자리 틀이 됐다** (2026-08-26 사용자 지시: "재화 3종은 펫 배경
-   기준으로 중앙에 오도록"). flex로 둘을 나란히 세우면 재화의 가운데가 **둘을 합친 묶음의
-   가운데**가 되어 방 중앙에서 Lv 폭의 절반만큼 왼쪽으로 밀린다.
-
-   그래서 이 요소는 자리만 잡고 안의 두 덩어리가 **각자 절대 위치**를 갖는다.
-   `height: 0`인 것은 이 틀이 아무 자리도 차지하지 않아야 하기 때문이다.
-   면은 없다 — 두 덩어리가 각자 알약이고, 여기에 판을 하나 더 두면 배경 6종이 가려진다 */
-.pet-topbar {
-  position: absolute;
-  top: var(--space-2xs);
-  left: 0;
-  right: 0;
-  z-index: calc(var(--z-raised) + 2);
-  height: 0;
-  pointer-events: none;
-}
-
-/* 재화 3종 — **방 기준 정중앙.** `left/right: 0`으로 가용 폭을 방 전체로 열고
-   `width: fit-content` + `margin-inline: auto`로 가운데를 잡는다.
-   `left: 50%` + `translateX(-50%)`를 쓰면 안 되는 이유는 이 파일 앞 `.pet-bar` 주석에
-   실측과 함께 있다 — 절대 위치 요소의 가용 폭이 방의 절반이 되어 알약이 접힌다 */
-.pet-topbar .pet-bar {
-  position: absolute;
-  top: 0;
-  left: 0;
-  right: 0;
-  width: fit-content;
-  margin-inline: auto;
-  max-width: calc(100% - var(--space-sm) * 2);
-}
-
-/* Lv 묶음 — 왼쪽 끝. 재화가 가운데를 쓰므로 이쪽이 가장자리로 간다 */
-.pet-topbar .pet-hud-lv {
-  position: absolute;
-  top: 0;
-  left: var(--space-2xs);
-}
-
-/* 틀이 `pointer-events: none`이므로 안에서 되살린다 */
-.pet-topbar > * {
-  pointer-events: auto;
-}
-
-/* Lv 덩어리를 한 줄로 눕힌다. 세로 3줄(Lv / 게이지 / exp)이 88px을 먹던 것이
-   가로 한 줄이면 약 30px이다. `exp / need` 숫자는 **띠에서 뺀다** — 게이지가 이미 비율을
-   말하고, 정확한 값은 씨앗을 넣을 때 유리 바가 크게 보여 준다(.pet-exp-pop).
-
-   ── 게임 느낌 (2026-08-26 사용자 지적: "너무 깔끔한 거 같음") ──
-   납작한 반투명 판이었다. 육성 게임 HUD는 **두께가 있다** — 위쪽 광택, 아래쪽 굳은 테두리,
-   또렷한 윤곽선. 이 파일이 이미 그 값을 갖고 있다(`--pet-gloss` · `--pet-gloss-edge`,
-   주 버튼 `.pet-btn`이 쓰는 것) — **새 색을 만들지 않고 그것을 얹는다** */
-.pet-topbar .pet-hud-lv {
-  display: flex;
-  align-items: center;
-  gap: var(--space-2xs);
-  /* **Lv 묶음의 자기 알약이다.** 한 번 걷었다가 되살렸다 —
-     처음엔 `.pet-hud`(상점 알약 클래스)를 물려받아 **재화까지 감싸는 291px 흰 판**이었고,
-     그것을 걷으니 Lv 배지와 재화 칩 셋이 나란히 떠서 **Lv이 네 번째 재화처럼** 보였다.
-     지금은 이름을 가른 뒤(.pet-topbar) 내용만큼만 감싼다: Lv 배지 + 게이지 한 묶음.
-
-     `width: fit-content`가 요점이다 — 이것이 없으면 flex 항목이 늘어나 다시 판이 된다.
-     면을 옅게 두는 것은 안의 배지(종족색 채움)와 무게를 가르기 위해서다 */
-  width: fit-content;
-  padding: 0.15rem var(--space-2xs) 0.15rem 0.15rem;
-  border: 2px solid color-mix(in oklch, var(--tribe) 38%, transparent);
-  border-radius: var(--radius-pill);
-  background: color-mix(in oklch, var(--color-card) 88%, transparent);
-  backdrop-filter: blur(6px);
-  box-shadow: 0 2px 0 color-mix(in oklch, var(--tribe) 24%, transparent);
-  box-sizing: border-box;
-}
-
-/* Lv 숫자를 **배지**로 만든다. 게임 HUD의 레벨은 거의 항상 동그라미 안에 있다 */
-.pet-topbar .pet-hud-lv__level {
-  display: grid;
-  place-items: center;
-  min-width: 2.1rem;
-  height: 2.1rem;
-  padding-inline: 0.2rem;
-  border-radius: var(--radius-pill);
-  background: var(--pet-gloss), linear-gradient(135deg, var(--tribe-face), var(--tribe));
-  box-shadow: var(--pet-gloss-edge);
-  font-size: var(--text-label);
-  font-weight: 700;
-  color: var(--color-ink);
-}
-
-.pet-topbar .pet-hud-lv__exp {
-  display: none;
-}
-
-.pet-topbar .pet-hud-lv .pet-gauge {
-  width: 4.5rem;
-  height: 0.9rem;
-  border-width: 2px;
-}
 
 /* ── 방 안 하단 액션 바 (2026-08-26 사용자 지시) ───────────────────────────────
  *
@@ -562,6 +409,95 @@
   color: var(--color-muted);
   box-shadow: none;
   cursor: default;
+}
+
+/* ── 버튼 아이콘 SVG (C의 손그림 아이콘 8종 · 2026-08-26 머지에서 채택) ────────
+ *
+ * **이모지를 대신한다.** 레일과 액션 바의 이모지 넷이 뜻과 어긋나 있었다 —
+ * 🌿(씨앗이 아니라 풀) · 📊(성과표로 읽힌다) · 🏪(편의점) · 🌟(무의미). C가 같은 날
+ * 사용자 시안으로 24×24 손그림 아이콘 8종을 그렸고(`PetIcon.tsx`), 머지에서 그것을 쓴다.
+ * C의 세트에 없던 셋(여행일기·마음 친구·더보기)은 같은 규칙으로 그 파일에 더 그렸다.
+ *
+ * 색은 CSS가 준다(`data-f` 속성 → 아래 규칙들). fill을 SVG에 하드코딩하지 않는 이유는
+ * 방 배경 SVG와 같다 — 색을 한 파일에 모아 두면 톤을 바꿀 때 한 곳만 본다.
+ *
+ * 채색은 **사물 고유색**이다(잎은 초록, 지붕은 노랑, 막대는 셋이 다른 색). 종족색을
+ * 따르면 파란 잎·주황 하늘이 된다 — 방 배경 SVG가 같은 판단을 하고 있다.
+ * **외곽선만은 종족색을 따른다** — 알약 링(`--pet-chip-ring`)이 종족색이라 선을 갈색으로
+ * 고정하면 고양이(파랑)·곰(초록) 링 안에서 아이콘만 갈색으로 뜬다.
+ */
+.pet-icon {
+  /* C의 값은 2.15rem이었다 — 방 밖 원형 버튼(1.3배)에 맞춘 크기다. 이 화면의 버튼은
+     레일 아이콘 칸(2.5rem)과 액션 알약(2.75rem)이라 그 안에서는 넘친다 */
+  width: 1.5rem;
+  height: 1.5rem;
+  fill: none;
+  stroke: var(--tribe-cta);
+  stroke-width: 1.7;
+  stroke-linecap: round;
+  stroke-linejoin: round;
+}
+
+/* 액션 알약 안에서는 글자와 나란히 서므로 한 단 작다. 44px 알약에 1.5rem을 넣으면
+   아이콘이 글자보다 커서 라벨이 부속처럼 보인다 */
+.pet-act .pet-icon {
+  width: 1.15rem;
+  height: 1.15rem;
+}
+
+/* 선만 있는 도형(줄기·받침선·글자 획). 채우면 획이 면으로 번진다 */
+.pet-icon [data-f="stem"],
+.pet-icon [data-f="check"] {
+  fill: none;
+}
+
+/* 체크만 한 단 굵다 — 짧은 두 획이라 같은 굵기에서 가늘어 보인다(광학적 무게) */
+.pet-icon [data-f="check"] {
+  stroke-width: 2.1;
+}
+
+/* 점처럼 채우는 도형. ⓘ의 점과 말풍선의 점 셋이다 */
+.pet-icon [data-f="ink"] {
+  fill: var(--tribe-cta);
+  stroke: none;
+}
+
+.pet-icon [data-f="cream"] {
+  fill: var(--color-card);
+}
+
+/* 나무·종이 계열. 방 바닥(#c8a878)의 밝은 이웃이다 */
+.pet-icon [data-f="tan"] {
+  fill: #e6cfa8;
+}
+
+.pet-icon [data-f="door"],
+.pet-icon [data-f="latch"],
+.pet-icon [data-f="clip"],
+.pet-icon [data-f="ball"] {
+  fill: #cfae84;
+}
+
+/* 지붕 띠. 시안의 24H 띠가 노랑이다 */
+.pet-icon [data-f="roof"] {
+  fill: #e8ca7d;
+}
+
+.pet-icon [data-f="leaf"] {
+  fill: #7fb069;
+}
+
+/* 막대 셋. 시안이 살구·초록·파랑이고 그 순서까지 같다 */
+.pet-icon [data-f="bar1"] {
+  fill: #e08d7d;
+}
+
+.pet-icon [data-f="bar2"] {
+  fill: #7fb069;
+}
+
+.pet-icon [data-f="bar3"] {
+  fill: #6fa5cd;
 }
 
 /* ── 오른쪽 세로 레일 (2026-08-26 사용자 지시) ────────────────────────────────
@@ -1879,7 +1815,7 @@
    카드째 지웠다.** 되살릴 때의 값은 `background: #fff` 한 줄이고, 근거는 "카드가 흰색이고
    재화 줄이 --color-card"였다(2026-08-21 결정. .pet-card 본체를 고치지 않고 변형 클래스로
    둔 이유는 이 화면의 카드 다섯 장이 전부 .pet-card를 쓰기 때문이다).
-   재화는 지금 상단 바(.pet-bar)가 갖는다 */
+   재화는 지금 상태판 알약 바(.pet-hud-bar)가 갖는다 */
 
 /* 2026-08-21 사용자 결정: 씨앗 투입 카드의 글씨체를 한 벌로 묶는다. 전에는 제목만 Gowun
    Dodum이고 보유 개수·스테퍼·개수 버튼·먹이기·각주는 본문 서체라 한 카드에 두 서체가 섞였다.
@@ -2130,7 +2066,7 @@
    `.pet-card--wallet .pet-wallet__shop`. 위쪽 카드 면(.pet-card--wallet)과 먹이기 버튼
    선택자에 얹혀 있던 몫도 같은 날 함께 걷었다.
    **2026-08-26 사용자 요청("보유재화 카드는 제거해줘")으로 지갑 카드를 지우면서 걷었다.**
-   같은 값이 상단 바로 갔다 — 이 파일 앞쪽 "재화 바" 절(.pet-bar).
+   같은 값이 상단 바로 갔다 — 이 파일 앞쪽 "상태판 알약 바" 절(.pet-hud-bar).
 
    되살릴 때 필요한 값만 남긴다. 결정 내력 전체는 `git log -p app/pet/pet.css`에 있다:
    - .pet-wallet — grid · gap --space-3xs · 목록 초기화
@@ -3792,90 +3728,43 @@
      방 → 재화 → 경험치 → 수확 → 투입 → 오늘의 활동 → 진화 순으로 흐르게 하던 값이다.
      **2026-08-26 시안 개편으로 열이 사라져 걷었다**(위 .pet-stage 주석).
 
-     대신 이 폭에서는 **원형 버튼이 작아진다.** 375px 방 안쪽이 약 279px인데 좌우 스택이
-     3rem(48px) + 라벨이면 두 스택이 방의 절반을 먹고 펫 자리가 150px 아래로 내려간다.
-     2.5rem(40px)으로 줄이면 두 스택이 약 200px이고 펫이 그만큼 넓게 선다.
-     **40px은 design.md의 44px 터치 하한 아래다** — 다만 하한이 요구하는 것은 터치 **면적**
-     이고, 이 버튼은 아이콘 원 아래 라벨 알약까지가 한 <button>이라 실제 높이가
-     40 + 라벨 약 20 = 60px이다. 폭은 라벨 쪽이 더 넓어 44px을 넘는다 */
-  .pet-circle__icon {
-    width: 2.5rem;
-    height: 2.5rem;
-    font-size: var(--text-body);
-  }
+     같은 자리에 C의 `.pet-circle__icon { 2.5rem }`(이 폭에서 원형 버튼을 40px로 줄이던 것)도
+     있었다 — 2026-08-26 머지에서 원형 버튼 자체를 걷어 규칙이 가리킬 것이 없어졌다.
+     이 폭의 버튼은 방 안 액션 알약이고 그쪽 좁힘은 아래 `.pet-act` 절이 한다 */
 
-  /* **이 폭에서는 Lv 오버레이와 재화 알약이 한 줄에 못 선다.** 375px에서 방 안쪽이 279px인데
-     Lv 상자가 96px, 알약이 197px이라 합이 293px이다(실측). 그래서 **세로로 쌓는다** —
-     알약이 맨 위 가운데, Lv이 그 아래 왼쪽, 버튼 스택이 그 아래다.
-     넓은 화면에서는 둘이 같은 줄에 있는 것이 시안이고, 이 폭만 예외다 */
-  /* ── 상단 띠를 한 줄로 지킨다 (2026-08-26 실측) ────────────────────────────────
+
+  /* ── 알약 바를 두 줄로 접는다 (C의 실측) ─────────────────────────────────────
    *
-   * 375px에서 띠 안쪽이 274px인데 `Lv 143 + 알약 201 + 간격 8 = 352`라 **알약이 아래 줄로
-   * 밀렸다.** 사용자가 "자원 알약을 삼켜버림"으로 본 것이 그 줄바꿈이다.
+   * 방 안쪽이 240~279px인데 안에 든 것이 레벨 알약 + 게이지 + 재화 알약 셋이라 한 줄에
+   * 못 선다. `flex-wrap`으로 접고 게이지가 한 줄을 다 쓰게 둔다 — 접힌 줄에서 게이지가
+   * 재화 알약 옆에 끼면 20px짜리 막대가 된다.
    *
-   * **게이지를 뺀다.** Lv 배지만 남으면 약 44 + 201 + 8 = 253 < 274로 한 줄이 유지된다.
-   * 게이지가 사라져도 경험치를 볼 길은 둘 남는다 — 씨앗을 넣는 순간 뜨는 유리 바
-   * (.pet-exp-pop, 같은 값을 크게 보여 준다)와 `더보기 → 펫 정보`다.
-   * 넓은 화면에서는 게이지가 그대로 있다(폭이 남는다).
+   * `top`은 기본값(--space-2xs) 그대로다. 옛 세로 카드는 방 폭의 절반을 넘어 천장에 붙어
+   * 보였지만, 알약 바는 좌우로 벌려 있어 그 문제가 없다.
+   *
+   * **여기에 내 세 벌의 좁은 화면 규칙이 있었다** — `.pet-hud-lv { top: 3.25rem }` →
+   * `2.4rem`, `.pet-topbar .pet-hud-lv .pet-gauge { display: none }`(게이지를 빼서 Lv 44 +
+   * 알약 201 + 간격 8 = 253 < 274로 한 줄을 지키던 것), `.pet-bar` 좁힘 3벌
+   * (칸 여백 8 → 4 · 칸 사이 16 → 8 · 숫자 --text-label), `.pet-hud-lv { --gauge-w: 5rem;
+   * top/left: auto }`. 알약 바 하나가 되면서 "둘이 한 줄에 못 선다" 문제 자체가 없어졌다.
    */
-  .pet-hud-lv {
-    top: 3.25rem;
+  .pet-hud-bar {
+    flex-wrap: wrap;
+    row-gap: var(--space-3xs);
   }
 
-  .pet-topbar .pet-hud-lv .pet-gauge {
-    display: none;
+  /* 바가 두 줄로 접히므로 말풍선 상한이 빼야 하는 몫도 커진다 — 접힌 바가 약 5.6rem이다.
+     이 값이 실제 바 높이보다 작으면 말풍선이 바 위로 올라가 글자가 가려진다(C 실측:
+     5.8rem으로 뒀다가 3줄 바 100px에 7px 모자라 겹쳤다) */
+  .pet-room {
+    --pet-hud-h: 4.8rem;
   }
-
-  /* 2px이 모자랐다. 게이지를 뺀 뒤 `Lv 55 + 알약 201 + 간격 8 = 264`인데 띠 안쪽이
-     좌우 여백 8×2 때문에 258이었다(실측). 그 여백을 걷어 274로 만든다 —
-     띠 자체가 면이 없으므로(안의 두 덩어리가 각자 알약이다) 여백이 할 일이 없다 */
-  /* **이 폭에서는 둘이 한 줄에 못 선다.** 방 안쪽이 263px인데 재화가 210px이라 가운데에
-     두면 34~244px을 쓰고, Lv(약 44px)을 왼쪽 8px에 두면 17px 겹친다(실측).
-     재화는 **가운데를 지켜야 하므로**(사용자 지시) Lv을 그 아래로 내린다 —
-     위에서 아래로 재화 → Lv 순이고 둘 다 방 안이다 */
-  .pet-topbar .pet-hud-lv {
-    top: 2.4rem;
-  }
-
-  /* 알약도 좁혀야 한 줄이 유지된다. 안 좁히면 247px 안에서 3줄로 접히고(실측 h 85px)
-     접힌 알약이 Lv 상자 위로 내려앉는다.
-     세 값 합쳐 약 60px을 번다: 칸 여백 8 → 4(3칸이라 24) · 칸 사이 16 → 8 · 숫자 16 → 12.8px */
-  .pet-bar {
-    gap: var(--space-3xs) var(--space-2xs);
-  }
-
-  .pet-bar__item {
-    padding: 0 var(--space-3xs);
-  }
-
-  .pet-bar__value {
-    font-size: var(--text-label);
-  }
-
-  /* **이 폭에서는 스택을 방 위에 얹지 않는다.** 방이 240~279px인데 좌우 스택이 가로로
-     151px을 먹고, 남는 73px 띠에는 쪽지(240px)도 펫(246px)도 들어가지 않는다. 방 아래쪽
-     가로 줄로 내려도 8개 버튼이 펫(272px)을 덮었다 — 두 자리 다 실측으로 막혔다.
-     그래서 absolute를 **풀어** 방 밖(.pet-stage 안)으로 흐르게 한다. 페이지가 그만큼
-     길어지지만 방 안은 펫과 쪽지가 온전히 쓴다.
-     좌측 그룹이 위 줄, 우측 그룹이 아래 줄이다 — 자주 누르는 것이 위에 온다 */
-  /* 여기에 `.pet-bar, .pet-hud-lv { position: static; width: fit-content;
-     margin-inline: auto }`가 남아 있었다 — 둘을 방 **위로** 흘리던 옛 판의 규칙이다.
-     한 띠(.pet-hud)로 합친 뒤에는 그 `margin-inline: auto`가 **flex 항목이 남는 공간을
-     전부 먹게** 만들어서, Lv 상자가 좌우로 꽉 차고 재화 알약이 아래 줄로 밀렸다
-     (사용자 지적: "자원 알약을 삼켜버림"). 정렬은 `.pet-hud`의 justify-content가 한다 */
 
   /* `.pet-stage { align-items: center }`를 넣었다가 **바로 버렸다.** 스테이지가
      `flex-direction: column`이라 그 값이 방까지 내용 폭으로 줄여서 방이 세로선 하나가 됐다
-     (실측: 방 폭이 279 → 약 2px). 가운데 정렬은 위 두 규칙의
-     `width: fit-content` + `margin-inline: auto`만으로 된다 — 그쪽은 자기 폭만 건드린다 */
+     (실측: 방 폭이 279 → 약 2px). 가운데 정렬은 `width: fit-content` +
+     `margin-inline: auto`로 한다 — 그쪽은 자기 폭만 건드린다 */
 
-  .pet-hud-lv {
-    --gauge-w: 5rem;
-    /* 넓은 화면에서 쓰던 top 값을 지운다 — static이면 무의미하고, 남겨 두면 다음 사람이
-       이 규칙이 안 먹는 줄 알고 값을 고친다 */
-    top: auto;
-    left: auto;
-  }
 
   /* ── 액션 바를 한 줄로 지킨다 (2026-08-26 실측) ──────────────────────────────
    *
@@ -4010,7 +3899,7 @@
 /* ── 재화 안내 팝업 · 여행일기 팝업의 공통 껍데기 ─────────────────────────────
    2026-08-26 밤 머지에서 **되살린 규칙이다.** C의 개편이 지갑 카드를 지우면서
    `.pet-wallet-pop*`도 함께 걷혔는데, 사용자 결정으로 **재화 안내는 남는다** —
-   입구만 지갑 줄에서 방 안 재화 알약(.pet-bar__btn)으로 옮겼다.
+   입구만 지갑 줄에서 방 안 재화 알약(.pet-hud-bar__coin-btn)으로 옮겼다.
    여행일기(.pet-diary-pop)가 같은 오버레이를 쓰므로 한 규칙에 둘을 함께 적는다 */
 /* 재화 안내 팝업 (2026-08-25). 확장식이 아닌 이유는 PetView의 지갑 줄 주석에 있다.
    오버레이 색·반경·그림자는 내 계정 모달(Sidebar)과 같은 값을 쓴다 — 앱 안에서
@@ -4734,14 +4623,14 @@
 }
 
 /* 상주 HUD의 게이지. 기본 transition은 즉시에 가까워서 올라가는 것이 안 보인다 */
-.pet-hud-lv .pet-gauge__fill {
+.pet-hud-bar .pet-gauge__fill {
   transition: width 0.8s cubic-bezier(0.22, 0.61, 0.36, 1);
 }
 
 /* 모션을 끈 사용자에게는 채워지는 연출을 주지 않는다 — 게이지는 최종값으로 바로 보인다.
    정보는 애니메이션 없이도 전달돼야 한다 */
 @media (prefers-reduced-motion: reduce) {
-  .pet-hud-lv .pet-gauge__fill {
+  .pet-hud-bar .pet-gauge__fill {
     transition: none;
   }
 }
@@ -4751,7 +4640,7 @@
 /* 재화 알약의 칸 전체가 버튼이다(2026-08-26 사용자 결정). 지갑 카드가 사라지면서 재화
    안내 팝업의 입구를 이쪽이 물려받았다. 버튼 기본 스타일만 끄고 **알약의 모양은 그대로
    둔다** — 방 위에 떠 있는 좁은 자리라 버튼처럼 보이면 원형 버튼들과 위계가 섞인다 */
-.pet-bar__btn {
+.pet-hud-bar__coin-btn {
   display: flex;
   align-items: center;
   gap: inherit;

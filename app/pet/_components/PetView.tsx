@@ -44,6 +44,7 @@ import { useModalA11y } from "@/app/components/useModalA11y"
 import { CurrencyIcon } from "@/app/components/CurrencyIcon"
 import { openChat } from "@/app/chat/_lib/events"
 import PetRoom from "./PetRoom"
+import { PetIcon } from "./PetIcon"
 import "@/styles/tokens.css"
 import "../pet.css"
 
@@ -910,22 +911,23 @@ export default function PetView({ initial }: { initial: PetState }) {
         <div className="pet-room">
             <PetRoom imageUrl={pet.roomImageUrl} />
 
-            {/* ── 상단 한 줄: Lv·경험치 + 재화 3종 (2026-08-26 사용자 지시) ──────────
-                두 덩어리(.pet-hud-lv · .pet-bar)를 **한 띠로 합쳤다.** 따로 두면 375px에서
-                서로와 말풍선을 덮었다 — 방 279×352에 말풍선 112 + 알약 29 + Lv 88 + 펫 274가
-                들어가지 않는다(실측). 한 줄로 합치면 세로 117 → 약 34px이다.
+            {/* ── 상태판 알약 바 (C의 2026-08-26 시안 · 같은 날 머지에서 채택) ────────
+                시안 구성: `( Lv.26 )` `( 게이지 )` … `( 🌱 )( 💗 )( ⭐ )`. 바깥이 알약이고
+                안쪽 넷도 각각 알약이며 **테두리 색이 전부 같다**(--pet-chip-ring).
 
-                **방 밖으로 내지 않는다**(사용자 지시: "배경이 좁아지니까 답답함이 느껴짐").
-                띠는 반투명 카드색 + blur이라 배경 6종 위에서 대비가 확보된다 — 재화 알약이
-                이미 그 값을 쓰고 있었고 C가 6종에서 확인해 둔 것이다 */}
-            <div className="pet-topbar">
-            {/* 좌상단 Lv + 경험치. 옛 "🍎 경험치" 카드가 여기로 왔다 — 게이지 골격은
-                그 카드가 쓰던 .pet-gauge 그대로다(높이·홈 그림자·전환).
-                진화 임박 각주("다음 단계까지 씨앗 N개")는 여기 두지 않고 펫 정보 모달로
-                보냈다. 방 위에 얹는 오버레이는 한눈에 읽히는 두 줄이어야 하고,
-                그 문장은 세 번째 줄이 된다 */}
-            <div className="pet-hud-lv">
-              <p className="pet-hud-lv__level">Lv.{pet.level}</p>
+                여기에 내 상단 띠(.pet-topbar — Lv 알약 왼쪽 끝 + 재화 칩 방 정중앙)가
+                있었다. 되살릴 값은 pet.css 그 자리 주석에 있다.
+
+                **시안에 없어서 뺀 것 둘**:
+                ① 펫 이름 — .pet-char 안 sr-only로 남아 있다
+                ② 게이지 안 숫자 — 펫 정보 모달의 "현재 Lv.N · 경험치 X / Y" 줄과 씨앗을
+                   넣을 때 뜨는 유리 바(.pet-exp-pop)가 그 값을 말한다. progressbar의 aria
+                   값은 그대로다
+
+                오버레이를 방 안에 둔다 — 방 밖으로 내지 않는다(사용자 지시:
+                "배경이 좁아지니까 답답함이 느껴짐") */}
+            <div className="pet-hud-bar">
+              <p className="pet-hud-bar__level">Lv.{pet.level}</p>
               <div
                 className="pet-gauge"
                 role="progressbar"
@@ -935,53 +937,45 @@ export default function PetView({ initial }: { initial: PetState }) {
                 aria-valuenow={pet.exp}
               >
                 {/* 씨앗을 넣은 직후 0.3초 동안 **이전 위치**를 그린다. 그 뒤 현재 값으로
-                    바뀌면 CSS transition(.pet-hud-lv .pet-gauge__fill)이 채워지는 모습을
+                    바뀌면 CSS transition(.pet-hud-bar .pet-gauge__fill)이 채워지는 모습을
                     만든다 — JS 애니메이션을 쓰지 않는다.
-                    2026-08-26 밤 머지에서 이 연출만 살렸다. 같은 값을 방 중앙 유리 팝업으로
-                    또 띄우던 것을 걷었고(사용자 결정), 게이지는 이 한 벌이다.
                     expShow가 null인 평상시에는 그냥 현재 값이라 아무 일도 하지 않는다 */}
                 <div
                   className="pet-gauge__fill"
                   style={{ width: `${(expShow?.from ?? progress) * 100}%` }}
                 />
               </div>
-              <p className="pet-hud-lv__exp">
-                {ko(pet.exp)} / {ko(need)}
-              </p>
-            </div>
-            {/* 재화 알약. 2026-08-26 오전에 만든 상단 바를 **자리만 옮긴 것**이다 —
-                마크업·클래스가 그대로이고 상점 버튼 2개만 빠졌다(좌측 "펫꾸미기"로 갔다).
-                이름을 sr-only로 남기는 처리도 그대로다: 시안에는 아이콘과 숫자만 있는데
-                그렇게만 두면 스크린리더에 아무것도 남지 않는다 */}
-            <div className="pet-bar">
-              <ul className="pet-bar__wallet">
+
+              {/* 재화 알약 셋. 이름을 sr-only로 남기는 처리는 옛 재화 알약에서 그대로
+                  가져왔다 — 시안에는 아이콘과 숫자만 있는데 그렇게만 두면 스크린리더에
+                  아무것도 안 남는다 */}
+              <ul className="pet-hud-bar__wallet">
                 {wallet.map((row) => (
-                  <li className="pet-bar__item" key={row.name}>
-                    {/* 2026-08-26 사용자 결정: **칸 전체가 버튼이다.** 지갑 카드가 개편에서
+                  <li className="pet-hud-bar__coin" key={row.name}>
+                    {/* 2026-08-25 사용자 결정: **칸 전체가 버튼이다.** 지갑 카드가 개편에서
                         사라지면서 재화 안내(획득 방법·하루 상한)를 여는 자리가 없어졌는데,
                         얼마를 어떻게 벌 수 있는지는 이 서비스에서 가장 많이 물어보게 되는
                         것이다. 알약이 그 입구를 물려받는다.
-                        `li` 안을 버튼으로 감싼 것은 알약이 방 위에 떠 있는 좁은 자리라
-                        ⓘ 같은 표시를 따로 둘 폭이 없어서다 — 손가락으로 누르는 화면이라
-                        표적은 칸 전체가 낫다(옛 지갑 줄도 줄 전체가 버튼이었다).
+                        C의 시안은 `<li>` 안에 아이콘 + 숫자만 두므로 **모양은 그대로 두고
+                        버튼만 안에 넣었다** — 좁은 자리라 ⓘ 표시를 따로 둘 폭이 없고,
+                        손가락으로 누르는 화면이라 표적은 칸 전체가 낫다.
                         아이콘은 aria-hidden이고 이름이 sr-only로 남아 있으므로 버튼 이름은
                         "씨앗 3,000"으로 읽힌다 */}
                     <button
                       type="button"
-                      className="pet-bar__btn"
+                      className="pet-hud-bar__coin-btn"
                       onClick={() => setWalletInfo(row.name)}
                       aria-haspopup="dialog"
                     >
-                      <span className="pet-bar__icon" aria-hidden="true">
+                      <span className="pet-hud-bar__coin-icon" aria-hidden="true">
                         {row.icon}
                       </span>
                       <span className="sr-only">{row.name}</span>
-                      <span className="pet-bar__value">{ko(row.value)}</span>
+                      <span className="pet-hud-bar__coin-value">{ko(row.value)}</span>
                     </button>
                   </li>
                 ))}
               </ul>
-            </div>
             </div>
 
 
@@ -1077,16 +1071,17 @@ export default function PetView({ initial }: { initial: PetState }) {
             <div className="pet-rail">
               {[
                 outing.available
-                  ? { icon: "📖", label: "여행일기", go: openHistory, on: modal === "history" }
+                  ? { icon: <PetIcon name="diary" />, label: "여행일기", go: openHistory, on: modal === "history" }
                   : null,
-                { icon: "📊", label: "오늘의 활동", go: () => setModal("today"), on: modal === "today" },
-                { icon: "🏪", label: "펫꾸미기", go: () => setModal("shop"), on: modal === "shop" },
-                { icon: "🌟", label: "펫 정보", go: () => setModal("info"), on: modal === "info" },
-                { icon: "💬", label: "마음 친구", go: openChat, on: false },
+                { icon: <PetIcon name="chart" />, label: "오늘의 활동", go: () => setModal("today"), on: modal === "today" },
+                { icon: <PetIcon name="shop" />, label: "펫꾸미기", go: () => setModal("shop"), on: modal === "shop" },
+                { icon: <PetIcon name="info" />, label: "펫 정보", go: () => setModal("info"), on: modal === "info" },
+                { icon: <PetIcon name="chat" />, label: "마음 친구", go: openChat, on: false },
               ]
-                .filter(
-                  (r): r is { icon: string; label: string; go: () => void; on: boolean } => r !== null,
-                )
+                // `filter` + 타입 술어였다. 아이콘이 이모지 문자열에서 JSX로 바뀌면서 술어에
+                // 적을 타입이 `JSX.Element`가 되고, 그러면 아이콘을 바꿀 때마다 이 줄도 같이
+                // 고쳐야 한다. `flatMap`은 타입을 적지 않고 같은 좁히기를 한다
+                .flatMap((r) => (r ? [r] : []))
                 .map((r) => (
                   <button
                     key={r.label}
@@ -1135,7 +1130,7 @@ export default function PetView({ initial }: { initial: PetState }) {
                 onClick={() => setModal("seed")}
                 aria-haspopup="dialog"
               >
-                <span aria-hidden="true">🌿</span> 씨앗 먹이기
+                <PetIcon name="seed" /> 씨앗 먹이기
               </button>
               {/* available: false면 버튼이 아예 없다. 마이그레이션(PetOuting)이 안 들어간
                   DB에서 lib/outing.ts가 그렇게 내려보낸다 — 없는 기능을 광고하지 않는다 */}
@@ -1154,7 +1149,7 @@ export default function PetView({ initial }: { initial: PetState }) {
                     else sendOuting()
                   }}
                 >
-                  <span aria-hidden="true">{outingCantYet ? "🔒" : "🚪"}</span> {outingLabelShort}
+                  <PetIcon name={outingCantYet ? "lock" : "outing"} /> {outingLabelShort}
                 </button>
               ) : null}
               <button
@@ -1163,7 +1158,7 @@ export default function PetView({ initial }: { initial: PetState }) {
                 onClick={() => setModal("menu")}
                 aria-haspopup="dialog"
               >
-                <span aria-hidden="true">☰</span> 더보기
+                <PetIcon name="menu" /> 더보기
               </button>
             </div>
 
@@ -1368,7 +1363,7 @@ export default function PetView({ initial }: { initial: PetState }) {
 
         {/* 여기에 **"🍎 경험치" 카드**가 있었다 — 제목 줄 + .pet-gauge + 각주(현재 Lv / 다음
             단계까지 씨앗 N개) 세 줄이었다. **2026-08-26 개편으로 방 안 좌상단 오버레이
-            (.pet-hud-lv)가 됐다.** 게이지는 같은 .pet-gauge 클래스를 그대로 쓰고, 각주는
+            (.pet-hud-bar)가 됐다.** 게이지는 같은 .pet-gauge 클래스를 그대로 쓰고, 각주는
             펫 정보 모달로 갔다(오버레이는 두 줄이어야 한다 — 그 자리 주석 참고) */}
 
         {/* 펫 정보 — 시안에 자리가 없던 것 셋을 모았다 (2026-08-26 사용자 결정).
@@ -1543,7 +1538,7 @@ export default function PetView({ initial }: { initial: PetState }) {
               </div>
             </section>
 
-            {/* 옛 "🍎 경험치" 카드의 각주다. 좌상단 오버레이(.pet-hud-lv)는 Lv과 게이지만
+            {/* 옛 "🍎 경험치" 카드의 각주다. 상태판 알약 바(.pet-hud-bar)는 Lv과 게이지만
                 갖고 이 문장은 여기로 왔다 — "다음 단계까지 씨앗 N개"는 진화 4칸 바로 옆에서
                 읽는 것이 맞고, 오버레이에 세 번째 줄을 붙이면 방 위 글자가 늘어난다 */}
             <p className="pet-card__foot">
@@ -1719,19 +1714,20 @@ export default function PetView({ initial }: { initial: PetState }) {
         {modal === "menu" ? (
           <PetModal title="더보기" onClose={closeModal}>
             <p className="pet-card__title">
-              <span aria-hidden="true">☰</span> 더보기
+              <PetIcon name="menu" /> 더보기
             </p>
             <ul className="pet-menu">
               {[
                 outing.available
-                  ? { icon: "📖", label: "여행일기", desc: "다녀온 이야기를 다시 읽어요", go: openHistory }
+                  ? { icon: <PetIcon name="diary" />, label: "여행일기", desc: "다녀온 이야기를 다시 읽어요", go: openHistory }
                   : null,
-                { icon: "📊", label: "오늘의 활동", desc: "오늘 들어온 재화를 봐요", go: () => setModal("today") },
-                { icon: "🏪", label: "펫꾸미기", desc: "외형과 배경을 바꿔요", go: () => setModal("shop") },
-                { icon: "🌟", label: "펫 정보", desc: "자라는 단계와 쌓인 씨앗을 봐요", go: () => setModal("info") },
-                { icon: "💬", label: "마음 친구", desc: "오늘 하루를 이야기해요", go: openChat },
+                { icon: <PetIcon name="chart" />, label: "오늘의 활동", desc: "오늘 들어온 재화를 봐요", go: () => setModal("today") },
+                { icon: <PetIcon name="shop" />, label: "펫꾸미기", desc: "외형과 배경을 바꿔요", go: () => setModal("shop") },
+                { icon: <PetIcon name="info" />, label: "펫 정보", desc: "자라는 단계와 쌓인 씨앗을 봐요", go: () => setModal("info") },
+                { icon: <PetIcon name="chat" />, label: "마음 친구", desc: "오늘 하루를 이야기해요", go: openChat },
               ]
-                .filter((r): r is { icon: string; label: string; desc: string; go: () => void } => r !== null)
+                // 타입을 적지 않고 null을 걷는다 — 위 레일의 그 자리 주석과 같은 이유다
+                .flatMap((r) => (r ? [r] : []))
                 .map((r) => (
                   <li key={r.label}>
                     {/* 줄 전체가 버튼이다 — 손가락으로 누르는 화면이라 표적이 클수록 낫다
