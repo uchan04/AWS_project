@@ -3571,3 +3571,69 @@ DEV_AUTH_BYPASS=false npm run dev      # /pet이 쿠키 없이 307 → /login �
   막히지 않는다. **다른 계정 15개는 전부 200 미만이라 `NOT_ENOUGH_AFFINITY`가 뜬다** —
   잘못이 아니라 설계대로다(2일에 1회 페이싱). 그 계정으로 볼 때는 "친밀도 N 더 필요해요"
   각주가 나오는 것이 맞는 화면이다
+
+---
+
+## `develop` 5차 머지·푸시 (2026-08-26, 사용자 지시)
+
+`origin/develop` 20커밋을 `feat/pet`에 머지하고(`c9bf374`) `develop`에 푸시했다
+(`9ef1610..c9bf374`). 펫 외출 5단계와 상점 별조각 전환이 전부 `develop`에 올라갔다.
+
+### 코드 충돌 0건 — 이유를 적어 둔다
+
+충돌은 `docs/STATUS.md`·`docs/dev/pet.md` **문서 2개뿐**이었다. `develop`의 20커밋이
+전부 D의 커뮤니티 검열(`app/community/`)과 A의 커리큘럼(`prisma/seed/curriculum.ts`)이라
+`app/pet/`·`lib/pet.ts`·`lib/outing.ts`와 한 줄도 겹치지 않았다. **4차 머지 때 펫 파일
+4개에서 충돌 11곳이 났던 것과 다른 이유는 그때 develop이 같은 화면을 만지고 있었기
+때문이고, 지금은 아니다** — 다음 머지에서 다시 겹칠 수 있으니 0건을 기대값으로 삼지 않는다.
+
+### 문서 충돌은 합집합으로 풀었다 — 한쪽을 지우지 않았다
+
+`STATUS.md`는 양쪽의 갱신 줄이 같은 자리(최종 갱신)에서 부딪쳤다. 내 08-25 3건을 위에,
+D의 08-25 4건을 그 아래 `이전 갱신`으로 내려 **전부 남겼다.** 그 과정에서 **이전 머지가
+흘린 `develop`쪽 08-24 항목 3건을 되살렸다** — 커뮤니티 검열 3커밋 머지 · 펫 외출 계획 ·
+100단계 복습 배치. 4차 머지에서 최종 갱신 줄만 골라 남기면서 딸려 사라진 것으로 보인다.
+**`STATUS.md`의 충돌은 "최신 한 줄 고르기"가 아니라 "목록 합치기"다.**
+
+`docs/dev/pet.md`는 더 컸다 — `develop`의 A 계획 절(191줄)과 내 구현 3절(382줄)이 같은
+위치에서 부딪쳤다. **시간순으로 재배치**했다:
+
+```
+계획 (08-24, A) → 1번 순수 함수 (08-25) → 2·3·4번 (08-25) → 상점 별조각 전환 (08-25)
+```
+
+계획 절을 **지우지 않은 이유**: 30~50 · 4시간 · 배경 500이 어떤 수급·소모 시뮬레이션에서
+나왔는지가 **거기에만 있다.** 구현 절은 값을 쓰고 근거는 계획 절을 가리킨다. 대신 제목의
+`**미구현**`을 걷고 정정 배너를 얹었다 — 그 표시를 그대로 두면 다음 사람이 이미 도는
+기능을 미구현으로 읽는다.
+
+### 검증
+
+`tsc --noEmit` 0 · `DEV_AUTH_BYPASS=false npm run build` 통과 ·
+`check:pet`·`check:community`·`check:safety`·`check:reward` 4종 통과.
+
+머지 전 로컬 서버 실측: `/pet` 200(펫 외출 카드 IDLE · 친밀도 200 · 4시간 각주) ·
+`/pet/cosmetics` 200(배경 6종 전부 `별조각 500` + 전환 고지 한 줄) ·
+`GET /api/pet/outing` → `{ state: "IDLE", costAffinity: 200, hours: 4, affinity: 400 }` ·
+브라우저 콘솔 에러 0.
+
+### 마이그레이션은 새로 들어온 것이 없다
+
+`develop`이 가져온 `prisma/` 변경은 `seed/curriculum.ts` 하나다(A의 복습 배치 수정).
+스키마·마이그레이션 무변경이므로 **`develop`을 받는 사람은 `npx prisma generate`만** 하면
+된다. `migrate deploy`는 필요 없다.
+
+### 함정 — `next dev`가 켜져 있으면 `prisma generate`가 죽는다
+
+```
+EPERM: operation not permitted, rename '.../query_engine-windows.dll.node.tmp...'
+```
+
+Windows에서 dev 서버가 쿼리 엔진 DLL을 잡고 있어서 생기는 것이고, 스키마나 머지와는
+무관하다. **서버를 내리고 돌린다.** 같은 이유로 `npm run build`도 dev 서버를 먼저 내린다.
+
+### 하지 않은 것
+
+- **`origin/feat/pet`은 34커밋 뒤처진 채로 뒀다** — 푸시 지시가 `develop`이었다.
+  다음 세션에서 `feat/pet`을 푸시할지 결정한다(내용은 `develop`에 이미 다 있다).
+- `main` 머지는 하지 않았다.
