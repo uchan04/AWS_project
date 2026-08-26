@@ -342,6 +342,14 @@ model Post {
   createdAt    DateTime  @default(now())
   deletedAt    DateTime?
 
+  // 관리자 삭제 통보용(2026-08-26, D 요청·E 승인). deletedAt만으로는 본인 삭제와
+  // 관리자 삭제를 구분할 수 없어 본인이 지운 글에도 "삭제되었습니다" 팝업이 뜨게 된다.
+  // deletedByAdmin=true && deleteNotifiedAt=null인 것만 다음 접속 때 팝업을 띄우고
+  // 그 순간 deleteNotifiedAt을 찍는다. 새 모델을 만들지 않았다 — MeetupParticipant의
+  // notifiedCancelAt과 같은 결이다(CLAUDE.md 11절 참고).
+  deletedByAdmin   Boolean   @default(false)
+  deleteNotifiedAt DateTime?
+
   user     User       @relation(fields: [userId], references: [id])
   comments Comment[]
   likes    PostLike[]
@@ -356,6 +364,10 @@ model Comment {
   body      String
   createdAt DateTime  @default(now())
   deletedAt DateTime?
+
+  // Post와 같은 이유·같은 구조다. 위 주석 참고.
+  deletedByAdmin   Boolean   @default(false)
+  deleteNotifiedAt DateTime?
 
   post Post @relation(fields: [postId], references: [id])
   user User @relation(fields: [userId], references: [id])
