@@ -93,8 +93,8 @@ export function Sidebar({ profile }: { profile: SidebarProfile | null }) {
   const pathname = usePathname()
   const router = useRouter()
   // `/diagnosis/result`의 `?new=1`을 보기 위해 읽는다. 아래 inDiagnosisFlow 주석 참고.
-  // 루트 레이아웃이 cookies()를 읽어 이미 동적 렌더라(lib/profile.ts) 여기서
-  // useSearchParams를 써도 정적 프리렌더를 깨지 않는다 — 그 제약은 정적 페이지 쪽이다.
+  // layout.tsx가 cookies()를 읽어도 개별 페이지가 정적 프리렌더 대상이면 빌드가 깨진다
+  // (2026-08-26). app/layout.tsx가 이 컴포넌트를 Suspense로 감싸서 막는다.
   const searchParams = useSearchParams()
   // 내 계정 모달. 열린 상태를 boolean이 아니라 **열었던 경로**로 들고 있다 (2026-08-24 제보).
   //

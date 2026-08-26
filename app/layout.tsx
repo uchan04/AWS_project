@@ -1,4 +1,5 @@
 import type { Metadata, Viewport } from "next";
+import { Suspense } from "react";
 import { Gowun_Dodum } from "next/font/google";
 import "./globals.css";
 import { getSidebarProfile } from "@/lib/profile";
@@ -95,7 +96,12 @@ export default async function RootLayout({ children }: LayoutProps<"/">) {
         <a className="skip-to-content" href="#main-content">
           본문으로 건너뛰기
         </a>
-        <Sidebar profile={profile} />
+        {/* Sidebar가 useSearchParams를 쓴다 — Suspense 없으면 정적 프리렌더 대상 페이지에서
+            빌드가 실패한다(Next "missing-suspense-with-csr-bailout"). fallback=null: 개발
+            모드에서는 안 보이고, 프로덕션에서도 첫 페인트와 하이드레이션 사이 간극이 짧다 */}
+        <Suspense fallback={null}>
+          <Sidebar profile={profile} />
+        </Suspense>
         <div
           id="main-content"
           style={{ flex: 1, background: "#F5F0E8", overflowY: "auto" }}
