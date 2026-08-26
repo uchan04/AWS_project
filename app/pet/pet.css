@@ -1922,6 +1922,42 @@
   cursor: not-allowed;
 }
 
+/*
+ * 잠긴 버튼 (2026-08-26 사용자 결정 — 1단계 외출).
+ *
+ * `:disabled`와 **모습은 같고 동작은 다르다.** `disabled`는 클릭 이벤트가 아예 안 와서
+ * 이유를 설명할 수 없다. 이 버튼은 눌리되 요청을 보내지 않고 안내만 띄운다.
+ *
+ * 그래서 `cursor`도 `not-allowed`가 아니라 `pointer`다 — 누를 수 있는 버튼이고,
+ * 누르면 무슨 일이 일어난다. `not-allowed`를 쓰면 눌러 볼 생각을 하지 않는다.
+ */
+.pet-btn--locked {
+  /* .pet-btn 본체가 `display: grid` + `place-items: center`다. 자물쇠 span과 글자가
+     **각각 그리드 항목**이 되어 두 줄로 쌓인다(실측: 🔒가 "외출 보내기" 위에 앉았다).
+     flex로 갈아 한 줄에 세운다 — 본체를 고치면 이 화면의 버튼 전부가 바뀐다 */
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: var(--space-2xs);
+  background: var(--color-paper-2);
+  box-shadow: 0 4px 0 var(--color-rule);
+  color: var(--color-muted);
+  cursor: pointer;
+}
+
+/* 눌리는 느낌은 남긴다. 반응이 없으면 고장으로 읽힌다 */
+.pet-btn--locked:active {
+  transform: translateY(2px);
+  box-shadow: 0 2px 0 var(--color-rule);
+}
+
+/* 잠긴 카드의 각주 오른쪽("N레벨 남았어요")은 강조색을 쓰지 않는다. 다른 카드의 <em>은
+   종족색으로 "지금 할 수 있는 것"을 가리키는데, 여기는 아직 못 하는 것이다 */
+.pet-card--outing[data-locked] .pet-card__foot em {
+  color: var(--color-muted);
+  font-style: normal;
+}
+
 /* ── 씨앗 투입 스테퍼 ────────────────────────────────────────────────────── */
 
 /* 2026-08-21 사용자 시안 반영: 스테퍼를 감싸던 칸(2px --tribe-line 테두리 + --tribe-wash
@@ -3252,6 +3288,43 @@
      늘리지 않는다. 카드가 넓은 화면에서만 길어지는 것은 여백이 거기에만 있기 때문이다) */
   .pet__grid {
     grid-template-columns: 1fr;
+    /* 2026-08-26: 1단이 되면 두 열이 **순서대로** 흐른다 — 왼쪽 열(방·재화·상점 2개)이
+       802px이라 오른쪽 열 첫 카드인 외출이 뷰포트(724px) 밖으로 밀렸다. 실측이다.
+       display: contents로 두 열의 자식을 그리드에 직접 올려 order로 다시 세운다 */
+    display: grid;
+  }
+
+  .pet__col {
+    display: contents;
+  }
+
+  /* 좁은 화면 순서. **외출을 방 바로 아래로 올린다** — 친밀도가 모였을 때만 보이는 카드라
+     그때 못 찾으면 기능이 없는 것과 같다(카드가 접히는 조건은 PetView 주석 참고) */
+  .pet-room {
+    order: 1;
+  }
+  .pet-card--outing {
+    order: 2;
+  }
+  .pet-card--wallet {
+    order: 3;
+  }
+  /* order: 4는 경험치 카드 자리였다. 그 카드는 2026-08-26에 화면 상단 중앙 팝업
+     (.pet-exp-pop)이 되어 그리드에서 빠졌다. 남은 번호는 당기지 않았다 —
+     order는 간격이 있어도 순서가 같고, 당기면 나머지 다섯 줄이 함께 바뀐다 */
+  .pet-card--feed {
+    order: 6;
+  }
+  .pet-card--today {
+    order: 7;
+  }
+  /* 상점 입구는 재화를 본 다음이다. 나머지(씨앗 줍기 등)는 기본 order: 0이 아니라
+     5를 받아 투입 앞에 선다 — 씨앗을 받고 나서 넣는 순서다 */
+  .pet__col--room > *:not(.pet-room):not(.pet-card--wallet) {
+    order: 8;
+  }
+  .pet__col--side > *:not(.pet-card--outing):not(.pet-card--feed):not(.pet-card--today) {
+    order: 5;
   }
 
   .pet__top {
@@ -3452,6 +3525,84 @@
   color: var(--color-ink);
 }
 
+/* ── 넓은 화면 2단 배치 (2026-08-26 사용자 요청 "가로로 좀 더 넓게") ──────────
+ *
+ * 좁은 화면은 그대로 3단 세로다(펫 → 이야기 → 재화). 넓은 화면에서만 왼쪽에 펫,
+ * 오른쪽에 이야기를 세우고 재화는 아래 전폭으로 깐다.
+ *
+ *   ┌──────────┬────────────────────┐
+ *   │ 펫 그림   │ 이야기              │
+ *   │ 제목      │                    │
+ *   ├──────────┴────────────────────┤
+ *   │ 가져온 것   씨앗 +N  별조각 +N   │
+ *   ├───────────────────────────────┤
+ *   │            닫기                │
+ *   └───────────────────────────────┘
+ *
+ * 실측(뷰포트 700px ↔ 1100px, 같은 일기 10문단):
+ *
+ *   상자 폭        384px → 704px   (+83%)
+ *   이야기 칸 폭    352px → 416px   (+18%)
+ *   상자 높이       640px → 613px   (같은 내용을 27px 덜 쓴다)
+ *
+ * **이야기 칸이 상자만큼 넓어지지는 않는다** — 왼쪽 펫 칸이 240px을 가져간다. 폭만
+ * 노리면 1단 44rem이 이야기에 672px을 주므로 그쪽이 낫다. 2단을 고른 이유는 다른 데
+ * 있다: 1단에서는 펫 그림 + 제목이 약 200px을 세로로 먹고 이야기를 그만큼 아래로 민다.
+ * 2단은 그 200px을 옆으로 치워서 **펫 얼굴을 보면서 이야기를 읽게** 된다 — 이 기능의
+ * 목적이 보람·동질감이라(docs/dev/pet.md 외출 절) 펫이 스크롤 밖으로 나가면 안 된다.
+ *
+ * 세로 3단을 버리지 않은 이유: 사용자가 2026-08-26에 정한 구성이 펫(상단)·이야기(중단)·
+ * 재화(하단)이고, 그 **읽는 순서**는 2단에서도 유지된다(왼쪽 → 오른쪽 → 아래).
+ * DOM 순서도 그대로라 스크린리더가 읽는 순서가 안 바뀐다.
+ *
+ * 경계는 769px이다 — 이 파일의 좁은 화면 블록(`max-width: 768px`)과 정확히 맞물려
+ * 두 규칙이 겹치는 구간이 없다. 새 경계를 만들지 않았다.
+ */
+@media (min-width: 769px) {
+  .pet-diary-pop__box--diary {
+    max-width: 44rem;
+    /* minmax(0, 1fr)이다. 그냥 1fr이면 이야기 문단의 최소 콘텐츠 폭이 트랙을 밀어
+       왼쪽 칸이 15rem보다 좁아진다 */
+    grid-template-columns: 15rem minmax(0, 1fr);
+    grid-template-areas:
+      "top story"
+      "loot loot"
+      "close close";
+    column-gap: var(--space-sm);
+  }
+
+  .pet-diary-pop__box--diary .pet-diary__top {
+    grid-area: top;
+    /* 세로 배치의 아래 구분선을 오른쪽으로 옮긴다 — 2단에서는 아래가 아니라 옆이 경계다 */
+    padding-bottom: 0;
+    border-bottom: 0;
+    padding-right: var(--space-sm);
+    border-right: 1px solid color-mix(in oklch, var(--color-muted) 25%, transparent);
+    /* 그림이 세로 가운데로 뜨지 않게 위에 붙인다. 오른쪽 이야기가 길어지면 행이
+       늘어나는데, 그때 펫만 가운데 떠 있으면 제목이 이야기와 어긋나 보인다 */
+    align-content: start;
+  }
+
+  .pet-diary-pop__box--diary .pet-diary__story {
+    grid-area: story;
+  }
+
+  .pet-diary-pop__box--diary .pet-diary__loot {
+    grid-area: loot;
+  }
+
+  .pet-diary-pop__box--diary > .pet-btn {
+    grid-area: close;
+  }
+
+  /* 재화 두 칸이 44rem을 반씩 나눠 가지면 아이콘과 숫자가 화면 양끝으로 벌어진다.
+     칸에 상한을 주고 왼쪽부터 채운다 */
+  .pet-diary-pop__box--diary .pet-diary__loot-list {
+    grid-template-columns: repeat(2, minmax(0, 14rem));
+    justify-content: start;
+  }
+}
+
 /* ─────────────────────────────────────────────────────────────────────
    2026-08-26 IA 정리 (사용자 결정)
    ───────────────────────────────────────────────────────────────────── */
@@ -3496,14 +3647,192 @@
 /* 경험치 카드는 이제 씨앗 투입 시에만 나타난다(PetView expShow 주석).
    채워지는 모습은 .pet-gauge__fill의 transition이 만든다 — JS 애니메이션이 없다.
    전환 시간을 여기서 늘려 잡는다: 기본값은 즉시에 가까워서 올라가는 게 안 보인다 */
-.pet-card--exp .pet-gauge__fill {
+/* ── 경험치 팝업 (2026-08-26) ─────────────────────────────────────────────── */
+/*
+ * 씨앗을 먹인 직후 **방의 중앙 상단**에 스스로 열리고 2.6초 뒤 스스로 닫힌다.
+ *
+ * 자리가 하루에 세 번 바뀌었다. 남겨 두는 이유는 뒤로 돌아가지 않기 위해서다.
+ *
+ *   ① 오른쪽 열 카드      나타나는 순간 아래 카드 네 장이 밀렸다(실측 153px).
+ *                        방금 누른 먹이기 버튼이 손가락 아래에서 움직인다
+ *   ② 화면 상단 중앙      밀림은 사라졌지만 방 밖이라 시선이 위로 튀었다가 돌아온다
+ *   ③ 방 중앙 상단(지금)  씨앗이 오르는 곳도, 눈이 가 있는 곳도 펫이다
+ *
+ * ③이 fixed가 아니라 absolute인 이유가 여기다 — 기준이 뷰포트가 아니라 방이다.
+ * .pet-room이 position: relative(파일 앞 .pet-room)이므로 이 자리가 곧 방 기준이고,
+ * 방이 overflow: hidden이라 팝업이 방 밖으로 새지 않는다.
+ *
+ * 오버레이(어두운 배경)를 깔지 않는다. 알림이지 대화 상자가 아니고, 뒤를 덮으면
+ * 연달아 먹이는 동작이 막힌다. 그래서 pointer-events: none이다 — 팝업이 떠 있는
+ * 2.6초 동안에도 그 아래를 누를 수 있다(오른쪽 위 진화 버튼 포함).
+ *
+ * 닫기 버튼도 없다. 있으면 "닫아야 하는 것"이 되고, 하루에 여러 번 뜨는 알림에
+ * 매번 닫기를 요구하면 그게 일이 된다.
+ */
+
+.pet-exp-pop {
+  position: absolute;
+  /* 3rem은 오른쪽 위 진화 버튼(.pet-room__evo: top 0.375rem + 높이 2rem = 2.375rem)
+     아래로 내려온 자리다. 방이 좁으면(394px 뷰포트에서 방 폭 282px 실측) 팝업이
+     방 폭을 거의 다 쓰므로 좌우로는 그 버튼을 피할 수 없다 — 세로로 피한다 */
+  top: 3rem;
+  left: 0;
+  right: 0;
+  /* 말풍선(.pet-welcome)이 --z-sticky다. 방이 짧으면 말풍선 윗부분과 겹치는데,
+     그때 위에 있어야 하는 쪽은 이쪽이다 — 말풍선은 5분마다 바뀌는 상주 문구고
+     이건 방금 누른 동작의 결과다 */
+  z-index: calc(var(--z-sticky) + 1);
+  display: grid;
+  justify-items: center;
+  padding-inline: var(--space-xs);
+  pointer-events: none;
+}
+
+/*
+ * Apple liquid glass(2025 디자인 언어)를 이 화면 색으로 옮긴 것. 네 겹이다.
+ *
+ *   1. 반투명 배경    뒤가 비쳐야 유리다. 위가 밝고 아래가 옅은 사선 그라디언트
+ *   2. backdrop-filter  뒤를 흐리고(blur) 채도를 올린다(saturate) — 유리의 핵심
+ *   3. 안쪽 하이라이트  inset 1px 흰 선. 유리 두께의 위쪽 모서리에 빛이 걸린 것
+ *   4. 바깥 그림자     크고 옅게. 화면에서 떠 있는 것으로 읽히게 한다
+ *
+ * blur만으로는 유리가 안 된다 — 3번이 없으면 그냥 흐린 사각형이다.
+ * saturate가 없으면 뒤의 종족색이 회색으로 빠져 유리가 플라스틱이 된다.
+ */
+.pet-exp-pop__box {
+  position: relative;
+  /* 22rem이었다. 기준이 화면에서 방으로 바뀌면서 20rem으로 줄였다 — 방은 화면보다
+     좁고(넓은 화면 실측 방 폭 = 왼쪽 열 폭), 방 폭을 꽉 채우면 유리가 창이 아니라
+     띠가 된다. 좁은 화면에서는 100%가 걸려 방 폭에서 좌우 여백만 뺀 값이 된다 */
+  width: min(20rem, 100%);
+  display: grid;
+  gap: 0.5rem;
+  padding: 0.875rem 1.125rem 0.75rem;
+  border-radius: 1.5rem;
+  overflow: hidden;
+  /* backdrop-filter를 못 쓰는 브라우저용 기본값. 이쪽은 더 불투명해야 글자가 읽힌다 */
+  background: linear-gradient(165deg, rgb(255 255 255 / 0.92), rgb(255 255 255 / 0.78));
+  border: 1px solid rgb(255 255 255 / 0.6);
+  box-shadow:
+    inset 0 1px 0 rgb(255 255 255 / 0.85),
+    inset 0 -1px 1px rgb(255 255 255 / 0.35),
+    0 1.25rem 2.5rem -0.75rem rgb(42 31 20 / 0.32),
+    0 0.125rem 0.5rem rgb(42 31 20 / 0.1);
+  animation: petExpPop 2.6s var(--ease-out) forwards;
+}
+
+@supports (backdrop-filter: blur(1px)) or (-webkit-backdrop-filter: blur(1px)) {
+  .pet-exp-pop__box {
+    /* 지원하면 배경을 걷어 실제로 뒤가 비치게 한다. 두 값 다 필요하다:
+       blur가 뒤를 지우고, saturate가 지워진 색을 되살린다 */
+    background: linear-gradient(165deg, rgb(255 255 255 / 0.5), rgb(255 255 255 / 0.24));
+    -webkit-backdrop-filter: blur(1.5rem) saturate(180%);
+    backdrop-filter: blur(1.5rem) saturate(180%);
+  }
+}
+
+/* 상단을 가로지르는 반사광 한 줄. 유리를 "표면"으로 만드는 것이 이 한 겹이다 —
+   빼면 균일한 반투명 면이 되고 재질이 사라진다. 각도(105deg)를 상자 그라디언트
+   (165deg)와 어긋나게 둬서 빛이 다른 방향에서 오는 것으로 읽힌다 */
+.pet-exp-pop__box::before {
+  content: "";
+  position: absolute;
+  inset: 0 0 auto;
+  height: 45%;
+  background: linear-gradient(
+    105deg,
+    rgb(255 255 255 / 0) 12%,
+    rgb(255 255 255 / 0.55) 38%,
+    rgb(255 255 255 / 0) 68%
+  );
+  pointer-events: none;
+}
+
+.pet-exp-pop__head {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: var(--space-xs);
+}
+
+.pet-exp-pop__title {
+  margin: 0;
+  font-size: var(--text-label);
+  font-weight: 600;
+  color: var(--color-ink);
+}
+
+.pet-exp-pop__meta {
+  font-size: var(--text-caption);
+  font-variant-numeric: tabular-nums;
+  color: var(--color-ink-2);
+}
+
+.pet-exp-pop__foot {
+  margin: 0;
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: var(--space-xs);
+  font-size: var(--text-caption);
+  color: var(--color-ink-2);
+}
+
+/* 채워지는 모습은 .pet-gauge__fill의 transition이 만든다 — JS 애니메이션이 없다.
+   전환 시간을 여기서 늘려 잡는다: 기본값은 즉시에 가까워서 올라가는 게 안 보인다 */
+.pet-exp-pop .pet-gauge__fill {
   transition: width 0.8s cubic-bezier(0.22, 0.61, 0.36, 1);
 }
 
-/* 모션을 끈 사용자에게는 채워지는 연출을 주지 않는다. 카드는 그대로 나타나고
-   게이지가 **최종값으로 바로** 보인다 — 애니메이션 없이도 정보는 전달돼야 한다 */
+/* 여닫기를 키프레임 하나로 처리한다. 길이(2.6초)가 PetView의 unmount 타이머와 같은
+   값이라, 나가는 연출이 끝나는 시점에 요소가 사라진다. 상태 하나로 여닫이가 되므로
+   `exiting` 같은 두 번째 state가 필요 없다 — 값을 두 곳에서 맞추는 대신 한 곳에서 맞춘다 */
+@keyframes petExpPop {
+  0% {
+    opacity: 0;
+    transform: translateY(-0.875rem) scale(0.94);
+  }
+  /* 살짝 지나쳤다 되돌아오는 구간(8% → 14%). 유리가 튀어나오는 느낌을 만든다 */
+  8% {
+    opacity: 1;
+    transform: translateY(0.125rem) scale(1.015);
+  }
+  14% {
+    transform: translateY(0) scale(1);
+  }
+  84% {
+    opacity: 1;
+    transform: translateY(0) scale(1);
+  }
+  100% {
+    opacity: 0;
+    transform: translateY(-0.5rem) scale(0.98);
+  }
+}
+
+/* 모션을 끈 사용자에게는 채워지는 연출도, 튀어나오는 연출도 주지 않는다.
+   대신 **사라지지 않게** 두지는 않는다 — 여기서 animation: none을 쓰면 팝업이
+   2.6초 동안 최종 상태(opacity 0)가 아니라 시작 상태로 남아 보이지 않게 된다.
+   그래서 애니메이션을 끄는 대신 페이드만 남긴 키프레임으로 갈아탄다 */
 @media (prefers-reduced-motion: reduce) {
-  .pet-card--exp .pet-gauge__fill {
+  .pet-exp-pop .pet-gauge__fill {
     transition: none;
+  }
+  .pet-exp-pop__box {
+    animation-name: petExpPopFade;
+  }
+  .pet-exp-pop__box::before {
+    display: none;
+  }
+}
+
+@keyframes petExpPopFade {
+  0%,
+  100% {
+    opacity: 0;
+  }
+  6%,
+  90% {
+    opacity: 1;
   }
 }

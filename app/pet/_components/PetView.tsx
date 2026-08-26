@@ -13,6 +13,9 @@ import {
   OUTING_MS,
   PET_IDLE_LINES,
   animalEmoji,
+  canGoOuting,
+  OUTING_LOCK_MESSAGE,
+  OUTING_LOCK_FOOT,
   applySeeds,
   expProgress,
   levelUpReply,
@@ -304,6 +307,15 @@ export default function PetView({ initial }: { initial: PetState }) {
     away && outing.placeKey ? outingAwayLine(outing.placeKey, outingProgressNow) : outing.awayLine
   // 보낼 수 있는지. 부족한 양을 함께 계산해 둔다 — 각주가 "얼마나 더"를 말해야 한다
   const outingShort = Math.max(0, outing.costAffinity - pet.affinity)
+  /**
+   * 진화 단계가 아직 외출을 못 여는 상태. **화면과 API가 같은 함수를 쓴다**
+   * (`lib/pet.ts` `canGoOuting`) — 판정이 두 벌이면 버튼은 열려 있는데 POST가 막힌다.
+   *
+   * 2026-08-26 사용자 결정: 1단계(알)에서 카드가 **아예 안 보이던 것**을 고쳤다.
+   * 전에는 친밀도가 모자라 접히는 규칙에 함께 걸려 사라졌고, 그러면 외출이라는 기능이
+   * 있다는 것 자체를 모른 채 알 단계를 보낸다. 지금은 **보이되 잠긴다.**
+   */
+  const outingLocked = !canGoOuting(pet.evolutionStage)
 
   // 재화 3종. 2026-08-21 사용자 결정으로 셋이 같은 칸을 쓴다 — 전에는 씨앗만 초록, 나머지
   // 둘은 나무색이었다. 색은 종족색 하나로 끝내고 구분은 이모지가 한다
@@ -817,6 +829,70 @@ export default function PetView({ initial }: { initial: PetState }) {
               🌟
             </button>
 
+            {/* 경험치 — **2026-08-26부터 씨앗 투입 시에만 나타난다**(사용자 결정,
+                게임 `이환`의 획득 게이지 형태). 상주하지 않는 이유는 위 expShow 주석에 있다.
+
+                같은 날 결정이 두 번 더 바뀌었다.
+                ① 오른쪽 열 카드 → 화면 상단 중앙 팝업. 카드로 두면 나타나는 순간 아래
+                   카드 네 장이 밀려 내려간다 — 방금 누른 먹이기 버튼이 손가락 아래에서
+                   움직인다. 실측 이동량 153px
+                ② 화면 기준 → **방 기준 중앙 상단**(지금). 씨앗을 먹인 결과가 오르는 곳은
+                   펫이고, 눈이 가 있는 곳도 펫이다. 화면 상단은 방 밖이라 시선이 한 번
+                   위로 튀었다가 돌아온다
+
+                그래서 마크업이 `<main>`이 아니라 `.pet-room` 안에 있다. 방이
+                `position: relative`(pet.css .pet-room)이므로 이 자리가 곧 방 기준이다.
+                방은 `overflow: hidden`이라 팝업이 방 밖으로 새지 않는다.
+
+                닫기 버튼이 없다 — 알림이지 대화 상자가 아니다. 그래서 `useModalA11y`를
+                쓰지 않는다. 초점을 빼앗으면 먹이기 버튼을 연달아 누를 수 없다.
+                `role="status"`가 스크린리더에 읽히는 경로다 */}
+            {expShow ? (
+              <div className="pet-exp-pop" role="status" aria-live="polite">
+                <div className="pet-exp-pop__box">
+                  <div className="pet-exp-pop__head">
+                    {/* 제목 앞 이모지는 2026-08-24 사용자 요청으로 되살린 것이다
+                        ("예전에 있던대로"). design.md의 "이모지는 마스코트 자리에만"에서
+                        벗어나는 자리다. 새 예외가 아니라 이 화면이 원래 갖고 있던 예외로
+                        돌아온 것이고, aria-hidden이라 스크린리더가 읽는 이름은 글자대로다 */}
+                    <p className="pet-exp-pop__title">
+                      <span aria-hidden="true">⭐</span> 경험치
+                    </p>
+                    <span className="pet-exp-pop__meta">
+                      {ko(pet.exp)} / {ko(need)}
+                    </span>
+                  </div>
+                  <div
+                    className="pet-gauge"
+                    role="progressbar"
+                    aria-label="다음 레벨까지 경험치"
+                    aria-valuemin={0}
+                    aria-valuemax={need}
+                    aria-valuenow={pet.exp}
+                  >
+                    {/* from이 있는 0.3초 동안은 **이전 위치**를 그린다. 그 뒤 현재 값으로
+                        바뀌면 CSS transition이 채워지는 모습을 만든다 —
+                        JS 애니메이션을 쓰지 않는다 */}
+                    <div
+                      className="pet-gauge__fill"
+                      style={{ width: `${(expShow.from ?? progress) * 100}%` }}
+                    />
+                  </div>
+                  {/* 지금까지 `Lv.25 마지막 진화`만 보여 줬다. 그 문구는 지금 무엇을 얼마나
+                      해야 하는지 알려 주지 않는다. 벤치마크한 육성 게임은 전부 남은 개수를
+                      쓴다 (2026-08-24 사용자 확정: seedsToNextStage 쪽을 쓴다) */}
+                  <p className="pet-exp-pop__foot">
+                    <span>현재 Lv.{pet.level}</span>
+                    <span>
+                      {nextStage
+                        ? `${STAGE_NAME[nextStage.stage - 1] ?? `${nextStage.stage}단계`}까지 씨앗 ${ko(nextStage.seeds)}개`
+                        : "마지막 단계예요"}
+                    </span>
+                  </p>
+                </div>
+              </div>
+            ) : null}
+
             {/* 여기 떠다니는 씨앗 장식 3개(🌱🌿🍃)가 있었다 — 2026-08-24 사용자 요청
                 ("주위에 둥둥 떠다니는 이모티콘들 지워줘")으로 걷었다. 펫 주위의 반짝임
                 3개(✨⭐✨)도 같은 요청으로 함께 걷었다(아래 .pet-char 주석).
@@ -1082,20 +1158,60 @@ export default function PetView({ initial }: { initial: PetState }) {
               특히 나쁘다(미션 문구가 명령형을 안 쓰는 것과 같은 이유).
               접는 조건은 IDLE + 부족일 때뿐이다. AWAY·RETURNED는 진행 중이므로 항상 보인다.
               보낼 수 있게 되면(친밀도 200) 카드가 저절로 나타난다 — 그게 알림 역할을 한다 */}
-          {outing.available && (outing.state !== "IDLE" || outingShort === 0) ? (
-            <div className="pet-card pet-card--outing" data-state={outing.state}>
+          {/* 2026-08-26 사용자 결정: **잠긴 상태는 접지 않는다.** 친밀도가 모자라 접는 규칙은
+              "곧 열린다"는 상태여서 접어도 잃는 것이 없다(모이면 저절로 나타난다). 1단계는
+              다르다 — 접으면 외출이라는 기능이 있다는 것 자체를 알 단계 내내 모른다.
+              그래서 outingLocked가 조건의 맨 앞에 붙는다 */}
+          {outing.available &&
+          (outingLocked || outing.state !== "IDLE" || outingShort === 0) ? (
+            <div
+              className="pet-card pet-card--outing"
+              data-state={outing.state}
+              data-locked={outingLocked ? "" : undefined}
+            >
               <div className="pet-card__head">
                 <p className="pet-card__title">
                   {/* 이 화면 카드 제목은 전부 이모지 하나로 시작한다(위 경험치 카드 주석).
                       🚪는 다른 넷(⭐🌱🌿📊🪙)과 겹치지 않고 재화 아이콘도 아니다 */}
                   <span aria-hidden="true">🚪</span> 펫 외출
                 </p>
+                {/* 잠긴 동안에는 친밀도를 쓰지 않는다 — 막고 있는 것이 친밀도가 아니다.
+                    "친밀도 200"을 띄우면 200을 모으면 되는 줄 알고 이틀을 모은 뒤에야
+                    레벨 문제였다는 것을 안다 */}
                 <span className="pet-card__meta">
-                  {away ? `${outingLabel} 뒤` : `친밀도 ${ko(outing.costAffinity)}`}
+                  {outingLocked
+                    ? `Lv.${EVOLUTION_LEVEL.STAGE2}부터`
+                    : away
+                      ? `${outingLabel} 뒤`
+                      : `친밀도 ${ko(outing.costAffinity)}`}
                 </span>
               </div>
 
-              {away ? (
+              {outingLocked ? (
+                <>
+                  {/* 잠긴 버튼. **`disabled`를 쓰지 않는다** — 사용자 요청이 "눌렀을 때
+                      2단계 이상이 되면 보낼 수 있다고 알린다"이고, `disabled` 버튼은
+                      클릭 이벤트가 아예 안 온다. 그래서 눌리되 아무 요청도 보내지 않고
+                      안내만 띄운다.
+
+                      `aria-disabled`도 쓰지 않는다. 그 속성은 "지금 못 쓴다"를 알리는데,
+                      이 버튼은 눌러야 설명이 나오는 버튼이라 스크린리더 사용자에게도
+                      눌러야 한다고 알려야 한다. 대신 이름 자체에 이유를 넣는다 */}
+                  <button
+                    type="button"
+                    className="pet-btn pet-btn--block pet-btn--locked"
+                    onClick={() => setToast({ text: OUTING_LOCK_MESSAGE })}
+                  >
+                    <span aria-hidden="true">🔒</span> 외출 보내기
+                  </button>
+                  <p className="pet-card__foot">
+                    <span>{OUTING_LOCK_FOOT}</span>
+                    {/* 오른쪽 강조 자리에 남은 레벨을 쓴다. 다른 카드의 각주와 같은 골격이고
+                        (왼쪽 설명 / 오른쪽 강조) 여기에는 **얼마나 남았는지**가 온다 */}
+                    <em>{Math.max(0, EVOLUTION_LEVEL.STAGE2 - pet.level)}레벨 남았어요</em>
+                  </p>
+                </>
+              ) : away ? (
                 <>
                   {/* 게이지 골격은 경험치·방치형 카드와 **같은 클래스**다. 채움색만 기본
                       종족색을 쓴다 — 초록(--pet-gauge--seed)은 씨앗 전용이고 이 막대는
@@ -1182,61 +1298,6 @@ export default function PetView({ initial }: { initial: PetState }) {
                 </>
               )}
             </div>
-          ) : null}
-
-          {/* 경험치 — **2026-08-26부터 씨앗 투입 시에만 나타난다**(사용자 결정,
-              게임 `이환`의 획득 게이지 형태). 상주하지 않는 이유는 위 expShow 주석에 있다.
-              먹이기 직후 약 2.6초 동안 나타났다가 사라진다 */}
-          {expShow ? (
-          <div className="pet-card pet-card--exp screen-enter">
-            <div className="pet-card__head">
-              {/* 제목 앞 이모지는 2026-08-24 사용자 요청으로 되살린 것이다("예전에 있던대로").
-                  836cd2b(Figma 이관)에 ⭐ 경험치 · 🌿 씨앗 투입 · 🌟 진화 단계가 있었고
-                  d56d813에서 걷혔다. 보유 재화 카드는 안에 이미 🌱❤️⭐ 아이콘 3개가 있어서
-                  처음에는 제외했는데, 같은 날 사용자 요청으로 👛(→ 같은 날 🪙)을 붙여
-                  다섯 장 전부가 됐다.
-                  design.md의 "이모지는 마스코트 자리에만"에서 벗어나는 자리다. 새 예외가
-                  아니라 이 화면이 원래 갖고 있던 예외로 돌아온 것이고, 전부 aria-hidden이라
-                  스크린리더가 읽는 카드 이름은 글자 그대로 남는다 */}
-              <p className="pet-card__title">
-                <span aria-hidden="true">⭐</span> 경험치
-              </p>
-              <span className="pet-card__meta">
-                {ko(pet.exp)} / {ko(need)}
-              </span>
-            </div>
-            <div
-              className="pet-gauge"
-              role="progressbar"
-              aria-label="다음 레벨까지 경험치"
-              aria-valuemin={0}
-              aria-valuemax={need}
-              aria-valuenow={pet.exp}
-            >
-              {/* 게이지 안에 {exp} / {need}를 겹쳐 쓰던 것을 지웠다 (2026-08-23).
-                  바로 위 .pet-card__meta가 **같은 문자열**을 이미 쓴다 — 8px 간격으로
-                  같은 숫자가 두 번이었다. 지운 쪽이 게이지 안이다:
-                  움직이는 그라디언트 위 글자라 대비가 채움률에 따라 변한다.
-                  배경 상점의 .pet-gauge__value는 그 게이지의 **유일한** 라벨이라 남는다 */}
-              {/* from이 있는 0.3초 동안은 **이전 위치**를 그린다. 그 뒤 현재 값으로 바뀌면
-                  CSS transition이 채워지는 모습을 만든다 — JS 애니메이션을 쓰지 않는다 */}
-              <div
-                className="pet-gauge__fill"
-                style={{ width: `${(expShow.from ?? progress) * 100}%` }}
-              />
-            </div>
-            {/* 지금까지 `Lv.25 마지막 진화`만 보여 줬다. 그 문구는 지금 무엇을 얼마나
-                해야 하는지 알려 주지 않는다. 벤치마크한 육성 게임은 전부 남은 개수를 쓴다
-                (2026-08-24 사용자 확정: seedsToNextStage 쪽을 쓴다) */}
-            <p className="pet-card__foot">
-              <span>현재 Lv.{pet.level}</span>
-              <span>
-                {nextStage
-                  ? `${STAGE_NAME[nextStage.stage - 1] ?? `${nextStage.stage}단계`}까지 씨앗 ${ko(nextStage.seeds)}개`
-                  : "마지막 단계예요"}
-              </span>
-            </p>
-          </div>
           ) : null}
 
           {/* 방치형 수확. 2026-08-21 사용자 결정으로 아이콘 칸 + 숫자를 왼쪽에 두던 한 줄을
@@ -1749,7 +1810,11 @@ function OutingDiaryModal({
         aria-modal="true"
         aria-labelledby="diary-title"
         tabIndex={-1}
-        className="pet-diary-pop__box screen-enter"
+        /* --diary 수식자는 **넓은 화면 2단 배치를 이 팝업에만** 걸기 위한 것이다.
+           `pet-diary-pop__box` 골격을 진화 단계 팝업(`.pet-evo-pop`)이 함께 쓰는데,
+           그쪽 자식들은 grid-area를 갖고 있지 않아서 공용 클래스에 배치를 넣으면
+           암시적 행으로 흩어진다 */
+        className="pet-diary-pop__box pet-diary-pop__box--diary screen-enter"
         onClick={(e) => e.stopPropagation()}
       >
         {/* ── 상단: 펫 모습 ── */}

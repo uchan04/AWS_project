@@ -1,42 +1,24 @@
-// 소유자: A. 홈. 로그인·진단 여부만 서버에서 가르고 화면을 고른다.
+// 소유자: A. `/` 라우트. **2026-08-26부터 화면이 아니라 갈림길이다.**
 //
-// 2026-08-22 분리: 전에는 홈 전체가 클라이언트 컴포넌트였다. 그래서
-//   1) 처음 온 사람이 보는 첫 화면이 "불러오고 있어요…"였다. 소개 화면은
-//      /api/diagnosis/me 왕복이 끝난 뒤에야 떴다 — 랜딩으로 쓸 수 없는 순서다
-//   2) 서버가 쿠키를 읽어 이미 알고 있는 닉네임·종족을 API로 한 번 더 읽었다
-// 지금은 여기서 한 번 읽어 Intro(진단 전) / HomeDashboard(진단 후)로 나눈다.
+// 하는 일이 셋뿐이다.
+//   미인증        → <Intro authed={false} />   (가입·로그인 유도)
+//   진단 미완료    → <Intro authed />           (진단 유도)
+//   진단 완료      → redirect("/pet")           ← 홈 화면을 없앴다(아래 리다이렉트 주석)
 //
 // 미인증도 여기까지 온다 — middleware.ts가 "/"를 공개 경로로 둔다. 그래야 소개 화면이
 // 보인다. 실제 인증은 각 API·보호 페이지의 첫 줄이 계속 한다.
+//
+// 내력: 2026-08-22에 클라이언트 컴포넌트에서 서버로 갈랐고(첫 화면이 "불러오고 있어요…"이던
+// 문제), 2026-08-26에 진단 후 분기를 리다이렉트로 바꿨다. HomeDashboard·loadMissions와
+// 미션·스킨 조회(왕복 2회, 실측 731ms)를 그때 함께 걷었다.
 
-import { petImageUrl } from "@/lib/assets"
-import { UnauthorizedError, getCurrentUser, getCurrentUserWithSkin } from "@/lib/auth"
-import { buildDashboard } from "@/lib/missions/dashboard"
-import { ensureMissionReset } from "@/lib/missions/reset"
-import { cappedStage } from "@/lib/pet"
+import { UnauthorizedError, getCurrentUser } from "@/lib/auth"
+import { redirect } from "next/navigation"
 import { Intro } from "./_components/Intro"
-import HomeDashboard from "./HomeDashboard"
 import "@/styles/tokens.css"
 
 // 쿠키를 읽으므로 정적 프리렌더 대상이 아니다
 export const dynamic = "force-dynamic"
-
-/**
- * 오늘의 미션·진행률. 실패해도 홈을 죽이지 않는다 — null이면 화면이
- * "불러오지 못했어요"를 띄우고 나머지 카드는 그대로 나온다.
- *
- * buildDashboard를 그대로 쓴다. 홈용 쿼리를 따로 짜면 GET /api/missions와 값이 갈라진다.
- * 필요한 두 조각만 뽑아 넘긴다 — 단계 미션까지 실어 보내면 홈이 쓰지 않는 바이트가 붙는다.
- */
-async function loadMissions(user: Awaited<ReturnType<typeof getCurrentUser>>) {
-  try {
-    const dashboard = await buildDashboard(await ensureMissionReset(user))
-    return { dailyMissions: dashboard.dailyMissions, progress: dashboard.progress }
-  } catch (error) {
-    console.error("[/ missions]", error)
-    return null
-  }
-}
 
 export default async function HomePage() {
   let user
@@ -64,38 +46,20 @@ export default async function HomePage() {
   // 진단이 중간에 끊긴 상태라 종족 표시가 반쪽이 된다(lib/profile.ts의 diagnosed와 같은 기준)
   // 여기서 먼저 갈라야 진단 전 방문자에게 미션 쿼리가 나가지 않는다
   if (!user.typeCode || !user.adjective) return <Intro authed />
-
-  // 오늘의 미션·진행률을 서버에서 읽어 내려보낸다(2026-08-23).
+  // **2026-08-26: 홈 화면을 없앴다(사용자 결정). 진단을 마친 사용자는 /pet으로 보낸다.**
   //
-  // 전에는 HomeDashboard가 마운트 후 fetch("/api/missions")로 읽었고, 응답이 도착하는 순간
-  // "오늘의 나" 카드가 없던 자리에 끼어들어 아래 내용을 전부 밀어냈다.
-  // 실측(prod 빌드, 2026-08-22): CLS 0.2807, shift 1건, 발생 시각 2280ms —
-  // fetch가 끝난 그 시점이고 원인 노드는 DIV.hm-home__cards · A.hm-row · H1.hm-home__name이었다.
-  // 기준선 0.1의 2.8배다. HTML에 처음부터 들어 있으면 밀어낼 것이 없다.
+  // 왜 없앴나 — 실측하니 홈 카드 3장 중 **고유 정보가 0**이었다:
+  //   `오늘의 나`(오늘 N/M · 이번 주 N/M · 연속 N일) = 미션 탭 ProgressCard 3칸과 같은 세 값
+  //   `오늘의 미션`                                  = 미션 탭 일일 미션 목록
+  //   `키우기`                                        = 사이드바 `나의 펫` 탭에 있는 링크
   //
-  // 스킨 읽기와 병렬로 돌린다. 둘 다 user만 있으면 되고 서로를 필요로 하지 않는다.
-  // 순차로 두면 왕복이 하나 더 붙는다 — 실측(prod, RDS us-east-1, 왕복 1회 180ms):
-  //   순차  912ms / 병렬  731ms
+  // 그리고 이 서비스 고유의 이유가 있다. 첫 화면이 숫자 요약이면 "오늘 2/5"가 성과표로
+  // 읽힌다. 펫이면 나를 기다린 존재가 먼저 온다 — OUTING_MOODS 주석의 "격려는 사용자를
+  // 격려받아야 하는 위치에 세운다"와 같은 계열이다. 성장형 펫 앱은 펫 화면이 곧 홈이다.
   //
-  // 스킨 읽기가 실패해도 홈을 죽이지 않는다. 마스코트 그림 하나이고 이모지 폴백이 있다 —
-  // 여기서 throw를 흘리면 홈 전체가 에러 화면이 된다(Promise.all은 하나만 깨져도 거부한다)
-  const [skin, missions] = await Promise.all([
-    getCurrentUserWithSkin()
-      .then((full) => full.activePetSkin)
-      .catch(() => null),
-    loadMissions(user),
-  ])
-
-  // 스킨이 없으면(아직 아무것도 착용하지 않은 계정) null이고, 그때만 이모지로 떨어진다.
-  // 기본값 4는 prisma/seed/items.ts의 stageCount와 같다(lib/profile.ts와 같은 이유)
-  const petImage = skin ? petImageUrl(skin.imageKeyBase, cappedStage(user.level, skin.stageCount)) : null
-
-  return (
-    <HomeDashboard
-      nickname={user.nickname || "익명"}
-      typeCode={user.typeCode}
-      petImage={petImage}
-      initialMissions={missions}
-    />
-  )
+  // **미진단·미인증 분기는 위에 그대로 남는다** — `/`는 여전히 진단 전 사용자의 입구다.
+  // 그래서 이 라우트를 지우지 않고 리다이렉트만 둔다.
+  //
+  // 미션·스킨 조회를 함께 걷었다. 리다이렉트에 필요 없는 왕복 2회였다(실측 731ms).
+  redirect("/pet")
 }
