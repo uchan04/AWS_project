@@ -261,3 +261,33 @@ FATAL: remaining connection slots are reserved for roles with the SUPERUSER attr
 ## GitHub 레포·브랜치
 
 레포 연결과 브랜치 5개(`feat/diagnosis` `feat/missions` `feat/pet` `feat/community` `feat/infra`) 생성이 끝났다. `DATABASE_URL` 등 실제 값이 든 `.env`는 커밋하지 않으므로, 팀원에게는 E가 개별적으로 값을 공유한다.
+
+## 커넥션을 누가 쥐는지 재는 스크립트 (2026-08-26, A) — **E 통보**
+
+`scripts/perf-connby.ts`. `perf-conncheck.ts`는 총량만 준다 — 상한에 부딪혔을 때 필요한 것은 총량이 아니라 **어느 기기가 몇 개를 쥐고 있는지**다. 그게 "끌 대상"을 정한다.
+
+```bash
+npx tsx -r dotenv/config scripts/perf-connby.ts
+```
+
+**풀을 `connection_limit=1`로 못 박았다 — 고갈 상태에서도 뜬다.** `perf-conncheck.ts`는 2026-08-26에 이 상태에서 죽었다(`FATAL: remaining connection slots are reserved for SUPERUSER`). 재려는 대상이 재는 것을 막는 상황이라 별 파일이 필요했다. 읽기 전용이고 `DATABASE_URL`은 출력하지 않는다.
+
+### 2026-08-26 실측 — 로컬 기기 2대가 Amplify와 맞먹었다
+
+```
+app share 76        끄기 전 77 사용 / 여유 −1     ← 조회조차 실패
+                    끄기 후 64 사용 / 여유 12
+```
+
+| 클라이언트 | 개수 | idle | 최고령 | 정체 |
+|---|---|---|---|---|
+| `121.135.170.5` | **18** | 18 | 21분 | 팀원 로컬 개발 기기 |
+| `221.143.15.110` | **13** | 13 | — | A 로컬 (껐다) |
+| AWS IP 15개 | 합 **34** | 34 | 33분 | Amplify Lambda |
+| `local / rdsadmin` | 2 | 2 | 6.9일 | RDS 관리 프로세스 |
+
+**로컬 2대 = 31개.** Amplify 34개와 맞먹는다. `18/18`, `34/34`가 전부 `idle`이다 — 부하가 아니라 **반납을 안 하는 것**이 원인이라는 진단이 그대로 재현됐다.
+
+`netstat`으로 교차 확인했다: 내 13개가 **PID 하나**(`next dev`)였다. Prisma 풀은 프로세스가 죽을 때까지 반납하지 않는다 — 창을 닫는 것으로는 안 된다.
+
+**처방은 이미 문서에 있다**(`DATABASE_URL`에 `connection_limit=2` + 재배포). 이 스크립트는 처방이 아니라 계측이다.
