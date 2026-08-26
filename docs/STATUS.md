@@ -12,6 +12,10 @@
 - **좁은 화면에서 외출 카드를 방 바로 아래로 올렸다.** 실측 **802px → 464px**(뷰포트 724px이라 전에는 스크롤해야 나왔다). `.pet__col { display: contents }` + `order`다. 친밀도가 모였을 때만 보이는 카드라 **그때 못 찾으면 기능이 없는 것과 같다**
 - **경험치 게이지를 카드 → 팝업으로.** 자리가 하루에 세 번 바뀌었고 이유가 각각 측정값이다. ① 오른쪽 열 카드: 나타나는 순간 아래 카드 네 장이 밀렸다(**실측 153px** — 방금 누른 먹이기 버튼이 손가락 아래에서 움직인다) ② 화면 상단 중앙: 밀림은 사라졌지만 방 밖이라 시선이 위로 튀었다 ③ **방 중앙 상단**(지금): 씨앗이 오르는 곳도 눈이 가 있는 곳도 펫이다. `.pet-room` 안 `position: absolute`이고 `pointer-events: none`이라 떠 있는 2.6초 동안에도 아래를 누를 수 있다. 실측 `레이아웃 이동 0px · 방 중앙 정렬 141/141 · 자동 닫힘 2599ms`
 
+이전 최종 갱신: **2026-08-26 (A) — 차단 31·32번을 닫았다.** 위기 + 타인 공격이 함께 있는 글에 109 안내가 나가고, 진단 전에는 오프라인 모임에 신청할 수 없다. `app/community/`(D 소유) 4파일 + e2e 단정 2건(80 → **82건**). 세부와 되돌릴 지점은 `docs/dev/community.md` 맨 아래 절.
+
+**A의 나머지 작업은 `improve/service-quality`에 남겨 뒀다** — 홈 제거(탭 5 → 3)·펫 화면 IA·경험치 팝업·1단계 외출 잠금·진단 직후 알 팝업이다. 그쪽은 C·B·E 소유 파일을 크게 건드려서(펫 +700줄, `Sidebar` 탭 구조, `styles/tokens.css`) **담당자에게 알린 뒤 따로 올린다.** 이 푸시에는 안전 수정만 있다.
+
 이전 최종 갱신: **2026-08-26 (A) — 펫 화면 IA를 정리하고(카드 9장 → 5장) 역할별 인계 문서를 썼다. `docs/인계-2026-08-26.md`.**
 
 이전 갱신: **2026-08-24 (E) — D의 요청으로 커뮤니티 글 이미지 업로드 경로를 열었다.** `POST /api/upload/community/presign`(신규) + `lib/uploads.ts`(신규) + `npm run check:uploads`(신규). 키는 `community/{userId}/{랜덤16}.{ext}`, 상한 5MB·jpg·png·webp다. **미션용 `lib/missions/upload.ts`는 한 줄도 고치지 않았다** — 그 파일의 `ALLOWED_TYPES`·`MAX_SIZE`가 모듈 상수이고 `verifyS3Object()`가 같은 값을 읽어서, 커뮤니티에 맞춰 올리면 비전 모델에 넘어가는 미션 사진 검증까지 함께 느슨해진다. `check:uploads`가 그 분리를 못 박는다(미션은 webp 거부·3MB 유지). 덤으로 확정한 것 2건: ① **글 이미지에 presigned GET은 필요 없다** — 버킷 `welli-uploads-185236887369`이 CloudFront(`diros91hbap9v`) origin과 같고 버킷 정책이 `/*` 전체를 OAC에 읽기 허용, 배포에 path pattern 제한도 없다(실측). `lib/assets.ts:cdnUrl()`로 그대로 보인다. **뒷면도 같이 적는다: 그래서 `missions/`의 미션 사진도 URL만 알면 누구나 읽는다** — prefix 단위 접근 제어가 없다. ② **배포 환경변수는 비어 있지 않다**(아래 차단 절 정정). D가 이어서 할 일은 `Post.imageKey` 수신·표시와 `WriteModal` 첨부 UI이고, 클라이언트가 보낸 키를 저장하기 전에 `isOwnCommunityKey()`를 반드시 통과시켜야 한다(안 하면 남의 미션 사진을 자기 글 이미지로 걸 수 있다). `DEV_AUTH_BYPASS=false npm run build` exit 0, `tsc`·`lint`·`check:*` 10종 통과.**
@@ -224,12 +228,12 @@
 
 지금 프로젝트를 멈춰 세우는 것만 적는다. 해결되면 즉시 지운다.
 
-**차단 31·32번은 2026-08-26에 해소됐다** (A, `768dc38`). 두 건 다 `app/community/`(D 소유)를 고쳤고 사용자 지시였다. 되돌릴 지점은 `docs/dev/community.md`에 있다.
+**차단 31·32번은 2026-08-26에 해소됐다** (A, 사용자 지시). 두 건 다 `app/community/`(D 소유)를 고쳤다 — 세부와 되돌릴 지점은 `docs/dev/community.md` 맨 아래 절에 있다.
 
-- **31 (위기 + 타인 공격)**: `blocksPosting()`을 `containsAbuse()` **앞**으로 올렸다. 글·댓글 라우트 둘 다. 새 순서는 `blocksPosting → containsAbuse → moderate → 저장 → crisisNotice`다. **우회가 열리지 않는다** — `blocksPosting()`은 글을 저장하지 않으므로 공격 글에 "죽고 싶다"를 덧붙여도 게시되지 않고, 달라지는 것은 응답뿐이다(`400 ABUSIVE_CONTENT` → `200` + 109 안내)
+- **31 (위기 + 타인 공격)**: `blocksPosting()`을 `containsAbuse()` **앞**으로 올렸다. 글·댓글 라우트 둘 다. 새 순서는 `이미지키 → blocksPosting → containsAbuse → moderate → 저장 → crisisNotice`다. **우회가 열리지 않는다** — `blocksPosting()`은 글을 저장하지 않으므로 공격 글에 "죽고 싶다"를 덧붙여도 게시되지 않고, 달라지는 것은 응답뿐이다(`400 ABUSIVE_CONTENT` → `200` + 109 안내)
 - **32 (모임 진단 게이트)**: `join` 라우트에 `NOT_DIAGNOSED` 게이트를 **모임 조회보다 앞**에 넣고 `meetups/page.tsx`도 `/community`로 보낸다. 라우트가 본체다 — 페이지만 막으면 API는 열려 있다
-- **e2e 단정 2건을 함께 넣었다**(80 → 82건). 32번 단정은 **없는 모임 id**를 쓴다 — 게이트가 조회보다 앞이라 `NOT_FOUND`가 아니라 `NOT_DIAGNOSED`가 와야 한다. 순서가 뒤집히면 단정이 깨진다
-- **근본 원인은 남아 있다.** "위기가 다른 판정을 이긴다"는 규칙이 여전히 모듈이 아니라 라우트의 줄 순서에 있다. 세 번째 관문이 생기면 같은 역전이 또 난다. 처방은 `docs/모듈-재배치-계획.md` 1번(8/28 이후)
+- **e2e 단정 2건을 함께 넣었다**(80 → 82건). 32번 단정은 **없는 모임 id**를 쓴다 — 게이트가 조회보다 앞이라 `NOT_FOUND`가 아니라 `NOT_DIAGNOSED`가 와야 한다. 순서가 뒤집히면 단정이 깨진다. e2e 계정은 `isAdmin`이 아니라 실재하는 모임으로는 못 잰다
+- **근본 원인은 남아 있다.** "위기가 다른 판정을 이긴다"는 규칙이 여전히 모듈이 아니라 라우트의 줄 순서에 있다. 30번을 고치니 31번이 나왔고, 세 번째 관문이 생기면 같은 역전이 또 난다. 처방은 `docs/모듈-재배치-계획.md` 1번(8/28 이후)이고 **D 판단이다**
 
 인프라 차단은 해소됐다(RDS·Cognito·S3·Bedrock 완료). 단 **AWS 리소스 생성이 끝난 것과 `.env`에 값이 온 것은 다르다** — 2026-08-20 로컬 `.env` 확인 결과 채워진 값은 `DATABASE_URL`(+`AWS_REGION`·`BEDROCK_REGION`·`DEV_AUTH_BYPASS=true`)뿐이고 `COGNITO_USER_POOL_ID`·`COGNITO_CLIENT_ID`·`BEDROCK_MODEL_ID`·`BEDROCK_VISION_MODEL_ID`·`S3_BUCKET`·`CLOUDFRONT_DOMAIN`은 **전부 빈 문자열**이다. E에게 개별 공유받아야 한다. 코드가 실제로 읽는 키는 9개이고 `.env`에 다 있다(키 누락은 없다 — 값만 없다). 영향:
 - **빌드·DB·펫·미션·진단은 막히지 않는다.** `DEV_AUTH_BYPASS=true` + `lib/auth.ts` 지연 생성(차단 3) 덕이다
