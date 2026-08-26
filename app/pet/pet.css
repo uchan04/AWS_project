@@ -317,14 +317,14 @@
   gap: var(--space-3xs);
   padding: var(--space-2xs);
   /* **면·radius·그림자를 걷었다** (2026-08-26 사용자 지적). Lv 숫자가 배지가 되고
-     (.pet-hud .pet-hud-lv__level) 게이지가 자기 테두리를 갖고 있어서, 이 상자의 판은
+     (.pet-topbar .pet-hud-lv__level) 게이지가 자기 테두리를 갖고 있어서, 이 상자의 판은
      그 둘 뒤의 흰 띠가 됐다.
      되살릴 값: `--color-card 88%` + `blur(8px)` + `--shadow-card` + `--radius-card` */
   padding: 0;
 }
 
 /* 아래 주석은 낡았다 — "이 상자 자체가 알약 계열 면"이었을 때의 근거이고, 그 면을 위에서
-   걷었다. 지금은 이 숫자가 **배지**이고 그 값은 `.pet-hud .pet-hud-lv__level`에 있다 */
+   걷었다. 지금은 이 숫자가 **배지**이고 그 값은 `.pet-topbar .pet-hud-lv__level`에 있다 */
 .pet-hud-lv__level {
   margin: 0;
   font-family: var(--font-display);
@@ -366,26 +366,55 @@
  *
  * 방 밖으로 내지 않는다(사용자 지시: "배경이 좁아지니까 답답함이 느껴짐").
  */
-.pet-hud {
+/* **이름이 `.pet-hud`였다가 `.pet-topbar`가 됐다** (2026-08-26 사용자 지적:
+   "레벨/경험치 배경이 재화도 감싸고 있다").
+
+   `.pet-hud`는 **이미 상점 두 화면(`/pet/skins`·`/pet/cosmetics`)의 잔액 알약**이 쓰는
+   클래스다(이 파일 845행, `SkinList.tsx`·`CosmeticList.tsx`). 그 규칙이 이 파일 뒤쪽에
+   있어 순서로 이겨서, **흰 알약 면 + radius 999px + 테두리 + 그림자가 내 띠에 얹혔다** —
+   실측 291×44px 흰 알약 하나가 Lv과 재화 셋을 통째로 감쌌다.
+
+   같은 이름을 쓰면 한쪽을 고칠 때 다른 화면이 조용히 바뀐다. 이름을 갈랐다. */
+/* **flex 한 줄이었다가 자리 틀이 됐다** (2026-08-26 사용자 지시: "재화 3종은 펫 배경
+   기준으로 중앙에 오도록"). flex로 둘을 나란히 세우면 재화의 가운데가 **둘을 합친 묶음의
+   가운데**가 되어 방 중앙에서 Lv 폭의 절반만큼 왼쪽으로 밀린다.
+
+   그래서 이 요소는 자리만 잡고 안의 두 덩어리가 **각자 절대 위치**를 갖는다.
+   `height: 0`인 것은 이 틀이 아무 자리도 차지하지 않아야 하기 때문이다.
+   면은 없다 — 두 덩어리가 각자 알약이고, 여기에 판을 하나 더 두면 배경 6종이 가려진다 */
+.pet-topbar {
   position: absolute;
   top: var(--space-2xs);
   left: 0;
   right: 0;
   z-index: calc(var(--z-raised) + 2);
-  display: flex;
-  flex-wrap: wrap;
-  align-items: center;
-  justify-content: center;
-  gap: var(--space-2xs);
-  padding-inline: var(--space-2xs);
-  /* 띠 자체는 면이 없다 — 안의 두 덩어리가 각자 알약이다. 면을 한 겹 더 두면
-     방 그림 위에 판이 하나 얹혀 배경 6종이 다 가려진다 */
+  height: 0;
   pointer-events: none;
 }
 
-/* 안의 두 덩어리는 흐름에 선다(각자 absolute였다). 누를 수 있어야 하므로 이벤트를 되살린다 */
-.pet-hud > * {
-  position: static;
+/* 재화 3종 — **방 기준 정중앙.** `left/right: 0`으로 가용 폭을 방 전체로 열고
+   `width: fit-content` + `margin-inline: auto`로 가운데를 잡는다.
+   `left: 50%` + `translateX(-50%)`를 쓰면 안 되는 이유는 이 파일 앞 `.pet-bar` 주석에
+   실측과 함께 있다 — 절대 위치 요소의 가용 폭이 방의 절반이 되어 알약이 접힌다 */
+.pet-topbar .pet-bar {
+  position: absolute;
+  top: 0;
+  left: 0;
+  right: 0;
+  width: fit-content;
+  margin-inline: auto;
+  max-width: calc(100% - var(--space-sm) * 2);
+}
+
+/* Lv 묶음 — 왼쪽 끝. 재화가 가운데를 쓰므로 이쪽이 가장자리로 간다 */
+.pet-topbar .pet-hud-lv {
+  position: absolute;
+  top: 0;
+  left: var(--space-2xs);
+}
+
+/* 틀이 `pointer-events: none`이므로 안에서 되살린다 */
+.pet-topbar > * {
   pointer-events: auto;
 }
 
@@ -397,18 +426,29 @@
    납작한 반투명 판이었다. 육성 게임 HUD는 **두께가 있다** — 위쪽 광택, 아래쪽 굳은 테두리,
    또렷한 윤곽선. 이 파일이 이미 그 값을 갖고 있다(`--pet-gloss` · `--pet-gloss-edge`,
    주 버튼 `.pet-btn`이 쓰는 것) — **새 색을 만들지 않고 그것을 얹는다** */
-.pet-hud .pet-hud-lv {
+.pet-topbar .pet-hud-lv {
   display: flex;
   align-items: center;
   gap: var(--space-2xs);
-  /* 컨테이너에 알약을 씌웠다가 걷었다 (2026-08-26 사용자 지적: "의미 없는 흰색 가로 바").
-     Lv 배지와 게이지가 각자 면·테두리를 갖고 있어서 그 뒤의 판이 흰 띠로 보였다.
-     두께는 배지와 게이지가 각자 낸다 */
-  padding: 0;
+  /* **Lv 묶음의 자기 알약이다.** 한 번 걷었다가 되살렸다 —
+     처음엔 `.pet-hud`(상점 알약 클래스)를 물려받아 **재화까지 감싸는 291px 흰 판**이었고,
+     그것을 걷으니 Lv 배지와 재화 칩 셋이 나란히 떠서 **Lv이 네 번째 재화처럼** 보였다.
+     지금은 이름을 가른 뒤(.pet-topbar) 내용만큼만 감싼다: Lv 배지 + 게이지 한 묶음.
+
+     `width: fit-content`가 요점이다 — 이것이 없으면 flex 항목이 늘어나 다시 판이 된다.
+     면을 옅게 두는 것은 안의 배지(종족색 채움)와 무게를 가르기 위해서다 */
+  width: fit-content;
+  padding: 0.15rem var(--space-2xs) 0.15rem 0.15rem;
+  border: 2px solid color-mix(in oklch, var(--tribe) 38%, transparent);
+  border-radius: var(--radius-pill);
+  background: color-mix(in oklch, var(--color-card) 88%, transparent);
+  backdrop-filter: blur(6px);
+  box-shadow: 0 2px 0 color-mix(in oklch, var(--tribe) 24%, transparent);
+  box-sizing: border-box;
 }
 
 /* Lv 숫자를 **배지**로 만든다. 게임 HUD의 레벨은 거의 항상 동그라미 안에 있다 */
-.pet-hud .pet-hud-lv__level {
+.pet-topbar .pet-hud-lv__level {
   display: grid;
   place-items: center;
   min-width: 2.1rem;
@@ -422,11 +462,11 @@
   color: var(--color-ink);
 }
 
-.pet-hud .pet-hud-lv__exp {
+.pet-topbar .pet-hud-lv__exp {
   display: none;
 }
 
-.pet-hud .pet-hud-lv .pet-gauge {
+.pet-topbar .pet-hud-lv .pet-gauge {
   width: 4.5rem;
   height: 0.9rem;
   border-width: 2px;
@@ -3782,15 +3822,19 @@
     top: 3.25rem;
   }
 
-  .pet-hud .pet-hud-lv .pet-gauge {
+  .pet-topbar .pet-hud-lv .pet-gauge {
     display: none;
   }
 
   /* 2px이 모자랐다. 게이지를 뺀 뒤 `Lv 55 + 알약 201 + 간격 8 = 264`인데 띠 안쪽이
      좌우 여백 8×2 때문에 258이었다(실측). 그 여백을 걷어 274로 만든다 —
      띠 자체가 면이 없으므로(안의 두 덩어리가 각자 알약이다) 여백이 할 일이 없다 */
-  .pet-hud {
-    padding-inline: 0;
+  /* **이 폭에서는 둘이 한 줄에 못 선다.** 방 안쪽이 263px인데 재화가 210px이라 가운데에
+     두면 34~244px을 쓰고, Lv(약 44px)을 왼쪽 8px에 두면 17px 겹친다(실측).
+     재화는 **가운데를 지켜야 하므로**(사용자 지시) Lv을 그 아래로 내린다 —
+     위에서 아래로 재화 → Lv 순이고 둘 다 방 안이다 */
+  .pet-topbar .pet-hud-lv {
+    top: 2.4rem;
   }
 
   /* 알약도 좁혀야 한 줄이 유지된다. 안 좁히면 247px 안에서 3줄로 접히고(실측 h 85px)

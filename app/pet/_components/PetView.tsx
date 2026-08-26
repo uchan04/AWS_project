@@ -918,7 +918,7 @@ export default function PetView({ initial }: { initial: PetState }) {
                 **방 밖으로 내지 않는다**(사용자 지시: "배경이 좁아지니까 답답함이 느껴짐").
                 띠는 반투명 카드색 + blur이라 배경 6종 위에서 대비가 확보된다 — 재화 알약이
                 이미 그 값을 쓰고 있었고 C가 6종에서 확인해 둔 것이다 */}
-            <div className="pet-hud">
+            <div className="pet-topbar">
             {/* 좌상단 Lv + 경험치. 옛 "🍎 경험치" 카드가 여기로 왔다 — 게이지 골격은
                 그 카드가 쓰던 .pet-gauge 그대로다(높이·홈 그림자·전환).
                 진화 임박 각주("다음 단계까지 씨앗 N개")는 여기 두지 않고 펫 정보 모달로
