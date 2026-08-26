@@ -18,12 +18,14 @@ export const dynamic = "force-dynamic"
 export default async function CosmeticsPage() {
   let items: CosmeticRow[]
   let progress: { owned: number; total: number }
-  let affinity: number
+  let starShards: number
   let typeCode: TypeCode | null
 
   try {
     const user = await getCurrentUser()
-    affinity = user.affinity
+    // 2026-08-25: 배경값이 친밀도 → 별조각으로 바뀌었다(사용자 결정). 이 화면의 잔액도
+    // 함께 바뀐다 — 외형 상점(/pet/skins)과 같은 재화를 같은 이름으로 본다
+    starShards = user.starShards
     typeCode = user.typeCode
 
     const [all, owned] = await Promise.all([
@@ -39,8 +41,8 @@ export default async function CosmeticsPage() {
 
     const ownedById = new Map(owned.map((row) => [row.itemId, row]))
 
-    // 2026-08-22: 타일에 배경 그림을 띄운다. 그 전까지는 이름과 가격만 있어서 친밀도
-    // 600을 무엇인지 모르고 내야 했다. 조립은 lib/assets.ts cdnUrl() 한 곳에서만 한다 —
+    // 2026-08-22: 타일에 배경 그림을 띄운다. 그 전까지는 이름과 가격만 있어서 별조각
+    // 500을 무엇인지 모르고 내야 했다. 조립은 lib/assets.ts cdnUrl() 한 곳에서만 한다 —
     // imageKey에 확장자가 이미 붙어 있으므로 여기서 .png를 덧붙이지 않는다.
     // 도메인이 비면 null이고 타일은 이름만 보인다
 
@@ -55,8 +57,7 @@ export default async function CosmeticsPage() {
         name: cosmeticLabel(item.name),
         slot: item.slot,
         rarity: item.rarity,
-        affinityOnly: item.affinityOnly,
-        priceAffinity: item.priceAffinity,
+        priceShards: item.priceShards,
         imageUrl: cdnUrl(item.imageKey),
         owned: ownedById.has(item.id),
         equipped: ownedById.get(item.id)?.equipped ?? false,
@@ -97,6 +98,11 @@ export default async function CosmeticsPage() {
   }
 
   return (
-    <CosmeticList items={items} progress={progress} affinity={affinity} typeCode={typeCode} />
+    <CosmeticList
+      items={items}
+      progress={progress}
+      starShards={starShards}
+      typeCode={typeCode}
+    />
   )
 }

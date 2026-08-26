@@ -173,7 +173,9 @@
   gap: var(--space-2xs);
 }
 
-/* 상점 두 화면 상단의 잔액 알약(외형=별조각, 배경=친밀도). 2026-08-21 사용자 결정으로
+/* 상점 두 화면 상단의 잔액 알약. 2026-08-25 전환으로 **둘 다 별조각**이다(전에는 배경이
+   친밀도였다) — 같은 값을 보는 알약이라 두 화면에서 숫자가 같아야 정상이다.
+   2026-08-21 사용자 결정으로
    나무 어휘(2px 나무 테두리 + 크림색 숫자 면 + 나무 그림자)를 걷고 바로 옆 "펫으로"
    (.pet-plank)와 같은 껍데기로 맞췄다 — 흰 면, 투명도 있는 종족색 테두리, 알약,
    --control-h 높이다. 둘이 한 줄에 붙어 있어 높이와 테두리가 다르면 그 줄만 어긋나 보인다.
@@ -688,6 +690,91 @@
    10문구로 갈면서(lib/pet.ts petTouchReply) 테두리를 달리 할 이유가 없어졌다 —
    PetView가 이제 먹이기에만 data-tone을 준다 */
 
+/* ── 외출 중인 방: 펫이 남긴 쪽지 (2026-08-25) ───────────────────────────── */
+
+/* 펫이 밖에 나가 있는 4시간 동안 방에 남는 것. 문장은 진행률에 따라 3막으로 바뀐다
+   (lib/pet.ts OUTING_AWAY_LINES, PetView의 outingLine).
+
+   **이 자리를 비워 두지 않는 것이 이 기능의 전제다.** 고립은둔청년 서비스에서 아무도 없는
+   방은 "혼자 남았다"로 읽히고, 그건 이 앱이 하려는 것의 정반대다. 그래서 펫을 지우는 대신
+   펫의 목소리를 그 자리에 남긴다.
+
+   골격은 말풍선(.pet-welcome)에서 가져왔다 — 같은 방, 같은 배경 그림 6종 위에 서는 물건이라
+   면색·선색·선 굵기·글자 규칙이 같아야 한다. 다른 점은 셋이다:
+   - 꼬리가 없다. 말하는 펫이 없으므로 꼬리를 어디에도 걸 수 없다
+   - 2:1 비율에 묶이지 않는다. 도형이 blob이 아니라 사각형이라 늘어나도 곡선이 뭉개지지 않는다
+   - 살짝 기울어져 있다. 방에 **놓인 종이**로 읽히게 하는 유일한 장치다 */
+.pet-away {
+  position: absolute;
+  /* 펫이 서 있던 자리보다 조금 위. 방 높이가 27rem(좁은 화면 22rem)이고 이 쪽지가
+     6.5rem이라 바닥에서 20%(5.4rem)면 아래로도 위로도 잘리지 않는다.
+     펫 크기(--pet-char-w)에 맞물리지 않는 값이라 단계별로 갈리지 않는다 — 펫이 없는
+     화면이므로 맞물릴 대상이 애초에 없다 */
+  bottom: 20%;
+  left: 50%;
+  /* 회전이 뒤에 온다: 먼저 자기 폭의 절반만큼 왼쪽으로 옮겨 가운데에 서고, 그 자리에서
+     자기 중심을 축으로 돈다. 순서를 바꾸면 회전한 좌표계에서 옮겨져 가운데를 벗어난다.
+     2.5도는 "손으로 놓은 종이"에 필요한 최소치다 — 5도를 넘으면 글자가 기울어 읽힌다 */
+  transform: translateX(-50%) rotate(-2.5deg);
+  z-index: var(--z-raised);
+  display: grid;
+  justify-items: center;
+  align-content: center;
+  gap: var(--space-3xs);
+  /* 말풍선과 같은 폭이다(14rem). 방 안에 같은 크기의 종이가 번갈아 서는 것이 자연스럽다 */
+  width: 14rem;
+  min-height: 6.5rem;
+  /* 좌우는 사각형이라 말풍선(1.5rem)만큼 피할 곡선이 없다. 그래도 1rem은 남긴다 —
+     선이 3px이고 그 안쪽에 글자가 붙으면 종이가 아니라 표처럼 보인다 */
+  padding: var(--space-sm);
+  /* 말풍선의 petSlideIn이 아니다 — 그쪽은 to에서 transform을 translate만으로 덮어 써
+     기울기가 끝날 때 툭 돌아간다. 이유와 짝은 파일 끝 petNoteIn 주석 */
+  animation: petNoteIn var(--dur-short) var(--ease-out);
+}
+
+/* 손으로 찢은 듯한 사각형. path 하나이고 굴곡이 네 변 모두 다르다.
+   z-index: -1로 글자 뒤로 보낸다 — 절대 위치 요소는 z-index: auto만으로도 형제 텍스트
+   위에 그려진다(.pet-welcome__shape와 같은 사정) */
+.pet-away__paper {
+  position: absolute;
+  inset: 0;
+  z-index: -1;
+  width: 100%;
+  height: 100%;
+  filter: drop-shadow(0 4px 10px rgb(42 31 20 / 0.22));
+}
+
+/* 면은 불투명한 카드색, 선은 종족색. 배경 그림 6종 위에서 글자 명암비를 지키는 유일한
+   조합이다(.pet-welcome 앞 주석의 계산). preserveAspectRatio="none"으로 늘어나므로
+   선 굵기는 vector-effect가 3px로 잡는다 */
+.pet-away__paper path {
+  fill: var(--color-card);
+  stroke: var(--tribe-line);
+  stroke-width: 3;
+  stroke-linejoin: round;
+  stroke-linecap: round;
+}
+
+/* "밖에서 온 소식". 현재형 문장("지금 공원쯤이야")의 화자를 정해 주는 한 줄이라 지우면
+   쪽지가 나가면서 써 두고 간 글로 읽히고, 4시간 동안 문장이 바뀌는 것과 어긋난다.
+   각주 크기·색이다 — 이 종이의 주인공은 아래 문장이다 */
+.pet-away__from {
+  margin: 0;
+  font-size: 0.64rem;
+  color: var(--color-muted);
+}
+
+.pet-away__text {
+  margin: 0;
+  text-align: center;
+  color: var(--color-ink);
+  font-size: var(--text-label);
+  line-height: 1.6;
+  /* 3막 문장이 "지금 정류장쯤이야"처럼 마디로 되어 있어 낱말 중간에서 끊지 않는다
+     (.pet-welcome__text와 같은 이유) */
+  word-break: keep-all;
+}
+
 /* ── 펫 캐릭터 ───────────────────────────────────────────────────────────── */
 
 /* 펫은 방 **중앙 하단**에 고정한다 (2026-08-21 사용자 확정).
@@ -739,6 +826,14 @@
   display: grid;
   justify-items: center;
   text-align: center;
+}
+
+/* 외출 중에는 접힌다(PetView의 hidden={away}). UA 기본 규칙 `[hidden] { display: none }`은
+   위 `display: grid`에 순서로 지므로 이 한 줄이 필요하다 — 없으면 hidden을 줘도 펫이
+   그대로 보이고 쪽지와 겹친다. display: none이라 탭 순서·접근성 트리에서도 빠진다
+   (쓰다듬기 버튼이 방에 없는 펫을 가리키고 있으면 안 된다) */
+.pet-char[hidden] {
+  display: none;
 }
 
 /* 머리 위 Lv. 배지 — 2026-08-23 사용자 요청으로 **삭제했다.**
@@ -1058,6 +1153,40 @@
   font-style: normal;
   font-weight: 600;
   color: var(--tribe-cta);
+}
+
+/* ── 외출 이야기 세 줄 (2026-08-25) ──────────────────────────────────────── */
+
+/* 돌아온 펫이 하는 이야기. 장소 → 만난 것 → 기분 순이고 문장은 lib/pet.ts에 있다.
+
+   왼쪽 세로선 하나로 묶는다. 카드 안에 또 상자를 만들지 않는 이유는 이 카드가 오른쪽 열
+   다섯 장 중 하나이고, 카드 안 카드가 되면 그 열의 리듬이 깨지기 때문이다.
+   세로선은 "인용"의 관습이라 세 줄이 **펫이 한 말**로 읽힌다 — 화면의 설명문이 아니다.
+
+   서체는 제목 서체(Gowun Dodum)다. 이 세 줄이 이 기능의 값이고 각주나 도움말이 아니라서
+   본문 서체로 두면 다른 카드의 각주와 같은 무게가 된다. 씨앗 투입 카드가 카드 전체에
+   같은 서체를 거는 것(.pet-card--feed)과 같은 판단이고, 여기서는 이 목록에만 건다 */
+.pet-story {
+  display: grid;
+  gap: var(--space-3xs);
+  margin: var(--space-3xs) 0;
+  padding: 0 0 0 var(--space-xs);
+  border-left: 3px solid var(--tribe-line);
+  list-style: none;
+  font-family: var(--font-display);
+  font-size: var(--text-label);
+  /* 세 줄이 붙어 있으면 한 문단으로 읽힌다. 서로 다른 순간을 말하는 문장들이다 */
+  line-height: 1.7;
+  color: var(--color-ink);
+  word-break: keep-all;
+}
+
+/* 방금 받아 간 이야기(PetView의 story). 지금 일이 아니라 지난 일이므로 글자를 낮추고
+   선을 흐린다 — 위 규칙과 나란히 서면 어느 쪽이 새 이야기인지 색으로 먼저 읽힌다.
+   지우지 않는 이유는 재화만 남고 이야기가 사라지면 이 기능이 재화 뽑기가 되기 때문이다 */
+.pet-story--past {
+  border-left-color: color-mix(in oklch, var(--tribe-line) 45%, transparent);
+  color: var(--color-muted);
 }
 
 /* ── 게이지 ──────────────────────────────────────────────────────────────── */
@@ -2742,6 +2871,21 @@
   }
 }
 
+/* 쪽지가 놓이는 순간 (.pet-away). 위 petSlideIn을 쓸 수 없어서 따로 있다 —
+   그쪽 to가 transform을 translate만으로 덮어 쓰므로 220ms 동안 기울기가 풀렸다가
+   끝나면서 툭 돌아간다. 마지막 프레임이 .pet-away의 static transform과 **글자까지 같아야**
+   그 튐이 없다. 한 값을 고치면 두 곳을 같이 고친다 */
+@keyframes petNoteIn {
+  from {
+    opacity: 0;
+    transform: translateX(-50%) rotate(-2.5deg) translateY(8px);
+  }
+  to {
+    opacity: 1;
+    transform: translateX(-50%) rotate(-2.5deg) translateY(0);
+  }
+}
+
 /* 반응 파티클이 떠오를 때 (먹이기 🌱✨🌿 · 쓰다듬기 💗) */
 @keyframes petBurst {
   from {
@@ -2768,7 +2912,8 @@
   .pet-char__sparkle,
   .pet-char__burst span,
   .pet-toast,
-  .pet-welcome {
+  .pet-welcome,
+  .pet-away {
     animation: none;
   }
   .pet-gauge__fill {
