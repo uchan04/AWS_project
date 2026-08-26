@@ -1041,6 +1041,19 @@
   fill: color-mix(in oklch, var(--tribe) 72%, var(--color-card));
   opacity: 0.75;
 }
+.pet-room__sill,
+.pet-room__sil {
+  fill: #c89060;
+}
+.pet-room__pot {
+  fill: #c87050;
+}
+.pet-room__pot-rim {
+  fill: #b56040;
+}
+.pet-room__sprout {
+  fill: var(--pet-seed-fill);
+}
 /* 여기에 화분이 있었다(.pet-room__pot #c87050 + .pet-room__leaf var(--pet-seed-fill)).
    **2026-08-26 사용자 요청으로 책장으로 갈았다.** 되살릴 값은 그 두 줄이고, 좌표는
    PetRoom.tsx의 SHELF_* 상수 위 주석에 옛 화분 좌표(x 24 · y 180 · 24×24 + 잎 3장)가

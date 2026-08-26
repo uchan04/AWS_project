@@ -30,6 +30,9 @@ const securityHeaders = [
 
 const nextConfig: NextConfig = {
   output: "standalone",
+  env: {
+    CLOUDFRONT_DOMAIN: process.env.CLOUDFRONT_DOMAIN,
+  },
 
   images: {
     // public/art의 30장은 내용이 바뀌면 파일명이 바뀐다(scripts/slice-art.ts).

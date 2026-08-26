@@ -2,6 +2,7 @@
 
 import { useEffect, useRef, useState, type ReactNode } from "react"
 import Link from "next/link"
+import { useRouter } from "next/navigation"
 import type { TypeCode } from "@prisma/client"
 import {
   IDLE_MAX_SEEDS,
@@ -42,9 +43,9 @@ const BACKGROUND_PRICE_SHARDS = 500
 import { ArtImage } from "@/app/components/ArtImage"
 import { useModalA11y } from "@/app/components/useModalA11y"
 import { CurrencyIcon } from "@/app/components/CurrencyIcon"
-import { openChat } from "@/app/chat/_lib/events"
 import PetRoom from "./PetRoom"
 import { PetIcon } from "./PetIcon"
+import { cdnUrl } from "@/lib/assets"
 import "@/styles/tokens.css"
 import "../pet.css"
 
@@ -219,15 +220,17 @@ const FEED_REPLY = "맛있어요! 힘이 나요"
 const OUTING_TICK_MS = 10_000
 
 export default function PetView({ initial }: { initial: PetState }) {
+  const router = useRouter()
   const [pet, setPet] = useState(initial)
   const [pending, setPending] = useState(false)
   const [toast, setToast] = useState<{ text: string; error?: boolean } | null>(null)
   const [evolvedTo, setEvolvedTo] = useState<number | null>(null)
-  const [amount, setAmount] = useState(1)
-  // 마지막으로 누른 개수 버튼. 개수 버튼이 "고르기"에서 "더하기"로 바뀌면서(2026-08-22)
-  // amount === p로는 어느 버튼을 눌렀는지 알 수 없게 됐다 — 10을 세 번 누르면 30이고
-  // 그 값과 같은 버튼이 없다. 알약 하나가 차 있는 시안의 모양을 지키려고 따로 담는다
-  const [lastPreset, setLastPreset] = useState<number | null>(null)
+  const [playingAnimation, setPlayingAnimation] = useState<"leave" | "return" | null>(null)
+  const [isAnimFadingOut, setIsAnimFadingOut] = useState(false)
+  const [hasSeenReturnPopup, setHasSeenReturnPopup] = useState(false)
+  const [amount, setAmount] = useState(0)
+  // 증감 단위 (기본 1)
+  const [step, setStep] = useState(1)
   // 말풍선. 닫으면 이 화면에 있는 동안 다시 뜨지 않는다
   const [bubbleClosed, setBubbleClosed] = useState(false)
   // 평상시 대사 순환 위치. null이면 아직 접속 인사를 보여 주는 중이다.
@@ -629,6 +632,26 @@ export default function PetView({ initial }: { initial: PetState }) {
     return () => clearTimeout(t)
   }, [reaction, burst])
 
+  useEffect(() => {
+    if (outing.state !== "RETURNED") {
+      setHasSeenReturnPopup(false)
+    }
+  }, [outing.state])
+
+  function handleAnimEnded() {
+    setIsAnimFadingOut(true)
+    setTimeout(() => {
+      const anim = playingAnimation
+      setPlayingAnimation(null)
+      setIsAnimFadingOut(false)
+      if (anim === "leave") {
+        sendOuting()
+      } else if (anim === "return") {
+        hearOuting()
+      }
+    }, 300)
+  }
+
   /**
    * 반응 한 번. `text`가 null이면 파티클만 띄우고 말풍선 문장은 건드리지 않는다.
    * 말풍선을 덮어도 되는 것은 **결과를 알리는 답**뿐이다 — 지금은 먹이기 하나다.
@@ -704,8 +727,8 @@ export default function PetView({ initial }: { initial: PetState }) {
         seeds: next.seeds,
         imageUrl: next.imageUrl ?? prev.imageUrl,
       }))
-      setAmount(1)
-      setLastPreset(null)
+      setAmount(0)
+      setStep(1)
       setToast({ text: `씨앗 ${ko(seeds)}개를 먹였어요. 경험치 +${ko(seeds * SEED_TO_EXP)}` })
 
       // 경험치 게이지를 띄운다. 순서: 이전 위치로 나타남 → 올라감 → 사라짐.
@@ -1074,9 +1097,8 @@ export default function PetView({ initial }: { initial: PetState }) {
                   ? { icon: <PetIcon name="diary" />, label: "여행일기", go: openHistory, on: modal === "history" }
                   : null,
                 { icon: <PetIcon name="chart" />, label: "오늘의 활동", go: () => setModal("today"), on: modal === "today" },
-                { icon: <PetIcon name="shop" />, label: "펫꾸미기", go: () => setModal("shop"), on: modal === "shop" },
+                { icon: <PetIcon name="shop" />, label: "상점", go: () => router.push("/pet/shop"), on: false },
                 { icon: <PetIcon name="info" />, label: "펫 정보", go: () => setModal("info"), on: modal === "info" },
-                { icon: <PetIcon name="chat" />, label: "마음 친구", go: openChat, on: false },
               ]
                 // `filter` + 타입 술어였다. 아이콘이 이모지 문자열에서 JSX로 바뀌면서 술어에
                 // 적을 타입이 `JSX.Element`가 되고, 그러면 아이콘을 바꿀 때마다 이 줄도 같이
@@ -1127,7 +1149,11 @@ export default function PetView({ initial }: { initial: PetState }) {
               <button
                 type="button"
                 className="pet-act pet-act--primary"
-                onClick={() => setModal("seed")}
+                onClick={() => {
+                  setAmount(0)
+                  setStep(1)
+                  setModal("seed")
+                }}
                 aria-haspopup="dialog"
               >
                 <PetIcon name="seed" /> 씨앗 먹이기
@@ -1143,10 +1169,10 @@ export default function PetView({ initial }: { initial: PetState }) {
                   onClick={() => {
                     // 못 나가는 두 상태는 요청을 보내지 않고 이유만 알린다(유연성)
                     if (outingLocked) setToast({ text: OUTING_LOCK_MESSAGE })
-                    else if (outing.state === "RETURNED") hearOuting()
+                    else if (outing.state === "RETURNED") setPlayingAnimation("return")
                     else if (outingShort > 0)
                       setToast({ text: outingNeedAffinityMessage(outingShort) })
-                    else sendOuting()
+                    else setPlayingAnimation("leave")
                   }}
                 >
                   <PetIcon name={outingCantYet ? "lock" : "outing"} /> {outingLabelShort}
@@ -1595,17 +1621,9 @@ export default function PetView({ initial }: { initial: PetState }) {
                   <button
                     type="button"
                     className="pet-step__btn"
-                    onClick={() => {
-                      // −·+로 수를 손대면 개수 버튼의 표시를 끈다. 안 끄면 10을 누른 뒤
-                      // −를 눌러 9가 돼도 "10개" 알약이 계속 차 있어 값과 어긋난다
-                      //
-                      // 2026-08-22 사용자 결정: 개수 버튼이 더하기 전용이 된 뒤에도 −는
-                      // 하나씩만 줄인다. "1로 초기화" 버튼은 두지 않는다
-                      setLastPreset(null)
-                      setAmount((a) => Math.max(1, a - 1))
-                    }}
-                    disabled={amount <= 1}
-                    aria-label="한 개 줄이기"
+                    onClick={() => setAmount((a) => Math.max(0, a - step))}
+                    disabled={amount - step < 0}
+                    aria-label={`${step}개 줄이기`}
                   >
                     −
                   </button>
@@ -1616,71 +1634,28 @@ export default function PetView({ initial }: { initial: PetState }) {
                   <button
                     type="button"
                     className="pet-step__btn"
-                    onClick={() => {
-                      setLastPreset(null)
-                      setAmount((a) => Math.min(Math.max(1, pet.seeds), a + 1))
-                    }}
-                    disabled={amount >= pet.seeds}
-                    aria-label="한 개 늘리기"
+                    onClick={() => setAmount((a) => Math.min(pet.seeds, a + step))}
+                    disabled={amount + step > pet.seeds}
+                    aria-label={`${step}개 늘리기`}
                   >
                     +
                   </button>
                 </div>
 
-                {/* export는 1·5·10·20이었다. 씨앗 1 = 경험치 10이고 Lv.1→2가 100이라
-                    실제 경제(일일 미션 60/일)에 맞춰 잡았다 — 값은 위 FEED_PRESETS에 있다
-
-                    2026-08-22 사용자 요청: 개수 버튼이 "그 값으로 정하기"에서 "그 값만큼
-                    더하기"로 바뀌었다. 10개를 세 번 누르면 30개다. 최소값(1)에서 누를 때만
-                    더하지 않고 그 값이 된다 — 1 + 10 = 11이 되면 "10개를 눌렀는데 11"이라
-                    버튼 이름과 결과가 어긋난다. 그래서 첫 누름은 10, 그다음부터 20·30이다.
-
-                    **더한 값이 보유량을 넘으면 자르지 않고 버튼을 막는다**(2026-08-22 사용자
-                    지적). 보유 27개에서 10개는 10 → 20까지만 눌리고 그 뒤로는 비활성이다.
-                    자르면 "10개"를 눌렀는데 7개가 들어가 버튼 이름과 결과가 어긋나고, 남은
-                    씨앗을 의도 없이 다 쓰게 된다. 남은 7개를 넣고 싶으면 5개·1개나 +로 채운다.
-                    onClick도 넘는 경우 값을 그대로 두는데, 이건 disabled와 겹치는 방어다 —
-                    눌림과 상태 갱신 사이에 보유량이 줄면(다른 탭에서 먹이기) disabled만으로는
-                    못 막는다.
-
-                    aria-pressed를 뺐다 — 이제 고른 상태가 아니라 실행하는 동작이고,
-                    누른 값을 표시하는 것은 lastPreset(data-active)이 맡는다 */}
                 <div className="pet-presets">
                   {FEED_PRESETS.map((p) => (
                     <button
                       key={p}
                       type="button"
                       className="pet-preset"
-                      data-active={lastPreset === p ? "true" : undefined}
-                      aria-label={`${ko(p)}개 더하기`}
-                      onClick={() => {
-                        setLastPreset(p)
-                        setAmount((a) => {
-                          const next = feedStep(a, p)
-                          return next > pet.seeds ? a : next
-                        })
-                      }}
-                      disabled={feedStep(amount, p) > pet.seeds}
+                      data-active={step === p ? "true" : undefined}
+                      aria-label={`증감 단위 ${ko(p)}개로 설정`}
+                      onClick={() => setStep(p)}
                     >
                       {ko(p)}개
                     </button>
                   ))}
                 </div>
-
-                <button
-                  type="button"
-                  className="pet-btn pet-btn--block"
-                  onClick={() => feed(feedable)}
-                  disabled={pending || amount > pet.seeds}
-                  aria-disabled={pending || amount > pet.seeds}
-                >
-                  {/* 글자 앞에 🌱이 있었다(시안대로). 2026-08-24 사용자 요청("씨앗 먹이기
-                      버튼 속 문구에서 새싹 이모티콘 삭제해줘")으로 걷었다. 스크린리더가 읽는
-                      이름은 전부터 aria-hidden 덕에 "씨앗 1개 먹이기"였으므로 이 삭제로
-                      바뀌지 않는다. 같은 카드의 제목(🌱 씨앗 투입)과 위 지갑 줄의 🌱은
-                      그대로다 — 요청이 버튼 문구 하나였다 */}
-                  씨앗 {ko(amount)}개 먹이기
-                </button>
 
                 {/* 투입할 개수가 정해지면 그것이 무엇이 되는지 바로 옆에서 말한다.
                     "씨앗 1개는 경험치 10"만으로는 100개를 넣기 전에 곱셈을 시켜야 했다 */}
@@ -1688,6 +1663,16 @@ export default function PetView({ initial }: { initial: PetState }) {
                   <span>씨앗 1개는 경험치 {SEED_TO_EXP}이 돼요</span>
                   <em>경험치 +{ko(feedable * SEED_TO_EXP)}</em>
                 </p>
+
+                <button
+                  type="button"
+                  className="pet-btn pet-btn--block"
+                  onClick={() => feed(feedable)}
+                  disabled={pending || amount > pet.seeds || amount <= 0}
+                  aria-disabled={pending || amount > pet.seeds || amount <= 0}
+                >
+                  먹이기
+                </button>
               </>
             )}
           </div>
@@ -1722,9 +1707,8 @@ export default function PetView({ initial }: { initial: PetState }) {
                   ? { icon: <PetIcon name="diary" />, label: "여행일기", desc: "다녀온 이야기를 다시 읽어요", go: openHistory }
                   : null,
                 { icon: <PetIcon name="chart" />, label: "오늘의 활동", desc: "오늘 들어온 재화를 봐요", go: () => setModal("today") },
-                { icon: <PetIcon name="shop" />, label: "펫꾸미기", desc: "외형과 배경을 바꿔요", go: () => setModal("shop") },
+                { icon: <PetIcon name="shop" />, label: "상점", desc: "외형과 배경을 바꿔요", go: () => router.push("/pet/shop") },
                 { icon: <PetIcon name="info" />, label: "펫 정보", desc: "자라는 단계와 쌓인 씨앗을 봐요", go: () => setModal("info") },
-                { icon: <PetIcon name="chat" />, label: "마음 친구", desc: "오늘 하루를 이야기해요", go: openChat },
               ]
                 // 타입을 적지 않고 null을 걷는다 — 위 레일의 그 자리 주석과 같은 이유다
                 .flatMap((r) => (r ? [r] : []))
@@ -1857,24 +1841,7 @@ export default function PetView({ initial }: { initial: PetState }) {
           </PetModal>
         ) : null}
 
-        {/* 상점 — 2026-08-26 오전에 만든 상단 바의 버튼 2개가 여기로 왔다. **모양은 그대로**
-            (채운 .pet-btn / 테두리형 .pet-btn--ghost)이고, 알약 모서리를 주던 .pet-bar__shop
-            자리를 .pet-modal__shop이 대신한다 */}
-        {modal === "shop" ? (
-          <PetModal title="펫꾸미기" onClose={closeModal}>
-            <p className="pet-card__title">
-              <span aria-hidden="true">🏪</span> 펫꾸미기
-            </p>
-            <div className="pet-modal__shops">
-              <Link className="pet-btn pet-modal__shop" href="/pet/skins">
-                외형 상점
-              </Link>
-              <Link className="pet-btn pet-btn--ghost pet-modal__shop" href="/pet/cosmetics">
-                배경 상점
-              </Link>
-            </div>
-          </PetModal>
-        ) : null}
+
 
 
       {toast ? (
@@ -1940,6 +1907,70 @@ export default function PetView({ initial }: { initial: PetState }) {
           스테이지의 flex 레이아웃에는 아무 영향이 없다.
 
           토스트는 그대로 `fixed`다 — 화면 아래 가운데가 그 관습이고, 방을 벗어나야 한다 */}
+      {playingAnimation ? (
+        <div
+          style={{
+            position: "fixed",
+            top: 0,
+            left: 0,
+            right: 0,
+            bottom: 0,
+            zIndex: 400,
+            backgroundColor: "rgba(0,0,0,0.7)",
+            display: "flex",
+            justifyContent: "center",
+            alignItems: "center",
+            opacity: isAnimFadingOut ? 0 : 1,
+            transition: "opacity 0.3s ease-in-out"
+          }}
+        >
+          <video
+            autoPlay
+            playsInline
+            muted
+            src={cdnUrl(`pets/${pet.typeCode === "HEALTH_EMOTION" ? "fox" : pet.typeCode === "INDEPENDENT_LOW_INCOME" ? "cat" : "bear"}_${playingAnimation}.webm`) || undefined}
+            onEnded={handleAnimEnded}
+            onError={handleAnimEnded}
+            style={{ maxWidth: "100%", maxHeight: "100%" }}
+          />
+        </div>
+      ) : null}
+
+      {outing.state === "RETURNED" && !hasSeenReturnPopup ? (
+        <div
+          style={{
+            position: "fixed",
+            top: 0,
+            left: 0,
+            right: 0,
+            bottom: 0,
+            zIndex: 350,
+            backgroundColor: "rgba(0,0,0,0.5)",
+            display: "flex",
+            justifyContent: "center",
+            alignItems: "center"
+          }}
+          onClick={() => setHasSeenReturnPopup(true)}
+        >
+          <div
+            className="pet-card"
+            style={{ textAlign: "center", padding: "2rem", maxWidth: "80%" }}
+            onClick={(e) => e.stopPropagation()}
+          >
+            <p style={{ fontSize: "1.1rem", marginBottom: "1.5rem", lineHeight: 1.5 }}>
+              펫이 무사히 복귀했어요!<br />
+              여행 결과를 확인해 보세요.
+            </p>
+            <button
+              type="button"
+              className="pet-btn pet-btn--block"
+              onClick={() => setHasSeenReturnPopup(true)}
+            >
+              확인
+            </button>
+          </div>
+        </div>
+      ) : null}
       </div>
     </main>
   )
