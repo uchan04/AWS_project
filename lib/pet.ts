@@ -717,11 +717,18 @@ export const OUTING_MOODS = [
  *
  * **3막을 저장하지 않는다.** startedAt·returnsAt·placeKey만 있으면 계산되므로 컬럼이
  * 늘지 않고, 새로고침해도 같은 값이 나온다.
+ *
+ * 2026-08-26 사용자 요청으로 세 줄을 **크레용으로 쓴 손글씨 말투**로 다시 썼다.
+ * 화면이 이 문장을 손글씨 서체(--font-crayon)로 그리므로 어투가 서체와 맞아야 한다 —
+ * "방금 나갔어."처럼 담담한 문장을 크레용으로 쓰면 서체만 겉도는 것으로 읽힌다.
+ * 규칙 둘을 지켰다: **주인을 부르는 줄은 처음과 끝에만 둔다**(세 줄 다 부르면 조르는 톤이
+ * 된다) · **느낌표는 한 줄에 하나까지**. 여전히 격려도 교훈도 없다 — OUTING_MOODS 주석과
+ * 같은 이유로 펫은 자기 얘기만 한다.
  */
 export const OUTING_AWAY_LINES = [
-  { key: "left", text: "방금 나갔어. 잘 다녀올게." },
-  { key: "midway", text: "지금 {where}쯤이야." },
-  { key: "back", text: "이제 돌아가는 중이야." },
+  { key: "left", text: "주인! 나 다녀올게!" },
+  { key: "midway", text: "나 지금 {where}쯤이야!" },
+  { key: "back", text: "주인! 이제 돌아가는 중이야!" },
 ] as const
 
 export type OutingPlaceKey = (typeof OUTING_PLACES)[number]["key"]

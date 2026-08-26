@@ -1,5 +1,5 @@
 import type { Metadata, Viewport } from "next";
-import { Gowun_Dodum } from "next/font/google";
+import { Gaegu, Gowun_Dodum } from "next/font/google";
 import "./globals.css";
 import { getSidebarProfile } from "@/lib/profile";
 import { Sidebar } from "./components/Sidebar";
@@ -34,6 +34,38 @@ const gowunDodum = Gowun_Dodum({
   weight: "400",
   variable: "--font-gowun-dodum",
   display: "swap",
+});
+
+// 2026-08-26 (C 요청 · 사용자 승인): 손글씨용 Gaegu를 더한다. **위 금지 규칙의 예외다.**
+//
+// 그 규칙이 막는 것은 "시스템에 이미 있는 글꼴을 다시 받는 것"이다 — Noto Sans KR을
+// 뺀 이유가 Android의 시스템 한국어 서체가 바로 그것이었기 때문이다. 손글씨체는
+// 사정이 다르다. 어느 OS에도 대체품이 없어서 폴백하면 고딕으로 떨어지고, 그러면
+// 이 서체를 쓰는 유일한 자리(펫 외출 쪽지)의 의도가 남지 않는다.
+// 제목용 Gowun Dodum을 남긴 것과 같은 판단이다.
+//
+// **전송량을 추정하지 않고 실측했다 (2026-08-26, 브라우저 Resource Timing).**
+// 이 서체는 @font-face 90개(unicode-range 조각)로 오고 브라우저는 실제로 쓰이는 글자가
+// 든 조각만 받는다. 결과:
+//   /pet 외출 중(쪽지가 있음)  → 5조각 77.8KB
+//   /pet/cosmetics (쪽지 없음) → 0KB
+// 즉 **/pet의 외출 중 상태에서만** 값을 치른다. 8자("주인 나 다녀올게")에 77.8KB가 붙는
+// 것은 조각 경계가 글자 수와 무관하게 잡혀 있어서다 — 적지 않지만 빠진 Noto Sans KR
+// (220.8KB, **모든 화면의 본문**)의 3분의 1이고 쓰이는 화면이 하나다.
+// 이 서체를 본문·제목·다른 화면에 쓰지 말 것 — 쓰는 순간 이 계산이 전부 무너진다.
+const gaegu = Gaegu({
+  subsets: ["latin"],
+  // 700만 받는다. 크레용 두께가 나는 굵기이고, 쓰는 자리가 한 곳이라 400은 짐이다
+  weight: "700",
+  variable: "--font-gaegu",
+  display: "swap",
+  // **preload: false가 이 서체를 공짜에 가깝게 만드는 한 줄이다.**
+  // 기본값(true)이면 next/font가 subsets의 latin 조각에 <link rel="preload">를 붙이고,
+  // 그러면 이 서체를 한 글자도 그리지 않는 화면까지 11.5KB를 받는다(실측). Gowun Dodum은
+  // 모든 화면의 제목에 쓰이므로 preload가 맞지만, 이쪽은 /pet의 외출 중 상태 한 곳뿐이다.
+  // 끄면 브라우저가 실제로 그 글자를 만날 때 받는다 — display: swap이라 그 사이에
+  // 폴백 고딕이 잠깐 보일 수 있는데, 4시간에 한 번 뜨는 쪽지에서 그건 값을 치를 만하다.
+  preload: false,
 });
 
 // APP_ORIGIN은 Amplify 환경변수에 있다. 없으면 배포 도메인으로 떨어진다 —
@@ -87,7 +119,7 @@ export default async function RootLayout({ children }: LayoutProps<"/">) {
   return (
     <html
       lang="ko"
-      className={`h-full antialiased ${gowunDodum.variable}`}
+      className={`h-full antialiased ${gowunDodum.variable} ${gaegu.variable}`}
     >
       <body className="h-full flex">
         {/* 사이드바·하단 탭을 Tab으로 다 지나지 않고 본문으로 건너뛴다 (globals.css) */}

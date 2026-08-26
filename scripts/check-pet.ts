@@ -781,10 +781,27 @@ assert.deepEqual(
   ],
 )
 assert.equal(OUTING_AWAY_LINES.length, 3)
+// 2026-08-26 사용자 요청으로 크레용 손글씨 말투로 바뀌었다(lib/pet.ts 주석)
 assert.deepEqual(
   OUTING_AWAY_LINES.map((l) => l.text),
-  ["방금 나갔어. 잘 다녀올게.", "지금 {where}쯤이야.", "이제 돌아가는 중이야."],
+  ["주인! 나 다녀올게!", "나 지금 {where}쯤이야!", "주인! 이제 돌아가는 중이야!"],
 )
+// 주인을 부르는 줄은 **처음과 끝에만** 둔다. 세 줄 다 부르면 조르는 톤이 된다
+assert.deepEqual(
+  OUTING_AWAY_LINES.map((l) => l.text.startsWith("주인!")),
+  [true, false, true],
+  "주인 호칭은 left·back 두 줄에만 있어야 한다",
+)
+// 느낌표는 호칭("주인!")과 문장 끝에 각각 하나까지다. 호칭을 떼고 센다 —
+// 그 안에서 둘이 되면("나 다녀올게! 진짜!") 손글씨가 아니라 고함으로 읽힌다
+for (const l of OUTING_AWAY_LINES) {
+  const body = l.text.replace(/^주인!\s*/, "")
+  assert.equal(
+    (body.match(/!/g) ?? []).length,
+    1,
+    `${l.key}: 호칭을 뗀 문장의 느낌표는 하나여야 한다 ("${l.text}")`,
+  )
+}
 
 // where는 "지금 …쯤이야"에 그대로 박히는 짧은 명사다. 문장이 들어오면 말이 깨진다.
 // 공백은 막지 않는다 — "문 앞"처럼 두 낱말인 장소명이 있고 "지금 문 앞쯤이야"는 자연스럽다
@@ -910,12 +927,12 @@ assert.equal(outingProgress({ startedAt: outNow, returnsAt: outNow, claimedAt: n
 
 // ── 나가 있는 동안의 3막 ──────────────────────────────────────────────────────
 // 경과 3분의 1마다 바뀐다. 4시간이면 0~80분 / 80~160분 / 160~240분이다
-assert.equal(outingAwayLine("park", 0), "방금 나갔어. 잘 다녀올게.")
-assert.equal(outingAwayLine("park", 0.32), "방금 나갔어. 잘 다녀올게.")
-assert.equal(outingAwayLine("park", 1 / 3), "지금 공원쯤이야.")
-assert.equal(outingAwayLine("park", 0.65), "지금 공원쯤이야.")
-assert.equal(outingAwayLine("park", 2 / 3), "이제 돌아가는 중이야.")
-assert.equal(outingAwayLine("park", 1), "이제 돌아가는 중이야.")
+assert.equal(outingAwayLine("park", 0), "주인! 나 다녀올게!")
+assert.equal(outingAwayLine("park", 0.32), "주인! 나 다녀올게!")
+assert.equal(outingAwayLine("park", 1 / 3), "나 지금 공원쯤이야!")
+assert.equal(outingAwayLine("park", 0.65), "나 지금 공원쯤이야!")
+assert.equal(outingAwayLine("park", 2 / 3), "주인! 이제 돌아가는 중이야!")
+assert.equal(outingAwayLine("park", 1), "주인! 이제 돌아가는 중이야!")
 // 장소마다 중간 문장이 달라야 3막이 의미가 있다 — 8곳 전부 다른 문장이 나온다
 const midwayLines = OUTING_PLACES.map((p) => outingAwayLine(p.key, 0.5))
 assert.equal(new Set(midwayLines).size, OUTING_PLACES.length)
@@ -924,9 +941,9 @@ for (const line of midwayLines) {
   assert.ok(!line.includes("{"), `치환되지 않은 자리가 남았다: "${line}"`)
 }
 // 알 수 없는 키·범위 밖 값에서도 "{where}"를 노출하지 않는다
-assert.equal(outingAwayLine("없는곳", 0.5), "지금 밖쯤이야.")
-assert.equal(outingAwayLine("park", -1), "방금 나갔어. 잘 다녀올게.")
-assert.equal(outingAwayLine("park", 99), "이제 돌아가는 중이야.")
-assert.equal(outingAwayLine("park", Number.NaN), "방금 나갔어. 잘 다녀올게.")
+assert.equal(outingAwayLine("없는곳", 0.5), "나 지금 밖쯤이야!")
+assert.equal(outingAwayLine("park", -1), "주인! 나 다녀올게!")
+assert.equal(outingAwayLine("park", 99), "주인! 이제 돌아가는 중이야!")
+assert.equal(outingAwayLine("park", Number.NaN), "주인! 나 다녀올게!")
 
 console.log("pet 체크 통과")
