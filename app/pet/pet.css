@@ -173,6 +173,120 @@
   gap: var(--space-2xs);
 }
 
+/* ── 재화 바 (2026-08-26 사용자 제공 이미지) ──────────────────────────────── */
+
+/* 지갑 카드(.pet-card--wallet)가 하던 일을 한 줄로 옮긴 것이다. 카드는 같은 요청에서
+   지웠다 — 자세한 사정은 PetView의 그 자리 주석.
+
+   **모서리는 알약이 아니다.** 제공된 이미지의 반지름은 높이의 약 4분의 1이고 알약(2분의 1)이
+   아니다. --radius-card(20px)가 이 바 높이(약 60px)에서 그 비율에 가장 가깝다.
+
+   면은 --color-card다. 페이지 배경(--color-paper)보다 한 단 밝아서 바가 띠로 떠 보인다 —
+   카드들과 같은 규칙이라 이 화면에 새 색을 들이지 않는다.
+
+   flex-wrap이 있는 이유: 좁은 화면에서 재화 3종과 상점 2개가 한 줄에 안 들어가면 두 줄로
+   접힌다. 접힐 때 상점 쪽이 통째로 내려가도록 오른쪽 묶음을 div 하나로 싸 뒀다 */
+.pet-bar {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--space-2xs) var(--space-sm);
+  padding: var(--space-2xs) var(--space-sm);
+  border-radius: var(--radius-card);
+  background: var(--color-card);
+  box-shadow: var(--shadow-card);
+}
+
+.pet-bar__wallet {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+/* 칸 사이의 세로 선. 제공된 이미지의 얇은 회색 구분선이다.
+   테두리로 그리고 **마지막 칸만 뺀다** — 가상 요소로 그리면 아이콘·숫자와 같은 줄에
+   또 하나의 flex 항목이 생겨 gap 계산이 어긋난다.
+   좌우 padding이 gap을 대신한다: 선이 두 칸 사이 가운데에 오려면 여백이 선을 기준으로
+   양쪽에 같아야 하고, gap을 쓰면 선이 오른쪽 칸에 붙는다 */
+/* 좌우 여백이 --space-sm(16px)이 아니라 --space-2xs(8px)인 것은 **한 줄에 들어가기 위한
+   값이다.** 제공된 이미지는 폭 2000px짜리 띠라 여백이 넉넉하지만, 이 화면의 실제 내용 폭은
+   사이드바를 뺀 약 534px(837px 창)이다. 16px이면 재화 3칸 + 상점 2개가 562px이 되어 8px
+   모자라 두 줄로 접힌다 — 8px로 내리면 514px이다. 눈대중이 아니라 그 48px 차이다 */
+.pet-bar__item {
+  display: flex;
+  align-items: center;
+  gap: var(--space-3xs);
+  padding: 0 var(--space-2xs);
+  border-inline-end: 1px solid var(--color-rule);
+}
+
+.pet-bar__item:first-child {
+  padding-inline-start: var(--space-3xs);
+}
+
+.pet-bar__item:last-child {
+  border-inline-end: none;
+}
+
+/* 지갑 카드의 아이콘은 종족색 20% 면을 깐 2rem 사각형이었다(.pet-wallet__icon).
+   여기서는 **면을 주지 않는다** — 제공된 이미지가 맨 이모지이고, 한 줄에 색 면 3개가
+   붙으면 바로 옆 상점 버튼(채운 종족색 면)과 눈에 띄기를 다툰다 */
+.pet-bar__icon {
+  font-size: 1.15rem;
+  line-height: 1;
+}
+
+/* 숫자는 --color-muted다. 이 바는 읽을 것이 아니라 참조하는 값이고, 이 화면의 주 동작은
+   먹이기·외출이다 — 잉크색으로 두면 제목줄과 같은 무게가 된다.
+   tabular-nums는 지갑 카드에서 그대로 가져온다. 값이 갱신될 때 자릿수가 바뀌어도
+   옆 칸이 밀리지 않는다 */
+.pet-bar__value {
+  color: var(--color-muted);
+  font-size: var(--text-body);
+  font-variant-numeric: tabular-nums;
+}
+
+.pet-bar__shops {
+  display: flex;
+  align-items: center;
+  gap: var(--space-2xs);
+}
+
+/* 상점 입구 2개. **모양은 이 파일에 이미 있는 두 버튼을 그대로 쓴다**(사용자 요청
+   "기존의 이미지를 갖고 와서") — 채운 .pet-btn과 테두리형 .pet-btn--ghost다.
+   여기서 더하는 것은 알약 모서리와 두 버튼의 글자를 맞추는 것뿐이다.
+
+   **선택자가 .pet-bar .pet-bar__shop(0,2,0)인 것은 특이도 때문이다.** .pet-btn--ghost가
+   font-size: --text-label을 갖고 파일 뒤쪽(2800줄대)에 있어서, 클래스 하나(0,1,0)로 두면
+   순서로 져 두 버튼의 글자 크기가 갈린다. 제공된 이미지의 두 라벨은 같은 크기다.
+
+   높이는 --control-h(44px)를 .pet-btn에서 물려받는다. 이미지의 버튼은 바 높이에 비해
+   더 납작하지만 design.md의 44px 터치 하한을 내리지 않는다 — 이 바는 모바일에도 나온다 */
+.pet-bar .pet-bar__shop {
+  display: grid;
+  place-items: center;
+  border-radius: var(--radius-pill);
+  /* --space-md(24px)가 아니라 --space-sm(16px)이다. 위 .pet-bar__item과 같은 이유 —
+     좌우로 32px을 벌면 한 줄이 유지되는 폭이 그만큼 내려간다 */
+  padding: 0 var(--space-sm);
+  text-decoration: none;
+  white-space: nowrap;
+  font-size: var(--text-label);
+  font-weight: 600;
+}
+
+/* 테두리형 버튼의 면만 흰색으로 올린다. .pet-btn--ghost 본체는 --color-card인데 이 바의
+   면도 --color-card라 그대로 두면 테두리 안쪽이 바와 같은 색이 된다(제공된 이미지는
+   바보다 밝은 면이다). 명암차는 1.07:1로 작지만, 이 버튼이 눌리는 물건으로 보이는 근거가
+   2px 테두리 하나만 남는 것을 피한다 */
+.pet-bar .pet-bar__shop.pet-btn--ghost {
+  background: #fff;
+}
+
 /* 상점 두 화면 상단의 잔액 알약. 2026-08-25 전환으로 **둘 다 별조각**이다(전에는 배경이
    친밀도였다) — 같은 값을 보는 알약이라 두 화면에서 숫자가 같아야 정상이다.
    2026-08-21 사용자 결정으로
@@ -258,8 +372,22 @@
   min-width: 0;
 }
 
+/* **2026-08-26: `1fr auto` → `auto`.** 지갑 카드를 지운(사용자 요청) 뒤 이 열에 방 하나만
+   남았는데, `1fr`이 남아 있으면 방이 **오른쪽 열 높이만큼 늘어난다.** 실측 1054px이었고
+   (설계값 432px) 펫과 쪽지가 화면 밖으로 내려갔다 — 둘 다 방 아래쪽에 붙어 있기 때문이다.
+
+   **늘어난 방은 이 파일의 계산 전제를 깬다.** 말풍선 자리 상한은 "27 − 7 − 0.5 = 19.5rem"
+   처럼 방 높이 27rem을 상수로 놓고 구한 값이고(.pet-welcome 주석), 쪽지의 `bottom: 20%`도
+   27rem의 20% = 5.4rem을 뜻한다. 1054px 방에서는 그 20%가 211px이 되어 둘 다 어긋난다.
+   그러니까 이건 카드를 지워서 생긴 문제가 아니라, 카드가 가려 주던 잠재 버그다 —
+   카드가 있을 때도 방은 이미 설계값보다 늘어나 있었다(약 796px).
+
+   대가: 왼쪽 열이 오른쪽 열보다 짧아 아래에 빈 자리가 생긴다. 그래도 이쪽을 고른 이유는
+   **이 화면의 주인공이 펫이고, 스크롤해야 보이는 펫보다 빈 자리가 낫다**는 것이다.
+   2026-08-24의 "왼쪽 카드랑 밑 끝나는 지점 맞게" 요청은 왼쪽 열 **카드**의 바닥을 맞추라는
+   것이었고, 그 카드가 이제 없다 */
 .pet__col--room {
-  grid-template-rows: 1fr auto;
+  grid-template-rows: auto;
 }
 
 /* 오른쪽 열 (2026-08-24 사용자 요청: "왼쪽 카드랑 밑 끝나는 지점 맞게").
@@ -1141,13 +1269,11 @@
   box-shadow: var(--shadow-card);
 }
 
-/* 2026-08-21 사용자 결정: 보유 재화 카드만 면 색을 재화 줄과 맞바꿨다. 전에는 카드가
-   --color-card(#fdfbf5)고 줄이 흰색이었다. 지금은 카드가 흰색이고 줄이 --color-card다.
-   .pet-card 본체를 고치지 않고 변형 클래스로 두는 이유: 이 화면의 카드 다섯 장이 전부
-   .pet-card를 쓰므로 본체를 흰색으로 바꾸면 경험치·씨앗 투입·진화 카드까지 같이 흰다 */
-.pet-card--wallet {
-  background: #fff;
-}
+/* .pet-card--wallet(보유 재화 카드의 흰 면)이 여기 있었다 — **2026-08-26 사용자 요청으로
+   카드째 지웠다.** 되살릴 때의 값은 `background: #fff` 한 줄이고, 근거는 "카드가 흰색이고
+   재화 줄이 --color-card"였다(2026-08-21 결정. .pet-card 본체를 고치지 않고 변형 클래스로
+   둔 이유는 이 화면의 카드 다섯 장이 전부 .pet-card를 쓰기 때문이다).
+   재화는 지금 상단 바(.pet-bar)가 갖는다 */
 
 /* 2026-08-21 사용자 결정: 씨앗 투입 카드의 글씨체를 한 벌로 묶는다. 전에는 제목만 Gowun
    Dodum이고 보유 개수·스테퍼·개수 버튼·먹이기·각주는 본문 서체라 한 카드에 두 서체가 섞였다.
@@ -1169,18 +1295,13 @@
    .pet-btn 본체를 고치지 않고 이 카드에만 거는 이유: 상점 2화면의 --ghost 버튼과 옆 칸의
    씨앗 줍기 버튼이 같은 .pet-btn을 쓴다. 본체를 알약으로 바꾸면 세 화면이 같이 바뀐다
 
-   2026-08-24 사용자 요청("…씨앗 먹이기 버튼 객체랑 똑같은 걸로 바꿔줘. 크기도 비슷했으면
-   좋겠어" → "상점 버튼들의 글씨를 씨앗 먹이기랑 동일한 폰트, 동일한 굵기의 글씨로 바꿔줘")로
-   **지갑 카드의 상점 입구 2개를 이 선택자에 함께 넣었다.** .pet-btn만 붙였을 때는 겉보기가
-   달랐다 — 먹이기 버튼의 실제 값은 .pet-btn 본체가 아니라 이 규칙(48px · 0.9rem · 400 ·
-   부드러운 번짐)이고, 본체만 물려받으면 44px · --text-body(16px) · 600 · 단계 그림자가 된다.
-   값을 상점 규칙에 베껴 쓰지 않고 선택자를 늘린 이유: 이 규칙이 바뀔 때 둘이 같이 움직인다.
-   상점 쪽이 .pet-card--wallet을 앞에 다는 것은 특이도 때문이다 — 클래스 하나(0,1,0)로 두면
-   파일 뒤쪽의 .pet-btn 본체가 순서로 이겨 min-height·font-size·font-weight가 되돌아간다.
-   **서체는 이 규칙에 넣을 수 없다.** 먹이기 버튼은 카드(.pet-card--feed)에서 물려받는데
-   지갑 카드는 본문 서체이므로, 상점 입구에는 아래 .pet-wallet__shop 규칙이 직접 준다 */
-.pet-card--feed .pet-btn,
-.pet-card--wallet .pet-wallet__shop {
+   2026-08-24에 **지갑 카드의 상점 입구 2개가 이 선택자에 함께 있었다**(`.pet-card--wallet
+   .pet-wallet__shop`). 먹이기 버튼과 같은 겉보기를 주려면 .pet-btn 본체만으로는 안 됐기
+   때문이다 — 실제 값이 본체가 아니라 이 규칙(48px · 0.9rem · 400 · 부드러운 번짐)에 있다.
+   **2026-08-26 사용자 요청으로 지갑 카드가 사라져 그 선택자도 걷었다.** 상점 입구는 지금
+   상단 바에 있고 거기서는 이 규칙을 타지 않는다(.pet-bar .pet-bar__shop이 직접 준다) —
+   바는 카드가 아니고, 44px · --text-label이 그 줄의 높이에 맞는 값이다 */
+.pet-card--feed .pet-btn {
   min-height: 3rem;
   border-radius: var(--radius-pill);
   box-shadow: 0 6px 16px color-mix(in oklch, var(--tribe) 42%, transparent);
@@ -1190,12 +1311,10 @@
 
 /* 아래 두 규칙은 .pet-btn 본체의 :active·:disabled가 하드 단계 그림자를 되살리기 때문에
    필요하다. 본체 규칙(.pet-btn:disabled)은 이 파일 뒤쪽에 있고 특이도가 위 규칙과 같아서
-   순서로 이긴다 — 클래스 하나를 더 얹어 특이도로 눌러 둔다 */
-/* 상점 입구가 :not(:disabled)를 같이 다는 것은 특이도 때문이다(<a>는 :disabled가 될 수 없어
-   항상 참이다) — 이게 없으면 파일 뒤쪽 .pet-btn:active:not(:disabled)와 특이도가 같아져
-   순서로 지고, 2px 눌림 + box-shadow: none이 걸린다 */
-.pet-card--feed .pet-btn:active:not(:disabled),
-.pet-card--wallet .pet-wallet__shop:active:not(:disabled) {
+   순서로 이긴다 — 클래스 하나를 더 얹어 특이도로 눌러 둔다.
+   `:not(:disabled)`는 이제 먹이기 버튼(<button>)에만 걸린다 — 지갑 카드의 상점 입구(<a>)가
+   같은 선택자에 있었고 2026-08-26에 함께 걷혔다 */
+.pet-card--feed .pet-btn:active:not(:disabled) {
   transform: translateY(1px);
   box-shadow: 0 3px 8px color-mix(in oklch, var(--tribe) 34%, transparent);
 }
@@ -1399,252 +1518,34 @@
  * 재화 3종 + 상점 입구를 넣었다(사용자 결정). 새 규칙은 아래 "지갑" 절에 있다.
  * 남은 .pet-gauge 본체는 경험치와 배경 수집 게이지가 계속 쓴다 */
 
-/* ── 지갑 (재화 3종 + 상점 입구) ──────────────────────────────────────────── */
+/* ── 지갑 (재화 3종 + 상점 입구) — 2026-08-26 삭제 ────────────────────────── */
 
-/* 종족색 면을 쓰지 않는다. 이 화면은 이미 씨앗 받기(초록)·먹이기(종족색)·나무판이
-   색을 나눠 갖고 있어서(파일 앞 PetView 주석의 "이 화면만 예외"), 재화 줄까지 색 면을
-   가지면 무엇이 주 동작인지 사라진다. 줄 배경은 종이색 한 단계다 */
-.pet-wallet {
-  display: grid;
-  gap: var(--space-3xs);
-  margin: 0;
-  padding: 0;
-  list-style: none;
-}
+/* 이 절에 규칙 7개가 있었다: .pet-wallet · __row · __icon · __name · __value · __shops ·
+   `.pet-card--wallet .pet-wallet__shop`. 위쪽 카드 면(.pet-card--wallet)과 먹이기 버튼
+   선택자에 얹혀 있던 몫도 같은 날 함께 걷었다.
+   **2026-08-26 사용자 요청("보유재화 카드는 제거해줘")으로 지갑 카드를 지우면서 걷었다.**
+   같은 값이 상단 바로 갔다 — 이 파일 앞쪽 "재화 바" 절(.pet-bar).
 
-/* 2026-08-21 사용자 결정: 줄과 카드 면의 색을 맞바꿨다(위 .pet-card--wallet 참고).
-   줄은 --color-card, 카드가 흰색이다. 테두리는 같은 날 지웠으므로 줄을 가르는 것은
-   이 한 단계 색 차이와 아이콘 칸뿐이다 */
-.pet-wallet__row {
-  display: grid;
-  grid-template-columns: auto 1fr auto;
-  align-items: center;
-  gap: var(--space-2xs);
-  min-height: var(--control-h);
-  padding: var(--space-3xs) var(--space-2xs);
-  border-radius: var(--radius-input);
-  background: var(--color-card);
-}
+   되살릴 때 필요한 값만 남긴다. 결정 내력 전체는 `git log -p app/pet/pet.css`에 있다:
+   - .pet-wallet — grid · gap --space-3xs · 목록 초기화
+   - __row — grid(auto 1fr auto) · min-height --control-h · --radius-input ·
+     면 --color-card (2026-08-21 결정으로 카드 면과 맞바꾼 값. 테두리 없음)
+   - __icon — 2rem 정사각 · --radius-input ·
+     면 color-mix(in oklch, var(--tribe) 20%, transparent)
+     불투명 --tribe-soft가 아니라 **알파**를 쓴 것이 요점이었다: 흰 줄 위에서도 카드 면 위에서도
+     같은 규칙 하나로 얹히게 하려는 것이다. **이 값은 아직 살아 있다** — 상점 두 화면의
+     .pet-hud__icon이 같은 값을 쓰고, 그 규칙의 주석이 이 자리를 가리킨다
+   - __name — --font-display · --text-body · --color-ink
+   - __value — --color-ink · --text-body · 400 · tabular-nums
+   - __shops — grid, auto-fit minmax(min(8rem, 100%), 1fr) · gap --space-2xs
+     (좁아지면 1열로 접혀 nowrap 라벨이 넘칠 자리가 없게 하는 값이었다)
+   - __shop — display: grid + place-items: center · --font-display · text-decoration: none ·
+     white-space: nowrap. 셋은 **<a>가 <button>이 아니라서** 필요한 것이고, 크기·번짐·굵기는
+     `.pet-card--feed .pet-btn`에서 왔다(그 선택자에서 함께 빠졌다)
 
-/* 2026-08-21 사용자 결정: 나무 테두리 + 나무 그라데이션을 걷고 종족색을 투명도로 깐 칸이다.
-   불투명 혼색(--tribe-soft)이 아니라 알파를 쓴다 — 흰 줄 위에서도, 카드 면 위의 상점 입구
-   에서도 같은 규칙 하나로 얹히게 하려는 것이다. 씨앗 초록 변형(.pet-wallet__icon--seed)은
-   함께 지웠다. 세 재화가 같은 칸을 쓰면 색은 종족색 하나로 끝난다 */
-.pet-wallet__icon {
-  display: grid;
-  place-items: center;
-  width: 2rem;
-  height: 2rem;
-  border-radius: var(--radius-input);
-  background: color-mix(in oklch, var(--tribe) 20%, transparent);
-  font-size: var(--text-body);
-  line-height: 1;
-}
-
-.pet-wallet__name {
-  font-family: var(--font-display);
-  font-size: var(--text-body);
-  color: var(--color-ink);
-}
-
-/* 나무색 숫자였다. 줄에서 나무를 걷었으니 숫자도 본문 잉크색이다.
-   2026-08-21 사용자 결정: --text-md 600에서 본문 크기 400으로 내렸다. 재화 이름과 같은
-   크기·굵기라 줄이 한 문장처럼 읽힌다. tabular-nums는 남긴다 — 세 줄의 자릿수가 어긋나면
-   오른쪽 끝이 들쭉날쭉해진다. letter-spacing은 큰 숫자용이었으므로 함께 지웠다 */
-.pet-wallet__value {
-  color: var(--color-ink);
-  font-size: var(--text-body);
-  font-weight: 400;
-  font-variant-numeric: tabular-nums;
-}
-
-/* 오늘 들어온 재화의 출처 줄(.pet-wallet__source, 2026-08-22) — 2026-08-24 사용자 요청으로
-   **삭제했다.** "오늘 미션으로 씨앗 +45" / "오늘 대화·커뮤니티로 친밀도 +N" 두 줄이
-   잔액 목록 아래에 붙어 있었다.
-   규칙은 .pet-card__meta와 같은 값(라벨 크기 + --color-muted)이었고, 면도 테두리도 없이
-   padding-inline만 재화 줄과 맞춰 왼쪽 끝을 정렬했다 — 되살리면 그 값이 다시 맞다.
-   빈 자리는 아래 상점 입구 두 개가 5rem으로 두꺼워지며 받았지만, 같은 날 마지막 요청으로
-   그 두께가 44px로 돌아갔다 — 지금 그 36px은 방(.pet__col--room의 1fr)에 있다 */
-
-/* 상점 입구 2개. auto-fit이라 좁아지면 두 줄로 갈린다 — 라벨이 nowrap이어서 억지로 한 줄에
-   두면 320px에서 글자가 칸을 넘어간다 */
-.pet-wallet__shops {
-  display: grid;
-  grid-template-columns: repeat(auto-fit, minmax(min(8rem, 100%), 1fr));
-  gap: var(--space-2xs);
-  margin-top: var(--space-3xs);
-}
-
-/* 2026-08-21 사용자 결정: 미션 화면의 "오늘 달성률" 카드를 따른다
-   (app/missions/MissionDashboard.tsx:602 ProgressCard) — 테두리 없는 종족색 연한 면,
-   가운데 정렬. 면 색은 --tribe-soft다. --tribe-wash는 종이색과 섞는 값이라 카드 위에 얹으면
-   거의 흰색으로 보인다.
-
-   같은 날 결정으로 아이콘(🎨/🖼️)을 지웠으므로 남는 것은 라벨 한 줄이다. 그래서 place-items로
-   가운데를 잡고 --control-h를 준다 — 글자 한 줄 높이(약 30px)로 두면 누를 자리가 44px
-   아래로 내려간다.
-
-   이름이 .pet-shop이었다. 파일 아래쪽 "상점 화면" 절에 상점 두 화면의 타일 격자를 잡는
-   .pet-shop이 이미 있어서, 같은 이름이 겹치면 여기 면 색·가운데 정렬·nowrap이 그 격자에도
-   먹었다(외형/배경 상점 목록 전체가 종족색 면으로 깔렸다). 홈 지갑 카드 안에만 있는
-   요소이므로 .pet-wallet__shop으로 옮긴다
-
-   2026-08-24 사용자 요청("눈에 잘 안 보여서"): 2026-08-22에 "광택은 주지 않는다"고 정했던
-   것을 뒤집는다. 그때 판단은 옳았지만 전제가 틀렸다 — 흰 띠가 안 보이는 것은 광택 탓이
-   아니라 면이 --tribe-soft(22%)로 너무 옅어서다. 그래서 광택을 얹는 대신 면부터 주 버튼과
-   같은 값(--tribe-face → --tribe 135deg)으로 올리고, 그 위에 광택 두 겹 + 사방으로 옅게
-   퍼지는 번짐을 준다(같은 날 두 번째 요청 "그림자 빼고 약간 주위에 퍼지게" — 처음에는
-   0 4px 0 단계 그림자였다). 면이 진해졌으므로 글자는 --color-muted를 쓸 수 없다 — 같은 면
-   위에서 이미 검증된 .pet-btn의 --color-ink로 올린다(design.md 명암비 규칙).
-
-   위계는 면 색이 아니라 글자와 모서리로 지킨다: 주 동작은 --text-body 600 + 알약,
-   여기는 --text-label 400 + --radius-card다.
-
-   2026-08-24 두 번째 요청("외형상점 배경상점도 저 버튼 안에 이거 채워줘" + 나무판 캡처):
-   면을 종족색에서 **나무**로 갈았다. 같은 날 상점 배너 띠가 나무색이 됐으므로 이 버튼이
-   그 화면의 입구인 셈이고, 입구와 그 안쪽 머리가 같은 재질이 된다. 8/21에 이 자리에서
-   나무판(.pet-plank)을 걷어낸 결정을 사용자가 뒤집은 것이다(--pet-wood-* 정의 주석).
-
-   처음에는 배너와 같은 나무 3색 중 진한 두 단을 그라데이션(135deg, wood-2 → wood-1 60%)으로
-   깔고 크림 글자를 얹었다. 8rem짜리 작은 면에서 밝은 --pet-wood-3까지 넣으면 글자 칸이
-   밝은 쪽으로 넘어가 크림이 2.6:1까지 떨어지기 때문이었다.
-
-   같은 날 사용자가 색을 따로 캡처해 보내며 **"외형 상점, 배경 상점 이 색으로 바꿔주고 글씨
-   검정색으로 해줘"**라고 해서 **단색 --pet-wood-light(#C29F6E) + 잉크 글자**로 다시 갔다.
-   이 면에서 잉크는 6.50:1이고 광택·결이 얹힌 최악의 자리(광택 하단 16%)도 5.04:1이라
-   그라데이션 때 필요했던 크림 뒤집기와 text-shadow가 둘 다 필요 없어졌다 — 어두운 글자에
-   어두운 그림자를 얹으면 획이 뭉갠다.
-   결 10%는 배너와 같은 규칙·같은 주기(12/14px)다 — 44px 높이에 3줄이 들어가 사용자가 보낸
-   나무판 캡처와 같은 밀도가 된다(색만 바꿔 달라는 요청이라 결과 광택은 남겼다).
-   광택은 맨 앞이다(8/24 첫 요청 "눈에 잘 안 보여서"): 결 → 면 순으로 아래에 깔고 광택을
-   그 위에 둔다. 순서를 바꾸면 불투명한 면이 둘을 덮는다.
-   번짐 색만 종족색에서 --pet-wood-1로 옮겼다 — 나무 면 밑에 종족색 후광이 남으면 면 색을
-   갈아 놓은 의미가 없다. 밝은 면을 딛는 그림자이므로 진한 첫 단을 쓴다
-
-   **높이 44px(--control-h) → 5rem(80px). 2026-08-24 세 번째 요청**("…문구 지워주고 그 빈
-   여백에 외형상점과 배경상점을 세로로 더 두껍게 만들어서 꽉차게 만들어줘").
-   5rem은 눈대중이 아니라 지운 문구가 쓰던 높이다:
-     카드 격자 간격 --space-2xs 8px + 문구 목록의 margin-top 8px
-     + 한 줄 높이(--text-label 0.8rem × line-height 1.6 = 20.48px) = 36.48px
-     44 + 36.48 = 80.48 → 5rem(80px)
-   그래서 지갑 카드의 총 높이는 0.5px 차이로 전과 같다. 이게 중요한 이유는 왼쪽 열이
-   grid-template-rows: 1fr auto라서(.pet__col--room) 카드가 짧아지면 그 높이가 **방**으로
-   가 버리는 것이다 — 문구만 지우면 방이 36px 늘고 버튼은 그대로여서 요청한 "꽉차게"가
-   되지 않는다. 두 값을 한 쌍으로 바꿔야 빈 자리가 버튼으로 간다.
-
-   높이를 늘려도 규칙은 그대로다: 라벨 한 줄이 place-items로 가운데에 있고, 결
-   (repeating-linear-gradient 12/14px)이 44px에 3줄에서 80px에 5줄로 늘어난다 — 주기가
-   고정이라 밀도가 유지된다. 카드 높이가 문구 줄 수(1줄/2줄/0줄)에 따라 흔들리던 것도
-   함께 없어졌다
-
-   ──────────────────────────────────────────────────────────────────────────
-   **2026-08-24 네 번째 요청: 면을 CSS로 그리지 않는다. 사용자가 보낸 나무 간판 그림
-   한 장으로 바꿨다**("두 상점 버튼을 이 이미지로 대체해주고 글씨도 좀 더 키워줘").
-
-   그래서 위 세 문단이 쌓아 온 것 중 **면 쪽은 전부 걷혔다** — 광택(--pet-gloss) · 결
-   10% · 단색 --pet-wood-light · 모서리 라운드 · 면 밖 번짐(box-shadow) 넷이 그림 안에
-   이미 그려져 있다(널판 테두리 · 결 무늬 · 명암 · 넝쿨 잎). CSS로 한 겹 더 얹으면
-   그림의 명암과 싸운다. 남긴 것은 높이 5rem, 가운데 정렬, 잉크 글자, nowrap, 누름 1px다.
-
-   그림 처리(원본은 어두운 배경이 깔린 캡처였다):
-   - 배경색(57,58,64)에서 26 이상 떨어진 픽셀만 남기고 **연결 요소 중 가장 큰 것 하나**만
-     골랐다 — 캡처 오른쪽 위에 걸려 있던 다른 UI 조각(회색 둥근 테두리)이 그 방법으로
-     빠진다
-   - 자른 크기 140 × 45. 알파 경계는 0.5px 가우시안으로만 부드럽게 했고, 흐리기 전에
-     바깥쪽 색을 안쪽 색으로 두 번 확장했다 — 이걸 안 하면 크림색 카드 위에서 테두리에
-     어두운 배경색이 실 같은 띠로 남는다
-   - 저장 위치는 `public/images/pet/wood-sign.png`다. `public/pet/`에 두면 URL이
-     `/pet/...`이 되어 이 화면의 라우트와 같은 접두사를 쓴다(지금은 안 겹치지만 나중에
-     `/pet/<무언가>` 라우트가 생기면 헷갈린다)
-
-   **background-size: 100% 100%(늘려 채움)를 고른 이유.** 그림 비율은 3.11:1이고 버튼은
-   화면 폭에 따라 1.9:1(좁은 데스크톱, 약 150px) ~ 3.9:1(넓은 화면, 약 310px)로 변한다.
-   - `contain`이면 그림이 버튼을 못 채우고 카드색 여백이 위아래(넓은 화면) 또는 좌우에
-     남는다 — 바로 앞 요청이 "꽉차게"였으므로 이건 그 요청을 되돌리는 셈이다
-   - `cover`면 널판 좌우 끝(넝쿨과 나뭇결 마감)이 잘린다
-   - `aspect-ratio`로 비율을 고정하면 좁은 데스크톱에서 높이가 48px까지 내려가 5rem 두께가
-     사라진다
-   늘려 채우면 널판이 화면 폭에 따라 조금 통통하거나 납작해지지만, 널판은 직사각형 + 가로
-   결이라 그 왜곡이 눈에 잘 안 걸린다. 대신 넝쿨 잎이 같이 늘어난다 — 눈에 걸리면
-   `contain`(여백을 받아들임) 또는 벡터로 다시 그리는 쪽이다.
-
-   **글자는 --text-label(12.8px) → --text-md(20px)다**(요청 "글씨도 좀 더 키워줘"). 한 단
-   위인 --text-body(16px)로 멈추지 않은 이유: 널판 몸통이 버튼 높이의 73%(58px)라 16px는
-   간판 안에서 여전히 잔글씨로 보인다. 20px는 씨앗 개수 스테퍼(--text-md)와 같은 단이다.
-   좁은 화면에서 두 칸이 한 줄에 안 들어가면 위 .pet-wallet__shops의 auto-fit이 1열로
-   접으므로(칸 폭이 카드 전체가 된다) nowrap 라벨이 넘칠 자리가 없다.
-   밝은 널판면(#EBBC8E) 위 잉크 글자는 9.3:1이다 — 옛 --pet-wood-light(6.5:1)보다 오히려
-   낫고, text-shadow는 여전히 필요 없다(어두운 글자에 어두운 그림자는 획을 뭉갠다).
-
-   **padding이 위아래로 다른 이유**: 그림 140 × 45 안에서 널판 몸통은 8~41행이고, 위쪽
-   8px은 널판 위로 솟은 넝쿨 순이다. 그래서 몸통의 가운데가 상자 가운데(50%)가 아니라
-   54.4%에 있다. place-items: center만 두면 글자가 널판 위쪽 테두리 쪽으로 3.5px 붙는다.
-   위 padding을 아래보다 0.45rem(7.2px) 크게 줘서 그만큼 내렸다 — 5rem 높이 기준이고,
-   높이가 달라지면 이 보정은 비율이 아니라 고정값이라 조금 어긋난다(3.5px 안쪽이다).
-
-   **번짐을 box-shadow로 되살리지 않는다.** 배경이 투명한 그림이므로 box-shadow는 널판
-   모양이 아니라 **네모 상자**를 따라 그려진다. 그림자가 필요하면 알파를 따르는
-   filter: drop-shadow를 써야 하지만, 그림 자체에 이미 아래쪽 어두운 마감이 들어 있어서
-   지금은 아무것도 얹지 않았다. --pet-wood-light 토큰은 쓰는 곳이 없어졌지만 파일 앞
-   정의 주석과 함께 남겨 둔다 — 그림을 되돌릴 때 다시 필요한 값이다
-
-   ──────────────────────────────────────────────────────────────────────────
-   **2026-08-24 다섯 번째 요청: 이 버튼만의 모양을 그만둔다. 먹이기 버튼과 같은 것이 됐다**
-   ("그냥 외형 상점이랑 배경 상점 버튼을 씨앗 먹이기 버튼 객체랑 똑같은 걸로 바꿔줘.
-   크기도 비슷했으면 좋겠어").
-
-   그래서 위 다섯 문단이 이 자리에 쌓아 온 면은 **전부 없다**: 종족색 연한 면 → 나무
-   그라데이션 → 단색 --pet-wood-light + 결 + 광택 → 나무 간판 그림. 이제 이 버튼의 면·
-   모서리·그림자·글자 크기·높이는 하나도 여기서 정하지 않고 **먹이기 버튼이 쓰는 규칙들을
-   그대로 물려받는다.** 값을 이 규칙에 베껴 오지 않은 이유는 그렇게 하면 다음에 먹이기
-   버튼만 손댔을 때 둘이 조용히 갈리는 것이다 — "똑같은 것"이라는 요청은 지금 같아 보이는
-   것이 아니라 앞으로도 같이 움직이는 것으로 지킨다. 물려받는 길이 두 갈래다:
-   - JSX에서 .pet-btn + .pet-btn--block을 함께 붙인다 → 좌우 padding --space-sm, 광택 두 겹
-     + 종족색 135deg 면, 잉크 글자, 폭 100%
-   - 위쪽 `.pet-card--feed .pet-btn` 규칙의 선택자에 이 클래스를 넣었다 → 높이 3rem(48px),
-     알약 모서리, 부드러운 번짐(0 6px 16px), 0.9rem, 굵기 400, 누름 translateY(1px)
-   두 번째가 필요한 이유는 **먹이기 버튼의 실제 값이 .pet-btn 본체에 없다**는 것이다. 본체만
-   붙였을 때 44px · 16px · 600 · 단계 그림자가 나와 사용자가 곧바로 다르다고 지적했다
-   ("상점 버튼들의 글씨를 씨앗 먹이기랑 동일한 폰트, 동일한 굵기의 글씨로 바꿔줘").
-
-   **서체 한 줄만 이 규칙이 직접 준다.** 먹이기 버튼은 자기 카드(.pet-card--feed)에서
-   Gowun Dodum을 물려받고 .pet-btn은 font-family: inherit이라 따라오는데, 이 버튼이 앉은
-   지갑 카드는 본문 서체(Noto Sans KR)다. 그래서 카드를 통한 상속으로는 같아질 수 없다 —
-   지갑 카드에 --font-display를 걸면 잔액 줄까지 서체가 바뀐다. 선택자에 .pet-card--wallet을
-   앞세운 것은 특이도 때문이다: 클래스 하나(0,1,0)면 파일 뒤쪽 .pet-btn의
-   font-family: inherit이 순서로 이겨 본문 서체로 되돌아간다.
-   굵기를 400으로 두는 것도 이 서체의 조건이다 — Gowun Dodum은 굵기가 400 하나뿐이라
-   600을 주면 브라우저가 합성해 획이 흐려진다(.pet-card--feed 주석).
-
-   **높이가 5rem → 3rem(48px)으로 돌아가는 것이 요청의 값이다**("크기도 비슷"). 세 번째 요청에서
-   5rem으로 올린 근거(지운 출처 문구 36.48px를 이 버튼이 받아 카드 높이를 지킨다)는 이
-   요청으로 뒤집힌다 — 지갑 카드가 32px 짧아지고 그 높이는 왼쪽 열이
-   grid-template-rows: 1fr auto라서(.pet__col--room) **방이 가진다.** 방이 그만큼 커지는
-   것이지 카드 안에 빈 여백이 생기는 것은 아니다(카드가 내용 높이를 따르므로) — 세 번째
-   요청의 "꽉차게"가 카드 안쪽에서는 유지된다.
-
-   `background`를 여기서 지운다(그림 · 그라데이션 · 색 전부). 이 규칙이 파일에서
-   .pet-btn보다 **앞**에 있어 특이도가 같으면 뒤가 이기지만, 그림을 지우지 않고 두면
-   .pet-btn의 background와 이 규칙의 background 중 하나만 남는 것이 아니라 읽는 사람이
-   어느 쪽이 보이는지 매번 세어야 한다. 남길 이유가 없으므로 지운다.
-   그림 파일(public/images/pet/wood-sign.png)은 지우지 않고 둔다 — 되돌릴 때 필요하고,
-   지우면 그 커밋을 되돌려야 다시 생긴다.
-
-   남은 세 줄은 전부 **<a>가 <button>이 아니라서** 필요한 것이다:
-   - display: grid + place-items: center — <button>은 안쪽 글자를 저절로 가운데에 두지만
-     <a>는 min-height만 받으면 글자가 위쪽에 붙는다
-   - text-decoration: none — 링크 밑줄
-   - white-space: nowrap — 라벨 두 줄 금지(design.md). 좁아지면 위 .pet-wallet__shops의
-     auto-fit이 1열로 접으므로 넘칠 자리가 없다
-   :active는 위 `.pet-card--feed .pet-btn:active` 규칙에 함께 넣었다(먹이기와 같은 1px) */
-.pet-card--wallet .pet-wallet__shop {
-  display: grid;
-  place-items: center;
-  /* 위 문단의 서체 한 줄. 나머지 글자 값(0.9rem·400)은 먹이기 버튼 규칙에서 온다 */
-  font-family: var(--font-display);
-  text-decoration: none;
-  white-space: nowrap;
-}
+   **나무 간판 그림(public/images/pet/wood-sign.png)은 이 절이 2026-08-24에 잠깐 썼다가 같은
+   날 걷은 것이고 파일로는 남아 있다** — 지금 어느 규칙도 참조하지 않는다. 지우지 않는 이유는
+   그때와 같다: 되돌리려면 커밋을 되감아야 다시 생긴다 */
 
 /* ── 오늘의 활동 (2026-08-24) ────────────────────────────────────────────── */
 

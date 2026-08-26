@@ -699,6 +699,41 @@ export default function PetView({ initial }: { initial: PetState }) {
         </div>
       </header>
 
+      {/* 상단 재화 바 (2026-08-26 사용자 제공 이미지). **지갑 카드(.pet-card--wallet)를 이것으로
+          갈았다** — 같은 요청에서 카드를 지웠으므로 재화 3종과 상점 입구 2개는 이제 이 화면에
+          한 벌만 있다. 카드를 남기고 바를 더하면 2026-08-23에 상단 씨앗 HUD를 걷어낸 이유
+          (같은 값을 두 곳에서 말한다)를 그대로 되풀이한다.
+
+          **이름을 화면에서 지우고 스크린리더에는 남긴다.** 제공된 이미지에는 아이콘과 숫자만
+          있는데, 그렇게만 두면 옛 HUD와 같은 실수가 된다 — 그쪽은 아이콘이 aria-hidden이고
+          이름이 없어서 스크린리더에 아무것도 남지 않았다. 이 화면이 이미 쓰는 `sr-only`로
+          이름만 눈에서 지우면 "씨앗 3,000"이 그대로 읽힌다(위 착용 치장 줄과 같은 처리).
+
+          상점 버튼은 **이 파일에 이미 있는 두 버튼 모양을 그대로 가져온다**(사용자 요청
+          "기존의 이미지를 갖고 와서") — 외형은 채운 .pet-btn, 배경은 테두리형
+          .pet-btn--ghost다. 제공된 이미지의 두 버튼(채움 / 테두리)이 그 둘과 같다 */}
+      <div className="pet-bar">
+        <ul className="pet-bar__wallet">
+          {wallet.map((row) => (
+            <li className="pet-bar__item" key={row.name}>
+              <span className="pet-bar__icon" aria-hidden="true">
+                {row.icon}
+              </span>
+              <span className="sr-only">{row.name}</span>
+              <span className="pet-bar__value">{ko(row.value)}</span>
+            </li>
+          ))}
+        </ul>
+        <div className="pet-bar__shops">
+          <Link className="pet-btn pet-bar__shop" href="/pet/skins">
+            외형 상점
+          </Link>
+          <Link className="pet-btn pet-btn--ghost pet-bar__shop" href="/pet/cosmetics">
+            배경 상점
+          </Link>
+        </div>
+      </div>
+
       <div className="pet__grid">
         <div className="pet__col pet__col--room">
           <div className="pet-room">
@@ -889,61 +924,16 @@ export default function PetView({ initial }: { initial: PetState }) {
             </div>
           </div>
 
-          {/* 배고픔 게이지가 있던 자리다. 재화 3종과 상점 입구 2개가 대신 들어간다.
-              숫자를 아이콘 옆에 글자로 두므로 aria를 따로 붙이지 않는다 — "씨앗 3,000"이
-              그대로 읽힌다. 아이콘만 aria-hidden이다 */}
-          <div className="pet-card pet-card--wallet">
-            <div className="pet-card__head">
-              {/* 2026-08-24 이 카드만 이모지를 뺐다가 같은 날 사용자 요청으로 붙였다.
-                  안의 재화 아이콘 3개(🌱❤️⭐)와 겹치지 않는 것을 골라야 해서 처음에는
-                  지갑(👛)이었다 — 세 재화 중 하나를 쓰면 제목이 그 줄의 제목처럼 읽힌다.
-                  같은 날 사용자 요청으로 **노란 코인(🪙)**이 됐다. 코인도 세 재화 아이콘과
-                  겹치지 않으므로 그 이유는 그대로 지켜진다 */}
-              <p className="pet-card__title">
-                <span aria-hidden="true">🪙</span> 보유 재화
-              </p>
-            </div>
+          {/* 여기에 **보유 재화 카드(.pet-card--wallet)**가 있었다 — 배고픔 게이지 자리를
+              물려받아 재화 3종 목록(🪙 보유 재화)과 상점 입구 2개를 갖고 있었다.
+              **2026-08-26 사용자 요청으로 지웠다**("보유재화 카드는 제거해줘"). 같은 요청에서
+              같은 값을 상단 바(.pet-bar, 이 파일 위쪽)로 옮겼으므로, 지우지 않으면 한 화면이
+              같은 재화를 두 번 말한다 — 2026-08-23에 상단 씨앗 HUD를 걷어낸 이유와 같다.
+              CSS(.pet-card--wallet · .pet-wallet* 7개)도 함께 걷었고, 되살릴 때 필요한 값과
+              결정 내력은 pet.css "지갑" 절 자리의 주석에 남겼다.
 
-            <ul className="pet-wallet">
-              {wallet.map((row) => (
-                <li className="pet-wallet__row" key={row.name}>
-                  <span className="pet-wallet__icon" aria-hidden="true">
-                    {row.icon}
-                  </span>
-                  <span className="pet-wallet__name">{row.name}</span>
-                  <span className="pet-wallet__value">{ko(row.value)}</span>
-                </li>
-              ))}
-            </ul>
-
-            {/* 잔액 목록과 상점 입구 사이에 오늘 들어온 재화의 출처 두 줄
-                (.pet-wallet__source)이 있었다. 2026-08-24 사용자 요청으로 걷었고, 그 높이(36px)를
-                아래 상점 입구 두 개가 5rem으로 두꺼워지며 받았다. 같은 날 마지막 요청으로 그
-                두께가 먹이기 버튼과 같은 44px로 돌아갔으므로 **지금 이 카드는 그만큼 짧다** —
-                남는 높이는 위 방(.pet__col--room의 1fr)이 가진다. 자세한 사정은 pet.css의
-                .pet-wallet__shop 주석, 삭제 이유는 위 sourceLines 자리의 주석에 있다 */}
-
-            {/* 상단 바에서 내려온 상점 입구 2개 (2026-08-21 사용자 결정).
-                나무판(.pet-plank)이었다. 같은 날 결정으로 미션 화면의 "오늘 달성률" 카드처럼
-                테두리 없는 종족색 면에 가운데 정렬이고, 아이콘 없이 라벨만 둔다.
-
-                2026-08-24 사용자 요청("그냥 외형 상점이랑 배경 상점 버튼을 씨앗 먹이기 버튼
-                객체랑 똑같은 걸로 바꿔줘. 크기도 비슷했으면 좋겠어"): 먹이기 버튼이 쓰는
-                **그 클래스를 그대로 붙인다**(.pet-btn.pet-btn--block). 값을 베껴 쓰지 않는
-                이유는 그러면 다음에 먹이기 버튼만 바뀌었을 때 둘이 갈리는 것이다.
-                단, 먹이기 버튼의 실제 크기·글자·그림자는 .pet-btn 본체가 아니라
-                `.pet-card--feed .pet-btn`에 있어서 이것만으로는 겉보기가 달랐다(같은 날
-                사용자 지적 "…동일한 폰트, 동일한 굵기"). 그래서 pet.css에서 그 규칙의
-                선택자에 .pet-wallet__shop을 함께 넣었다 — 자세한 사정은 그 두 주석 */}
-            <div className="pet-wallet__shops">
-              <Link className="pet-btn pet-btn--block pet-wallet__shop" href="/pet/skins">
-                외형 상점
-              </Link>
-              <Link className="pet-btn pet-btn--block pet-wallet__shop" href="/pet/cosmetics">
-                배경 상점
-              </Link>
-            </div>
-          </div>
+              **왼쪽 열이 이제 방 하나다.** .pet__col--room이 grid-template-rows: 1fr auto인데
+              auto 줄(카드)이 없어졌으므로 방이 열 전체를 갖는다 */}
         </div>
 
         <div className="pet__col pet__col--side">
