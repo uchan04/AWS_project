@@ -1185,30 +1185,122 @@
 /* 2026-08-21 사용자 결정: 줄과 카드 면의 색을 맞바꿨다(위 .pet-card--wallet 참고).
    줄은 --color-card, 카드가 흰색이다. 테두리는 같은 날 지웠으므로 줄을 가르는 것은
    이 한 단계 색 차이와 아이콘 칸뿐이다 */
+/* 2026-08-25 사용자 요청으로 줄이 <li>에서 <button>이 됐다(누르면 획득 방법 안내).
+   버튼 기본 스타일(테두리·서체·정렬)을 끄고 원래 줄 모양을 그대로 유지한다 —
+   눌러진다는 신호는 오른쪽 ▾ 하나와 hover 면 색으로만 준다. 카드 안의 줄이므로
+   버튼처럼 보이면 상점 입구 두 개와 위계가 섞인다 */
 .pet-wallet__row {
   display: grid;
-  grid-template-columns: auto 1fr auto;
+  grid-template-columns: auto 1fr auto auto;
   align-items: center;
   gap: var(--space-2xs);
+  width: 100%;
   min-height: var(--control-h);
   padding: var(--space-3xs) var(--space-2xs);
+  border: 0;
   border-radius: var(--radius-input);
   background: var(--color-card);
+  font: inherit;
+  color: inherit;
+  text-align: left;
+  cursor: pointer;
 }
 
-/* 2026-08-21 사용자 결정: 나무 테두리 + 나무 그라데이션을 걷고 종족색을 투명도로 깐 칸이다.
-   불투명 혼색(--tribe-soft)이 아니라 알파를 쓴다 — 흰 줄 위에서도, 카드 면 위의 상점 입구
-   에서도 같은 규칙 하나로 얹히게 하려는 것이다. 씨앗 초록 변형(.pet-wallet__icon--seed)은
-   함께 지웠다. 세 재화가 같은 칸을 쓰면 색은 종족색 하나로 끝난다 */
-.pet-wallet__icon {
+.pet-wallet__row:hover {
+  background: color-mix(in oklch, var(--color-card) 88%, var(--tribe) 12%);
+}
+
+.pet-wallet__caret {
+  font-size: var(--text-label);
+  color: var(--color-muted);
+}
+
+/* 재화 안내 팝업 (2026-08-25). 확장식이 아닌 이유는 PetView의 지갑 줄 주석에 있다.
+   오버레이 색·반경·그림자는 내 계정 모달(Sidebar)과 같은 값을 쓴다 — 앱 안에서
+   팝업이 두 종류로 보이지 않게 한다. z-index 400도 그쪽과 같다 */
+.pet-wallet-pop {
+  position: fixed;
+  inset: 0;
+  z-index: 400;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: var(--space-sm);
+  background: rgba(42, 31, 20, 0.45);
+}
+
+.pet-wallet-pop__box {
+  width: 100%;
+  max-width: 22rem;
+  padding: var(--space-sm);
+  border-radius: 28px;
+  background: #fdfbf5;
+  box-shadow: 0 32px 80px rgba(0, 0, 0, 0.2);
+  font-size: var(--text-label);
+  line-height: 1.6;
+  color: var(--color-ink-2);
+}
+
+.pet-wallet-pop__head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--space-2xs);
+  margin-bottom: var(--space-2xs);
+}
+
+.pet-wallet-pop__title {
+  margin: 0;
+  font-family: var(--font-display);
+  font-size: var(--text-lg);
+  color: var(--color-ink);
+}
+
+/* 닫기 버튼은 화면의 다른 ✕과 같은 크기(44px 표적)로 둔다 */
+.pet-wallet-pop__close {
   display: grid;
   place-items: center;
-  width: 2rem;
-  height: 2rem;
-  border-radius: var(--radius-input);
-  background: color-mix(in oklch, var(--tribe) 20%, transparent);
+  width: 2.25rem;
+  height: 2.25rem;
+  border: 0;
+  border-radius: 999px;
+  background: transparent;
   font-size: var(--text-body);
-  line-height: 1;
+  color: var(--color-muted);
+  cursor: pointer;
+}
+
+.pet-wallet-pop__close:hover {
+  background: color-mix(in oklch, var(--tribe) 14%, transparent);
+}
+
+.pet-wallet-pop__use {
+  margin: 0 0 var(--space-2xs);
+  padding: var(--space-2xs);
+  border-radius: var(--radius-input);
+  background: color-mix(in oklch, var(--tribe) 12%, transparent);
+  font-weight: 700;
+  color: var(--color-ink);
+}
+
+.pet-wallet-pop__head-label {
+  margin: 0 0 var(--space-3xs);
+  font-weight: 700;
+  color: var(--color-ink);
+}
+
+.pet-wallet-pop__list {
+  margin: 0 0 var(--space-2xs);
+  padding-left: 1.2em;
+  display: grid;
+  gap: 2px;
+}
+
+.pet-wallet-pop__cap {
+  margin: 0;
+  padding-top: var(--space-3xs);
+  border-top: 1px solid color-mix(in oklch, var(--color-muted) 25%, transparent);
+  color: var(--color-muted);
 }
 
 .pet-wallet__name {

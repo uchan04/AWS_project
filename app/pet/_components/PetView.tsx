@@ -15,7 +15,18 @@ import {
   seedsToNextStage,
 } from "@/lib/pet"
 import { EVOLUTION_LEVEL, SEED_TO_EXP, expToNextLevel } from "@/lib/types"
+// 안내 문구의 숫자를 손으로 적지 않는다 — 값이 바뀌면 문구가 조용히 거짓이 된다.
+// ChatPanel도 같은 모듈에서 상수만 가져온다(클라이언트 컴포넌트에서 이미 쓰는 방식).
+import {
+  AFFINITY_CAP_BY_SOURCE,
+  CHAT_TURN_AFFINITY,
+  POST_AFFINITY,
+  COMMENT_AFFINITY,
+  MEETUP_JOIN_AFFINITY,
+} from "@/app/community/_lib/affinity"
+import { AFFINITY_DAILY_CAP } from "@/lib/reward"
 import { ArtImage } from "@/app/components/ArtImage"
+import { useModalA11y } from "@/app/components/useModalA11y"
 import PetRoom from "./PetRoom"
 import "@/styles/tokens.css"
 import "../pet.css"
@@ -228,10 +239,52 @@ export default function PetView({ initial }: { initial: PetState }) {
   // 별조각 → 친밀도). 이 배열이 화면 순서다 — 아래 렌더가 map만 한다.
   // 친밀도 이모지도 같은 요청으로 💛 → ❤️다("페이지 내의 모든 친밀도"). 노란 하트는
   // 이 카드에서 ⭐·🌱과 같은 노란·연두 계열이라 세 줄이 한 색으로 뭉쳐 보였다
+  //
+  // 2026-08-25 사용자 요청: 줄을 누르면 **획득 방법과 방법별 상한**을 안내한다.
+  // 상한을 여기 적는 이유 — 친밀도에 출처별 상한(챗봇 40 / 커뮤니티 60)이 생겼는데
+  // 그 사실을 알 수 있는 자리가 챗봇 패널 안뿐이었다. 재화를 보는 자리에 있어야 한다.
+  // 숫자는 전부 상수에서 읽는다. 손으로 적으면 값이 바뀔 때 문구만 낡는다.
+  // 열린 재화 이름. 한 번에 하나만 열린다 — 셋이 다 열리면 카드가 화면을 넘긴다
+  const [walletInfo, setWalletInfo] = useState<string | null>(null)
+
   const wallet = [
-    { name: "씨앗", icon: "🌱", value: pet.seeds },
-    { name: "친밀도", icon: "❤️", value: pet.affinity },
-    { name: "별조각", icon: "⭐", value: pet.starShards },
+    {
+      name: "씨앗",
+      icon: "🌱",
+      value: pet.seeds,
+      use: `펫에게 먹이면 경험치가 돼요 (씨앗 1 = 경험치 ${SEED_TO_EXP})`,
+      how: [
+        "일일 미션 5개를 다 하면 60",
+        "출석은 1~7일차 10·15·20·25·30·35·40 (주 175)",
+        `가만히 둬도 시간당 ${IDLE_SEEDS_PER_HOUR}개씩 쌓여요 — ${IDLE_MAX_SEEDS}개까지만 모여요`,
+        "단계 미션은 구간이 오를수록 늘어요 (미션당 22~58)",
+      ],
+      cap: "하루 상한은 없어요. 방치형만 100개에서 멈춰요",
+    },
+    {
+      name: "친밀도",
+      icon: "❤️",
+      value: pet.affinity,
+      use: "펫 방의 배경을 사요 (배경 하나 600)",
+      how: [
+        `챗봇과 1턴 대화 +${CHAT_TURN_AFFINITY} — 오늘 최대 ${AFFINITY_CAP_BY_SOURCE.CHAT}`,
+        `커뮤니티 글 +${POST_AFFINITY} · 댓글 +${COMMENT_AFFINITY} · 모임 신청 +${MEETUP_JOIN_AFFINITY}`,
+        `커뮤니티 세 가지를 합쳐 오늘 최대 ${AFFINITY_CAP_BY_SOURCE.COMMUNITY}`,
+      ],
+      cap: `하루 최대 ${AFFINITY_DAILY_CAP}. 대화만으로는 다 채울 수 없어요 — 나머지는 사람과 닿는 쪽에서 쌓여요`,
+    },
+    {
+      name: "별조각",
+      icon: "⭐",
+      value: pet.starShards,
+      use: "종족 외형 스킨을 사요 (하나 2,500)",
+      how: [
+        "일일 미션을 **전부** 다 하면 60 (하나라도 빠지면 0)",
+        "출석 4일차 5 · 7일차 20 (주 25)",
+        "단계 미션은 3구간(문 앞까지)부터 붙어요 — 미션당 1~8",
+      ],
+      cap: "하루 상한은 없어요",
+    },
   ]
 
   // 여기서 오늘 들어온 재화의 출처 문장(sourceLines)을 만들었다 — "오늘 미션으로 씨앗 +45",
@@ -680,14 +733,29 @@ export default function PetView({ initial }: { initial: PetState }) {
               </p>
             </div>
 
+            {/* 2026-08-25 사용자 결정: 안내를 **확장식이 아니라 팝업**으로 띄운다.
+                지갑 카드는 오른쪽 좁은 열(약 150px)에 있어 펼치면 글이 한 줄에 5~6자로
+                끊기고 카드가 세로로 길어져 아래 상점 입구를 밀어낸다. 팝업은 폭을
+                화면에서 받으므로 그 두 문제가 함께 사라진다 */}
             <ul className="pet-wallet">
               {wallet.map((row) => (
-                <li className="pet-wallet__row" key={row.name}>
-                  <span className="pet-wallet__icon" aria-hidden="true">
-                    {row.icon}
-                  </span>
-                  <span className="pet-wallet__name">{row.name}</span>
-                  <span className="pet-wallet__value">{ko(row.value)}</span>
+                <li key={row.name}>
+                  {/* 줄 전체가 버튼이다. 손가락으로 누르는 화면이라 표적이 클수록 낫다 */}
+                  <button
+                    type="button"
+                    className="pet-wallet__row"
+                    onClick={() => setWalletInfo(row.name)}
+                    aria-haspopup="dialog"
+                  >
+                    <span className="pet-wallet__icon" aria-hidden="true">
+                      {row.icon}
+                    </span>
+                    <span className="pet-wallet__name">{row.name}</span>
+                    <span className="pet-wallet__value">{ko(row.value)}</span>
+                    <span className="pet-wallet__caret" aria-hidden="true">
+                      ⓘ
+                    </span>
+                  </button>
                 </li>
               ))}
             </ul>
@@ -1133,6 +1201,72 @@ export default function PetView({ initial }: { initial: PetState }) {
           <p className="pet-card__meta">{pet.skinName}가 한 단계 자랐습니다</p>
         </div>
       ) : null}
+
+      {walletInfo ? (
+        <WalletInfoModal
+          row={wallet.find((r) => r.name === walletInfo)!}
+          onClose={() => setWalletInfo(null)}
+        />
+      ) : null}
     </main>
+  )
+}
+
+/**
+ * 재화 안내 팝업. 지갑 줄을 누르면 뜬다(2026-08-25 사용자 결정).
+ *
+ * 확장식이 아닌 이유는 지갑 줄 렌더 자리의 주석에 있다 — 열이 좁아 글이 끊기고
+ * 카드가 상점 입구를 밀어낸다.
+ *
+ * Escape·초점 가두기·닫을 때 초점 되돌리기는 `useModalA11y`가 한다. 이 앱의 다른
+ * 모달 네 개(미션 상세·글쓰기·글 상세·내 계정)와 같은 훅이다 — 규칙을 두 벌로 만들지 않는다.
+ */
+function WalletInfoModal({
+  row,
+  onClose,
+}: {
+  row: { name: string; icon: string; use: string; how: string[]; cap: string }
+  onClose: () => void
+}) {
+  const boxRef = useModalA11y(onClose)
+  const titleId = `wallet-info-${row.name}`
+
+  return (
+    <div className="pet-wallet-pop" onClick={onClose}>
+      <div
+        ref={boxRef}
+        role="dialog"
+        aria-modal="true"
+        aria-labelledby={titleId}
+        tabIndex={-1}
+        className="pet-wallet-pop__box screen-enter"
+        onClick={(e) => e.stopPropagation()}
+      >
+        <div className="pet-wallet-pop__head">
+          <p className="pet-wallet-pop__title" id={titleId}>
+            <span aria-hidden="true">{row.icon}</span> {row.name}
+          </p>
+          <button
+            type="button"
+            className="pet-wallet-pop__close"
+            onClick={onClose}
+            aria-label="닫기"
+          >
+            ✕
+          </button>
+        </div>
+
+        <p className="pet-wallet-pop__use">{row.use}</p>
+
+        <p className="pet-wallet-pop__head-label">이렇게 모아요</p>
+        <ul className="pet-wallet-pop__list">
+          {row.how.map((line) => (
+            <li key={line}>{line}</li>
+          ))}
+        </ul>
+
+        <p className="pet-wallet-pop__cap">{row.cap}</p>
+      </div>
+    </div>
   )
 }

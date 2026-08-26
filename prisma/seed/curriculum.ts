@@ -267,8 +267,12 @@ const HEALTH: PoolMission[][] = [
   ],
   [
     m("H_HOSPITAL_FIND", "병원 위치 찾아보기", "예약하지 않아도 괜찮아요."),
-    m("H_DRINK_OUT", "밖에서 한 잔 마시기", "마신 컵을 찍어봐요. 물이어도 좋아요.", true),
-    m("H_COUNSEL_DESK", "상담 창구 알아보기", "청년마음건강 지원도 있어요."),
+    // 2026-08-25: 제목이 공용 S_CAFE_DRINK("밖에서 한 잔 마시기", 같은 5구간 43단계)와
+    // 겹쳐서 여우만 46단계에 같은 제목을 두 번 봤다. 여우 맥락(의료 미충족)으로 갈랐다
+    m("H_PHARMACY", "약국에 들어가보기", "사지 않고 둘러만 봐도 괜찮아요.", true),
+    // 2026-08-25: 공용 S_COUNSEL_FIND("상담 창구 알아보기", 8구간 77단계)와 제목이 겹쳤다.
+    // 여우는 상담이 5구간에 오는 것이 맞으므로 이쪽을 더 구체적인 제목으로 바꿨다
+    m("H_COUNSEL_DESK", "청년마음건강 지원 알아보기", "무료 상담 바우처도 있어요."),
   ],
   [
     m("H_WALK30", "30분 산책하기", "쉬면서 걸어도 좋아요."),
@@ -366,6 +370,34 @@ const FINALE: PoolMission[] = [
   m("S_FIN_NEXT", "다음 목표 한 줄 쓰기", "일이든 공부든 하고 싶은 것 하나면 충분해요."),
 ]
 
+/**
+ * 공용 미션 치환 (2026-08-25 사용자 결정).
+ *
+ * **왜 재배치가 아니라 치환인가.** 공용 미션을 구간 간에 옮기면 구간 라벨이 깨진다
+ * (`BAND_LABELS`는 사용자에게 보이고, 각 구간은 정확히 9개를 요구한다 — 아래 자기 점검).
+ * 유형 전용 30개도 각자 그 구간 주제로 쓰였으니 구간 간 재분배가 안 된다.
+ * 그래서 **구간·개수·라벨을 그대로 두고 그 자리의 미션만 유형별로 갈아끼운다.**
+ *
+ * 지금 갈아끼우는 것은 여우(건강·정서취약형)의 7구간 대면 미션 3개다.
+ * 근거: 우울 57%·소진 85%·의료 미충족이 높은 집단이라 **낯선 사람에게 말을 거는 것**이
+ * 다른 두 유형보다 확실히 비싸다. 그런데 7구간은 세 유형이 같은 9개를 받고 있었다.
+ * 사진 여부는 원본과 같게 둔다 — 사진 미션 슬롯 수가 유형별로 갈리면 인증 부담이 달라진다.
+ *
+ * 늘릴 때 규칙 둘. ① 키를 새로 만든다(원본 키를 재사용하면 복습 추적이 섞인다).
+ * ② 같은 구간의 목표를 유지한다 — 7구간은 "사람이 등장한다"이므로 사람을 아예 지우지 않고
+ *    **말을 거는 부담만** 뺀다. 대면을 통째로 지우면 사다리가 끊긴다.
+ */
+const SHARED_SUBSTITUTE: Partial<Record<TypeCode, Record<string, PoolMission>>> = {
+  HEALTH_EMOTION: {
+    // 카페에서 주문하기 → 말하지 않고 살 수 있는 경로
+    S_CAFE_ORDER: m("H_KIOSK_ORDER", "무인 주문기로 사기", "말하지 않아도 괜찮아요. 산 것을 찍어봐요.", true),
+    // 사람 있는 곳에 앉기 → 사람이 있는 곳에 가되 붐비지 않는 시간
+    S_SIT_PEOPLE: m("H_QUIET_HOUR", "사람 적은 시간에 나가기", "한가한 시간을 골라도 좋아요. 나간 자리를 찍어봐요.", true),
+    // 위치 물어보기 → 묻지 않고 찾아가기
+    S_ASK_WHERE: m("H_FIND_SIGN", "안내판 보고 찾아가기", "묻지 않고 찾아도 충분해요."),
+  },
+}
+
 const TYPE_POOLS: Record<TypeCode, PoolMission[][]> = {
   INDEPENDENT_LOW_INCOME: INDEPENDENT,
   HEALTH_EMOTION: HEALTH,
@@ -394,7 +426,9 @@ function newCountFor(stageInBand: number, band: number): number {
  * 3개씩 끼워 넣어 구간 안에 흩뿌린다 — 4번째마다 유형 미션이 하나 온다.
  */
 function bandIntroOrder(band: number, typeCode: TypeCode): PoolMission[] {
-  const shared = SHARED[band - 1]
+  // 치환은 여기 한 곳에서만 일어난다. 구간 크기가 그대로이므로 아래 배치 계산은 모르는 채로 돈다
+  const sub = SHARED_SUBSTITUTE[typeCode]
+  const shared = sub ? SHARED[band - 1].map((mm) => sub[mm.key] ?? mm) : SHARED[band - 1]
   const typed = TYPE_POOLS[typeCode][band - 1]
   const out: PoolMission[] = []
   let s = 0
@@ -664,9 +698,12 @@ export function auditCurriculum() {
       if (new Set(keys).size !== keys.length) problems.push(`${typeCode} 단계 ${s}: 같은 미션 중복`)
     }
 
-    // 풀에 써놓고 한 번도 배치되지 않은 미션이 없는지. 있으면 문구를 쓴 만큼 낭비다
+    // 풀에 써놓고 한 번도 배치되지 않은 미션이 없는지. 있으면 문구를 쓴 만큼 낭비다.
+    // 치환된 공용 미션은 그 유형에서 기대하지 않는다 — 대신 치환본이 기대 목록에 들어간다.
+    // 그래서 치환을 넣어도 "쓴 문구가 다 쓰인다"는 단정이 살아 있다.
+    const sub = SHARED_SUBSTITUTE[typeCode] ?? {}
     const expected = [
-      ...SHARED.flat().map((mm) => mm.key),
+      ...SHARED.flat().map((mm) => (sub[mm.key] ?? mm).key),
       ...TYPE_POOLS[typeCode].flat().map((mm) => mm.key),
       ...FINALE.map((mm) => mm.key),
     ]

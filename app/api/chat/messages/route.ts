@@ -2,7 +2,12 @@ import type { NextRequest } from "next/server"
 import { getCurrentUser, getCurrentUserWithSkin, UnauthorizedError } from "@/lib/auth"
 import { prisma } from "@/lib/prisma"
 import { ok, fail } from "@/lib/api"
-import { grantAffinity, CHAT_TURN_AFFINITY } from "@/app/community/_lib/affinity"
+import {
+  grantAffinity,
+  chatAffinityToday,
+  CHAT_TURN_AFFINITY,
+  AFFINITY_CAP_BY_SOURCE,
+} from "@/app/community/_lib/affinity"
 import { completeMissionByCode } from "@/lib/missions/completion"
 
 export async function GET() {
@@ -23,6 +28,10 @@ export async function GET() {
     return ok({
       messages: recent.reverse(),
       affinityToday: user.affinityToday,
+      // 챗봇 게이지는 총 친밀도가 아니라 **챗봇 몫**을 보여준다(상한 40).
+      // 총합을 보여주면 커뮤니티에서 받은 양까지 섞여 "챗봇으로 얼마 더 받을 수 있나"를 못 읽는다.
+      chatAffinityToday: await chatAffinityToday(user.id),
+      chatAffinityCap: AFFINITY_CAP_BY_SOURCE.CHAT,
       nickname: user.nickname,
       typeCode: user.typeCode,
       bedrockConfigured: Boolean(process.env.BEDROCK_MODEL_ID),
@@ -46,13 +55,17 @@ export async function POST(request: NextRequest) {
     const content = typeof payload?.content === "string" ? payload.content.trim() : ""
     if (!content) return fail("INVALID_BODY", "메시지를 입력해주세요", 400)
 
+    // 챗봇 상한(40)을 재려면 **이 턴을 넣기 전** 누계가 필요하다. 만든 뒤에 세면
+    // 방금 만든 1턴이 포함돼 8턴째에 이미 40으로 읽히고 그 턴이 0을 받는다.
+    const beforeThisTurn = await chatAffinityToday(user.id)
+
     const message = await prisma.chatMessage.create({
       data: { userId: user.id, role: "USER", content },
     })
 
     // 친밀도는 사용자가 메시지를 보낸 이 시점에만 지급한다 — Bedrock 응답 저장 시점
     // (/api/chat/stream)에서 다시 지급하지 않는다(1턴 = 사용자 발화 기준, 중복 지급 금지).
-    const granted = await grantAffinity(user, CHAT_TURN_AFFINITY)
+    const granted = await grantAffinity(user, CHAT_TURN_AFFINITY, "CHAT", beforeThisTurn)
 
     // 미션 완료는 본 동작이 끝난 뒤에 별도 try/catch로 부른다.
     // 트랜잭션에 넣지 않는다 — 미션 실패가 메시지 저장을 롤백시키면 안 된다.
@@ -65,7 +78,7 @@ export async function POST(request: NextRequest) {
       console.error("[DAILY_CHAT] 미션 완료 처리 실패", error)
     }
 
-    return ok({ message, granted })
+    return ok({ message, granted, chatAffinityToday: beforeThisTurn + granted })
   } catch (error) {
     if (error instanceof UnauthorizedError) return fail("UNAUTHORIZED", error.message, 401)
     throw error
