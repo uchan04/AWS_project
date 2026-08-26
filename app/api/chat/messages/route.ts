@@ -55,17 +55,16 @@ export async function POST(request: NextRequest) {
     const content = typeof payload?.content === "string" ? payload.content.trim() : ""
     if (!content) return fail("INVALID_BODY", "메시지를 입력해주세요", 400)
 
-    // 챗봇 상한(40)을 재려면 **이 턴을 넣기 전** 누계가 필요하다. 만든 뒤에 세면
-    // 방금 만든 1턴이 포함돼 8턴째에 이미 40으로 읽히고 그 턴이 0을 받는다.
-    const beforeThisTurn = await chatAffinityToday(user.id)
-
+    // 챗봇 몫은 `User.affinityTodayChat`에 있고 grantAffinity()가 그 컬럼을 읽는다.
+    // 메시지 수로 유도하던 시절에는 이 턴을 넣기 **전** 누계를 따로 재야 했다 —
+    // 컬럼이 생겨서 그 계산이 필요 없어졌다(affinity.ts todayBySource 주석)
     const message = await prisma.chatMessage.create({
       data: { userId: user.id, role: "USER", content },
     })
 
     // 친밀도는 사용자가 메시지를 보낸 이 시점에만 지급한다 — Bedrock 응답 저장 시점
     // (/api/chat/stream)에서 다시 지급하지 않는다(1턴 = 사용자 발화 기준, 중복 지급 금지).
-    const granted = await grantAffinity(user, CHAT_TURN_AFFINITY, "CHAT", beforeThisTurn)
+    const granted = await grantAffinity(user, CHAT_TURN_AFFINITY, "CHAT")
 
     // 미션 완료는 본 동작이 끝난 뒤에 별도 try/catch로 부른다.
     // 트랜잭션에 넣지 않는다 — 미션 실패가 메시지 저장을 롤백시키면 안 된다.
@@ -78,7 +77,7 @@ export async function POST(request: NextRequest) {
       console.error("[DAILY_CHAT] 미션 완료 처리 실패", error)
     }
 
-    return ok({ message, granted, chatAffinityToday: beforeThisTurn + granted })
+    return ok({ message, granted, chatAffinityToday: await chatAffinityToday(user.id) })
   } catch (error) {
     if (error instanceof UnauthorizedError) return fail("UNAUTHORIZED", error.message, 401)
     throw error

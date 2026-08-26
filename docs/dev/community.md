@@ -518,7 +518,9 @@ grantAffinity(user, base, source = "COMMUNITY", alreadyFromSource?)
 ```
 
 - **두 값의 합이 총 상한 100과 같다.** 그래서 총 상한이 출처 상한보다 먼저 걸리는 일이 없다 — 이게 아래 유도 계산을 정확하게 만든다
-- **마이그레이션을 만들지 않았다.** 챗봇 몫을 `ChatMessage`의 오늘 `USER` 메시지 수 × 5로 유도한다(`chatAffinityToday()`). `USER` 1건 = 정확히 5이고 챗봇 상한이 먼저 걸리므로 `min(40, 턴수×5)`가 실제 지급 누계와 같다. `@@index([userId, createdAt])`가 있어 인덱스 count 1회다. 발표 전에 공유 DB 스키마를 바꾸지 않으려고 이렇게 했다
+- ~~**마이그레이션을 만들지 않았다.**~~ → **D의 컬럼으로 갈아탔다(2026-08-26, A).** 처음에는 챗봇 몫을 `ChatMessage`의 오늘 `USER` 메시지 수 × 5로 유도했다. **그 방식에 버그가 있었다** — `lib/missions/completion.ts:159`와 `attendance.ts:121`이 `grantAffinity()`를 거치지 않고 `affinityToday`를 직접 증가시킨다. 커뮤니티 몫을 `전체 − 챗봇`으로 계산하면 그 미션 몫이 커뮤니티에 잘못 얹혀 **상한이 일찍 걸린다.** 지금은 모든 미션의 `rewardAffinity`가 0이라 잠들어 있지만 누가 그 값을 올리는 순간 조용히 깨진다. **D의 마이그레이션 주석이 이 함정을 정확히 지적했다** — 날짜 마커를 `affinityTodayDate`와 따로 둔 이유도 같다(미션 경로가 먼저 리셋하면 새 컬럼만 리셋을 건너뛴다).
+
+지금은 `User.affinityTodayChat` · `affinityTodayCommunity` · `affinitySourceDate` 3컬럼을 읽고 쓴다(`20260826150000_affinity_source_split`, D). **출처 컬럼은 절대값으로 쓴다** — `increment`를 쓰면 날짜가 바뀐 날 전날 값에 더해진다. D가 컬럼만 만들고 배선은 안 한 상태였고, 두 방식을 남기면 죽은 컬럼 + 잠재 버그가 되므로 A가 갈아탔다
 - 커뮤니티 몫은 `affinityToday − 챗봇 몫`이다. 출처가 둘뿐이라 정확하다
 - **`messages/route.ts`는 메시지를 만들기 *전에* 누계를 잰다.** 만든 뒤에 세면 방금 만든 1턴이 포함돼 8턴째가 이미 40으로 읽히고 그 턴이 0을 받는다. 그 값을 `alreadyFromSource`로 넘긴다
 - `lib/reward.ts`(C 소유)는 **건드리지 않았다.** `capAffinity`는 총 상한만 보고, 출처 상한은 이 파일이 얹는다
@@ -530,6 +532,8 @@ grantAffinity(user, base, source = "COMMUNITY", alreadyFromSource?)
 커뮤니티 글1~3: +20씩 → 60       글4: +0
 최종 affinityToday 100 = 챗봇 40 + 커뮤니티 60
 ```
+
+**컬럼으로 갈아탄 뒤 같은 값으로 재측정했다**(2026-08-26). 실측 중에 한 번 전부 `+0`이 나왔는데 버그가 아니었다 — 그 계정이 앞선 검증으로 이미 총 상한 100을 채운 상태였다. **출처별 상한을 잴 때는 `affinityToday`가 0인지 먼저 본다.**
 
 **되돌리려면** `AFFINITY_CAP_BY_SOURCE`를 `{ CHAT: 100, COMMUNITY: 100 }`으로 두면 예전 동작이 된다.
 
