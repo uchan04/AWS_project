@@ -128,7 +128,14 @@
   --pet-wood-light: #c29f6e;
 
   display: grid;
-  align-content: start;
+  /* **2026-08-26 시안 개편: 줄을 못 박았다.** 머리(제목 + 안내 문구)가 auto, 방이 1fr이다.
+     min-height: 100%와 짝이라 방이 창 아래까지 내려간다 — 시안의 "방이 화면을 채운다"가
+     이 두 줄이다. 부모(#main-content)가 body.h-full.flex의 flex: 1이라 높이가 확정돼
+     있어서 %가 풀린다.
+     align-content: start를 지운 이유: 1fr이 남는 공간을 다 먹으므로 분배할 자유 공간이
+     0이고, 값이 남아 있으면 다음 사람이 "카드가 위로 뭉치는 규칙"으로 읽는다 */
+  grid-template-rows: auto 1fr;
+  min-height: 100%;
   gap: var(--space-sm);
   padding: var(--space-md);
   background: var(--color-paper);
@@ -178,23 +185,40 @@
 /* 지갑 카드(.pet-card--wallet)가 하던 일을 한 줄로 옮긴 것이다. 카드는 같은 요청에서
    지웠다 — 자세한 사정은 PetView의 그 자리 주석.
 
-   **모서리는 알약이 아니다.** 제공된 이미지의 반지름은 높이의 약 4분의 1이고 알약(2분의 1)이
-   아니다. --radius-card(20px)가 이 바 높이(약 60px)에서 그 비율에 가장 가깝다.
-
-   면은 --color-card다. 페이지 배경(--color-paper)보다 한 단 밝아서 바가 띠로 떠 보인다 —
-   카드들과 같은 규칙이라 이 화면에 새 색을 들이지 않는다.
-
-   flex-wrap이 있는 이유: 좁은 화면에서 재화 3종과 상점 2개가 한 줄에 안 들어가면 두 줄로
-   접힌다. 접힐 때 상점 쪽이 통째로 내려가도록 오른쪽 묶음을 div 하나로 싸 뒀다 */
+   **2026-08-26 시안 개편: 방 위의 블록 → 방 안 상단 중앙에 떠 있는 알약.**
+   같은 날 오전에 만든 마크업을 자리만 옮겼고 상점 버튼 2개가 빠졌다(펫꾸미기 모달로 갔다).
+   바뀐 값은 넷이다:
+   - position: absolute + top/left/translateX — 방 안에 뜬다
+   - 모서리가 --radius-card(20px) → --radius-pill. 상점 버튼이 빠져 높이가 44px 아래로
+     내려왔고, 그 높이에서 20px은 알약과 거의 같아 보이면서 각만 남는다. 시안도 알약이다
+   - justify-content: space-between을 지웠다 — 오른쪽에 밀어낼 상대(상점 묶음)가 없다
+   - 반투명 + 흐림. 방 그림 위에 뜨는 오버레이라 불투명 면이면 배경 그림을 가린다.
+     시안이 rgba(255,245,240,0.88) + blur(8px)이고, 여기서는 그 흰색을 이 앱의 카드색으로
+     바꿔 썼다(색을 새로 들이지 않는다). 88%면 배경 6종 위에서 숫자 명암비가 유지된다 */
 .pet-bar {
+  position: absolute;
+  top: var(--space-2xs);
+  /* **`left: 50%` + `translateX(-50%)`로 가운데를 잡으면 안 된다.** 절대 위치 요소의 폭은
+     shrink-to-fit이고 그 "가용 폭"이 left 오프셋부터 오른쪽 끝까지, 즉 **방의 절반**이 된다.
+     transform은 그 뒤에 눈에 보이는 자리만 옮기므로 폭 계산에 끼지 않는다.
+     실측: 375px에서 알약이 137px로 잡혀 두 줄로 접혔다(내용은 196px이 필요했다).
+     left/right를 0으로 열어 가용 폭을 방 전체로 만들고, `width: fit-content` + `margin: auto`로
+     가운데를 잡는다 — 이 조합은 폭을 먼저 내용으로 정하고 나서 남는 공간을 반씩 나눈다 */
+  left: 0;
+  right: 0;
+  width: fit-content;
+  margin-inline: auto;
+  z-index: calc(var(--z-raised) + 2);
   display: flex;
   flex-wrap: wrap;
   align-items: center;
-  justify-content: space-between;
   gap: var(--space-2xs) var(--space-sm);
-  padding: var(--space-2xs) var(--space-sm);
-  border-radius: var(--radius-card);
-  background: var(--color-card);
+  /* 방 안쪽 폭을 넘지 않는다. 좌우 여백은 Lv 오버레이(왼쪽)와 균형을 맞춘 값이다 */
+  max-width: calc(100% - var(--space-sm) * 2);
+  padding: var(--space-3xs) var(--space-2xs);
+  border-radius: var(--radius-pill);
+  background: color-mix(in oklch, var(--color-card) 88%, transparent);
+  backdrop-filter: blur(8px);
   box-shadow: var(--shadow-card);
 }
 
@@ -250,40 +274,280 @@
   font-variant-numeric: tabular-nums;
 }
 
-.pet-bar__shops {
+/* 여기에 **상점 입구 2개 규칙 3벌**(.pet-bar__shops · .pet-bar .pet-bar__shop ·
+   그 --ghost 변형)이 있었다. **2026-08-26 시안 개편으로 펫꾸미기 모달로 갔다** —
+   같은 값이 아래 .pet-modal__shop에 있고, 모양(채운 .pet-btn / 테두리형 .pet-btn--ghost)은
+   그대로다. 옮기면서 지운 것은 "한 줄에 들어가려고" 좁혔던 좌우 여백뿐이다 —
+   모달 안에서는 두 버튼이 세로로 쌓이므로 그 제약이 없다 */
+
+/* ── 좌상단 Lv + 경험치 오버레이 (2026-08-26 시안) ─────────────────────────── */
+
+/* 옛 "🍎 경험치" 카드가 여기로 왔다. 카드에서 온 것은 게이지(.pet-gauge) 하나이고
+   제목·이모지·각주는 오지 않았다 — 방 위에 얹는 오버레이는 **한눈에 읽히는 두 줄**이어야
+   한다. 각주("다음 단계까지 씨앗 N개")는 펫 정보 모달로 보냈다.
+
+   면 처리는 재화 알약과 같다(반투명 카드색 + blur) — 같은 방 위에 뜨는 두 오버레이가
+   재질이 다르면 하나는 UI, 하나는 가구로 읽힌다.
+
+   폭을 고정하지 않는다. 안쪽에서 폭을 정하는 것은 "350 / 2,600"이고 그 자릿수가 레벨에
+   따라 늘어난다 — min-width로 못 박으면 낮은 레벨에서 오른쪽이 비고, 높은 레벨에서 넘친다.
+   대신 게이지에 하한을 준다(아래 --gauge-w) — 그게 없으면 숫자가 짧을 때 막대가 같이
+   짧아져 게이지로 안 보인다 */
+.pet-hud-lv {
+  --gauge-w: 7rem;
+  position: absolute;
+  top: var(--space-2xs);
+  left: var(--space-2xs);
+  z-index: calc(var(--z-raised) + 2);
+  display: grid;
+  gap: var(--space-3xs);
+  padding: var(--space-2xs);
+  border-radius: var(--radius-card);
+  background: color-mix(in oklch, var(--color-card) 88%, transparent);
+  backdrop-filter: blur(8px);
+  box-shadow: var(--shadow-card);
+}
+
+/* 레벨은 이 오버레이에서 가장 큰 글자다. 알약을 씌우지 않은 이유: 이 상자 자체가 이미
+   알약 계열 면이고, 그 안에 또 알약을 넣으면 배지 안 배지가 된다 */
+.pet-hud-lv__level {
+  margin: 0;
+  font-family: var(--font-display);
+  font-size: var(--text-body);
+  color: var(--color-ink);
+  line-height: 1.2;
+}
+
+.pet-hud-lv .pet-gauge {
+  min-width: var(--gauge-w);
+}
+
+/* 옛 카드의 .pet-card__meta와 같은 값(라벨 크기 + muted)이다. tabular-nums는 카운트가
+   오를 때 자릿수가 바뀌어도 게이지 오른쪽 끝이 흔들리지 않게 한다 */
+.pet-hud-lv__exp {
+  margin: 0;
+  text-align: right;
+  font-size: var(--text-label);
+  color: var(--color-muted);
+  font-variant-numeric: tabular-nums;
+}
+
+/* ── 좌우 원형 버튼 스택 (2026-08-26 시안) ─────────────────────────────────── */
+
+/* 방 안 좌우에 세로로 붙는다. 가운데(펫·말풍선·쪽지)를 피해 양 끝에 두는 것이 시안이고,
+   그래야 방 그림의 주인공이 가려지지 않는다.
+
+   **top: 50% + translateY(-50%)를 쓰지 않는다.** 시안은 그 방식인데, 버튼 수가 좌(5)·우(3)로
+   달라서 가운데 정렬하면 두 스택의 첫 버튼 높이가 어긋난다. 위에서부터 쌓되 Lv 오버레이
+   아래에서 시작하도록 top을 고정한다 — 두 스택의 첫 줄이 같은 높이에서 시작한다.
+
+   pointer-events는 건드리지 않는다. 이 상자는 버튼 크기만큼만 차지하므로(폭이 내용 폭)
+   방을 덮지 않고, 펫 쓰다듬기 클릭을 막지 않는다 */
+.pet-actions {
+  position: absolute;
+  /* Lv 오버레이 아래에서 시작한다. 그 상자가 8px(top) + 88px(높이) = 96px을 쓰므로
+     6.5rem(104px)이면 8px 여유가 남는다 — 6rem이면 정확히 맞닿아 붙어 보인다 */
+  top: 6.5rem;
+  z-index: calc(var(--z-raised) + 2);
   display: flex;
-  align-items: center;
+  flex-direction: column;
   gap: var(--space-2xs);
 }
 
-/* 상점 입구 2개. **모양은 이 파일에 이미 있는 두 버튼을 그대로 쓴다**(사용자 요청
-   "기존의 이미지를 갖고 와서") — 채운 .pet-btn과 테두리형 .pet-btn--ghost다.
-   여기서 더하는 것은 알약 모서리와 두 버튼의 글자를 맞추는 것뿐이다.
+.pet-actions--left {
+  left: var(--space-2xs);
+}
 
-   **선택자가 .pet-bar .pet-bar__shop(0,2,0)인 것은 특이도 때문이다.** .pet-btn--ghost가
-   font-size: --text-label을 갖고 파일 뒤쪽(2800줄대)에 있어서, 클래스 하나(0,1,0)로 두면
-   순서로 져 두 버튼의 글자 크기가 갈린다. 제공된 이미지의 두 라벨은 같은 크기다.
+.pet-actions--right {
+  right: var(--space-2xs);
+  /* 라벨을 오른쪽 끝에 맞춘다 — 왼쪽 스택은 왼쪽 정렬이라 두 스택이 방 바깥쪽을 향한다 */
+  align-items: flex-end;
+}
 
-   높이는 --control-h(44px)를 .pet-btn에서 물려받는다. 이미지의 버튼은 바 높이에 비해
-   더 납작하지만 design.md의 44px 터치 하한을 내리지 않는다 — 이 바는 모바일에도 나온다 */
-.pet-bar .pet-bar__shop {
+/* 버튼 하나. 아이콘 원 + 라벨 알약이고 둘이 세로로 붙는다(시안 구조).
+   <button>과 <Link>가 같은 클래스를 쓴다 — 우측 스택은 링크다(CircleBtn 주석) */
+.pet-circle {
+  display: grid;
+  justify-items: center;
+  gap: 0.2rem;
+  padding: 0;
+  border: none;
+  background: none;
+  text-decoration: none;
+  cursor: pointer;
+  /* 시안이 hover에서 1.1배, active에서 0.95배로 튄다. 이 앱의 다른 버튼은 1px 눌림이라
+     그쪽에 맞춘다 — 한 화면에서 버튼이 두 방식으로 반응하면 다른 물건으로 읽힌다 */
+  transition: transform var(--dur-micro) var(--ease-out);
+}
+
+.pet-circle:active:not(:disabled) {
+  transform: translateY(1px);
+}
+
+.pet-circle:disabled {
+  cursor: default;
+}
+
+/* 아이콘 원. 면·번짐은 이 화면의 주 버튼(.pet-btn)과 같은 종족색 계열이다 —
+   새 색을 만들지 않는다. 3rem(48px)은 design.md의 44px 터치 하한 위이고, 라벨까지
+   합치면 한 버튼이 약 68px이라 좌측 5개가 340px 안에 들어간다(방 높이 하한 432px) */
+.pet-circle__icon {
+  display: grid;
+  place-items: center;
+  width: 3rem;
+  height: 3rem;
+  border-radius: var(--radius-pill);
+  background: var(--pet-gloss), linear-gradient(135deg, var(--tribe-face), var(--tribe));
+  box-shadow: var(--pet-gloss-edge), 0 4px 12px color-mix(in oklch, var(--tribe) 38%, transparent);
+  font-size: var(--text-md);
+  line-height: 1;
+}
+
+/* 열려 있는 모달의 버튼. 면을 한 단 어둡게 해 "지금 이걸 보고 있다"를 남긴다 */
+.pet-circle[data-active="true"] .pet-circle__icon {
+  background: var(--pet-gloss), linear-gradient(135deg, var(--tribe), var(--tribe-cta));
+}
+
+/* 못 누르는 버튼(외출 중, 친밀도 부족, 요청 진행 중)은 뜨지 않는다 —
+   .pet-btn:disabled와 같은 처리다(번짐이 남으면 누를 수 있어 보인다) */
+.pet-circle:disabled .pet-circle__icon {
+  background: var(--color-paper-2);
+  box-shadow: none;
+  opacity: 0.7;
+}
+
+/* 라벨 알약. 방 그림 위에 글자만 두면 배경 6종 중 밝은 셋에서 읽히지 않으므로 면을 깐다.
+   재화 알약과 같은 반투명 카드색이다 */
+.pet-circle__label {
+  padding: 0.1rem var(--space-2xs);
+  border-radius: var(--radius-pill);
+  background: color-mix(in oklch, var(--color-card) 85%, transparent);
+  backdrop-filter: blur(4px);
+  font-size: var(--text-label);
+  font-weight: 600;
+  color: var(--color-ink);
+  white-space: nowrap;
+}
+
+/* 라벨 아래 한 줄. 지금은 외출 버튼의 "친밀도 N 부족" 하나뿐이다 */
+.pet-circle__note {
+  font-size: 0.64rem;
+  color: var(--color-strong);
+  white-space: nowrap;
+}
+
+/* ── 모달 (2026-08-26 시안) ────────────────────────────────────────────────── */
+
+/* 카드 5장이 여기로 들어갔다. position: fixed라 방 경계와 무관하다 — 방 안에 두면
+   .pet-room의 overflow: hidden이 모달을 자른다.
+
+   **z-index가 --z-modal(300)이다.** 챗봇 대화창이 Tailwind z-50이므로 이 모달이 그 위에
+   온다. 서열 충돌로 보이지만 실제로 부딪히지 않는다: 이 모달이 열려 있으면 화면 가운데가
+   덮여 챗봇 버튼(우상단 z-40)을 누를 수 없고, 챗봇이 열려 있으면 방이 대화창 뒤에 있어
+   원형 버튼을 누를 수 없다. 둘이 동시에 열리는 경로가 없다.
+   (같은 파일의 .pet-welcome은 그 반대로 11까지 **내렸다** — 그쪽은 대화창과 겹치는 경로가
+   실제로 있었다. 2026-08-26 z 척도 불일치 기록 참고) */
+.pet-modal {
+  position: fixed;
+  inset: 0;
+  z-index: var(--z-modal);
+  display: grid;
+  place-items: center;
+  padding: var(--space-sm);
+}
+
+.pet-modal__scrim {
+  position: absolute;
+  inset: 0;
+  background: rgb(42 31 20 / 0.35);
+}
+
+/* 내용 상자. .pet-card와 같은 면·반지름을 쓰되 그림자만 깊다 — 카드는 종이 위에 놓인
+   것이고 이것은 화면 위에 떠 있는 것이다.
+   max-height + overflow-y는 씨앗 투입(스테퍼 + 프리셋 4개 + 버튼 + 각주)과 펫 정보
+   (게이지 + 진화 4칸 + 각주 + 링크)가 낮은 창에서 넘치기 때문에 있다 */
+.pet-modal__box {
+  position: relative;
+  z-index: 1;
+  display: grid;
+  gap: var(--space-sm);
+  width: min(22rem, 100%);
+  max-height: calc(100dvh - var(--space-lg));
+  overflow-y: auto;
+  padding: var(--space-md);
+  border-radius: var(--radius-card);
+  background: var(--color-card);
+  box-shadow: 0 12px 40px rgb(42 31 20 / 0.28);
+}
+
+/* 진화 단계 4칸이 한 줄로 들어가야 하는 펫 정보 모달만 넓다 — 두 줄로 접히면
+   "1 → 2 → 3 → 4" 순서가 한눈에 안 들어온다 */
+.pet-modal__box[data-wide="true"] {
+  width: min(34rem, 100%);
+}
+
+/* 닫기 ✕. 오른쪽 위 모퉁이에 절대 위치로 두는 것은 이 앱의 다른 모달 두 개와 같다.
+   안쪽 내용이 카드 마크업 그대로라 제목 줄에 자리를 만들 수 없다(제목 오른쪽은
+   .pet-card__meta 것이다) */
+.pet-modal__close {
+  position: absolute;
+  top: var(--space-2xs);
+  right: var(--space-2xs);
+  display: grid;
+  place-items: center;
+  width: 2rem;
+  height: 2rem;
+  border: none;
+  border-radius: var(--radius-pill);
+  background: none;
+  color: var(--color-muted);
+  font-size: var(--text-label);
+  cursor: pointer;
+}
+
+.pet-modal__close:hover {
+  background: var(--color-paper-2);
+  color: var(--color-ink);
+}
+
+/* 펫 정보 모달의 진화 4칸을 **한 줄로 못 박는다.**
+   본체(.pet-evo__list)는 `auto-fit minmax(min(8rem, 100%), 1fr)`이라 칸 하한이 128px이다.
+   wide 모달(544px)의 안쪽은 496px이고 gap 24를 빼면 칸당 118px이라 하한에 걸려 3 + 1로
+   갈린다 — 실측했다. 모달을 더 넓히는 대신 칸 수를 고정한 이유: 폭으로 맞추면 창이
+   608px보다 좁아지는 순간 다시 접히고, 그 폭은 흔하다.
+   `minmax(0, 1fr)`의 0이 필요하다 — 기본값 auto는 내용 최소 폭이라 여기서도 넘친다.
+
+   560px 아래에서는 2 × 2다. 4열을 유지하면 칸이 60px 아래로 내려가 "1단계 · 잠김" 같은
+   라벨이 두 줄로 접힌다. 2 × 2는 "1 → 2 / 3 → 4"로 여전히 순서가 읽힌다 */
+.pet-modal .pet-evo__list {
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+}
+
+@media (max-width: 560px) {
+  .pet-modal .pet-evo__list {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+}
+
+/* 펫꾸미기 모달의 상점 입구 2개. 옛 .pet-bar__shop이 하던 일을 그대로 한다 —
+   달라진 것은 세로로 쌓는다는 것뿐이라 폭을 좁힐 이유가 없어졌다(--space-md로 되돌렸다) */
+.pet-modal__shops {
+  display: grid;
+  gap: var(--space-2xs);
+}
+
+.pet-modal .pet-modal__shop {
   display: grid;
   place-items: center;
   border-radius: var(--radius-pill);
-  /* --space-md(24px)가 아니라 --space-sm(16px)이다. 위 .pet-bar__item과 같은 이유 —
-     좌우로 32px을 벌면 한 줄이 유지되는 폭이 그만큼 내려간다 */
-  padding: 0 var(--space-sm);
+  padding: 0 var(--space-md);
   text-decoration: none;
   white-space: nowrap;
   font-size: var(--text-label);
   font-weight: 600;
 }
 
-/* 테두리형 버튼의 면만 흰색으로 올린다. .pet-btn--ghost 본체는 --color-card인데 이 바의
-   면도 --color-card라 그대로 두면 테두리 안쪽이 바와 같은 색이 된다(제공된 이미지는
-   바보다 밝은 면이다). 명암차는 1.07:1로 작지만, 이 버튼이 눌리는 물건으로 보이는 근거가
-   2px 테두리 하나만 남는 것을 피한다 */
-.pet-bar .pet-bar__shop.pet-btn--ghost {
+.pet-modal .pet-modal__shop.pet-btn--ghost {
   background: #fff;
 }
 
@@ -358,80 +622,46 @@
 
 /* ── 2단 그리드 ──────────────────────────────────────────────────────────── */
 
-.pet__grid {
-  display: grid;
-  grid-template-columns: 6fr 4fr;
-  align-items: stretch;
-  gap: var(--space-sm);
-}
+/* ── 스테이지 (2026-08-26 시안 개편) ─────────────────────────────────────────── */
 
-.pet__col {
-  display: grid;
-  align-content: start;
-  gap: var(--space-sm);
-  min-width: 0;
-}
+/* 여기에 **2열 격자(.pet__grid 6fr/4fr)와 두 열(.pet__col, --room, --side)**이 있었다.
+   왼쪽에 방, 오른쪽에 카드 5장이 쌓이는 구조였다.
+   **2026-08-26 사용자 시안(Figma Make "Reorganize Pet App Layout")으로 걷었다** —
+   카드가 전부 모달·오버레이로 갔으므로 열이 하나도 남지 않는다.
 
-/* **2026-08-26: `1fr auto` → `auto`.** 지갑 카드를 지운(사용자 요청) 뒤 이 열에 방 하나만
-   남았는데, `1fr`이 남아 있으면 방이 **오른쪽 열 높이만큼 늘어난다.** 실측 1054px이었고
-   (설계값 432px) 펫과 쪽지가 화면 밖으로 내려갔다 — 둘 다 방 아래쪽에 붙어 있기 때문이다.
+   되살릴 때의 값:
+   - .pet__grid — grid · grid-template-columns: 6fr 4fr · align-items: stretch · gap --space-sm
+   - .pet__col — grid · align-content: start · gap --space-sm · min-width: 0
+   - .pet__col--room — grid-template-rows: auto (2026-08-26 오전에 `1fr auto`에서 바꾼 값이다.
+     `1fr`이면 방이 오른쪽 열 높이만큼 늘어나 펫이 화면 밖으로 내려갔다 — 아래 .pet-stage가
+     그 문제를 구조로 없앤다)
+   - .pet__col--side — flex 열 + 카드 하나가 1fr(오른쪽 열 바닥을 왼쪽과 맞추는 값)
 
-   **늘어난 방은 이 파일의 계산 전제를 깬다.** 말풍선 자리 상한은 "27 − 7 − 0.5 = 19.5rem"
-   처럼 방 높이 27rem을 상수로 놓고 구한 값이고(.pet-welcome 주석), 쪽지의 `bottom: 20%`도
-   27rem의 20% = 5.4rem을 뜻한다. 1054px 방에서는 그 20%가 211px이 되어 둘 다 어긋난다.
-   그러니까 이건 카드를 지워서 생긴 문제가 아니라, 카드가 가려 주던 잠재 버그다 —
-   카드가 있을 때도 방은 이미 설계값보다 늘어나 있었다(약 796px).
-
-   대가: 왼쪽 열이 오른쪽 열보다 짧아 아래에 빈 자리가 생긴다. 그래도 이쪽을 고른 이유는
-   **이 화면의 주인공이 펫이고, 스크롤해야 보이는 펫보다 빈 자리가 낫다**는 것이다.
-   2026-08-24의 "왼쪽 카드랑 밑 끝나는 지점 맞게" 요청은 왼쪽 열 **카드**의 바닥을 맞추라는
-   것이었고, 그 카드가 이제 없다 */
-.pet__col--room {
-  grid-template-rows: auto;
-}
-
-/* 오른쪽 열 (2026-08-24 사용자 요청: "왼쪽 카드랑 밑 끝나는 지점 맞게").
-
-   두 열의 **상자**는 이미 같은 높이였다 — .pet__grid이 align-items: stretch다. 어긋나
-   보이던 건 안쪽이다: .pet__col이 align-content: start라 카드가 위로 뭉치고 남는 높이가
-   맨 아래에 여백으로 남는다. 왼쪽 열만 grid-template-rows: 1fr auto라 방이 그 여백을
-   먹고 지갑 카드가 바닥에 붙어 있었다.
-
-   왼쪽처럼 줄 수를 못 박을 수는 없다. 오른쪽 열의 카드 수가 3개 아니면 4개로 바뀐다
-   (오늘의 활동은 오늘 값 3종이 다 0이면 렌더되지 않는다). 그래서 이 열만 flex로 바꾸고
-   마지막 카드에 margin-top: auto를 준다 — flex의 auto 여백은 컨테이너에 남는 공간을
-   먹으므로 그 카드가 바닥으로 내려간다.
-
-   grid로는 안 된다. align-content: start에서 남는 공간은 컨테이너 것이고, grid 아이템의
-   margin: auto는 자기가 배정받은 칸 안에서만 정렬한다. 컨테이너의 여백은 건드리지 못한다.
-
-   **:last-child가 아니라 .pet-card--today를 지목한 이유**: 오늘의 활동이 없는 날에는
-   씨앗 투입이 마지막 카드가 되고, 그게 바닥으로 내려가면 위 카드들과 사이에 200px짜리
-   구멍이 생긴다. 카드가 하나 빠진 날은 지금처럼 위에서부터 쌓이는 것이 맞다.
-
-   flex-shrink는 0으로 묶는다. flex 아이템은 기본이 1이라, 오른쪽 열이 더 길어서 높이를
-   정하는 쪽이 됐을 때(넓은 화면에서 흔하다 — 아래 .pet-room 주석) 반올림 오차만큼
-   카드가 눌릴 수 있다. 방어용이다.
-
-   **2026-08-24 두 번째 요청("오늘의 활동 카드의 세로를 길게해서 위에 있는 여백을 없게
-   꽉차게")으로 margin-top: auto를 flex-grow: 1로 바꿨다.** 둘 다 남는 공간을 먹는데
-   먹는 주체가 다르다 — auto 여백은 그 공간을 **빈 채로** 카드 위에 두고(카드는 바닥에
-   붙고 위가 뚫린다), flex-grow는 같은 공간을 **카드 높이로** 준다. 카드 바닥이 왼쪽 열과
-   맞는 것은 그대로다(그게 8/24 첫 요청이었다).
-   카드가 하나 빠진 날의 동작도 그대로다: 이 규칙이 :last-child가 아니라 오늘의 활동만
-   지목하므로, 그 카드가 없으면 아무도 늘어나지 않고 위에서부터 쌓인다 */
-.pet__col--side {
+   **.pet-stage가 그 자리를 대신한다.** 방 하나뿐이므로 열 개념이 필요 없고, 남는 높이를
+   방이 갖는 것이 이제 의도다(전에는 사고였다). `min-height: 0`은 flex 자식이 내용보다
+   작아질 수 있게 하는 값이다 — 없으면 방이 min-height 27rem 아래로 못 내려가 좁고 낮은
+   창에서 페이지가 넘친다 */
+.pet-stage {
+  /* 버튼 스택의 absolute 기준이다. 스테이지 안에 방 하나뿐이고 방이 flex: 1이라
+     이 사각형과 방의 사각형이 같다 — 그래서 스택을 방 **밖**(스테이지 안)에 두고도
+     방 위에 얹은 것처럼 앉는다.
+     스택을 방 안에 두지 않은 이유는 좁은 화면이다: 방 안에 있으면 absolute를 풀 수 없고
+     (풀면 방의 flex 흐름에 끼어 펫 옆에 선다), 얹은 채로 두면 버튼 8개가 펫을 덮는다 */
+  position: relative;
   display: flex;
+  /* 좁은 화면에서 스택이 static으로 풀리면 이 방향으로 흐른다 — 방 아래에 줄로 선다.
+     넓은 화면에서는 스택이 absolute라 흐름에서 빠지고 방 혼자 남으므로 column이 무해하다 */
   flex-direction: column;
+  gap: var(--space-2xs);
+  min-height: 0;
 }
 
-.pet__col--side > * {
-  flex-shrink: 0;
-}
-
-.pet__col--side > .pet-card--today {
-  flex-grow: 1;
-}
+/* 여기에 **.pet__col--room / .pet__col--side 규칙 4벌**이 있었다 (위 .pet-stage 주석의
+   되살릴 값 목록 참고). 오른쪽 열이 flex 열이고 .pet-card--today가 flex-grow: 1로 남는
+   높이를 먹어 왼쪽 열 바닥과 맞추는 구조였다(2026-08-24 사용자 요청 두 건의 결과다).
+   **2026-08-26 시안 개편으로 열이 사라져 함께 걷었다.**
+   아래 .pet-card--today의 grid-template-rows 두 줄은 남긴다 — 그 카드가 모달 안에서도
+   같은 골격을 쓰고, 자유 공간이 0이면 1fr이 내용 높이로 풀려 지금과 같다 */
 
 /* 늘어난 높이를 **안에서도** 쓴다. .pet-card는 display: grid + align-content: start라
    카드만 키우면 제목·타일이 위에 뭉치고 여백이 카드 안으로 옮겨 갈 뿐이다
@@ -456,10 +686,15 @@
    ("캐릭터 80% 정도 크기로 조정해줘") → 거기서 7% 더("7% 더 크게 만들어줘").
    단계별 크기·말풍선 자리·발밑 그림자가 전부 아래 --pet-char-size 하나에서 나온다.
 
-   min-height는 **하한**이다. 오른쪽 열(재화·경험치·수확·투입·진화 카드)이 더 길면
-   .pet__grid의 align-items: stretch가 방을 그 높이까지 늘리므로, 넓은 화면에서 이 값을
-   올려도 눈에 안 보일 수 있다 — 그때는 이미 오른쪽 열이 높이를 정하고 있는 것이다 */
+   min-height는 **하한**이다. **2026-08-26 시안 개편으로 실제 높이는 `flex: 1`이 정한다** —
+   방이 .pet-stage의 유일한 자식이고 .pet이 `grid-template-rows: auto 1fr`이라 창 아래까지
+   내려온다. 전에는 이 자리에 "오른쪽 열이 더 길면 stretch가 방을 그 높이까지 늘린다"고
+   적혀 있었다. 늘어나는 것 자체는 같지만 **기준이 남의 열 높이에서 창 높이로 바뀌었다** —
+   그래서 방 안 요소를 방 높이의 %로 붙이면 안 된다(아래 .pet-away 주석) */
 .pet-room {
+  /* 스테이지가 준 높이를 다 받는다. min-height(27rem)는 창이 그보다 낮을 때의 하한으로
+     남고, 그 경우 페이지가 스크롤된다 */
+  flex: 1;
   /* 펫 그림 크기 (2026-08-24 사용자 요청 세 번 — 아래 :has() 네 줄의 주석 참고).
      기본값은 stageCount = 1인 단일 형태 캐릭터가 쓰는 중간 크기다
      (9 → 18 → 14.4 → 15.4rem). 단계별 값은 아래 :has() 네 줄에 있고, 여기서 한 번 상한을
@@ -904,12 +1139,15 @@
   --away-tape: #e9b93c;
   --away-tape-edge: #cf9c22;
   position: absolute;
-  /* 펫이 서 있던 자리보다 조금 위. 방 높이가 27rem(좁은 화면 22rem)이고 이 쪽지가
-     9.5rem이라 바닥에서 20%(5.4rem)면 아래로도 위로도 잘리지 않는다 — 위로 9.5 + 5.4 =
-     14.9rem이라 좁은 화면(22rem)에서도 7rem이 남고 테이프가 삐져나올 자리가 있다.
-     펫 크기(--pet-char-w)에 맞물리지 않는 값이라 단계별로 갈리지 않는다 — 펫이 없는
-     화면이므로 맞물릴 대상이 애초에 없다 */
-  bottom: 20%;
+  /* **2026-08-26 시안 개편: `20%` → 펫 크기 기준.** 20%는 "27rem 방의 20% = 5.4rem"을
+     뜻하던 값이고, 방이 창 높이를 받게 된 지금(위 .pet-room의 flex: 1) 800px 방에서는
+     160px이 되어 쪽지가 방 가운데로 붕 뜬다. 방 높이에 비례해서는 안 되는 자리였다 —
+     쪽지는 **펫이 서 있던 자리**에 놓인 물건이고, 그 자리는 방 높이와 무관하다.
+     말풍선(.pet-welcome)이 이미 `calc(var(--pet-char-w) * 0.81)`로 그렇게 하고 있었고,
+     이 값은 그보다 낮다(0.55) — 말풍선은 펫 머리 위, 쪽지는 펫이 서던 바닥 쪽이다.
+     펫이 없는 상태(AWAY)라 --pet-char-w가 가리키는 그림은 없지만, 값 자체는 방이 아는
+     "펫 한 마리 크기"이고 단계에 따라 함께 움직이는 것이 맞다 */
+  bottom: calc(var(--pet-char-w) * 0.55);
   left: 50%;
   /* 회전이 뒤에 온다: 먼저 자기 폭의 절반만큼 왼쪽으로 옮겨 가운데에 서고, 그 자리에서
      자기 중심을 축으로 돈다. 순서를 바꾸면 회전한 좌표계에서 옮겨져 가운데를 벗어난다.
@@ -3192,12 +3430,63 @@
     padding: var(--space-sm);
   }
 
-  /* 2단을 1단으로. 방 → 재화·상점 → 경험치 → 수확 → 투입 → 오늘의 활동 → 진화 순으로
-     흐른다(오늘의 활동은 2026-08-24에 투입 아래로 내려왔다. .pet__col--side 주석 참고 —
-     한 열이 되면 열 높이가 내용 높이라 남는 공간이 없고, 그 열의 flex-grow: 1은 아무것도
-     늘리지 않는다. 카드가 넓은 화면에서만 길어지는 것은 여백이 거기에만 있기 때문이다) */
-  .pet__grid {
-    grid-template-columns: 1fr;
+  /* 여기에 `.pet__grid { grid-template-columns: 1fr }`가 있었다 — 2열을 1열로 접어
+     방 → 재화 → 경험치 → 수확 → 투입 → 오늘의 활동 → 진화 순으로 흐르게 하던 값이다.
+     **2026-08-26 시안 개편으로 열이 사라져 걷었다**(위 .pet-stage 주석).
+
+     대신 이 폭에서는 **원형 버튼이 작아진다.** 375px 방 안쪽이 약 279px인데 좌우 스택이
+     3rem(48px) + 라벨이면 두 스택이 방의 절반을 먹고 펫 자리가 150px 아래로 내려간다.
+     2.5rem(40px)으로 줄이면 두 스택이 약 200px이고 펫이 그만큼 넓게 선다.
+     **40px은 design.md의 44px 터치 하한 아래다** — 다만 하한이 요구하는 것은 터치 **면적**
+     이고, 이 버튼은 아이콘 원 아래 라벨 알약까지가 한 <button>이라 실제 높이가
+     40 + 라벨 약 20 = 60px이다. 폭은 라벨 쪽이 더 넓어 44px을 넘는다 */
+  .pet-circle__icon {
+    width: 2.5rem;
+    height: 2.5rem;
+    font-size: var(--text-body);
+  }
+
+  /* **이 폭에서는 Lv 오버레이와 재화 알약이 한 줄에 못 선다.** 375px에서 방 안쪽이 279px인데
+     Lv 상자가 96px, 알약이 197px이라 합이 293px이다(실측). 그래서 **세로로 쌓는다** —
+     알약이 맨 위 가운데, Lv이 그 아래 왼쪽, 버튼 스택이 그 아래다.
+     넓은 화면에서는 둘이 같은 줄에 있는 것이 시안이고, 이 폭만 예외다 */
+  .pet-hud-lv {
+    --gauge-w: 5rem;
+    top: 3.25rem;
+  }
+
+  /* 알약도 좁혀야 한 줄이 유지된다. 안 좁히면 247px 안에서 3줄로 접히고(실측 h 85px)
+     접힌 알약이 Lv 상자 위로 내려앉는다.
+     세 값 합쳐 약 60px을 번다: 칸 여백 8 → 4(3칸이라 24) · 칸 사이 16 → 8 · 숫자 16 → 12.8px */
+  .pet-bar {
+    gap: var(--space-3xs) var(--space-2xs);
+  }
+
+  .pet-bar__item {
+    padding: 0 var(--space-3xs);
+  }
+
+  .pet-bar__value {
+    font-size: var(--text-label);
+  }
+
+  /* **이 폭에서는 스택을 방 위에 얹지 않는다.** 방이 240~279px인데 좌우 스택이 가로로
+     151px을 먹고, 남는 73px 띠에는 쪽지(240px)도 펫(246px)도 들어가지 않는다. 방 아래쪽
+     가로 줄로 내려도 8개 버튼이 펫(272px)을 덮었다 — 두 자리 다 실측으로 막혔다.
+     그래서 absolute를 **풀어** 방 밖(.pet-stage 안)으로 흐르게 한다. 페이지가 그만큼
+     길어지지만 방 안은 펫과 쪽지가 온전히 쓴다.
+     좌측 그룹이 위 줄, 우측 그룹이 아래 줄이다 — 자주 누르는 것이 위에 온다 */
+  .pet-actions {
+    position: static;
+    flex-direction: row;
+    flex-wrap: wrap;
+    justify-content: center;
+    gap: var(--space-2xs);
+  }
+
+  /* 세로 스택에서 쓰던 오른쪽 정렬을 되돌린다 — 가로 줄에서는 가운데다 */
+  .pet-actions--right {
+    align-items: center;
   }
 
   .pet__top {
@@ -3261,6 +3550,7 @@
   .pet {
     padding: var(--space-2xs);
   }
+
 
   .pet-card {
     padding: var(--space-2xs);
