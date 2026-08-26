@@ -15,10 +15,18 @@ import {
   OUTING_COMBINATIONS,
   OUTING_COST_AFFINITY,
   OUTING_HOURS,
-  OUTING_MET,
   OUTING_MOODS,
   OUTING_MS,
   OUTING_PLACES,
+  OUTING_RESULTS,
+  OUTING_OPENERS,
+  OUTING_LEAD_FIRST,
+  OUTING_LEAD_MID,
+  OUTING_LEAD_LAST,
+  OUTING_LEGS_MIN,
+  OUTING_LEGS_MAX,
+  OUTING_MIN_STAGE,
+  OUTING_RECENT_AVOID,
   OUTING_REWARD_MAX,
   OUTING_REWARD_MIN,
   PET_GREETINGS,
@@ -36,6 +44,10 @@ import {
   lineIndex,
   outingAwayLine,
   outingEpisode,
+  outingDiary,
+  outingComboKey,
+  canGoOuting,
+  rollOutingLegs,
   outingPlacesForStage,
   outingProgress,
   outingRemainingLabel,
@@ -741,43 +753,50 @@ for (let i = 0; i <= 100; i += 1) {
 // 문구는 **사용자가 쓴다.** 지금 들어 있는 19줄은 C의 초안이다.
 // PET_GREETINGS·PET_IDLE_LINES가 그랬듯 사용자 문장으로 갈리면 아래 원문도 함께 고친다 —
 // 그것이 이 단정의 목적이다(문장이 조용히 다듬어지는 것을 막는다).
-assert.equal(OUTING_PLACES.length, 8)
-assert.equal(OUTING_MET.length, 6)
-assert.equal(OUTING_MOODS.length, 5)
-assert.equal(OUTING_COMBINATIONS, 240)
+assert.equal(OUTING_PLACES.length, 15)
+assert.equal(OUTING_MOODS.length, 8)
+// 장소마다 사건 4개 · 만난것 3개가 정확히 있어야 한다. 하나만 비면 그 장소가 늘 같은 말을 한다
+for (const p of OUTING_PLACES) {
+  assert.equal(p.deeds.length, 4, `${p.key}: 사건이 4개여야 한다`)
+  assert.equal(p.sights.length, 3, `${p.key}: 만난것이 3개여야 한다`)
+}
+// 결과는 유형 6개 × 3개다. **2 : 1 비율의 자리**이므로 개수가 바뀌면 톤 규칙이 깨진다
+assert.equal(Object.keys(OUTING_RESULTS).length, 6)
+for (const [tag, lines] of Object.entries(OUTING_RESULTS)) {
+  assert.equal(lines.length, 3, `OUTING_RESULTS.${tag}: 3개여야 한다`)
+}
+// 작성량 — 문구가 조용히 줄어드는 것을 막는다
+assert.equal(
+  OUTING_PLACES.reduce((n, p) => n + p.deeds.length, 0),
+  60,
+  "사건 60개",
+)
+assert.equal(
+  OUTING_PLACES.reduce((n, p) => n + p.sights.length, 0),
+  45,
+  "만난것 45개",
+)
 
-assert.deepEqual(
-  OUTING_PLACES.map((p) => p.text),
-  [
-    "창가에 한참 앉아 있었어.",
-    "부엌 쪽을 탐험했어.",
-    "문 앞 계단까지 나가 봤어.",
-    "골목 담벼락을 따라 걸었어.",
-    "동네 공원에 갔어.",
-    "버스 정류장 앞에 서 있었어.",
-    "강가까지 갔다 왔어.",
-    "사람 많은 길을 지나왔어.",
-  ],
-)
-assert.deepEqual(
-  OUTING_MET.map((m) => m.text),
-  [
-    "고양이 한 마리가 나를 쳐다봤어.",
-    "낮잠 자는 강아지 옆을 조용히 지나갔어.",
-    "빨래 걷는 할머니가 계셨어.",
-    "이름 모를 꽃이 피어 있었어.",
-    "나보다 훨씬 큰 나무가 있었어.",
-    "종이봉투를 든 사람이 지나갔어.",
-  ],
-)
+// 단계별 장소 5곳씩. 한쪽으로 쏠리면 그 단계 사용자가 같은 곳만 본다
+for (const stage of [2, 3, 4]) {
+  assert.equal(
+    OUTING_PLACES.filter((p) => p.stage === stage).length,
+    5,
+    `${stage}단계 장소가 5곳이어야 한다`,
+  )
+}
+
 assert.deepEqual(
   OUTING_MOODS.map((m) => m.text),
   [
     "그냥 좋았어.",
-    "조금 무서웠는데 괜찮았어.",
+    "조금 무서웠는데 해보니까 괜찮았어.",
     "아무 생각도 안 났어.",
-    "오래 보고 있었어.",
+    "계속 보고 있었어.",
     "돌아오는 길에 네 생각이 났어.",
+    "좀 피곤해서 오는 길에 하품했어.",
+    "조용해서 좋았어.",
+    "별일은 없었어.",
   ],
 )
 assert.equal(OUTING_AWAY_LINES.length, 3)
@@ -786,10 +805,23 @@ assert.deepEqual(
   ["방금 나갔어. 잘 다녀올게.", "지금 {where}쯤이야.", "이제 돌아가는 중이야."],
 )
 
+// 전환어. 이것이 없으면 문단이 순간이동한다
+assert.equal(Object.keys(OUTING_OPENERS).length, 3)
+for (const [stage, lines] of Object.entries(OUTING_OPENERS)) {
+  assert.equal(lines.length, 2, `OUTING_OPENERS[${stage}]: 2개여야 한다`)
+}
+assert.equal(OUTING_LEAD_FIRST.length, 3)
+assert.equal(OUTING_LEAD_MID.length, 4)
+assert.equal(OUTING_LEAD_LAST.length, 2)
+// 기분 문장과 겹치면 "돌아오는 길에 … 돌아오는 길에 네 생각이 났어"가 된다
+for (const lead of [...OUTING_LEAD_FIRST, ...OUTING_LEAD_MID, ...OUTING_LEAD_LAST]) {
+  assert.ok(!lead.includes("돌아오는 길에"), `전환어가 기분 문장과 겹친다: "${lead}"`)
+}
+
 // where는 "지금 …쯤이야"에 그대로 박히는 짧은 명사다. 문장이 들어오면 말이 깨진다.
 // 공백은 막지 않는다 — "문 앞"처럼 두 낱말인 장소명이 있고 "지금 문 앞쯤이야"는 자연스럽다
 for (const p of OUTING_PLACES) {
-  assert.ok(p.where.length > 0 && p.where.length <= 4, `${p.key}: where가 너무 길다 (${p.where})`)
+  assert.ok(p.where.length > 0 && p.where.length <= 6, `${p.key}: where가 너무 길다 (${p.where})`)
   assert.ok(!p.where.endsWith("."), `${p.key}: where가 문장이다 (${p.where})`)
 }
 // 치환 자리가 정확히 한 곳 있어야 한다. 오타가 나면 화면에 "{where}"가 그대로 나온다
@@ -802,50 +834,203 @@ assert.equal(
 // 키가 겹치면 find()가 앞의 것만 잡아 뒤의 문장이 영구히 안 나온다
 for (const [label, keys] of [
   ["OUTING_PLACES", OUTING_PLACES.map((p) => p.key)],
-  ["OUTING_MET", OUTING_MET.map((m) => m.key)],
   ["OUTING_MOODS", OUTING_MOODS.map((m) => m.key)],
 ] as const) {
   assert.equal(new Set(keys).size, keys.length, `${label}: 키가 중복이다`)
 }
-
-// 장소의 stage는 진화 단계(1~4) 안에 있어야 한다. 5가 들어가면 영원히 안 나온다
+// 장소 안에서도 키가 겹치면 안 된다 (find가 앞의 것만 잡는다)
 for (const p of OUTING_PLACES) {
-  assert.ok(p.stage >= 1 && p.stage <= 4, `${p.key}: stage가 1~4를 벗어났다 (${p.stage})`)
+  const dk = p.deeds.map((d) => d.key)
+  const sk = p.sights.map((x) => x.key)
+  assert.equal(new Set(dk).size, dk.length, `${p.key}: 사건 키가 중복이다`)
+  assert.equal(new Set(sk).size, sk.length, `${p.key}: 만난것 키가 중복이다`)
+}
+// 사건의 유형 태그가 결과 표에 실제로 있어야 한다. 없으면 결과 줄이 조용히 빠진다
+for (const p of OUTING_PLACES) {
+  for (const d of p.deeds) {
+    assert.ok(d.tag in OUTING_RESULTS, `${p.key}/${d.key}: 모르는 유형 태그 (${d.tag})`)
+  }
+}
+
+// 장소의 stage는 2~4다. **1은 없어야 한다** — 알은 외출하지 않는다
+for (const p of OUTING_PLACES) {
+  assert.ok(
+    p.stage >= OUTING_MIN_STAGE && p.stage <= 4,
+    `${p.key}: stage가 ${OUTING_MIN_STAGE}~4를 벗어났다 (${p.stage})`,
+  )
 }
 
 // **톤 규칙을 기계로 지킨다.** 펫은 자기 얘기만 하고 사용자를 평가하거나 격려하지 않는다 —
 // 격려는 사용자를 격려받아야 하는 위치에 세운다 (docs/dev/pet.md 참고)
-const BANNED_TONE = ["할 수 있", "잘했", "대단해", "힘내", "노력"]
-for (const line of [
-  ...OUTING_PLACES,
-  ...OUTING_MET,
-  ...OUTING_MOODS,
-  ...OUTING_AWAY_LINES,
-].map((x) => x.text)) {
+const BANNED_TONE = ["할 수 있", "잘했", "대단해", "힘내", "노력", "너도"]
+const ALL_OUTING_TEXT = [
+  ...OUTING_PLACES.map((p) => p.text),
+  ...OUTING_PLACES.flatMap((p) => p.deeds.map((d) => d.text)),
+  ...OUTING_PLACES.flatMap((p) => p.sights.map((x) => x.text)),
+  ...Object.values(OUTING_RESULTS).flat(),
+  ...OUTING_MOODS.map((m) => m.text),
+  ...OUTING_AWAY_LINES.map((l) => l.text),
+  ...Object.values(OUTING_OPENERS).flat(),
+]
+for (const line of ALL_OUTING_TEXT) {
   for (const bad of BANNED_TONE) {
     assert.ok(!line.includes(bad), `외출 문구에 격려·평가가 들어갔다: "${line}" (${bad})`)
   }
 }
+// 지출 압박 금지 — 외출은 친밀도 200이 든다. 펫이 또 가고 싶다고 하면 요구가 된다
+for (const m of OUTING_MOODS) {
+  assert.ok(!m.text.includes("또 가"), `기분에 지출 압박이 들어갔다: "${m.text}"`)
+}
+// 한 문장 상한. 세 문단을 묶었을 때 카드가 무거워지지 않게 한다
+for (const line of ALL_OUTING_TEXT) {
+  assert.ok(line.length <= 30, `외출 문구가 너무 길다 (${line.length}자): "${line}"`)
+}
 
 // ── 단계별 장소 범위 ──────────────────────────────────────────────────────────
-assert.equal(outingPlacesForStage(1).length, 2)
-assert.equal(outingPlacesForStage(2).length, 4)
-assert.equal(outingPlacesForStage(3).length, 6)
-assert.equal(outingPlacesForStage(4).length, 8)
-// 1단계도 갈 곳이 있어야 하고, 잘못된 단계에서도 빈 배열을 주지 않는다
-assert.ok(outingPlacesForStage(0).length >= 1)
-assert.ok(outingPlacesForStage(-3).length >= 1)
+// **1단계는 빈 배열이다.** 알이 창가에 나가는 것이 정상처럼 보이면 안 된다
+assert.equal(outingPlacesForStage(1).length, 0)
+assert.equal(outingPlacesForStage(0).length, 0)
+assert.equal(outingPlacesForStage(-3).length, 0)
+assert.equal(canGoOuting(1), false)
+assert.equal(canGoOuting(2), true)
+
+assert.equal(outingPlacesForStage(2).length, 5)
+assert.equal(outingPlacesForStage(3).length, 10)
+assert.equal(outingPlacesForStage(4).length, 15)
 // 단계를 넘겨도 전체보다 많아지지 않는다
 assert.equal(outingPlacesForStage(99).length, OUTING_PLACES.length)
 
-// ── 에피소드 조립 ─────────────────────────────────────────────────────────────
-assert.deepEqual(outingEpisode("window", "cat", "good"), [
-  "창가에 한참 앉아 있었어.",
-  "고양이 한 마리가 나를 쳐다봤어.",
+// ── 여행일기 조립 ─────────────────────────────────────────────────────────────
+// 문단 수 = 도입 1 + 장소 수 + 기분 1
+{
+  const legs = [
+    { place: "park", deed: "dash", result: 0, sight: "cat" },
+    { place: "river", deed: "splash", result: 1, sight: "ducks" },
+  ]
+  const diary = outingDiary(legs, "missyou")
+  assert.equal(diary.length, 4, "도입 1 + 장소 2 + 기분 1")
+  assert.ok(OUTING_OPENERS[4].includes(diary[0]), "도입은 가장 먼 장소의 단계에서 온다")
+  assert.equal(diary[3], "돌아오는 길에 네 생각이 났어.")
+  // 한 문단에 장소·사건·결과·만난것이 다 들어간다
+  assert.ok(diary[1].includes("동네 공원에 들렀어."))
+  assert.ok(diary[1].includes("풀밭을 가로질러 달렸어."))
+  assert.ok(diary[1].includes("다리에 힘이 좀 붙은 것 같아."))
+  assert.ok(diary[1].includes("낮잠 자는 고양이가 두 걸음 옆에 있었어."))
+  // 같은 기록이면 항상 같은 일기여야 한다 — 새로고침에 문장이 바뀌면 안 된다
+  assert.deepEqual(outingDiary(legs, "missyou"), diary)
+}
+// 3곳이면 마지막 문단이 마지막 전환어를 쓴다
+{
+  const legs = [
+    { place: "doorstep", deed: "down", result: 0, sight: "mail" },
+    { place: "park", deed: "lie", result: 2, sight: "tree" },
+    { place: "view", deed: "home", result: 1, sight: "far" },
+  ]
+  const diary = outingDiary(legs, "nothing")
+  assert.equal(diary.length, 5)
+  assert.ok(
+    OUTING_LEAD_LAST.some((l) => diary[3].startsWith(l)),
+    `3곳이면 마지막 문단에 마지막 전환어가 붙는다: "${diary[3]}"`,
+  )
+}
+// 알 수 없는 키는 그 조각만 빠지고 죽지 않는다 (옛 기록·수동 수정)
+{
+  const diary = outingDiary([{ place: "park", deed: "없는사건", result: 0, sight: "없는것" }], "good")
+  assert.equal(diary.length, 3)
+  assert.ok(diary[1].includes("동네 공원에 들렀어."))
+  assert.equal(diary[2], "그냥 좋았어.")
+}
+assert.deepEqual(outingDiary([], "good"), [])
+assert.deepEqual(outingDiary([{ place: "없는곳", deed: "x", result: 0, sight: "y" }], "good"), [])
+// result 인덱스가 범위를 벗어나도 안전하게 접힌다
+{
+  const d = outingDiary([{ place: "park", deed: "dash", result: 99, sight: "cat" }], "good")
+  assert.ok(d[1].includes(OUTING_RESULTS.walk[2]))
+}
+
+// ── 뽑기 ──────────────────────────────────────────────────────────────────────
+// 1단계는 아무것도 못 뽑는다
+assert.deepEqual(rollOutingLegs(1, () => 0), [])
+// 장소 수가 2~3이고 겹치지 않는다. rand를 주입하므로 경계를 고정할 수 있다
+for (const r of [0, 0.25, 0.5, 0.75, 0.999]) {
+  for (const stage of [2, 3, 4]) {
+    const legs = rollOutingLegs(stage, () => r)
+    assert.ok(
+      legs.length >= OUTING_LEGS_MIN && legs.length <= OUTING_LEGS_MAX,
+      `stage ${stage} rand ${r}: 장소 수가 ${legs.length}`,
+    )
+    const keys = legs.map((l) => l.place)
+    assert.equal(new Set(keys).size, keys.length, "같은 장소를 두 번 가지 않는다")
+    // 뽑힌 장소는 그 단계에서 갈 수 있는 곳이어야 한다
+    const allowed = new Set(outingPlacesForStage(stage).map((p) => p.key))
+    for (const k of keys) assert.ok(allowed.has(k), `stage ${stage}에서 못 가는 곳: ${k}`)
+    // 조립이 죽지 않아야 한다
+    assert.ok(outingDiary(legs, "good").length >= 3)
+  }
+}
+// 가까운 곳 → 먼 곳 순으로 선다 (여행 경로처럼 읽힌다)
+{
+  const legs = rollOutingLegs(4, () => 0.999)
+  const stages = legs.map((l) => OUTING_PLACES.find((p) => p.key === l.place)!.stage)
+  assert.deepEqual(stages, [...stages].sort((a, b) => a - b), "장소가 단계 순으로 서야 한다")
+}
+// 최근 조합 회피 — 그 장소의 사건 4개를 다 막으면 회피를 포기하고 그래도 뽑는다
+{
+  const all = OUTING_PLACES.flatMap((p) => p.deeds.map((d) => outingComboKey({ place: p.key, deed: d.key })))
+  const legs = rollOutingLegs(4, () => 0, all)
+  assert.ok(legs.length >= OUTING_LEGS_MIN, "회피 때문에 외출이 실패하면 안 된다")
+}
+// 회피 목록에 있는 조합은 다른 후보가 있으면 안 뽑힌다
+{
+  const place = OUTING_PLACES.find((p) => p.key === "park")!
+  const avoid = [outingComboKey({ place: "park", deed: place.deeds[0].key })]
+  for (let i = 0; i < 20; i++) {
+    const legs = rollOutingLegs(4, () => i / 20, avoid)
+    for (const l of legs) {
+      assert.ok(!avoid.includes(outingComboKey(l)), `회피 대상이 뽑혔다: ${outingComboKey(l)}`)
+    }
+  }
+}
+assert.equal(OUTING_RECENT_AVOID, 30)
+// **전부 ③(담담·미완)인 외출이 나오지 않아야 한다.** leg마다 독립으로 뽑으면 2곳이면
+// 1/9이 전부 ③이 되고, 그러면 친밀도 200을 태운 값이 안 보인다. rand를 훑어 확인한다
+for (let i = 0; i <= 40; i++) {
+  const r = i / 40
+  for (const stage of [2, 3, 4]) {
+    const legs = rollOutingLegs(stage, () => r)
+    assert.ok(
+      !legs.every((l) => l.result === 2),
+      `stage ${stage} rand ${r}: 결과가 전부 담담이다 (${JSON.stringify(legs.map((l) => l.result))})`,
+    )
+  }
+}
+// 그렇다고 ③이 사라지면 안 된다 — 실패 여지가 없어진다. 어딘가에서는 나와야 한다
+{
+  let sawFlat = false
+  for (let i = 0; i <= 200; i++) {
+    const legs = rollOutingLegs(4, () => i / 200)
+    if (legs.some((l) => l.result === 2)) sawFlat = true
+  }
+  assert.ok(sawFlat, "담담한 결과가 아예 안 나오면 실패 여지가 사라진다")
+}
+// 변동폭이 조용히 줄어드는 것을 막는다. 15곳 × 사건 4 × 결과 3 × 만난것 3 × 기분 8
+assert.equal(OUTING_COMBINATIONS, 15 * 4 * 3 * 3 * 8)
+
+// ── 옛 기록 렌더 (legs 마이그레이션 전까지) ───────────────────────────────────
+// 옛 전역 MET 키
+assert.deepEqual(outingEpisode("park", "granny", "good"), [
+  "동네 공원에 들렀어.",
+  "빨래 걷는 할머니가 계셨어.",
   "그냥 좋았어.",
 ])
-// 알 수 없는 키는 그 줄만 빠지고 죽지 않는다 (옛 기록·수동 수정)
-assert.deepEqual(outingEpisode("없는곳", "cat", "good"), [
+// 5축 전환 뒤의 sight 키도 같은 함수로 읽힌다
+assert.deepEqual(outingEpisode("park", "cat", "good"), [
+  "동네 공원에 들렀어.",
+  "낮잠 자는 고양이가 두 걸음 옆에 있었어.",
+  "그냥 좋았어.",
+])
+// 버린 1단계 장소는 그 줄만 빠진다 (창가·부엌 기록이 남아 있다)
+assert.deepEqual(outingEpisode("window", "cat", "good"), [
   "고양이 한 마리가 나를 쳐다봤어.",
   "그냥 좋았어.",
 ])

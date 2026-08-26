@@ -242,6 +242,17 @@ export default function PetView({ initial }: { initial: PetState }) {
   // 다음 외출을 보낼 때까지 이 자리에 남겨 둔다 — 이야기가 이 기능의 값이고,
   // 재화를 받은 순간 그것이 화면에서 없어지면 재화만 남는다
   const [story, setStory] = useState<string[]>([])
+  /**
+   * 여행일기 팝업 (2026-08-26 사용자 결정). `결과 확인`을 누른 뒤에만 열린다.
+   *
+   * 카드 안에 이야기를 펼치지 않는 이유는 지갑 안내와 같다 — 이 카드는 오른쪽 좁은 열에
+   * 있고, 5축 구조로 가면 일기가 최대 11줄이 된다. 카드 안에서는 읽을 수 없다.
+   * 받은 재화를 함께 담으므로 토스트는 띄우지 않는다 (같은 값을 두 번 말하지 않는다).
+   */
+  const [diary, setDiary] = useState<{
+    episode: string[]
+    gained: { seeds: number; starShards: number }
+  } | null>(null)
 
   // 말풍선을 덮는 반응 대사. 지금은 먹이기만 여기 온다 — 쓰다듬기는 text가 null이라
   // 파티클만 띄우고 이 값은 계속 null이다(위 reaction 주석)
@@ -717,9 +728,8 @@ export default function PetView({ initial }: { initial: PetState }) {
       // 반가움. 문구를 새로 만들지 않고 💗 파티클만 올린다 — 말풍선에 오는 문장은
       // 사용자가 쓴 20문구와 먹이기 답뿐이라는 규칙을 지킨다(위 pat·react 주석)
       react(null)
-      setToast({
-        text: `이야기를 들었어요 · 씨앗 +${ko(next.gained.seeds)} · 별조각 +${ko(next.gained.starShards)}`,
-      })
+      // 토스트를 띄우지 않는다 — 아래 여행일기 팝업이 같은 재화를 하단에 담는다
+      setDiary({ episode: next.episode, gained: next.gained })
       window.dispatchEvent(new CustomEvent("user-stats-changed"))
     } catch {
       setToast({ text: "네트워크 연결을 확인해 주세요", error: true })
@@ -1063,21 +1073,19 @@ export default function PetView({ initial }: { initial: PetState }) {
                 </>
               ) : outing.state === "RETURNED" ? (
                 <>
-                  {/* 이야기 세 줄. 장소 → 만난 것 → 기분 순이고 문장은 lib/pet.ts에 있다.
-                      key에 문장을 쓴다 — 세 줄이 서로 다른 풀에서 오므로 겹칠 수 없다 */}
-                  <ul className="pet-story">
-                    {outing.episode.map((line) => (
-                      <li key={line}>{line}</li>
-                    ))}
-                  </ul>
+                  {/* 2026-08-26 사용자 결정: 이야기를 카드에 펼치지 않는다. `결과 확인`을
+                      누르면 여행일기 팝업이 뜨고 그 안에서 읽는다(위 diary 주석).
+                      카드는 "돌아왔다"는 사실과 받을 양만 보여 준다 — 미리 다 보여 주면
+                      누를 이유가 사라진다 */}
                   <button
                     type="button"
                     className="pet-btn pet-btn--block"
                     onClick={hearOuting}
                     disabled={pending}
                     aria-disabled={pending}
+                    aria-haspopup="dialog"
                   >
-                    이야기 듣기
+                    결과 확인
                   </button>
                   {/* 받을 양을 누르기 **전에** 보여 준다. 저장값이 아니라 스킨 배율까지 얹은
                       실지급액이다(lib/outing.ts toOutingView reward 주석) */}
@@ -1541,6 +1549,16 @@ export default function PetView({ initial }: { initial: PetState }) {
           onClose={() => setWalletInfo(null)}
         />
       ) : null}
+
+      {diary ? (
+        <OutingDiaryModal
+          art={petFace}
+          skinName={pet.skinName}
+          episode={diary.episode}
+          gained={diary.gained}
+          onClose={() => setDiary(null)}
+        />
+      ) : null}
     </main>
   )
 }
@@ -1601,6 +1619,83 @@ function WalletInfoModal({
         {row.extra ? <p className="pet-wallet-pop__extra">{row.extra}</p> : null}
 
         <p className="pet-wallet-pop__cap">{row.cap}</p>
+      </div>
+    </div>
+  )
+}
+
+/**
+ * 여행일기 팝업 (2026-08-26 사용자 결정).
+ *
+ * 구성이 고정이다 — **펫 모습(상단) · 이야기(중단) · 수집한 재화(하단).**
+ * 이 순서인 이유: 누가 다녀왔는지를 먼저 세우고(화자), 무슨 일이 있었는지를 읽고(내용),
+ * 그래서 무엇이 들어왔는지로 닫는다(결과). 재화를 위에 두면 일기가 영수증 부록이 된다.
+ *
+ * 펫 그림은 `petFace`를 그대로 받는다 — 방에 있는 것과 다른 그림을 쓰면 같은 펫으로 안 읽힌다.
+ * Escape·초점 가두기는 지갑 팝업과 같은 `useModalA11y`다.
+ */
+function OutingDiaryModal({
+  art,
+  skinName,
+  episode,
+  gained,
+  onClose,
+}: {
+  art: React.ReactNode
+  skinName: string
+  episode: string[]
+  gained: { seeds: number; starShards: number }
+  onClose: () => void
+}) {
+  const boxRef = useModalA11y(onClose)
+
+  return (
+    <div className="pet-diary-pop" onClick={onClose}>
+      <div
+        ref={boxRef}
+        role="dialog"
+        aria-modal="true"
+        aria-labelledby="diary-title"
+        tabIndex={-1}
+        className="pet-diary-pop__box screen-enter"
+        onClick={(e) => e.stopPropagation()}
+      >
+        {/* ── 상단: 펫 모습 ── */}
+        <div className="pet-diary__top">
+          <div className="pet-diary__art">{art}</div>
+          <p className="pet-diary__title" id="diary-title">
+            {skinName}의 여행일기
+          </p>
+          <p className="pet-diary__sub">다녀왔어요</p>
+        </div>
+
+        {/* ── 중단: 이야기 ──
+            줄 수가 5축 구조에서 최대 11줄까지 늘어난다. 여기서만 스크롤되고 팝업 자체는
+            화면을 넘지 않는다 — 상단 펫과 하단 재화는 항상 보여야 한다 */}
+        <ul className="pet-diary__story">
+          {episode.map((line, i) => (
+            <li key={`${i}-${line}`}>{line}</li>
+          ))}
+        </ul>
+
+        {/* ── 하단: 수집한 재화 ──
+            실지급액이다(서버가 calculateReward()를 통과시킨 값). 0이어도 칸을 지우지 않는다 —
+            "여기에 재화가 들어온다"는 자리로 읽히는 편이 낫다(지갑 카드와 같은 판단) */}
+        <div className="pet-diary__loot">
+          <p className="pet-diary__loot-head">가져온 것</p>
+          <ul className="pet-diary__loot-list">
+            <li>
+              <span aria-hidden="true">🌱</span> 씨앗 <strong>+{ko(gained.seeds)}</strong>
+            </li>
+            <li>
+              <span aria-hidden="true">⭐</span> 별조각 <strong>+{ko(gained.starShards)}</strong>
+            </li>
+          </ul>
+        </div>
+
+        <button type="button" className="pet-btn pet-btn--block" onClick={onClose}>
+          닫기
+        </button>
       </div>
     </div>
   )
