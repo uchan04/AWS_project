@@ -1,6 +1,6 @@
 "use client"
 
-import { useEffect, useRef, useState } from "react"
+import { useEffect, useRef, useState, type ReactNode } from "react"
 import Link from "next/link"
 import type { TypeCode } from "@prisma/client"
 import {
@@ -1558,7 +1558,7 @@ function WalletInfoModal({
   row,
   onClose,
 }: {
-  row: { name: string; icon: string; use: string; how: string[]; cap: string; extra?: string }
+  row: { name: string; icon: ReactNode; use: string; how: string[]; cap: string; extra?: string }
   onClose: () => void
 }) {
   const boxRef = useModalA11y(onClose)
