@@ -215,11 +215,11 @@
   gap: var(--space-2xs) var(--space-sm);
   /* 방 안쪽 폭을 넘지 않는다. 좌우 여백은 Lv 오버레이(왼쪽)와 균형을 맞춘 값이다 */
   max-width: calc(100% - var(--space-sm) * 2);
-  padding: var(--space-3xs) var(--space-2xs);
-  border-radius: var(--radius-pill);
-  background: color-mix(in oklch, var(--color-card) 88%, transparent);
-  backdrop-filter: blur(8px);
-  box-shadow: var(--shadow-card);
+  /* **면·radius·그림자를 걷었다** (2026-08-26 사용자 지적: "의미 없는 흰색 가로 바").
+     세 칸이 각자 칩이 되면서(.pet-bar__item) 그 뒤의 판은 아무것도 담지 않는 흰 띠가 됐다.
+     이제 이 요소는 칩을 줄 세우는 flex 컨테이너뿐이다 —
+     되살릴 값: `--color-card 88%` + `blur(8px)` + `--shadow-card` + `--radius-pill` */
+  padding: 0;
 }
 
 .pet-bar__wallet {
@@ -242,15 +242,29 @@
    모자라 두 줄로 접힌다 — 8px로 내리면 514px이다. 눈대중이 아니라 그 48px 차이다 */
 /* 세 칸을 구분선으로 가르던 한 판이었다. **각자 칩이 된다** (2026-08-26, 게임 느낌).
    구분선은 "표"로 읽히고 칩은 "모은 것"으로 읽힌다 — 재화는 후자다 */
+/* 세 칩의 **높이와 좌우 여백을 못 박는다** (2026-08-26 사용자 지적: "세로 길이가 다르다.
+   가로 여백도 다르다"). 원인 둘이었다:
+   ① `:first-child`에만 다른 `padding-inline-start`가 남아 있었다(옛 구분선 판의 값)
+   ② 높이를 내용에 맡겨서, 아이콘(22px)과 숫자의 line-height 합이 칸마다 미세하게 달랐다
+   → `min-height`로 고정하고 여백을 네 방향 다 같은 식으로 준다 */
 .pet-bar__item {
   display: flex;
   align-items: center;
   gap: var(--space-3xs);
-  padding: 0.15rem var(--space-2xs) 0.15rem 0.15rem;
+  min-height: 1.9rem;
+  padding-block: 0;
+  padding-inline: 0.2rem var(--space-2xs);
   border: 2px solid color-mix(in oklch, var(--tribe) 38%, transparent);
   border-radius: var(--radius-pill);
   background: var(--pet-gloss), color-mix(in oklch, var(--color-card) 92%, transparent);
   box-shadow: var(--pet-gloss-edge), 0 2px 0 color-mix(in oklch, var(--tribe) 24%, transparent);
+  box-sizing: border-box;
+}
+
+/* 아이콘 그림이 줄 높이를 밀지 않게 블록으로 세운다 — 22px 이미지가 인라인이면
+   글꼴의 baseline만큼 칸이 높아지고, 그 값이 숫자 길이에 따라 달라 보였다 */
+.pet-bar__item img {
+  display: block;
 }
 
 /* 지갑 카드의 아이콘은 종족색 20% 면을 깐 2rem 사각형이었다(.pet-wallet__icon).
@@ -302,14 +316,15 @@
   display: grid;
   gap: var(--space-3xs);
   padding: var(--space-2xs);
-  border-radius: var(--radius-card);
-  background: color-mix(in oklch, var(--color-card) 88%, transparent);
-  backdrop-filter: blur(8px);
-  box-shadow: var(--shadow-card);
+  /* **면·radius·그림자를 걷었다** (2026-08-26 사용자 지적). Lv 숫자가 배지가 되고
+     (.pet-hud .pet-hud-lv__level) 게이지가 자기 테두리를 갖고 있어서, 이 상자의 판은
+     그 둘 뒤의 흰 띠가 됐다.
+     되살릴 값: `--color-card 88%` + `blur(8px)` + `--shadow-card` + `--radius-card` */
+  padding: 0;
 }
 
-/* 레벨은 이 오버레이에서 가장 큰 글자다. 알약을 씌우지 않은 이유: 이 상자 자체가 이미
-   알약 계열 면이고, 그 안에 또 알약을 넣으면 배지 안 배지가 된다 */
+/* 아래 주석은 낡았다 — "이 상자 자체가 알약 계열 면"이었을 때의 근거이고, 그 면을 위에서
+   걷었다. 지금은 이 숫자가 **배지**이고 그 값은 `.pet-hud .pet-hud-lv__level`에 있다 */
 .pet-hud-lv__level {
   margin: 0;
   font-family: var(--font-display);
@@ -386,13 +401,10 @@
   display: flex;
   align-items: center;
   gap: var(--space-2xs);
-  padding: var(--space-3xs) var(--space-xs) var(--space-3xs) var(--space-3xs);
-  border: 2px solid color-mix(in oklch, var(--tribe) 45%, transparent);
-  border-radius: var(--radius-pill);
-  background: var(--pet-gloss), color-mix(in oklch, var(--color-card) 92%, transparent);
-  /* 아래쪽 굳은 테두리 한 겹이 두께를 만든다. 주 버튼의 `0 4px 0`보다 얇은 2px이다 —
-     HUD는 누르는 것이 아니라 얹혀 있는 것이다 */
-  box-shadow: var(--pet-gloss-edge), 0 2px 0 color-mix(in oklch, var(--tribe) 30%, transparent);
+  /* 컨테이너에 알약을 씌웠다가 걷었다 (2026-08-26 사용자 지적: "의미 없는 흰색 가로 바").
+     Lv 배지와 게이지가 각자 면·테두리를 갖고 있어서 그 뒤의 판이 흰 띠로 보였다.
+     두께는 배지와 게이지가 각자 낸다 */
+  padding: 0;
 }
 
 /* Lv 숫자를 **배지**로 만든다. 게임 HUD의 레벨은 거의 항상 동그라미 안에 있다 */
@@ -602,7 +614,7 @@
 .pet-rail__btn:focus-visible .pet-rail__label {
   max-width: 5.5rem;
   opacity: 1;
-  padding-inline: var(--space-2xs) 0;
+  padding-inline: var(--space-2xs);
 }
 
 /* 열려 있는 모달의 버튼은 라벨을 펼친 채로 둔다 — 모달이 화면을 덮으므로 어느 버튼에서
@@ -614,7 +626,7 @@
 .pet-rail__btn[data-active="true"] .pet-rail__label {
   max-width: 5.5rem;
   opacity: 1;
-  padding-inline: var(--space-2xs) 0;
+  padding-inline: var(--space-2xs);
 }
 
 @media (prefers-reduced-motion: reduce) {
@@ -711,8 +723,14 @@
    원형 버튼을 누를 수 없다. 둘이 동시에 열리는 경로가 없다.
    (같은 파일의 .pet-welcome은 그 반대로 11까지 **내렸다** — 그쪽은 대화창과 겹치는 경로가
    실제로 있었다. 2026-08-26 z 척도 불일치 기록 참고) */
+/* **`fixed` → `absolute`** (2026-08-26 사용자 지시). 씨앗 투입 창이 뷰포트 가운데에 떠서
+   방 위쪽의 경험치 게이지를 덮었다. 지금은 `.pet-stage`(= 방 사각형) 기준이라 **방 가운데**다.
+   마크업도 함께 스테이지 안으로 옮겼다(PetView의 스테이지 닫는 태그 주석).
+
+   스크림도 방만 덮는다 — 페이지 전체를 덮지 않는 것이 이 결정의 대가이고, 닫는 길은
+   ✕ · Esc · 스크림 세 개가 그대로 남는다(초점은 useModalA11y가 가둔다) */
 .pet-modal {
-  position: fixed;
+  position: absolute;
   inset: 0;
   z-index: var(--z-modal);
   display: grid;
@@ -3953,9 +3971,11 @@
 /* 재화 안내 팝업 (2026-08-25). 확장식이 아닌 이유는 PetView의 지갑 줄 주석에 있다.
    오버레이 색·반경·그림자는 내 계정 모달(Sidebar)과 같은 값을 쓴다 — 앱 안에서
    팝업이 두 종류로 보이지 않게 한다. z-index 400도 그쪽과 같다 */
+/* **`fixed` → `absolute`** (2026-08-26 사용자 지시: "여행 팝업 창도 배경 기준으로 중앙").
+   위 `.pet-modal`과 같은 이유·같은 방식이다 */
 .pet-wallet-pop,
 .pet-diary-pop {
-  position: fixed;
+  position: absolute;
   inset: 0;
   z-index: 400;
   display: flex;

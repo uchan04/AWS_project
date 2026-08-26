@@ -1095,12 +1095,17 @@ export default function PetView({ initial }: { initial: PetState }) {
                     onClick={r.go}
                     data-active={r.on ? "true" : undefined}
                   >
-                    {/* 라벨이 늘어나며 나오는 부분. **aria에서 숨기지 않는다** —
-                        스크린리더에는 늘 읽혀야 하고, 눈에만 접혀 있다 */}
-                    <span className="pet-rail__label">{r.label}</span>
+                    {/* **아이콘이 DOM에서 먼저다.** `flex-direction: row-reverse`가
+                        첫 자식을 오른쪽 끝에 두므로, 라벨을 먼저 두면 라벨이 오른쪽으로
+                        자라 방 밖으로 잘렸다(2026-08-26 사용자 지적). 순서를 바꿔서
+                        아이콘이 오른쪽에 고정되고 라벨이 **왼쪽으로** 자란다.
+
+                        라벨을 aria에서 숨기지 않는다 — 스크린리더에는 늘 읽혀야 하고
+                        눈에만 접혀 있다 */}
                     <span className="pet-rail__icon" aria-hidden="true">
                       {r.icon}
                     </span>
+                    <span className="pet-rail__label">{r.label}</span>
                   </button>
                 ))}
             </div>
@@ -1348,7 +1353,6 @@ export default function PetView({ initial }: { initial: PetState }) {
 
           </div>
 
-      </div>
 
         {/* ── 모달 5개 ───────────────────────────────────────────────────────────
             몸통은 옛 카드 마크업 그대로다. 껍데기(.pet-modal)만 새로 만들었고
@@ -1930,6 +1934,17 @@ export default function PetView({ initial }: { initial: PetState }) {
           onClose={() => setHistoryPick(null)}
         />
       ) : null}
+      {/* **`.pet-stage`가 여기서 닫힌다** (2026-08-26 사용자 지시로 옮겼다).
+          전에는 방 바로 뒤에서 닫혔고 모달·팝업이 그 밖(`<main>`)에 있었다. 그러면
+          `position: fixed`가 **뷰포트** 기준이라 씨앗 투입 창이 화면 가운데에 뜨고,
+          방 위쪽의 경험치 게이지를 덮었다.
+
+          스테이지 안으로 들이면 `position: absolute`가 **스테이지 = 방 사각형** 기준이
+          된다(그 등식은 `.pet-stage` 주석의 근거다). 절대 위치 자식은 흐름에서 빠지므로
+          스테이지의 flex 레이아웃에는 아무 영향이 없다.
+
+          토스트는 그대로 `fixed`다 — 화면 아래 가운데가 그 관습이고, 방을 벗어나야 한다 */}
+      </div>
     </main>
   )
 }
