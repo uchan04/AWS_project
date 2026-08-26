@@ -11,12 +11,16 @@ import {
   OUTING_COST_AFFINITY,
   OUTING_HOURS,
   OUTING_MS,
-  OUTING_MET,
   OUTING_MOODS,
   type OutingState,
   outingAwayLine,
   outingEpisode,
+  outingDiary,
+  outingComboKey,
+  rollOutingLegs,
+  OUTING_RECENT_AVOID,
   outingPlacesForStage,
+  type OutingLeg,
   outingProgress,
   outingRemainingLabel,
   outingRemainingMs,
@@ -99,6 +103,36 @@ export async function findOpenOuting(userId: string): Promise<PetOuting | null |
 }
 
 /** 행 하나를 화면이 쓸 모양으로 옮긴다. 순수 함수라 API와 페이지가 같은 값을 본다 */
+/**
+ * 저장된 기록을 일기 문단으로 만든다. **legs가 있으면 5축, 없으면 옛 3컬럼이다.**
+ *
+ * 폴백을 남긴 이유 둘. ① `legs` 마이그레이션을 아직 안 받은 팀원의 DB에서도 돌아야 한다
+ * ② 이미 쌓인 옛 기록(placeKey='window' 등)이 계속 렌더돼야 한다.
+ * 옛 컬럼이 드롭되면 이 함수의 아래 절반과 `outingEpisode`를 함께 지운다.
+ *
+ * Json 컬럼이라 타입이 보장되지 않는다 — 모양을 직접 확인하고, 아니면 폴백으로 내려간다.
+ */
+function outingLines(outing: {
+  legs?: unknown
+  placeKey: string
+  metKey: string
+  moodKey: string
+}): string[] {
+  const legs = outing.legs
+  if (Array.isArray(legs) && legs.length > 0) {
+    const parsed = legs.filter(
+      (l): l is OutingLeg =>
+        typeof l === "object" &&
+        l !== null &&
+        typeof (l as OutingLeg).place === "string" &&
+        typeof (l as OutingLeg).deed === "string" &&
+        typeof (l as OutingLeg).sight === "string",
+    )
+    if (parsed.length > 0) return outingDiary(parsed, outing.moodKey)
+  }
+  return outingEpisode(outing.placeKey, outing.metKey, outing.moodKey)
+}
+
 export function toOutingView(
   outing: PetOuting | null,
   skin: PetSkin | null,
@@ -120,10 +154,7 @@ export function toOutingView(
     awayLine: state === "AWAY" ? outingAwayLine(outing.placeKey, progress) : null,
     // AWAY에서만 준다. RETURNED에 넣으면 에피소드 첫 줄과 같은 장소를 두 번 말하게 된다
     placeKey: state === "AWAY" ? outing.placeKey : null,
-    episode:
-      state === "RETURNED"
-        ? outingEpisode(outing.placeKey, outing.metKey, outing.moodKey)
-        : [],
+    episode: state === "RETURNED" ? outingLines(outing) : [],
     reward:
       state === "RETURNED"
         ? {
@@ -154,7 +185,11 @@ export async function loadOutingView(
 
 export type StartOutingResult =
   | { ok: true; view: OutingView; affinity: number }
-  | { ok: false; code: "NOT_ENOUGH_AFFINITY" | "ALREADY_OUT" | "NO_TABLE"; message: string }
+  | {
+      ok: false
+      code: "NOT_ENOUGH_AFFINITY" | "ALREADY_OUT" | "NO_TABLE" | "PET_TOO_YOUNG"
+      message: string
+    }
 
 /**
  * 외출을 보낸다.
@@ -176,10 +211,51 @@ export async function startOuting(
   rand: () => number = Math.random,
 ): Promise<StartOutingResult> {
   const places = outingPlacesForStage(args.evolutionStage)
+  // 1단계(알)는 나가지 않는다(2026-08-26 사용자 결정). outingPlacesForStage가 빈 배열을
+  // 주므로 여기서 막지 않으면 pick()이 undefined를 집는다
+  if (places.length === 0) {
+    return {
+      ok: false,
+      code: "PET_TOO_YOUNG",
+      message: "펫이 한 번 자라면 밖에 나갈 수 있어요",
+    }
+  }
+
   const pick = <T>(pool: readonly T[]): T => pool[Math.min(pool.length - 1, Math.floor(rand() * pool.length))]
 
-  const place = pick(places)
-  const met = pick(OUTING_MET)
+  // **최근 조합을 피한다.** 같은 (장소·사건)이 금방 다시 나오면 100일에 같은 문장을 5번 본다.
+  // `pickReview()`가 커리큘럼에서 하는 것과 같은 장치다. 조회 실패는 삼킨다 — 회피는
+  // 있으면 좋은 것이고, 이것 때문에 외출이 막히면 안 된다
+  let recent: string[] = []
+  try {
+    const past = await prisma.petOuting.findMany({
+      where: { userId: args.userId },
+      orderBy: { startedAt: "desc" },
+      take: OUTING_RECENT_AVOID,
+      select: { legs: true, placeKey: true, metKey: true },
+    })
+    recent = past.flatMap((row) => {
+      const legs = row.legs
+      if (!Array.isArray(legs)) return []
+      return legs
+        .filter(
+          (l): l is OutingLeg =>
+            typeof l === "object" && l !== null && typeof (l as OutingLeg).place === "string",
+        )
+        .map(outingComboKey)
+    })
+  } catch {
+    recent = []
+  }
+
+  const legs = rollOutingLegs(args.evolutionStage, rand, recent)
+  if (legs.length === 0) {
+    return { ok: false, code: "PET_TOO_YOUNG", message: "펫이 한 번 자라면 밖에 나갈 수 있어요" }
+  }
+  // 옛 3컬럼도 함께 채운다 — 이 마이그레이션을 아직 안 받은 팀원의 코드가 그것을 읽는다.
+  // 첫 장소를 넣는다: AWAY 쪽지의 "지금 {where}쯤이야"가 이 값을 쓴다
+  const place = places.find((p) => p.key === legs[0].place) ?? pick(places)
+  const met = place.sights.find((x) => x.key === legs[0].sight) ?? pick(place.sights)
   const mood = pick(OUTING_MOODS)
   const roll = rollOutingReward(rand)
 
@@ -200,6 +276,7 @@ export async function startOuting(
           userId: args.userId,
           startedAt: now,
           returnsAt: new Date(now.getTime() + OUTING_MS),
+          legs,
           placeKey: place.key,
           metKey: met.key,
           moodKey: mood.key,
@@ -307,7 +384,7 @@ export async function claimOuting(
 
     return {
       ok: true,
-      episode: outingEpisode(open.placeKey, open.metKey, open.moodKey),
+      episode: outingLines(open),
       gained: { seeds, starShards },
       seeds: result.seeds,
       starShards: result.starShards,

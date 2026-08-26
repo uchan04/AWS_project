@@ -55,10 +55,9 @@ export async function POST(request: NextRequest) {
     const content = typeof payload?.content === "string" ? payload.content.trim() : ""
     if (!content) return fail("INVALID_BODY", "메시지를 입력해주세요", 400)
 
-    // 챗봇 상한(40)을 재려면 **이 턴을 넣기 전** 누계가 필요하다. 만든 뒤에 세면
-    // 방금 만든 1턴이 포함돼 8턴째에 이미 40으로 읽히고 그 턴이 0을 받는다.
-    const beforeThisTurn = await chatAffinityToday(user.id)
-
+    // 챗봇 몫은 `User.affinityTodayChat`에 있고 grantAffinity()가 그 컬럼을 읽는다.
+    // 메시지 수로 유도하던 시절에는 이 턴을 넣기 **전** 누계를 따로 재야 했다 —
+    // 컬럼이 생겨서 그 계산이 필요 없어졌다(affinity.ts todayBySource 주석)
     const message = await prisma.chatMessage.create({
       data: { userId: user.id, role: "USER", content },
     })
@@ -78,7 +77,7 @@ export async function POST(request: NextRequest) {
       console.error("[DAILY_CHAT] 미션 완료 처리 실패", error)
     }
 
-    return ok({ message, granted, chatAffinityToday: beforeThisTurn + granted })
+    return ok({ message, granted, chatAffinityToday: await chatAffinityToday(user.id) })
   } catch (error) {
     if (error instanceof UnauthorizedError) return fail("UNAUTHORIZED", error.message, 401)
     throw error

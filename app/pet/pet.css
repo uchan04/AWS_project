@@ -1347,7 +1347,8 @@
 /* 재화 안내 팝업 (2026-08-25). 확장식이 아닌 이유는 PetView의 지갑 줄 주석에 있다.
    오버레이 색·반경·그림자는 내 계정 모달(Sidebar)과 같은 값을 쓴다 — 앱 안에서
    팝업이 두 종류로 보이지 않게 한다. z-index 400도 그쪽과 같다 */
-.pet-wallet-pop {
+.pet-wallet-pop,
+.pet-diary-pop {
   position: fixed;
   inset: 0;
   z-index: 400;
@@ -1358,7 +1359,8 @@
   background: rgba(42, 31, 20, 0.45);
 }
 
-.pet-wallet-pop__box {
+.pet-wallet-pop__box,
+.pet-diary-pop__box {
   width: 100%;
   max-width: 22rem;
   padding: var(--space-sm);
@@ -3348,4 +3350,104 @@
     align-items: center;
     width: 100%;
   }
+}
+
+/* ─────────────────────────────────────────────────────────────────────
+   여행일기 팝업 (2026-08-26 사용자 결정)
+
+   구성이 고정이다 — 펫 모습(상단) · 이야기(중단) · 수집한 재화(하단).
+   오버레이와 박스는 지갑 안내 팝업과 **같은 규칙을 공유한다**(위 선택자 목록) —
+   앱 안에서 팝업이 두 종류로 보이지 않게 한다.
+   ───────────────────────────────────────────────────────────────────── */
+
+/* 일기는 상단·중단·하단 세 덩어리라 지갑 팝업보다 넓고, 중단만 스크롤한다 */
+.pet-diary-pop__box {
+  max-width: 24rem;
+  display: grid;
+  gap: var(--space-2xs);
+  max-height: min(90dvh, 40rem);
+}
+
+/* ── 상단 ── */
+.pet-diary__top {
+  display: grid;
+  justify-items: center;
+  gap: 2px;
+  padding-bottom: var(--space-2xs);
+  border-bottom: 1px solid color-mix(in oklch, var(--color-muted) 25%, transparent);
+}
+
+/* 방의 펫과 같은 그림(petFace)을 받는다. .pet-char__img가 단계별 크기를 갖고 있으므로
+   여기서는 담는 칸만 정한다 — 크기를 다시 지정하면 두 곳이 갈린다 */
+.pet-diary__art {
+  display: grid;
+  place-items: center;
+  width: 100%;
+  min-height: 7rem;
+}
+
+.pet-diary__title {
+  margin: 0;
+  font-family: var(--font-display);
+  font-size: var(--text-lg);
+  color: var(--color-ink);
+}
+
+.pet-diary__sub {
+  margin: 0;
+  font-size: var(--text-label);
+  color: var(--color-muted);
+}
+
+/* ── 중단 ──
+   줄 수가 5축 구조에서 최대 11줄이 된다. 여기만 스크롤되고 상단 펫과 하단 재화는
+   항상 보인다. 불릿을 쓰지 않는다 — 목록이 아니라 글이다 */
+.pet-diary__story {
+  margin: 0;
+  padding: var(--space-2xs);
+  border-radius: var(--radius-input);
+  background: color-mix(in oklch, var(--tribe) 10%, transparent);
+  list-style: none;
+  display: grid;
+  /* 5축 전환으로 한 원소가 **한 문단**이 됐다(장소+사건+결과+만난것). 줄 간격이 아니라
+     문단 간격이 필요하다 — 3xs로 두면 도입·본문·기분이 한 덩어리로 붙어 읽힌다 */
+  gap: var(--space-2xs);
+  overflow-y: auto;
+  font-size: var(--text-label);
+  line-height: 1.65;
+  color: var(--color-ink-2);
+}
+
+/* ── 하단 ── */
+.pet-diary__loot-head {
+  margin: 0 0 var(--space-3xs);
+  font-size: var(--text-label);
+  font-weight: 700;
+  color: var(--color-ink);
+}
+
+.pet-diary__loot-list {
+  margin: 0;
+  padding: 0;
+  list-style: none;
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: var(--space-2xs);
+  font-size: var(--text-label);
+  color: var(--color-ink-2);
+}
+
+.pet-diary__loot-list li {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  padding: var(--space-3xs) var(--space-2xs);
+  border-radius: var(--radius-input);
+  background: var(--color-card);
+}
+
+.pet-diary__loot-list strong {
+  margin-left: auto;
+  font-variant-numeric: tabular-nums;
+  color: var(--color-ink);
 }
