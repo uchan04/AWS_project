@@ -26,12 +26,16 @@ function getTribeEmoji(typeCode: TypeCode | null): string {
   return tribe.emoji
 }
 
-const TABS: { href: string; label: string; emoji: string; desc: string }[] = [
-  { href: "/", label: "홈", emoji: "🏡", desc: "오늘 현황" },
-  { href: "/missions", label: "미션", emoji: "✅", desc: "작은 한 걸음" },
-  { href: "/pet", label: "나의 펫", emoji: "🌱", desc: "함께 성장해요" },
-  { href: "/community", label: "커뮤니티", emoji: "💬", desc: "같은 종족 이야기" },
-  { href: "/community/meetups", label: "모임", emoji: "🤝", desc: "오프라인에서 만나기" },
+// 이모지 대신 쓰는 내비 아이콘 5종(2026-08-26, 모꼬지 UI 에셋). public/images/에
+// 정적으로 커밋돼 있다 — CloudFront가 아니라 avatarUrl()과 같은 경로다(lib/assets.ts
+// 주석 참고). 원본은 400~700px이라 표시 크기(20~22px)에는 과했다. sips -Z 200으로
+// 줄여 5장 합계 637KB → 116KB로 낮췄다.
+const TABS: { href: string; label: string; icon: string; desc: string }[] = [
+  { href: "/", label: "홈", icon: "/images/nav_home.png", desc: "오늘 현황" },
+  { href: "/missions", label: "미션", icon: "/images/nav_missions.png", desc: "작은 한 걸음" },
+  { href: "/pet", label: "나의 펫", icon: "/images/nav_pet.png", desc: "함께 성장해요" },
+  { href: "/community", label: "커뮤니티", icon: "/images/nav_community.png", desc: "같은 종족 이야기" },
+  { href: "/community/meetups", label: "모임", icon: "/images/nav_meetup.png", desc: "오프라인에서 만나기" },
 ]
 
 /**
@@ -267,12 +271,13 @@ export function Sidebar({ profile }: { profile: SidebarProfile | null }) {
 
         {/* Nav */}
         <nav style={{ flex: 1, padding: compact ? "8px 4px" : "8px 12px", overflowY: "auto" }}>
-          {TABS.map(({ href, label, emoji, desc }) => {
+          {TABS.map(({ href, label, icon, desc }) => {
             const active = pathname === href
             return (
               <Link
                 key={href}
                 href={href}
+                aria-label={compact ? label : undefined}
                 style={{
                   width: "100%",
                   display: "flex",
@@ -297,10 +302,14 @@ export function Sidebar({ profile }: { profile: SidebarProfile | null }) {
                 }}
               >
                 {compact ? (
-                  <span style={{ fontSize: 20 }}>{emoji}</span>
+                  // eslint-disable-next-line @next/next/no-img-element
+                  <img src={icon} alt="" width={22} height={22} style={{ objectFit: "contain" }} />
                 ) : (
                   <>
-                    <span style={{ fontSize: 18, width: 24, textAlign: "center", flexShrink: 0 }}>{emoji}</span>
+                    <div style={{ width: 24, display: "flex", justifyContent: "center", flexShrink: 0 }}>
+                      {/* eslint-disable-next-line @next/next/no-img-element */}
+                      <img src={icon} alt="" width={20} height={20} style={{ objectFit: "contain" }} />
+                    </div>
                     <div>
                       <p
                         className={styles.navLabel}
