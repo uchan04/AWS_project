@@ -433,7 +433,7 @@ export default function PetView({ initial }: { initial: PetState }) {
   const wallet = [
     {
       name: "씨앗",
-      icon: <CurrencyIcon currency="seed" size={18} />,
+      icon: <CurrencyIcon currency="seed" size={22} />,
       value: pet.seeds,
       use: `펫에게 먹이면 경험치가 돼요 (씨앗 1 = 경험치 ${SEED_TO_EXP})`,
       how: [
@@ -446,7 +446,7 @@ export default function PetView({ initial }: { initial: PetState }) {
     },
     {
       name: "친밀도",
-      icon: <CurrencyIcon currency="affinity" size={18} />,
+      icon: <CurrencyIcon currency="affinity" size={22} />,
       value: pet.affinity,
       use: `펫을 밖에 내보내요 (외출 한 번 ${OUTING_COST_AFFINITY})`,
       how: [
@@ -459,7 +459,7 @@ export default function PetView({ initial }: { initial: PetState }) {
     },
     {
       name: "별조각",
-      icon: <CurrencyIcon currency="starShard" size={18} />,
+      icon: <CurrencyIcon currency="starShard" size={22} />,
       value: pet.starShards,
       use: `외형 스킨(2,500)과 방 배경(${BACKGROUND_PRICE_SHARDS})을 사요`,
       how: [

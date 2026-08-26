@@ -240,20 +240,17 @@
    값이다.** 제공된 이미지는 폭 2000px짜리 띠라 여백이 넉넉하지만, 이 화면의 실제 내용 폭은
    사이드바를 뺀 약 534px(837px 창)이다. 16px이면 재화 3칸 + 상점 2개가 562px이 되어 8px
    모자라 두 줄로 접힌다 — 8px로 내리면 514px이다. 눈대중이 아니라 그 48px 차이다 */
+/* 세 칸을 구분선으로 가르던 한 판이었다. **각자 칩이 된다** (2026-08-26, 게임 느낌).
+   구분선은 "표"로 읽히고 칩은 "모은 것"으로 읽힌다 — 재화는 후자다 */
 .pet-bar__item {
   display: flex;
   align-items: center;
   gap: var(--space-3xs);
-  padding: 0 var(--space-2xs);
-  border-inline-end: 1px solid var(--color-rule);
-}
-
-.pet-bar__item:first-child {
-  padding-inline-start: var(--space-3xs);
-}
-
-.pet-bar__item:last-child {
-  border-inline-end: none;
+  padding: 0.15rem var(--space-2xs) 0.15rem 0.15rem;
+  border: 2px solid color-mix(in oklch, var(--tribe) 38%, transparent);
+  border-radius: var(--radius-pill);
+  background: var(--pet-gloss), color-mix(in oklch, var(--color-card) 92%, transparent);
+  box-shadow: var(--pet-gloss-edge), 0 2px 0 color-mix(in oklch, var(--tribe) 24%, transparent);
 }
 
 /* 지갑 카드의 아이콘은 종족색 20% 면을 깐 2rem 사각형이었다(.pet-wallet__icon).
@@ -268,9 +265,12 @@
    먹이기·외출이다 — 잉크색으로 두면 제목줄과 같은 무게가 된다.
    tabular-nums는 지갑 카드에서 그대로 가져온다. 값이 갱신될 때 자릿수가 바뀌어도
    옆 칸이 밀리지 않는다 */
+/* --color-muted였다("참조하는 값"). 게임 HUD에서 모은 재화는 또렷하다 —
+   잉크색 + 굵기로 올린다(2026-08-26 사용자 지적) */
 .pet-bar__value {
-  color: var(--color-muted);
-  font-size: var(--text-body);
+  color: var(--color-ink);
+  font-size: var(--text-label);
+  font-weight: 700;
   font-variant-numeric: tabular-nums;
 }
 
@@ -376,12 +376,38 @@
 
 /* Lv 덩어리를 한 줄로 눕힌다. 세로 3줄(Lv / 게이지 / exp)이 88px을 먹던 것이
    가로 한 줄이면 약 30px이다. `exp / need` 숫자는 **띠에서 뺀다** — 게이지가 이미 비율을
-   말하고, 정확한 값은 씨앗을 넣을 때 유리 바가 크게 보여 준다(.pet-exp-pop) */
+   말하고, 정확한 값은 씨앗을 넣을 때 유리 바가 크게 보여 준다(.pet-exp-pop).
+
+   ── 게임 느낌 (2026-08-26 사용자 지적: "너무 깔끔한 거 같음") ──
+   납작한 반투명 판이었다. 육성 게임 HUD는 **두께가 있다** — 위쪽 광택, 아래쪽 굳은 테두리,
+   또렷한 윤곽선. 이 파일이 이미 그 값을 갖고 있다(`--pet-gloss` · `--pet-gloss-edge`,
+   주 버튼 `.pet-btn`이 쓰는 것) — **새 색을 만들지 않고 그것을 얹는다** */
 .pet-hud .pet-hud-lv {
   display: flex;
   align-items: center;
   gap: var(--space-2xs);
-  padding: var(--space-3xs) var(--space-2xs);
+  padding: var(--space-3xs) var(--space-xs) var(--space-3xs) var(--space-3xs);
+  border: 2px solid color-mix(in oklch, var(--tribe) 45%, transparent);
+  border-radius: var(--radius-pill);
+  background: var(--pet-gloss), color-mix(in oklch, var(--color-card) 92%, transparent);
+  /* 아래쪽 굳은 테두리 한 겹이 두께를 만든다. 주 버튼의 `0 4px 0`보다 얇은 2px이다 —
+     HUD는 누르는 것이 아니라 얹혀 있는 것이다 */
+  box-shadow: var(--pet-gloss-edge), 0 2px 0 color-mix(in oklch, var(--tribe) 30%, transparent);
+}
+
+/* Lv 숫자를 **배지**로 만든다. 게임 HUD의 레벨은 거의 항상 동그라미 안에 있다 */
+.pet-hud .pet-hud-lv__level {
+  display: grid;
+  place-items: center;
+  min-width: 2.1rem;
+  height: 2.1rem;
+  padding-inline: 0.2rem;
+  border-radius: var(--radius-pill);
+  background: var(--pet-gloss), linear-gradient(135deg, var(--tribe-face), var(--tribe));
+  box-shadow: var(--pet-gloss-edge);
+  font-size: var(--text-label);
+  font-weight: 700;
+  color: var(--color-ink);
 }
 
 .pet-hud .pet-hud-lv__exp {
@@ -429,11 +455,17 @@
   /* 44px 터치 하한(design.md). 방 안이라 더 키울 수 없어 정확히 그 값이다 */
   min-height: 2.75rem;
   padding: 0 var(--space-sm);
+  /* 게임 버튼의 두께 (2026-08-26). 위 광택 + 아래 굳은 테두리 `0 4px 0`은 이 화면의
+     주 버튼(.pet-btn)이 쓰는 값이다 — 새로 만들지 않고 같은 것을 쓴다.
+     누르면 그 4px을 2px로 줄여 실제로 내려앉는다(아래 :active) */
   border: 2px solid transparent;
   border-radius: var(--radius-pill);
-  background: color-mix(in oklch, var(--color-card) 88%, transparent);
+  background: var(--pet-gloss), color-mix(in oklch, var(--color-card) 92%, transparent);
   backdrop-filter: blur(6px);
-  box-shadow: 0 2px 8px rgb(42 31 20 / 0.14);
+  box-shadow:
+    var(--pet-gloss-edge),
+    0 4px 0 color-mix(in oklch, var(--tribe) 32%, transparent),
+    0 5px 10px rgb(42 31 20 / 0.16);
   font-family: var(--font-display);
   font-size: var(--text-label);
   font-weight: 600;
@@ -444,13 +476,19 @@
 }
 
 .pet-act:active:not(:disabled) {
-  transform: translateY(1px);
+  transform: translateY(2px);
+  box-shadow:
+    var(--pet-gloss-edge),
+    0 2px 0 color-mix(in oklch, var(--tribe) 32%, transparent),
+    0 3px 6px rgb(42 31 20 / 0.16);
 }
 
 /* 주 동작은 종족색 테두리로 가른다. **면을 채우지 않는다** — 방 그림 위라 채우면
    배경이 그만큼 가려지고, 6종 중 밝은 셋에서는 글자 대비가 오히려 떨어진다 */
+/* font-size를 --text-body로 올렸다가 되돌렸다 — 알약이 넓어져 375px에서 셋이 두 줄로
+   접히고 그 두 줄이 펫을 덮었다(실측). 게임 느낌은 글자 크기가 아니라 두께가 만든다 */
 .pet-act--primary {
-  border-color: color-mix(in oklch, var(--tribe) 62%, transparent);
+  border-color: color-mix(in oklch, var(--tribe) 68%, transparent);
 }
 
 /* 더보기는 테두리 없이 한 단 옅다 — 주 동작과 위계를 가른다 */
@@ -3601,9 +3639,29 @@
      Lv 상자가 96px, 알약이 197px이라 합이 293px이다(실측). 그래서 **세로로 쌓는다** —
      알약이 맨 위 가운데, Lv이 그 아래 왼쪽, 버튼 스택이 그 아래다.
      넓은 화면에서는 둘이 같은 줄에 있는 것이 시안이고, 이 폭만 예외다 */
+  /* ── 상단 띠를 한 줄로 지킨다 (2026-08-26 실측) ────────────────────────────────
+   *
+   * 375px에서 띠 안쪽이 274px인데 `Lv 143 + 알약 201 + 간격 8 = 352`라 **알약이 아래 줄로
+   * 밀렸다.** 사용자가 "자원 알약을 삼켜버림"으로 본 것이 그 줄바꿈이다.
+   *
+   * **게이지를 뺀다.** Lv 배지만 남으면 약 44 + 201 + 8 = 253 < 274로 한 줄이 유지된다.
+   * 게이지가 사라져도 경험치를 볼 길은 둘 남는다 — 씨앗을 넣는 순간 뜨는 유리 바
+   * (.pet-exp-pop, 같은 값을 크게 보여 준다)와 `더보기 → 펫 정보`다.
+   * 넓은 화면에서는 게이지가 그대로 있다(폭이 남는다).
+   */
   .pet-hud-lv {
-    --gauge-w: 5rem;
     top: 3.25rem;
+  }
+
+  .pet-hud .pet-hud-lv .pet-gauge {
+    display: none;
+  }
+
+  /* 2px이 모자랐다. 게이지를 뺀 뒤 `Lv 55 + 알약 201 + 간격 8 = 264`인데 띠 안쪽이
+     좌우 여백 8×2 때문에 258이었다(실측). 그 여백을 걷어 274로 만든다 —
+     띠 자체가 면이 없으므로(안의 두 덩어리가 각자 알약이다) 여백이 할 일이 없다 */
+  .pet-hud {
+    padding-inline: 0;
   }
 
   /* 알약도 좁혀야 한 줄이 유지된다. 안 좁히면 247px 안에서 3줄로 접히고(실측 h 85px)
@@ -3627,21 +3685,11 @@
      그래서 absolute를 **풀어** 방 밖(.pet-stage 안)으로 흐르게 한다. 페이지가 그만큼
      길어지지만 방 안은 펫과 쪽지가 온전히 쓴다.
      좌측 그룹이 위 줄, 우측 그룹이 아래 줄이다 — 자주 누르는 것이 위에 온다 */
-  /* ── 읽는 값 둘을 방 위로 흘린다 (2026-08-26) ──────────────────────────────
-   *
-   * 375px에서 방이 279×352인데 말풍선(112) + 알약(29) + Lv HUD(88) + 펫(274) = 503이다.
-   * **방이 담을 수 없는 양이라 자리를 옮겨 풀 문제가 아니었다** — 말풍선이 방 상단 112px을
-   * 다 먹고 알약과 HUD를 함께 덮었다(실측: 말풍선 17~129 · 알약 10~39 · HUD 54~142).
-   *
-   * 말풍선과 펫은 방 안에 있어야 한다(펫이 말하는 것으로 읽혀야 하고, 말풍선 자리가
-   * `--pet-char-w`에 묶여 있다). 그래서 **읽는 값 둘만** 방 위로 낸다. 독이 방 아래로
-   * 내려간 것과 대칭이고, 폰 화면의 관습(상단 HUD 띠 + 그 아래 장면)과도 맞는다 */
-  .pet-bar,
-  .pet-hud-lv {
-    position: static;
-    width: fit-content;
-    margin-inline: auto;
-  }
+  /* 여기에 `.pet-bar, .pet-hud-lv { position: static; width: fit-content;
+     margin-inline: auto }`가 남아 있었다 — 둘을 방 **위로** 흘리던 옛 판의 규칙이다.
+     한 띠(.pet-hud)로 합친 뒤에는 그 `margin-inline: auto`가 **flex 항목이 남는 공간을
+     전부 먹게** 만들어서, Lv 상자가 좌우로 꽉 차고 재화 알약이 아래 줄로 밀렸다
+     (사용자 지적: "자원 알약을 삼켜버림"). 정렬은 `.pet-hud`의 justify-content가 한다 */
 
   /* `.pet-stage { align-items: center }`를 넣었다가 **바로 버렸다.** 스테이지가
      `flex-direction: column`이라 그 값이 방까지 내용 폭으로 줄여서 방이 세로선 하나가 됐다
