@@ -121,7 +121,6 @@ export async function POST(request: Request) {
     typeCode,
     adjective,
     nickname,
-    family: tribe.family,
     animal: tribe.animal,
     colorHex: tribe.colorHex,
   })

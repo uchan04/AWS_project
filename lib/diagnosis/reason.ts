@@ -139,7 +139,7 @@ export async function summarizeReason(params: { answers: Answer[]; typeCode: Typ
           content: [
             {
               // 종족은 이미 화면에 떠 있다. 문장이 그 결과와 어긋나지 않게 알려만 준다
-              text: `이 사용자는 결과 화면에서 "${tribe.family} · ${tribe.animal}"을 보고 있습니다.\n\n질문과 답:\n${body}`,
+              text: `이 사용자는 결과 화면에서 "${tribe.animal}"(을)를 보고 있습니다.\n\n질문과 답:\n${body}`,
             },
           ],
         },

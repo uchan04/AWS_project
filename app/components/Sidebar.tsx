@@ -195,7 +195,7 @@ export function Sidebar({ profile }: { profile: SidebarProfile | null }) {
   const tribe = profile.typeCode ? TRIBE[profile.typeCode] : null
   const color = tribe?.colorHex || "#7A6B58"
   const bg = getBgColor(color)
-  const familyLabel = tribe?.family || "미분류"
+  const familyLabel = tribe?.animal || "미분류"
   const joinDate = new Date(profile.createdAt).toLocaleDateString("ko-KR", {
     year: "numeric",
     month: "long",
@@ -486,33 +486,7 @@ export function Sidebar({ profile }: { profile: SidebarProfile | null }) {
               </div>
 
               <div style={{ display: "flex", flexDirection: "column", gap: 8 }}>
-                {/* 재진단은 잠겼다(lib/diagnosis/flags.ts, 2026-08-22 A). 같은 자리를 이름 바꾸기로 쓴다 —
-                    결과 화면에 이름 입력이 이미 있고, 그 화면으로 가는 입구가 하단 탭뿐이었다 */}
-                <button
-                  onClick={() => {
-                    router.push("/diagnosis/result")
-                  }}
-                  style={{
-                    width: "100%",
-                    padding: "12px",
-                    background: "#F5F0E8",
-                    border: "1px solid #DDD0BC",
-                    borderRadius: 12,
-                    fontSize: 13,
-                    color: "#5A4A3A",
-                    cursor: "pointer",
-                    fontWeight: 500,
-                    transition: "all 0.15s",
-                  }}
-                  onMouseEnter={(e) => {
-                    e.currentTarget.style.background = "#F0EAD8"
-                  }}
-                  onMouseLeave={(e) => {
-                    e.currentTarget.style.background = "#F5F0E8"
-                  }}
-                >
-                  이름 바꾸기
-                </button>
+                {/* 재진단은 잠겼다(lib/diagnosis/flags.ts, 2026-08-22 A). */}
                 {/* 계정 설정(비밀번호 변경·탈퇴) 입구. 2026-08-22 A 추가 —
                     가입 이후 계정을 손댈 수 있는 화면이 하나도 없었다 */}
                 <button

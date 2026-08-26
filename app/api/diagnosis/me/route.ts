@@ -24,7 +24,6 @@ export async function GET() {
     typeCode: user.typeCode,
     adjective: user.adjective,
     nickname: user.nickname,
-    family: tribe.family,
     animal: tribe.animal,
     colorHex: tribe.colorHex,
   })

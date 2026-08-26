@@ -33,7 +33,7 @@ export function PostCard({
             className="shrink-0 rounded-full px-2.5 py-1 text-[11px] font-bold"
             style={{ backgroundColor: `${tribe.colorHex}22`, color: tribe.colorHex }}
           >
-            {tribe.family}
+            {tribe.animal}
           </span>
         )}
       </div>
