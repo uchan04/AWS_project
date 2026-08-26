@@ -1,6 +1,6 @@
 "use client"
 
-import { useEffect, useRef, useState } from "react"
+import { useEffect, useRef, useState, type ReactNode } from "react"
 import Link from "next/link"
 import type { TypeCode } from "@prisma/client"
 import {
@@ -38,6 +38,7 @@ import { AFFINITY_DAILY_CAP } from "@/lib/reward"
 const BACKGROUND_PRICE_SHARDS = 500
 import { ArtImage } from "@/app/components/ArtImage"
 import { useModalA11y } from "@/app/components/useModalA11y"
+import { CurrencyIcon } from "@/app/components/CurrencyIcon"
 import PetRoom from "./PetRoom"
 import "@/styles/tokens.css"
 import "../pet.css"
@@ -322,7 +323,7 @@ export default function PetView({ initial }: { initial: PetState }) {
   const wallet = [
     {
       name: "씨앗",
-      icon: "🌱",
+      icon: <CurrencyIcon currency="seed" size={18} />,
       value: pet.seeds,
       use: `펫에게 먹이면 경험치가 돼요 (씨앗 1 = 경험치 ${SEED_TO_EXP})`,
       how: [
@@ -335,7 +336,7 @@ export default function PetView({ initial }: { initial: PetState }) {
     },
     {
       name: "친밀도",
-      icon: "❤️",
+      icon: <CurrencyIcon currency="affinity" size={18} />,
       value: pet.affinity,
       use: `펫을 밖에 내보내요 (외출 한 번 ${OUTING_COST_AFFINITY})`,
       how: [
@@ -348,7 +349,7 @@ export default function PetView({ initial }: { initial: PetState }) {
     },
     {
       name: "별조각",
-      icon: "⭐",
+      icon: <CurrencyIcon currency="starShard" size={18} />,
       value: pet.starShards,
       use: `외형 스킨(2,500)과 방 배경(${BACKGROUND_PRICE_SHARDS})을 사요`,
       how: [
@@ -405,11 +406,12 @@ export default function PetView({ initial }: { initial: PetState }) {
   // text를 미리 만드는 이유: 재화 셋은 "+N"이고 출석은 "N일"이라 접두사·단위가 다르다.
   // 렌더에서 분기하면 칸마다 다른 서식이 JSX에 흩어진다.
   const todayTiles = [
-    { name: "받은 씨앗", icon: "🌱", text: `+${ko(pet.today.seeds)}`, seed: true },
-    { name: "받은 별조각", icon: "⭐", text: `+${ko(pet.today.starShards)}`, seed: false },
-    // 친밀도 이모지는 2026-08-24 사용자 요청으로 💛 → ❤️다. 지갑 줄과 같은 값을 쓴다 —
-    // 같은 재화가 두 카드에서 다른 그림이면 같은 것인지 알 수 없다
-    { name: "받은 친밀도", icon: "❤️", text: `+${ko(pet.today.affinity)}`, seed: false },
+    { name: "받은 씨앗", icon: <CurrencyIcon currency="seed" size={22} />, text: `+${ko(pet.today.seeds)}`, seed: true },
+    { name: "받은 별조각", icon: <CurrencyIcon currency="starShard" size={22} />, text: `+${ko(pet.today.starShards)}`, seed: false },
+    // 친밀도 이모지는 2026-08-24 사용자 요청으로 💛 → ❤️였다가, 2026-08-26 모꼬지 재화
+    // 에셋으로 다시 바뀌었다. 지갑 줄과 같은 값을 쓴다 — 같은 재화가 두 카드에서
+    // 다른 그림이면 같은 것인지 알 수 없다
+    { name: "받은 친밀도", icon: <CurrencyIcon currency="affinity" size={22} />, text: `+${ko(pet.today.affinity)}`, seed: false },
     { name: "출석일수", icon: "📅", text: `${ko(pet.attendanceDays)}일`, seed: false },
   ]
 
@@ -1209,7 +1211,7 @@ export default function PetView({ initial }: { initial: PetState }) {
                     카드 높이는 그대로다 — 줄 높이를 정하는 쪽이 여전히 4.5rem 버튼이다 */}
                 <div className="pet-card__head">
                   <p className="pet-card__title">
-                    <span aria-hidden="true">🌱</span> 그동안 쌓인 씨앗
+                    <CurrencyIcon currency="seed" size={16} /> 그동안 쌓인 씨앗
                   </p>
                   {/* "N개"에서 "N / 100개"로 늘렸다. 경험치 카드가 게이지 위에 같은 형태로
                       현재/최대를 적는다 — 분모가 없으면 막대가 어디서 끝나는지 알 수 없다 */}
@@ -1574,7 +1576,7 @@ function WalletInfoModal({
   row,
   onClose,
 }: {
-  row: { name: string; icon: string; use: string; how: string[]; cap: string; extra?: string }
+  row: { name: string; icon: ReactNode; use: string; how: string[]; cap: string; extra?: string }
   onClose: () => void
 }) {
   const boxRef = useModalA11y(onClose)
