@@ -548,11 +548,38 @@
   fill: color-mix(in oklch, var(--tribe) 72%, var(--color-card));
   opacity: 0.75;
 }
-.pet-room__pot {
+/* 여기에 화분이 있었다(.pet-room__pot #c87050 + .pet-room__leaf var(--pet-seed-fill)).
+   **2026-08-26 사용자 요청으로 책장으로 갈았다.** 되살릴 값은 그 두 줄이고, 좌표는
+   PetRoom.tsx의 SHELF_* 상수 위 주석에 옛 화분 좌표(x 24 · y 180 · 24×24 + 잎 3장)가
+   함께 남아 있다.
+
+   책장도 화분과 같은 규칙을 따른다: **종족색을 쓰지 않는다.** 나무 가구는 사물 고유색이고
+   종족색을 따르면 파란 책장·주황 책장이 된다(위 .pet-room__wall 앞 주석과 같은 근거).
+   뒷판이 선반보다 어두운 것은 칸 안쪽이 그늘로 보이게 하는 값이다 — 두 색이 같으면
+   선반 4장이 사라지고 네모 한 장이 된다 */
+.pet-room__shelf {
+  fill: #a67a52;
+}
+.pet-room__shelf-board {
+  /* 창틀(.pet-room__frame)과 같은 나무색이다. 방 안의 나무 물건을 두 색으로 쓰지 않는다 */
+  fill: #c89060;
+}
+
+/* 책 4색. **채도를 낮춰 둔 것이 요점이다** — design.md의 "채도 높은 색은 종족색 하나뿐"에
+   걸리지 않게, 방이 이미 갖고 있는 고정색(하늘 #aee4f8 · 바닥 #c8a878 · 옛 화분 #c87050)을
+   각각 한 단 눌러 만든 값이다. 책 한 권이 화면에서 5~9좌표(약 6~11px)라 이 채도에서도
+   네 색이 갈린다. 색을 늘리지 않는다 — 다섯 번째가 필요해지면 그건 책장이 너무 크다는 뜻이다 */
+.pet-room__book[data-tone="0"] {
   fill: #c87050;
 }
-.pet-room__leaf {
-  fill: var(--pet-seed-fill);
+.pet-room__book[data-tone="1"] {
+  fill: #8fa9b8;
+}
+.pet-room__book[data-tone="2"] {
+  fill: #a9b98f;
+}
+.pet-room__book[data-tone="3"] {
+  fill: #d8bc86;
 }
 .pet-room__rug {
   fill: color-mix(in oklch, var(--tribe) 48%, var(--color-card));
