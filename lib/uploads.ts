@@ -47,15 +47,21 @@ function bucket(): string {
  * 허용 타입 → 확장자. **삼항이 아니라 map으로 둔다.** 미션 쪽은
  * `contentType === "image/jpeg" ? "jpg" : "png"`라서 타입을 하나 늘리면 webp가 `.png` 키로
  * 올라간다. 여기서는 타입을 늘리는 자리와 확장자를 정하는 자리가 한 곳이라 어긋날 수 없다.
+ *
+ * **webp를 지웠다(2026-08-26, D 요청).** Bedrock Guardrails 이미지 필터가 PNG·JPEG만
+ * 받는다 — webp를 그대로 두면 그 확장자로 올린 사진만 판정을 통째로 우회한다.
  */
 const COMMUNITY_EXT: Record<string, string> = {
   "image/jpeg": "jpg",
   "image/png": "png",
-  "image/webp": "webp",
 }
 
-/** 미션(3MB)보다 큰 이유는 글 이미지가 본문 폭 전체를 쓰기 때문이다. D 요청값. */
-const COMMUNITY_MAX_SIZE = 5 * 1024 * 1024
+/**
+ * Guardrails 이미지 판정의 상한(4MB)에 맞췄다(2026-08-26, D 요청). 원래는 5MB였다 —
+ * 미션(3MB)보다 큰 이유는 글 이미지가 본문 폭 전체를 쓰기 때문이었는데, 그 값이 필터
+ * 상한을 넘으면 큰 사진일수록 판정 없이 통과한다. 필터 쪽 상한이 더 좁은 값이다.
+ */
+const COMMUNITY_MAX_SIZE = 4 * 1024 * 1024
 
 /** 키 첫 세그먼트. 용도 판정이 문자열 비교 한 번으로 끝나도록 상수로 내보낸다. */
 export const COMMUNITY_PREFIX = "community/"
@@ -106,7 +112,7 @@ export async function generateCommunityPresignedUrl(params: {
 
   const ext = COMMUNITY_EXT[contentType]
   if (!ext) {
-    throw new UploadError("INVALID_FILE", "JPG·PNG·WEBP 이미지만 올릴 수 있습니다")
+    throw new UploadError("INVALID_FILE", "JPG·PNG 이미지만 올릴 수 있습니다")
   }
 
   if (!Number.isFinite(fileSize) || fileSize <= 0) {
@@ -114,7 +120,7 @@ export async function generateCommunityPresignedUrl(params: {
   }
 
   if (fileSize > COMMUNITY_MAX_SIZE) {
-    throw new UploadError("INVALID_FILE", "파일 크기는 5MB 이하여야 합니다")
+    throw new UploadError("INVALID_FILE", "파일 크기는 4MB 이하여야 합니다")
   }
 
   const s3Key = `${COMMUNITY_PREFIX}${userId}/${randomBytes(8).toString("hex")}.${ext}`
@@ -170,11 +176,11 @@ export async function verifyCommunityObject(params: {
   }
 
   if (!result.ContentType || !(result.ContentType in COMMUNITY_EXT)) {
-    throw new UploadError("INVALID_FILE", "JPG·PNG·WEBP 이미지만 올릴 수 있습니다")
+    throw new UploadError("INVALID_FILE", "JPG·PNG 이미지만 올릴 수 있습니다")
   }
 
   if (!result.ContentLength || result.ContentLength > COMMUNITY_MAX_SIZE) {
-    throw new UploadError("INVALID_FILE", "파일 크기는 5MB 이하여야 합니다")
+    throw new UploadError("INVALID_FILE", "파일 크기는 4MB 이하여야 합니다")
   }
 
   return { contentType: result.ContentType, contentLength: result.ContentLength }

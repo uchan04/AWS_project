@@ -12,7 +12,7 @@ frontend:
         # DATABASE_URL"으로 500이 났다. 빌드 시점에 .env.production으로 구워 산출물에 실어 보낸다.
         # AWS_REGION은 넣지 않는다 — 런타임이 이미 주입하고, Amplify 예약 접두사다.
         # grep이 하나도 못 맞히면 종료 코드 1로 빌드가 실패한다. 조용히 깨진 채 배포되는 것보다 낫다.
-        - env | grep -e DATABASE_URL -e SESSION_SECRET -e COGNITO_USER_POOL_ID -e COGNITO_CLIENT_ID -e COGNITO_DOMAIN -e BEDROCK_REGION -e BEDROCK_MODEL_ID -e BEDROCK_VISION_MODEL_ID -e S3_BUCKET -e CLOUDFRONT_DOMAIN -e DEV_AUTH_BYPASS -e APP_ORIGIN >> .env.production
+        - env | grep -e DATABASE_URL -e SESSION_SECRET -e COGNITO_USER_POOL_ID -e COGNITO_CLIENT_ID -e COGNITO_DOMAIN -e BEDROCK_REGION -e BEDROCK_MODEL_ID -e BEDROCK_VISION_MODEL_ID -e BEDROCK_GUARDRAIL_ID -e BEDROCK_GUARDRAIL_VERSION -e S3_BUCKET -e CLOUDFRONT_DOMAIN -e DEV_AUTH_BYPASS -e APP_ORIGIN >> .env.production
         # OAuth redirect_uri에 쓸 공개 오리진. SSR 컴퓨트에서 request.url의 호스트는
         # Lambda 내부 호스트(localhost:3000)라 그대로 쓰면 Cognito가 redirect_mismatch로 거부한다.
         # AWS_BRANCH·AWS_APP_ID는 Amplify가 빌드 컨테이너에 넣어 주므로 콘솔 설정이 필요 없다.
