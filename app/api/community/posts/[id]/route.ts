@@ -68,13 +68,20 @@ export async function DELETE(_request: NextRequest, ctx: RouteContext<"/api/comm
     const post = await prisma.post.findUnique({ where: { id }, select: { userId: true, deletedAt: true } })
     if (!post) return fail("NOT_FOUND", "게시글을 찾을 수 없어요", 404)
 
-    if (post.userId !== user.id && !user.isAdmin) {
+    const isOwn = post.userId === user.id
+    if (!isOwn && !user.isAdmin) {
       return fail("FORBIDDEN", "본인 글만 삭제할 수 있어요", 400)
     }
 
     if (post.deletedAt) return fail("NOT_FOUND", "이미 삭제된 글이에요", 404)
 
-    await prisma.post.update({ where: { id }, data: { deletedAt: new Date() } })
+    // 남이 지운 경우에만 true다. **관리자가 자기 글을 지우면 false다** — 자기가 지운 글로
+    // 자기한테 통보가 가면 안 된다. 판정 기준은 isAdmin이 아니라 "본인 여부"다.
+    // 통보는 deletedByAdmin && deleteNotifiedAt === null인 것만 대상으로 한다(schema.prisma 주석).
+    await prisma.post.update({
+      where: { id },
+      data: { deletedAt: new Date(), deletedByAdmin: !isOwn },
+    })
 
     return ok({ id })
   } catch (error) {

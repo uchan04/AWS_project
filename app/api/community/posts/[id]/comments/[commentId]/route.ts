@@ -23,7 +23,8 @@ export async function DELETE(
     // URL의 글과 댓글이 안 맞으면 엉뚱한 글의 commentCount를 깎게 된다.
     if (comment.postId !== id) return fail("NOT_FOUND", "댓글을 찾을 수 없어요", 404)
 
-    if (comment.userId !== user.id && !user.isAdmin) {
+    const isOwn = comment.userId === user.id
+    if (!isOwn && !user.isAdmin) {
       return fail("FORBIDDEN", "본인 댓글만 삭제할 수 있어요", 400)
     }
 
@@ -31,7 +32,11 @@ export async function DELETE(
     if (comment.deletedAt) return fail("NOT_FOUND", "이미 삭제된 댓글이에요", 404)
 
     await prisma.$transaction([
-      prisma.comment.update({ where: { id: commentId }, data: { deletedAt: new Date() } }),
+      // 글 삭제와 같은 기준이다. 남이 지운 경우에만 true(관리자가 자기 댓글을 지우면 false).
+      prisma.comment.update({
+        where: { id: commentId },
+        data: { deletedAt: new Date(), deletedByAdmin: !isOwn },
+      }),
       prisma.post.update({ where: { id }, data: { commentCount: { decrement: 1 } } }),
     ])
 
