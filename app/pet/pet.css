@@ -3433,175 +3433,399 @@
    앱 안에서 팝업이 두 종류로 보이지 않게 한다.
    ───────────────────────────────────────────────────────────────────── */
 
-/* 일기는 상단·중단·하단 세 덩어리라 지갑 팝업보다 넓고, 중단만 스크롤한다 */
-.pet-diary-pop__box {
-  max-width: 24rem;
+/* 2026-08-26 사용자 시안으로 다시 짰다. **종이 한 장**이다 — 마스킹 테이프 두 조각,
+   클립, 겹친 종이 그림자, 점선 구분선, 형광펜 밑줄, 선물 타일.
+
+   앞 판(펫 초상 + 3단, 넓은 화면 2단)에서 걷은 것:
+   - `.pet-diary__top` / `.pet-diary__art` / `.pet-diary__title` / `.pet-diary__sub`
+   - `.pet-diary__loot*` (선물 타일 `.pet-diary__gift*`로 대체)
+   - `@media (min-width: 769px)`의 2단 배치 — 시안이 세로로 긴 종이라 두 규칙이 싸운다
+
+   **새 이미지를 넣지 않았다.** 테이프·클립·반짝임·형광펜은 전부 CSS 도형이다.
+   재화 그림은 이미 있는 `CurrencyIcon`(currency_*.png)을 56px로 쓴다. */
+
+/* 종이 색·선 색을 여기서 한 번 정한다 — 아래 12벌이 같은 값을 읽어야 종이 한 장으로 보인다.
+   전역 토큰을 쓰지 않는 이유: 이 팝업은 앱의 카드(--color-card)보다 노랗고, 그 노랑이
+   "오래된 종이"라는 재질을 만든다. 앱 색을 이쪽으로 끌어오면 다른 화면이 함께 노래진다 */
+.pet-diary-pop__box--diary {
+  --paper: #fdfaf0;
+  --paper-line: #e0d5bb;
+  --paper-ink: #6b5b45;
+  --paper-accent: #e8a33d;
+
+  position: relative;
+  max-width: 26rem;
+  padding: var(--space-md) var(--space-sm) var(--space-sm);
+  border-radius: 18px;
+  background: var(--paper);
   display: grid;
   gap: var(--space-2xs);
-  max-height: min(90dvh, 40rem);
+  max-height: min(92dvh, 46rem);
+  /* 겹친 종이. 뒤로 두 장이 살짝 삐져나온 것을 그림자 두 겹으로 만든다 —
+     실제 요소를 두 개 더 두면 초점 순서와 스크린리더에 빈 칸이 생긴다 */
+  box-shadow:
+    6px 6px 0 -2px color-mix(in oklch, var(--paper) 88%, #000),
+    10px 11px 0 -3px color-mix(in oklch, var(--paper) 78%, #000),
+    0 32px 80px rgba(0, 0, 0, 0.28);
 }
 
-/* ── 상단 ── */
-.pet-diary__top {
-  display: grid;
-  justify-items: center;
-  gap: 2px;
-  padding-bottom: var(--space-2xs);
-  border-bottom: 1px solid color-mix(in oklch, var(--color-muted) 25%, transparent);
+/* ── 종이 장식 ── */
+
+/* 왼쪽 위 클립. 반원 두 개를 겹친 것이 아니라 테두리만 있는 타원을 기울였다 */
+.pet-diary__clip {
+  position: absolute;
+  top: -0.7rem;
+  left: 1.9rem;
+  width: 1rem;
+  height: 2.3rem;
+  border: 3px solid #b9b2a4;
+  border-radius: 999px;
+  transform: rotate(-12deg);
+  pointer-events: none;
 }
 
-/* 방의 펫과 같은 그림(petFace)을 받는다. .pet-char__img가 단계별 크기를 갖고 있으므로
-   여기서는 담는 칸만 정한다 — 크기를 다시 지정하면 두 곳이 갈린다 */
-.pet-diary__art {
+/* 마스킹 테이프. 반투명 초록에 세로 결을 넣어 종이 위에 붙은 것으로 읽히게 한다 */
+.pet-diary__tape {
+  position: absolute;
+  width: 4.5rem;
+  height: 1.6rem;
+  background:
+    repeating-linear-gradient(
+      90deg,
+      rgb(255 255 255 / 0.35) 0 2px,
+      transparent 2px 5px
+    ),
+    color-mix(in oklch, #cfdcae 82%, transparent);
+  box-shadow: 0 1px 3px rgb(42 31 20 / 0.12);
+  pointer-events: none;
+}
+
+.pet-diary__tape--tl {
+  top: 0.9rem;
+  left: -1.4rem;
+  transform: rotate(-34deg);
+}
+
+/* bottom: 2.6rem이었다 — `맞이하기` 버튼 위에 앉아 글자를 가렸다(실측).
+   시안처럼 오른쪽 아래 **모서리**로 내린다 */
+.pet-diary__tape--br {
+  right: -1.3rem;
+  bottom: -0.5rem;
+  transform: rotate(-32deg);
+}
+
+/* 왼쪽 아래 점 네 개. 시안의 여백 장식이다 */
+.pet-diary__dots {
+  position: absolute;
+  left: 0.9rem;
+  bottom: 0.9rem;
+  width: 0.9rem;
+  height: 0.9rem;
+  background-image: radial-gradient(circle, var(--paper-line) 42%, transparent 46%);
+  background-size: 0.45rem 0.45rem;
+  pointer-events: none;
+}
+
+/* 오른쪽 위 닫기. 테두리 원 하나다 — 면을 채우면 종이 위에 버튼이 얹힌 것으로 보인다 */
+.pet-diary__x {
+  position: absolute;
+  top: var(--space-xs);
+  right: var(--space-xs);
+  z-index: 1;
   display: grid;
   place-items: center;
-  width: 100%;
-  min-height: 7rem;
+  width: 2.25rem;
+  height: 2.25rem;
+  border: 2px solid var(--paper-line);
+  border-radius: 999px;
+  background: transparent;
+  color: var(--paper-ink);
+  font-size: var(--text-body);
+  line-height: 1;
+  cursor: pointer;
 }
 
-.pet-diary__title {
+.pet-diary__x:hover {
+  background: color-mix(in oklch, var(--paper-line) 30%, transparent);
+}
+
+/* ── 머리: 발자국 · 날짜 · 이름 ── */
+
+.pet-diary__head {
+  display: grid;
+  justify-items: center;
+  gap: var(--space-3xs);
+  /* 좌우 여백을 여기서 2.5rem 주고 있었다. 그러면 416px 상자에서 제목 칸이 316px이 되고
+     `북극여우의 외출 이야기`가 `…이야 / 기`로 끊긴다(실측). 닫기 원과 겹치는 것은
+     발자국·날짜 줄뿐이므로 그 두 줄만 비운다 — 제목은 상자 폭을 다 쓴다 */
+  padding: 0;
+}
+
+.pet-diary__paw,
+.pet-diary__date {
+  padding: 0 2.5rem;
+}
+
+.pet-diary__paw {
+  font-size: var(--text-lg);
+  line-height: 1;
+}
+
+/* 날짜 양옆 점선. `border-top: dashed`가 아니라 반복 그라디언트다 —
+   dashed는 브라우저마다 점 길이가 달라 좌우 길이가 어긋나 보인다 */
+.pet-diary__date {
+  margin: 0;
+  display: flex;
+  align-items: center;
+  gap: var(--space-2xs);
+  font-size: var(--text-caption);
+  font-variant-numeric: tabular-nums;
+  letter-spacing: 0.06em;
+  color: color-mix(in oklch, var(--paper-ink) 70%, transparent);
+}
+
+.pet-diary__date-rule {
+  width: 2.5rem;
+  height: 2px;
+  background-image: linear-gradient(90deg, var(--paper-line) 0 4px, transparent 4px 8px);
+  background-size: 8px 2px;
+}
+
+/* 형광펜 밑줄. text-decoration이 아니라 배경이다 — 밑줄은 글자에 붙지만
+   형광펜은 글자를 가로지르며 조금 넘쳐야 한다. no-repeat + 아래쪽 정렬로 띠를 만든다 */
+.pet-diary__name {
   margin: 0;
   font-family: var(--font-display);
-  font-size: var(--text-lg);
-  color: var(--color-ink);
+  font-size: var(--text-xl);
+  line-height: 1.35;
+  color: #4a3c2a;
+  text-align: center;
+  background-image: linear-gradient(
+    color-mix(in oklch, var(--paper-accent) 55%, transparent),
+    color-mix(in oklch, var(--paper-accent) 55%, transparent)
+  );
+  background-repeat: no-repeat;
+  background-size: 100% 0.4em;
+  background-position: 0 88%;
+  /* 그래도 두 줄이 될 때(긴 스킨 이름) 한 글자만 내려가지 않게 균형을 잡는다.
+     지원하지 않는 브라우저는 기존 줄바꿈이라 잃는 것이 없다 */
+  text-wrap: balance;
 }
 
-.pet-diary__sub {
+/* ── 점선 구분선 (가운데 점 하나) ── */
+.pet-diary__rule {
+  position: relative;
+  display: block;
+  height: 2px;
+  margin: var(--space-2xs) 0;
+  background-image: linear-gradient(90deg, var(--paper-line) 0 5px, transparent 5px 11px);
+  background-size: 11px 2px;
+}
+
+.pet-diary__rule::after {
+  content: "";
+  position: absolute;
+  top: 50%;
+  left: 50%;
+  width: 0.4rem;
+  height: 0.4rem;
+  border-radius: 999px;
+  background: var(--paper-accent);
+  transform: translate(-50%, -50%);
+}
+
+/* ── 제목 한 줄 (본문 위) ── */
+
+.pet-diary__lead {
   margin: 0;
-  font-size: var(--text-label);
-  color: var(--color-muted);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: var(--space-xs);
 }
 
-/* ── 중단 ──
-   줄 수가 5축 구조에서 최대 11줄이 된다. 여기만 스크롤되고 상단 펫과 하단 재화는
-   항상 보인다. 불릿을 쓰지 않는다 — 목록이 아니라 글이다 */
+.pet-diary__lead-text {
+  font-family: var(--font-display);
+  font-size: var(--text-lg);
+  font-weight: 700;
+  line-height: 1.4;
+  color: #4a3c2a;
+  text-align: center;
+  text-wrap: balance;
+}
+
+/* 반짝임 세 줄. 이모지가 아니라 CSS다 — 이모지는 폰트마다 크기가 달라 좌우 대칭이 깨진다.
+   가운데 선이 길고 위아래가 짧으며 바깥으로 벌어진다 */
+.pet-diary__spark {
+  position: relative;
+  flex: 0 0 auto;
+  width: 0.9rem;
+  height: 1.4rem;
+}
+
+/* 위아래 두 줄. 각도를 ±28 → ±42도로 벌렸다 — 28도에서는 가운데 선과 합쳐져
+   `≥` 꼴의 꺾쇠로 읽혔다(실측). 벌리면 한 점에서 퍼지는 세 줄이 된다 */
+.pet-diary__spark::before,
+.pet-diary__spark::after {
+  content: "";
+  position: absolute;
+  right: 0.05rem;
+  width: 0.6rem;
+  height: 2px;
+  border-radius: 2px;
+  background: var(--paper-accent);
+}
+
+.pet-diary__spark::before {
+  top: 0.15rem;
+  transform: rotate(-42deg);
+}
+
+.pet-diary__spark::after {
+  bottom: 0.15rem;
+  transform: rotate(42deg);
+}
+
+/* 가운데 선은 요소 자체의 배경으로 그린다. 0.85 → 0.65rem으로 줄였다 —
+   바깥 두 줄보다 길면 화살표처럼 보인다 */
+.pet-diary__spark {
+  background-image: linear-gradient(var(--paper-accent), var(--paper-accent));
+  background-repeat: no-repeat;
+  background-size: 0.65rem 2px;
+  background-position: right center;
+}
+
+.pet-diary__spark--l {
+  transform: scaleX(-1);
+}
+
+/* ── 본문 ── */
+
+/* 5축 일기가 최대 11줄이라 여기만 스크롤한다. 종이 높이가 화면을 넘지 않아야 하고
+   위 제목과 아래 선물은 늘 보여야 한다. 불릿을 쓰지 않는다 — 목록이 아니라 글이다.
+   면색을 주지 않았다(앞 판은 종족색 10%였다) — 종이 위에 다른 색 상자가 얹히면
+   종이 한 장이라는 재질이 깨진다 */
 .pet-diary__story {
   margin: 0;
-  padding: var(--space-2xs);
-  border-radius: var(--radius-input);
-  background: color-mix(in oklch, var(--tribe) 10%, transparent);
+  padding: 0 var(--space-2xs);
   list-style: none;
   display: grid;
-  /* 5축 전환으로 한 원소가 **한 문단**이 됐다(장소+사건+결과+만난것). 줄 간격이 아니라
-     문단 간격이 필요하다 — 3xs로 두면 도입·본문·기분이 한 덩어리로 붙어 읽힌다 */
   gap: var(--space-2xs);
   overflow-y: auto;
   font-size: var(--text-label);
-  line-height: 1.65;
-  color: var(--color-ink-2);
+  line-height: 1.85;
+  color: var(--paper-ink);
+  text-align: center;
 }
 
-/* ── 하단 ── */
-.pet-diary__loot-head {
-  margin: 0 0 var(--space-3xs);
+/* ── 선물 ── */
+
+.pet-diary__gift-head {
+  margin: 0;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: var(--space-2xs);
+}
+
+.pet-diary__gift-rule {
+  flex: 1;
+  max-width: 3.5rem;
+  height: 2px;
+  background-image: linear-gradient(90deg, var(--paper-line) 0 4px, transparent 4px 8px);
+  background-size: 8px 2px;
+}
+
+.pet-diary__gift-chip {
+  padding: var(--space-3xs) var(--space-xs);
+  border-radius: 999px;
+  background: color-mix(in oklch, #cfdcae 55%, var(--paper));
   font-size: var(--text-label);
   font-weight: 700;
-  color: var(--color-ink);
+  color: #4a3c2a;
 }
 
-.pet-diary__loot-list {
+/* 타일 개수가 데이터로 정해진다(지금 2). auto-fit이 아니라 고정 열을 쓰면 재화가
+   늘 때 CSS를 함께 고쳐야 한다 — 상한만 주고 가운데로 모은다 */
+.pet-diary__gifts {
   margin: 0;
   padding: 0;
   list-style: none;
   display: grid;
-  grid-template-columns: 1fr 1fr;
+  grid-template-columns: repeat(auto-fit, minmax(0, 8rem));
+  justify-content: center;
   gap: var(--space-2xs);
-  font-size: var(--text-label);
-  color: var(--color-ink-2);
 }
 
-.pet-diary__loot-list li {
+.pet-diary__gift {
+  display: grid;
+  justify-items: center;
+  gap: var(--space-3xs);
+  padding: var(--space-2xs);
+  border: 2px solid color-mix(in oklch, var(--paper-line) 70%, transparent);
+  border-radius: 14px;
+  background: color-mix(in oklch, var(--paper) 60%, #fff);
+}
+
+.pet-diary__gift-art {
+  position: relative;
+  display: grid;
+  place-items: center;
+  width: 3.5rem;
+  height: 3.5rem;
+}
+
+/* 수량 배지. 그림 오른쪽 아래에 얹는다 — 이름 줄에도 같은 수량이 있지만 시안 그대로다.
+   그림만 보고 지나가는 사람에게 숫자가 붙어 있어야 한다 */
+.pet-diary__gift-badge {
+  position: absolute;
+  right: -0.2rem;
+  bottom: -0.2rem;
+  padding: 1px 0.4rem;
+  border-radius: 999px;
+  background: #7c8f5a;
+  color: #fff;
+  font-size: var(--text-caption);
+  font-weight: 700;
+  font-variant-numeric: tabular-nums;
+  line-height: 1.5;
+}
+
+.pet-diary__gift-name {
+  font-size: var(--text-caption);
+  color: var(--paper-ink);
+  text-align: center;
+}
+
+/* ── 맞이하기 버튼 ── */
+
+/* `.pet-btn` 골격을 쓰되 색을 종이 쪽으로 돌린다. 종족색을 그대로 쓰면 이 종이 위에서
+   버튼만 다른 화면 것으로 보인다. `.pet-btn`이 grid + place-items라 발자국과 글자가
+   두 줄로 쌓이므로(1단계 잠금 버튼과 같은 함정) flex로 갈아탄다 */
+.pet-diary__go {
   display: flex;
   align-items: center;
-  gap: 4px;
-  padding: var(--space-3xs) var(--space-2xs);
-  border-radius: var(--radius-input);
-  background: var(--color-card);
+  justify-content: center;
+  gap: var(--space-2xs);
+  margin-top: var(--space-3xs);
+  border: 2px solid color-mix(in oklch, var(--paper-accent) 70%, #000 12%);
+  border-radius: 999px;
+  background: linear-gradient(
+    180deg,
+    color-mix(in oklch, var(--paper-accent) 45%, #fff),
+    var(--paper-accent)
+  );
+  box-shadow: 0 4px 0 color-mix(in oklch, var(--paper-accent) 60%, #000);
+  color: #4a3c2a;
+  font-family: var(--font-display);
+  font-size: var(--text-body);
 }
 
-.pet-diary__loot-list strong {
-  margin-left: auto;
-  font-variant-numeric: tabular-nums;
-  color: var(--color-ink);
+.pet-diary__go:active {
+  transform: translateY(2px);
+  box-shadow: 0 2px 0 color-mix(in oklch, var(--paper-accent) 60%, #000);
 }
 
-/* ── 넓은 화면 2단 배치 (2026-08-26 사용자 요청 "가로로 좀 더 넓게") ──────────
- *
- * 좁은 화면은 그대로 3단 세로다(펫 → 이야기 → 재화). 넓은 화면에서만 왼쪽에 펫,
- * 오른쪽에 이야기를 세우고 재화는 아래 전폭으로 깐다.
- *
- *   ┌──────────┬────────────────────┐
- *   │ 펫 그림   │ 이야기              │
- *   │ 제목      │                    │
- *   ├──────────┴────────────────────┤
- *   │ 가져온 것   씨앗 +N  별조각 +N   │
- *   ├───────────────────────────────┤
- *   │            닫기                │
- *   └───────────────────────────────┘
- *
- * 실측(뷰포트 700px ↔ 1100px, 같은 일기 10문단):
- *
- *   상자 폭        384px → 704px   (+83%)
- *   이야기 칸 폭    352px → 416px   (+18%)
- *   상자 높이       640px → 613px   (같은 내용을 27px 덜 쓴다)
- *
- * **이야기 칸이 상자만큼 넓어지지는 않는다** — 왼쪽 펫 칸이 240px을 가져간다. 폭만
- * 노리면 1단 44rem이 이야기에 672px을 주므로 그쪽이 낫다. 2단을 고른 이유는 다른 데
- * 있다: 1단에서는 펫 그림 + 제목이 약 200px을 세로로 먹고 이야기를 그만큼 아래로 민다.
- * 2단은 그 200px을 옆으로 치워서 **펫 얼굴을 보면서 이야기를 읽게** 된다 — 이 기능의
- * 목적이 보람·동질감이라(docs/dev/pet.md 외출 절) 펫이 스크롤 밖으로 나가면 안 된다.
- *
- * 세로 3단을 버리지 않은 이유: 사용자가 2026-08-26에 정한 구성이 펫(상단)·이야기(중단)·
- * 재화(하단)이고, 그 **읽는 순서**는 2단에서도 유지된다(왼쪽 → 오른쪽 → 아래).
- * DOM 순서도 그대로라 스크린리더가 읽는 순서가 안 바뀐다.
- *
- * 경계는 769px이다 — 이 파일의 좁은 화면 블록(`max-width: 768px`)과 정확히 맞물려
- * 두 규칙이 겹치는 구간이 없다. 새 경계를 만들지 않았다.
- */
-@media (min-width: 769px) {
-  .pet-diary-pop__box--diary {
-    max-width: 44rem;
-    /* minmax(0, 1fr)이다. 그냥 1fr이면 이야기 문단의 최소 콘텐츠 폭이 트랙을 밀어
-       왼쪽 칸이 15rem보다 좁아진다 */
-    grid-template-columns: 15rem minmax(0, 1fr);
-    grid-template-areas:
-      "top story"
-      "loot loot"
-      "close close";
-    column-gap: var(--space-sm);
-  }
-
-  .pet-diary-pop__box--diary .pet-diary__top {
-    grid-area: top;
-    /* 세로 배치의 아래 구분선을 오른쪽으로 옮긴다 — 2단에서는 아래가 아니라 옆이 경계다 */
-    padding-bottom: 0;
-    border-bottom: 0;
-    padding-right: var(--space-sm);
-    border-right: 1px solid color-mix(in oklch, var(--color-muted) 25%, transparent);
-    /* 그림이 세로 가운데로 뜨지 않게 위에 붙인다. 오른쪽 이야기가 길어지면 행이
-       늘어나는데, 그때 펫만 가운데 떠 있으면 제목이 이야기와 어긋나 보인다 */
-    align-content: start;
-  }
-
-  .pet-diary-pop__box--diary .pet-diary__story {
-    grid-area: story;
-  }
-
-  .pet-diary-pop__box--diary .pet-diary__loot {
-    grid-area: loot;
-  }
-
-  .pet-diary-pop__box--diary > .pet-btn {
-    grid-area: close;
-  }
-
-  /* 재화 두 칸이 44rem을 반씩 나눠 가지면 아이콘과 숫자가 화면 양끝으로 벌어진다.
-     칸에 상한을 주고 왼쪽부터 채운다 */
-  .pet-diary-pop__box--diary .pet-diary__loot-list {
-    grid-template-columns: repeat(2, minmax(0, 14rem));
-    justify-content: start;
-  }
-}
 
 /* ─────────────────────────────────────────────────────────────────────
    2026-08-26 IA 정리 (사용자 결정)

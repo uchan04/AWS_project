@@ -27,6 +27,8 @@ import {
   OUTING_LEGS_MAX,
   OUTING_MIN_STAGE,
   OUTING_LOCK_MESSAGE,
+  OUTING_TITLE_SUFFIX,
+  outingTitle,
   OUTING_LOCK_FOOT,
   OUTING_RECENT_AVOID,
   OUTING_REWARD_MAX,
@@ -1145,5 +1147,49 @@ for (const line of [OUTING_LOCK_MESSAGE, OUTING_LOCK_FOOT]) {
 // 잠금 판정은 화면과 API가 같은 함수를 쓴다. 경계가 OUTING_MIN_STAGE에 붙어 있어야 한다
 assert.equal(canGoOuting(OUTING_MIN_STAGE - 1), false)
 assert.equal(canGoOuting(OUTING_MIN_STAGE), true)
+
+// ── 여행일기 제목 (2026-08-26 화면 시안) ──────────────────────────────────────
+//
+// 제목은 **저장된 legs에서 계산한다** — 새 축도, 난수도, DB 컬럼도 없다.
+// 그래서 같은 외출을 다시 열면 늘 같은 제목이 나와야 한다. 아래가 그것을 못 박는다.
+
+{
+  // 파일 앞의 다른 단정들과 같은 방식으로 rand를 고정한다(() => r)
+  const legs = rollOutingLegs(4, () => 0.4)
+  const once = outingTitle(legs)
+  assert.equal(outingTitle(legs), once, "같은 legs에 제목이 두 번 다르게 나온다 — 난수가 섞였다")
+
+  // 가장 좋았던(result가 가장 작은) 구간의 장소를 쓴다
+  const picked = OUTING_PLACES.find((p) => p.where && once.startsWith(p.where))
+  assert.ok(picked, `제목이 어느 장소로도 시작하지 않는다: "${once}"`)
+  const best = legs.reduce((a, b) => (b.result < a.result ? b : a), legs[0])
+  assert.equal(picked!.key, best.place, `제목이 가장 좋았던 구간의 장소가 아니다: "${once}"`)
+  assert.ok(once.endsWith(OUTING_TITLE_SUFFIX[best.result]), `뒷말이 결과 인덱스와 어긋난다: "${once}"`)
+}
+
+// 세 뒷말 전부가 쓰이는지 + 문구 규칙
+for (let r = 0; r < OUTING_TITLE_SUFFIX.length; r += 1) {
+  const t = outingTitle([{ place: "park", deed: "watch", result: r, sight: "cat" }])
+  assert.ok(t.startsWith("공원"), `장소 앞말이 안 붙었다: "${t}"`)
+  assert.ok(t.endsWith(OUTING_TITLE_SUFFIX[r]), `결과 ${r}의 뒷말이 틀렸다: "${t}"`)
+  assert.ok(t.length <= 30, `제목이 30자를 넘는다(${t.length}): "${t}"`)
+  for (const bad of [...BANNED_TONE, "!", "하세요", "해보세요"]) {
+    assert.ok(!t.includes(bad), `제목에 금지 표현 "${bad}"가 있다: "${t}"`)
+  }
+}
+
+// 옛 3컬럼 기록(legs 없음)도 제목을 갖는다. 결과를 모르므로 가운데 뒷말이다 —
+// 없는 사건을 좋았다고 말하지 않는다
+assert.equal(outingTitle([], "강가"), `강가${OUTING_TITLE_SUFFIX[1]}`)
+// 장소도 모르면 장소 이름을 지어내지 않는다
+assert.equal(outingTitle([]), "조용한 하루")
+
+// 조사가 `에서`·`까지`뿐이어야 한다 — `이/가`·`은/는`을 쓰면 15곳마다 받침으로 갈라진다
+for (const suffix of OUTING_TITLE_SUFFIX) {
+  assert.ok(
+    /^(에서|까지)/.test(suffix),
+    `뒷말이 받침에 따라 갈리는 조사로 시작한다: "${suffix}"`,
+  )
+}
 
 console.log("pet 체크 통과")
