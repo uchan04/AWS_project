@@ -13,6 +13,9 @@ import {
   OUTING_MS,
   PET_IDLE_LINES,
   animalEmoji,
+  canGoOuting,
+  OUTING_LOCK_MESSAGE,
+  OUTING_LOCK_FOOT,
   applySeeds,
   expProgress,
   levelUpReply,
@@ -304,6 +307,15 @@ export default function PetView({ initial }: { initial: PetState }) {
     away && outing.placeKey ? outingAwayLine(outing.placeKey, outingProgressNow) : outing.awayLine
   // 보낼 수 있는지. 부족한 양을 함께 계산해 둔다 — 각주가 "얼마나 더"를 말해야 한다
   const outingShort = Math.max(0, outing.costAffinity - pet.affinity)
+  /**
+   * 진화 단계가 아직 외출을 못 여는 상태. **화면과 API가 같은 함수를 쓴다**
+   * (`lib/pet.ts` `canGoOuting`) — 판정이 두 벌이면 버튼은 열려 있는데 POST가 막힌다.
+   *
+   * 2026-08-26 사용자 결정: 1단계(알)에서 카드가 **아예 안 보이던 것**을 고쳤다.
+   * 전에는 친밀도가 모자라 접히는 규칙에 함께 걸려 사라졌고, 그러면 외출이라는 기능이
+   * 있다는 것 자체를 모른 채 알 단계를 보낸다. 지금은 **보이되 잠긴다.**
+   */
+  const outingLocked = !canGoOuting(pet.evolutionStage)
 
   // 재화 3종. 2026-08-21 사용자 결정으로 셋이 같은 칸을 쓴다 — 전에는 씨앗만 초록, 나머지
   // 둘은 나무색이었다. 색은 종족색 하나로 끝내고 구분은 이모지가 한다
@@ -1146,20 +1158,60 @@ export default function PetView({ initial }: { initial: PetState }) {
               특히 나쁘다(미션 문구가 명령형을 안 쓰는 것과 같은 이유).
               접는 조건은 IDLE + 부족일 때뿐이다. AWAY·RETURNED는 진행 중이므로 항상 보인다.
               보낼 수 있게 되면(친밀도 200) 카드가 저절로 나타난다 — 그게 알림 역할을 한다 */}
-          {outing.available && (outing.state !== "IDLE" || outingShort === 0) ? (
-            <div className="pet-card pet-card--outing" data-state={outing.state}>
+          {/* 2026-08-26 사용자 결정: **잠긴 상태는 접지 않는다.** 친밀도가 모자라 접는 규칙은
+              "곧 열린다"는 상태여서 접어도 잃는 것이 없다(모이면 저절로 나타난다). 1단계는
+              다르다 — 접으면 외출이라는 기능이 있다는 것 자체를 알 단계 내내 모른다.
+              그래서 outingLocked가 조건의 맨 앞에 붙는다 */}
+          {outing.available &&
+          (outingLocked || outing.state !== "IDLE" || outingShort === 0) ? (
+            <div
+              className="pet-card pet-card--outing"
+              data-state={outing.state}
+              data-locked={outingLocked ? "" : undefined}
+            >
               <div className="pet-card__head">
                 <p className="pet-card__title">
                   {/* 이 화면 카드 제목은 전부 이모지 하나로 시작한다(위 경험치 카드 주석).
                       🚪는 다른 넷(⭐🌱🌿📊🪙)과 겹치지 않고 재화 아이콘도 아니다 */}
                   <span aria-hidden="true">🚪</span> 펫 외출
                 </p>
+                {/* 잠긴 동안에는 친밀도를 쓰지 않는다 — 막고 있는 것이 친밀도가 아니다.
+                    "친밀도 200"을 띄우면 200을 모으면 되는 줄 알고 이틀을 모은 뒤에야
+                    레벨 문제였다는 것을 안다 */}
                 <span className="pet-card__meta">
-                  {away ? `${outingLabel} 뒤` : `친밀도 ${ko(outing.costAffinity)}`}
+                  {outingLocked
+                    ? `Lv.${EVOLUTION_LEVEL.STAGE2}부터`
+                    : away
+                      ? `${outingLabel} 뒤`
+                      : `친밀도 ${ko(outing.costAffinity)}`}
                 </span>
               </div>
 
-              {away ? (
+              {outingLocked ? (
+                <>
+                  {/* 잠긴 버튼. **`disabled`를 쓰지 않는다** — 사용자 요청이 "눌렀을 때
+                      2단계 이상이 되면 보낼 수 있다고 알린다"이고, `disabled` 버튼은
+                      클릭 이벤트가 아예 안 온다. 그래서 눌리되 아무 요청도 보내지 않고
+                      안내만 띄운다.
+
+                      `aria-disabled`도 쓰지 않는다. 그 속성은 "지금 못 쓴다"를 알리는데,
+                      이 버튼은 눌러야 설명이 나오는 버튼이라 스크린리더 사용자에게도
+                      눌러야 한다고 알려야 한다. 대신 이름 자체에 이유를 넣는다 */}
+                  <button
+                    type="button"
+                    className="pet-btn pet-btn--block pet-btn--locked"
+                    onClick={() => setToast({ text: OUTING_LOCK_MESSAGE })}
+                  >
+                    <span aria-hidden="true">🔒</span> 외출 보내기
+                  </button>
+                  <p className="pet-card__foot">
+                    <span>{OUTING_LOCK_FOOT}</span>
+                    {/* 오른쪽 강조 자리에 남은 레벨을 쓴다. 다른 카드의 각주와 같은 골격이고
+                        (왼쪽 설명 / 오른쪽 강조) 여기에는 **얼마나 남았는지**가 온다 */}
+                    <em>{Math.max(0, EVOLUTION_LEVEL.STAGE2 - pet.level)}레벨 남았어요</em>
+                  </p>
+                </>
+              ) : away ? (
                 <>
                   {/* 게이지 골격은 경험치·방치형 카드와 **같은 클래스**다. 채움색만 기본
                       종족색을 쓴다 — 초록(--pet-gauge--seed)은 씨앗 전용이고 이 막대는

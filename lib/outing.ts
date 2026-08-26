@@ -19,6 +19,7 @@ import {
   outingComboKey,
   rollOutingLegs,
   OUTING_RECENT_AVOID,
+  OUTING_LOCK_MESSAGE,
   outingPlacesForStage,
   type OutingLeg,
   outingProgress,
@@ -217,7 +218,7 @@ export async function startOuting(
     return {
       ok: false,
       code: "PET_TOO_YOUNG",
-      message: "펫이 한 번 자라면 밖에 나갈 수 있어요",
+      message: OUTING_LOCK_MESSAGE,
     }
   }
 
@@ -250,7 +251,7 @@ export async function startOuting(
 
   const legs = rollOutingLegs(args.evolutionStage, rand, recent)
   if (legs.length === 0) {
-    return { ok: false, code: "PET_TOO_YOUNG", message: "펫이 한 번 자라면 밖에 나갈 수 있어요" }
+    return { ok: false, code: "PET_TOO_YOUNG", message: OUTING_LOCK_MESSAGE }
   }
   // 옛 3컬럼도 함께 채운다 — 이 마이그레이션을 아직 안 받은 팀원의 코드가 그것을 읽는다.
   // 첫 장소를 넣는다: AWAY 쪽지의 "지금 {where}쯤이야"가 이 값을 쓴다

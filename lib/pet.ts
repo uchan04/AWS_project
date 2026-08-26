@@ -1104,6 +1104,27 @@ export function canGoOuting(stage: number): boolean {
   return outingPlacesForStage(stage).length >= OUTING_LEGS_MIN
 }
 
+/**
+ * 아직 나갈 수 없을 때 쓰는 문장. **화면과 API가 같은 문자열을 쓴다.**
+ *
+ * 2026-08-26 사용자 결정으로 1단계에도 카드가 **보이되 잠긴 상태**가 됐다. 그러면
+ * 이 문장이 두 곳에서 나간다 — 잠긴 버튼을 눌렀을 때(화면)와, 그 판정을 우회해
+ * POST가 들어왔을 때(`lib/outing.ts` `PET_TOO_YOUNG`)다. 두 곳에 손으로 적으면
+ * 한쪽만 다듬어져 같은 상황에 다른 말을 하게 된다.
+ *
+ * 레벨을 상수에서 만든다 — `EVOLUTION_LEVEL.STAGE2`가 바뀌면 문장도 따라간다.
+ * `아기`는 진화 단계 이름이고 정본은 `PetView`의 `STAGE_NAME`이지만, 그쪽은 화면
+ * 전용 배열이라 여기서 참조하면 lib가 컴포넌트를 의존한다. 이름 하나는 여기 적고
+ * `check:pet`이 두 값이 어긋나는 것을 막는다.
+ *
+ * 명령형을 쓰지 않는다("씨앗을 먹이세요"). 미션 문구와 같은 규칙이다 — 못 하는 것을
+ * 알릴 때 지시를 붙이면 그 자리가 과제가 된다.
+ */
+export const OUTING_LOCK_MESSAGE = `아기(Lv.${EVOLUTION_LEVEL.STAGE2})가 되면 밖에 나갈 수 있어요`
+
+/** 잠긴 카드 각주의 왼쪽 줄. 위 문장보다 짧아야 한 줄에 들어온다 */
+export const OUTING_LOCK_FOOT = "지금은 알이라 방에서 지내요"
+
 /** 한 장소에서 한 일. DB에 저장하는 단위다 — 문장이 아니라 키만 담는다 */
 export type OutingLeg = {
   place: string

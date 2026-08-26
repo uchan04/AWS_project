@@ -26,6 +26,8 @@ import {
   OUTING_LEGS_MIN,
   OUTING_LEGS_MAX,
   OUTING_MIN_STAGE,
+  OUTING_LOCK_MESSAGE,
+  OUTING_LOCK_FOOT,
   OUTING_RECENT_AVOID,
   OUTING_REWARD_MAX,
   OUTING_REWARD_MIN,
@@ -1113,5 +1115,35 @@ assert.equal(outingAwayLine("없는곳", 0.5), "지금 밖쯤이야.")
 assert.equal(outingAwayLine("park", -1), "방금 나갔어. 잘 다녀올게.")
 assert.equal(outingAwayLine("park", 99), "이제 돌아가는 중이야.")
 assert.equal(outingAwayLine("park", Number.NaN), "방금 나갔어. 잘 다녀올게.")
+
+// ── 1단계 외출 잠금 문구 (2026-08-26 사용자 결정) ──────────────────────────────
+//
+// 카드가 **보이되 잠긴다.** 그러면 문구가 화면(잠긴 버튼)과 API(PET_TOO_YOUNG) 두 곳에
+// 나가므로 한 상수를 쓴다. 아래 단정이 그 상수가 조용히 갈라지는 것을 막는다.
+
+// 레벨을 손으로 적으면 EVOLUTION_LEVEL이 바뀔 때 문장이 거짓이 된다
+assert.ok(
+  OUTING_LOCK_MESSAGE.includes(`Lv.${EVOLUTION_LEVEL.STAGE2}`),
+  `잠금 문구에 STAGE2 레벨이 없다: "${OUTING_LOCK_MESSAGE}"`,
+)
+// 단계 이름은 PetView의 STAGE_NAME[1]과 같아야 한다. 그 배열은 화면 전용이라
+// lib에서 참조할 수 없어 이름 하나가 두 곳에 있다 — 어긋나는 것을 여기서 막는다
+assert.ok(
+  OUTING_LOCK_MESSAGE.includes("아기"),
+  `잠금 문구의 단계 이름이 STAGE_NAME[1]("아기")과 다르다: "${OUTING_LOCK_MESSAGE}"`,
+)
+assert.ok(OUTING_LOCK_FOOT.includes("알"), `잠금 각주에 현재 단계 이름이 없다: "${OUTING_LOCK_FOOT}"`)
+
+// 못 하는 것을 알리는 자리에 지시를 붙이지 않는다 — 미션 문구와 같은 규칙이다
+for (const line of [OUTING_LOCK_MESSAGE, OUTING_LOCK_FOOT]) {
+  for (const bad of [...BANNED_TONE, "하세요", "해보세요", "주세요", "!"]) {
+    assert.ok(!line.includes(bad), `잠금 문구에 금지 표현 "${bad}"가 있다: "${line}"`)
+  }
+  assert.ok(line.length <= 30, `잠금 문구가 30자를 넘는다(${line.length}): "${line}"`)
+}
+
+// 잠금 판정은 화면과 API가 같은 함수를 쓴다. 경계가 OUTING_MIN_STAGE에 붙어 있어야 한다
+assert.equal(canGoOuting(OUTING_MIN_STAGE - 1), false)
+assert.equal(canGoOuting(OUTING_MIN_STAGE), true)
 
 console.log("pet 체크 통과")
