@@ -1061,9 +1061,16 @@ export default function PetView({ initial }: { initial: PetState }) {
                   다섯 장 전부가 됐다.
                   design.md의 "이모지는 마스코트 자리에만"에서 벗어나는 자리다. 새 예외가
                   아니라 이 화면이 원래 갖고 있던 예외로 돌아온 것이고, 전부 aria-hidden이라
-                  스크린리더가 읽는 카드 이름은 글자 그대로 남는다 */}
+                  스크린리더가 읽는 카드 이름은 글자 그대로 남는다.
+
+                  **2026-08-26 사용자 요청으로 ⭐ → 🍎다.** 덤으로 겹침 하나가 풀렸다 —
+                  ⭐가 상단 바의 별조각 아이콘(.pet-bar__icon)과 "오늘의 활동"의 받은 별조각
+                  칸에도 있어서, 한 화면에서 같은 글자가 **재화 하나와 게이지 하나를 동시에**
+                  가리키고 있었다. 🍎는 이 화면에서 쓰이지 않던 글자다.
+                  남은 중복 🌱(상단 바 씨앗 · 쌓인 씨앗 카드 · 받은 씨앗 칸)은 그대로 둔다 —
+                  세 자리가 전부 씨앗을 뜻하므로 같은 글자인 것이 맞다. ⭐만 뜻이 갈렸다 */}
               <p className="pet-card__title">
-                <span aria-hidden="true">⭐</span> 경험치
+                <span aria-hidden="true">🍎</span> 경험치
               </p>
               <span className="pet-card__meta">
                 {ko(pet.exp)} / {ko(need)}
