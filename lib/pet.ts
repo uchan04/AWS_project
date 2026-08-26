@@ -670,19 +670,342 @@ export function rollOutingReward(rand: () => number): { seeds: number; starShard
  * 문장은 키로 저장한다(placeKey). 문장을 DB에 저장하면 나중에 문구를 다듬을 때 옛 기록이
  * 옛 문장으로 굳는다 — PET_IDLE_LINES를 상수로 둔 것과 같은 판단이다.
  */
-export const OUTING_PLACES = [
-  { key: "window", stage: 1, where: "창가", text: "창가에 한참 앉아 있었어." },
-  { key: "kitchen", stage: 1, where: "부엌", text: "부엌 쪽을 탐험했어." },
-  { key: "doorstep", stage: 2, where: "문 앞", text: "문 앞 계단까지 나가 봤어." },
-  { key: "alley", stage: 2, where: "골목", text: "골목 담벼락을 따라 걸었어." },
-  { key: "park", stage: 3, where: "공원", text: "동네 공원에 갔어." },
-  { key: "busstop", stage: 3, where: "정류장", text: "버스 정류장 앞에 서 있었어." },
-  { key: "river", stage: 4, where: "강가", text: "강가까지 갔다 왔어." },
-  { key: "downtown", stage: 4, where: "큰길", text: "사람 많은 길을 지나왔어." },
-] as const
+/**
+ * 여행일기의 결과 문장. **사건의 유형(tag)에 붙는다** — 사건마다 결과를 따로 쓰면 120줄이 되고,
+ * 완전히 독립 축으로 두면 "그림을 그렸는데 / 파도가 지웠어"가 엉뚱한 사건에 붙는다.
+ * 유형 6개 × 3개로 사건 60개를 전부 덮는다.
+ *
+ * **비율이 규칙이다.** 각 유형의 세 줄은 ① 해냈다 ② 좋았다 ③ 담담·미완 순이고,
+ * 활동적인 쪽이 2 : 담담한 쪽이 1이다.
+ *
+ * 왜 이 비율인가 (2026-08-26 사용자 결정):
+ * - 계속 시들하면 친밀도 200을 태운 값이 안 보인다 → 보람이 사라진다
+ * - 완전히 씩씩하면 "얘는 나랑 다르네"가 된다 → 동질감이 사라진다
+ * - **펫은 사용자보다 반 걸음 앞선다.** 겁도 내지만 결국 해본다
+ *
+ * ③을 없애지 않는 이유는 그것이 실패 여지이기 때문이다. 아무 일 없는 날이 결함처럼
+ * 읽히면 안 된다 — 미션 문구의 "나가지 않아도 괜찮아요"와 같은 장치다.
+ */
+export const OUTING_RESULTS = {
+  water: [
+    "차가운데 계속 있어봤어.",
+    "물살이 발가락 사이로 지나가는 게 좋았어.",
+    "생각보다 차가워서 금방 뺐어.",
+  ],
+  walk: [
+    "다리에 힘이 좀 붙은 것 같아.",
+    "걷는 동안 바람이 계속 따라왔어.",
+    "가다가 한 번 멈췄어.",
+  ],
+  stay: [
+    "생각보다 오래 있었어.",
+    "자리가 편해서 좀 더 있었어.",
+    "시간이 얼마나 갔는지 몰랐어.",
+  ],
+  look: ["끝까지 지켜봤어.", "계속 보고 있으니까 재미있었어.", "오래 봤는데 잘 모르겠더라."],
+  smell: ["계속 킁킁거렸어.", "좋은 냄새라서 한참 있었어.", "무슨 냄새인지는 몰랐어."],
+  touch: ["한 번 더 해봤어.", "느낌이 좋아서 조금 더 있었어.", "조금 놀라서 발을 뗐어."],
+} as const
 
-/** 거기서 만난 것. 전부 나에게 아무것도 요구하지 않는 것들이다 */
-export const OUTING_MET = [
+export type OutingResultTag = keyof typeof OUTING_RESULTS
+
+type OutingDeed = { key: string; text: string; tag: OutingResultTag }
+type OutingSight = { key: string; text: string }
+type OutingPlace = {
+  key: string
+  /** 펫 진화 단계. **2가 최소다** — 1단계(알)는 외출하지 않는다(2026-08-26 사용자 결정) */
+  stage: number
+  where: string
+  text: string
+  /** 펫이 한 일. 4개 중 1개를 뽑는다 */
+  deeds: readonly OutingDeed[]
+  /** 그냥 거기 있던 것. 3개 중 1개를 뽑는다. **펫에게 아무것도 요구하지 않는다** */
+  sights: readonly OutingSight[]
+}
+
+/**
+ * 갈 수 있는 장소 15곳. **stage 이하가 후보가 된다** — 펫이 자라면 범위가 밖으로 넓어지고,
+ * 그 모양이 사용자의 100단계 사다리와 같다.
+ *
+ * **활동성은 톤이 올리고 범위는 stage가 잡는다.** 2단계 펫도 활발하게 돌아다니지만
+ * 집 근처를 벗어나지 않는다. 이렇게 나누면 노출 위계가 안 깨진다.
+ *
+ * 문장은 키로 저장한다 — 문장을 DB에 넣으면 나중에 문구를 다듬을 때 옛 기록이 옛 문장으로
+ * 굳는다(PET_IDLE_LINES를 상수로 둔 것과 같은 판단).
+ *
+ * 2026-08-26에 8곳 → 15곳으로 늘리고 축을 5개로 나눴다(장소·사건·결과·만난것·기분).
+ * 전에는 "만난 것"이 장소와 독립이라 `부엌 / 빨래 걷는 할머니가 계셨어`가 나왔다.
+ * 그리고 1단계 장소(창가·부엌)는 **애초에 외출이 아니어서** 버렸다.
+ */
+export const OUTING_PLACES: readonly OutingPlace[] = [
+  // ── 2단계: 집 근처. 사람이 없다 ──
+  {
+    key: "doorstep",
+    stage: 2,
+    where: "문 앞",
+    text: "문 앞 계단에 나가 있었어.",
+    deeds: [
+      { key: "down", text: "계단을 끝까지 내려갔어.", tag: "walk" },
+      { key: "peek", text: "문 앞에 서서 골목 끝까지 봤어.", tag: "look" },
+      { key: "twostep", text: "문 밖으로 나가서 좀 걸었어.", tag: "walk" },
+      { key: "sun", text: "해 드는 자리를 찾아 옮겨 앉았어.", tag: "stay" },
+    ],
+    sights: [
+      { key: "mail", text: "우편함에 뭐가 꽂혀 있었어." },
+      { key: "door", text: "옆집 문이 한 번 열렸다 닫혔어." },
+      { key: "laundry", text: "어디선가 빨래 냄새가 났어." },
+    ],
+  },
+  {
+    key: "alley",
+    stage: 2,
+    where: "골목",
+    text: "골목으로 들어갔어.",
+    deeds: [
+      { key: "wall", text: "담벼락 따라 끝까지 걸었어.", tag: "walk" },
+      { key: "lean", text: "벽에 기대서 좀 쉬었어.", tag: "stay" },
+      { key: "shadow", text: "그림자만 밟고 걸어봤어.", tag: "walk" },
+      { key: "crack", text: "담벼락 틈에 코를 대 봤어.", tag: "smell" },
+    ],
+    sights: [
+      { key: "pots", text: "화분 몇 개가 줄지어 있었어." },
+      { key: "bike", text: "자전거가 세워져 있었어." },
+      { key: "flap", text: "위에서 빨래가 펄럭였어." },
+    ],
+  },
+  {
+    key: "stairs",
+    stage: 2,
+    where: "계단",
+    text: "계단을 올라가 봤어.",
+    deeds: [
+      { key: "top", text: "한 칸씩 끝까지 올라갔어.", tag: "walk" },
+      { key: "mid", text: "중간에 앉아서 아래를 봤어.", tag: "stay" },
+      { key: "rail", text: "손잡이 밑으로 지나가 봤어.", tag: "touch" },
+      { key: "downlook", text: "위에서 아래를 한참 내려다봤어.", tag: "look" },
+    ],
+    sights: [
+      { key: "shoes", text: "누가 놓고 간 신발이 있었어." },
+      { key: "light", text: "창으로 빛이 길게 들어왔어." },
+      { key: "steps", text: "발소리가 위에서 났어." },
+    ],
+  },
+  {
+    key: "flowerbed",
+    stage: 2,
+    where: "화단",
+    text: "화단 옆에 있었어.",
+    deeds: [
+      { key: "leaf", text: "잎사귀를 발로 건드려 봤어.", tag: "touch" },
+      { key: "soil", text: "흙 냄새를 맡아봤어.", tag: "smell" },
+      { key: "round", text: "화단을 한 바퀴 돌았어.", tag: "walk" },
+      { key: "curl", text: "그 옆에 웅크리고 있었어.", tag: "stay" },
+    ],
+    sights: [
+      { key: "flower", text: "이름 모를 꽃이 피어 있었어." },
+      { key: "ants", text: "개미가 줄지어 지나갔어." },
+      { key: "wet", text: "물 준 자리가 아직 젖어 있었어." },
+    ],
+  },
+  {
+    key: "parking",
+    stage: 2,
+    where: "주차장",
+    text: "주차장을 지나갔어.",
+    deeds: [
+      { key: "run", text: "넓은 데를 한 번 뛰어봤어.", tag: "walk" },
+      { key: "shade", text: "차 밑 그늘에 들어가 봤어.", tag: "stay" },
+      { key: "tire", text: "바퀴에 코를 대 봤어.", tag: "smell" },
+      { key: "car", text: "지나가는 차를 눈으로 따라갔어.", tag: "look" },
+    ],
+    sights: [
+      { key: "quiet", text: "아무도 없이 조용했어." },
+      { key: "engine", text: "어디선가 시동 소리가 났어." },
+      { key: "line", text: "바닥에 흰 선이 길게 있었어." },
+    ],
+  },
+
+  // ── 3단계: 동네. 사람이 있지만 스치기만 한다 ──
+  {
+    key: "park",
+    stage: 3,
+    where: "공원",
+    text: "동네 공원에 들렀어.",
+    deeds: [
+      { key: "dash", text: "풀밭을 가로질러 달렸어.", tag: "walk" },
+      { key: "lie", text: "풀밭에 누워서 하늘을 봤어.", tag: "stay" },
+      { key: "bench", text: "벤치 위로 올라가 봤어.", tag: "touch" },
+      { key: "fountain", text: "분수 물에 발을 담가 봤어.", tag: "water" },
+    ],
+    sights: [
+      { key: "cat", text: "낮잠 자는 고양이가 두 걸음 옆에 있었어." },
+      { key: "ball", text: "공놀이하는 소리가 저쪽에서 났어." },
+      { key: "tree", text: "나보다 훨씬 큰 나무가 있었어." },
+    ],
+  },
+  {
+    key: "busstop",
+    stage: 3,
+    where: "정류장",
+    text: "버스 정류장에 서 있었어.",
+    deeds: [
+      { key: "table", text: "시간표를 올려다봤어.", tag: "look" },
+      { key: "under", text: "의자 밑에 들어가 앉았어.", tag: "stay" },
+      { key: "back", text: "정류장을 두 번 왕복했어.", tag: "walk" },
+      { key: "bus", text: "버스가 서고 떠나는 걸 지켜봤어.", tag: "look" },
+    ],
+    sights: [
+      { key: "feet", text: "다들 발이 바빴어." },
+      { key: "point", text: "누가 버스를 놓쳤어." },
+      { key: "door", text: "버스 문이 두 번 열렸어." },
+    ],
+  },
+  {
+    key: "store",
+    stage: 3,
+    where: "편의점 앞",
+    text: "편의점 앞을 지났어.",
+    deeds: [
+      { key: "inside", text: "문이 열릴 때 안을 들여다봤어.", tag: "look" },
+      { key: "thrice", text: "앞을 세 번 왕복했어.", tag: "walk" },
+      { key: "glass", text: "유리에 비친 나를 봤어.", tag: "look" },
+      { key: "smellin", text: "문 앞 냄새를 맡아봤어.", tag: "smell" },
+    ],
+    sights: [
+      { key: "song", text: "안에서 노랫소리가 조그맣게 났어." },
+      { key: "bag", text: "봉투를 든 사람이 나왔어." },
+      { key: "cold", text: "문 열릴 때마다 찬 바람이 나왔어." },
+    ],
+  },
+  {
+    key: "library",
+    stage: 3,
+    where: "도서관 앞",
+    text: "도서관 앞까지 갔어.",
+    deeds: [
+      { key: "steps", text: "계단 끝까지 올라갔어.", tag: "walk" },
+      { key: "sit", text: "계단에 앉아 있었어.", tag: "stay" },
+      { key: "nose", text: "유리문에 코를 붙여 봤어.", tag: "touch" },
+      { key: "count", text: "나오는 사람을 세어봤어.", tag: "look" },
+    ],
+    sights: [
+      { key: "silent", text: "안이 아주 조용했어." },
+      { key: "books", text: "책을 안은 사람이 지나갔어." },
+      { key: "shade", text: "그늘이 계단까지 내려와 있었어." },
+    ],
+  },
+  {
+    key: "market",
+    stage: 3,
+    where: "시장 골목",
+    text: "시장 골목에 들어갔어.",
+    deeds: [
+      { key: "follow", text: "냄새를 따라 끝까지 갔어.", tag: "smell" },
+      { key: "boxes", text: "상자 사이를 지나가 봤어.", tag: "walk" },
+      { key: "wetfloor", text: "물 뿌린 바닥을 밟았어.", tag: "touch" },
+      { key: "crowd", text: "붐비는 걸 구경했어.", tag: "look" },
+    ],
+    sights: [
+      { key: "mixed", text: "상자마다 다른 게 담겨 있었어." },
+      { key: "seller", text: "상인이 물건을 옮기고 있었어." },
+      { key: "damp", text: "바닥이 아직 젖어 있었어." },
+    ],
+  },
+
+  // ── 4단계: 멀리. 사람과 닿아도 아무것도 요구받지 않는다 ──
+  {
+    key: "river",
+    stage: 4,
+    where: "강가",
+    text: "강가에 닿았어.",
+    deeds: [
+      { key: "splash", text: "물에 들어가서 첨벙거렸어.", tag: "water" },
+      { key: "along", text: "강을 따라 끝까지 걸었어.", tag: "walk" },
+      { key: "prints", text: "젖은 모래에 발자국을 길게 남겼어.", tag: "walk" },
+      { key: "watch", text: "물 위로 지나가는 걸 눈으로 따라갔어.", tag: "look" },
+    ],
+    sights: [
+      { key: "skip", text: "누가 던진 돌이 물 위를 세 번 튀었어." },
+      { key: "fisher", text: "낚시하는 사람이 멀리 있었어." },
+      { key: "ducks", text: "오리 몇 마리가 줄지어 갔어." },
+    ],
+  },
+  {
+    key: "beach",
+    stage: 4,
+    where: "바닷가",
+    text: "바다가 보이는 데까지 갔어.",
+    deeds: [
+      { key: "toWave", text: "파도까지 뛰어갔다 돌아왔어.", tag: "walk" },
+      { key: "draw", text: "모래에 큼직하게 그림을 그렸어.", tag: "touch" },
+      { key: "in", text: "물에 들어가서 파도를 맞았어.", tag: "water" },
+      { key: "line", text: "수평선을 한참 봤어.", tag: "look" },
+    ],
+    sights: [
+      { key: "shells", text: "조개껍데기가 흩어져 있었어." },
+      { key: "gull", text: "갈매기가 낮게 날았어." },
+      { key: "sand", text: "모래가 발가락 사이로 들어왔어." },
+    ],
+  },
+  {
+    key: "downtown",
+    stage: 4,
+    where: "큰길",
+    text: "사람 많은 길을 지나왔어.",
+    deeds: [
+      { key: "through", text: "사람들 사이를 끝까지 지나갔어.", tag: "walk" },
+      { key: "food", text: "맛있는 냄새 나는 데를 찾아갔어.", tag: "smell" },
+      { key: "neon", text: "불빛을 한참 올려다봤어.", tag: "look" },
+      { key: "window", text: "유리창에 발을 대 봤어.", tag: "touch" },
+    ],
+    sights: [
+      { key: "smile", text: "누가 나를 보고 웃었어." },
+      { key: "sign", text: "간판 불빛이 물에 비친 것처럼 흔들렸어." },
+      { key: "music", text: "음악이 가게마다 달랐어." },
+    ],
+  },
+  {
+    key: "station",
+    stage: 4,
+    where: "기차역",
+    text: "기차역에 들어가 봤어.",
+    deeds: [
+      { key: "board", text: "전광판 글자가 바뀌는 걸 지켜봤어.", tag: "look" },
+      { key: "platform", text: "승강장까지 걸어갔어.", tag: "walk" },
+      { key: "bench", text: "벤치에 올라가 앉았어.", tag: "stay" },
+      { key: "wind", text: "기차 지나가는 바람을 맞았어.", tag: "touch" },
+    ],
+    sights: [
+      { key: "train", text: "기차가 한 대 들어왔다 나갔어." },
+      { key: "wheels", text: "캐리어 끄는 소리가 났어." },
+      { key: "nobody", text: "아무도 나를 안 물어봤어." },
+    ],
+  },
+  {
+    key: "view",
+    stage: 4,
+    where: "높은 데",
+    text: "높은 데까지 올라갔어.",
+    deeds: [
+      { key: "top", text: "끝까지 올라가서 아래를 봤어.", tag: "walk" },
+      { key: "wind", text: "바람을 맞고 서 있었어.", tag: "stay" },
+      { key: "home", text: "우리 집 쪽을 찾아봤어.", tag: "look" },
+      { key: "rail", text: "난간에 발을 올려 봤어.", tag: "touch" },
+    ],
+    sights: [
+      { key: "small", text: "집들이 다 작아 보였어." },
+      { key: "gust", text: "바람이 계속 세게 불었어." },
+      { key: "far", text: "멀리까지 다 보였어." },
+    ],
+  },
+]
+
+/**
+ * **더 쓰지 않는다.** 2026-08-26 5축 전환으로 "만난 것"이 장소별 `sights`로 옮겨졌다.
+ * 여기 남겨 둔 이유는 옛 `PetOuting.metKey` 행이 아직 있어서다 — 스키마가 `legs`로 바뀌기
+ * 전까지 `outingEpisode()`가 그 키를 읽는다. 마이그레이션이 들어가면 이 배열을 지운다.
+ */
+export const OUTING_MET_LEGACY = [
   { key: "cat", text: "고양이 한 마리가 나를 쳐다봤어." },
   { key: "dog", text: "낮잠 자는 강아지 옆을 조용히 지나갔어." },
   { key: "granny", text: "빨래 걷는 할머니가 계셨어." },
@@ -692,32 +1015,52 @@ export const OUTING_MET = [
 ] as const
 
 /**
- * 돌아와서의 기분.
+ * 돌아와서의 기분. **독립 축이다** — 어떤 여행에도 붙어야 하므로 장소·사건을 언급하지 않는다.
  *
  * **평가도 교훈도 없다.** "너도 할 수 있어" 같은 말을 넣지 않는다 — 격려는 사용자를
  * 격려받아야 하는 위치에 세운다. 펫은 자기 얘기만 한다.
+ *
+ * `또 가고 싶어`류도 넣지 않는다. 외출은 친밀도 200이 든다 — 펫이 또 가고 싶다고 하면
+ * 사용자에게 지출 압박이 된다.
+ *
+ * `별일은 없었어`가 실패 여지다. 매번 뭔가 있었다고 하면 아무 일 없는 날이 결함으로 읽힌다.
  */
 export const OUTING_MOODS = [
   { key: "good", text: "그냥 좋았어." },
-  { key: "scared", text: "조금 무서웠는데 괜찮았어." },
+  { key: "scared", text: "조금 무서웠는데 해보니까 괜찮았어." },
   { key: "blank", text: "아무 생각도 안 났어." },
-  { key: "long", text: "오래 보고 있었어." },
+  { key: "long", text: "계속 보고 있었어." },
   { key: "missyou", text: "돌아오는 길에 네 생각이 났어." },
+  { key: "tired", text: "좀 피곤해서 오는 길에 하품했어." },
+  { key: "quiet", text: "조용해서 좋았어." },
+  { key: "nothing", text: "별일은 없었어." },
 ] as const
 
 /**
- * 나가 있는 동안 방에 남는 쪽지 3막. **4시간을 죽은 대기로 두지 않기 위한 장치다.**
- *
- * 4시간 동안 화면이 "3시간 12분 남음"만 보여 주면 그 사이의 방문은 전부 빈손이 된다.
- * 경과 비율로 문장이 두 번 바뀌므로 들어올 때마다 새 줄이 있다 —
- * Finch가 여정을 단계로 쪼개 보여 주는 것과 Pikmin Bloom의 엽서에서 가져왔다.
- *
- * `{where}`는 OUTING_PLACES.where로 채운다. 뒤에 "쯤"이 붙으므로 받침에 관계없이
- * 조사 문제가 없다 — 여기 문장을 고칠 때 조사를 새로 넣지 않는다.
- *
- * **3막을 저장하지 않는다.** startedAt·returnsAt·placeKey만 있으면 계산되므로 컬럼이
- * 늘지 않고, 새로고침해도 같은 값이 나온다.
+ * 여행일기의 첫 줄. 그날 간 **가장 먼 장소의 stage**로 갈린다 — 전체에 제목 역할을 한다.
+ * 도입이 없으면 기분 한 줄이 마무리를 다 짊어진다.
  */
+export const OUTING_OPENERS: Record<number, readonly string[]> = {
+  2: ["오늘은 문 밖까지만 나갔어.", "멀리는 못 갔어. 그래도 나갔다 왔어."],
+  3: ["오늘은 동네를 좀 돌았어.", "동네 쪽으로 한 바퀴 다녀왔어."],
+  4: ["오늘은 좀 멀리 나갔어.", "오늘은 꽤 걸었어."],
+}
+
+/**
+ * 장소 사이의 이동. **이게 없으면 문단이 순간이동한다** — 조합 방식이 리스트처럼 읽히던
+ * 가장 큰 원인이었다.
+ *
+ * `돌아오는 길에`를 일부러 넣지 않았다 — 기분 문장 `돌아오는 길에 네 생각이 났어`와 겹친다.
+ */
+export const OUTING_LEAD_FIRST = ["먼저 ", "일단 ", ""] as const
+export const OUTING_LEAD_MID = [
+  "거기서 나와서 ",
+  "한참 걷다가 ",
+  "조금 더 가서 ",
+  "그다음엔 ",
+] as const
+export const OUTING_LEAD_LAST = ["마지막으로 ", "돌아오기 전에 "] as const
+
 export const OUTING_AWAY_LINES = [
   { key: "left", text: "방금 나갔어. 잘 다녀올게." },
   { key: "midway", text: "지금 {where}쯤이야." },
@@ -725,21 +1068,156 @@ export const OUTING_AWAY_LINES = [
 ] as const
 
 export type OutingPlaceKey = (typeof OUTING_PLACES)[number]["key"]
-export type OutingMetKey = (typeof OUTING_MET)[number]["key"]
 export type OutingMoodKey = (typeof OUTING_MOODS)[number]["key"]
 
-/** 8 × 6 × 5 = 240가지 */
-export const OUTING_COMBINATIONS = OUTING_PLACES.length * OUTING_MET.length * OUTING_MOODS.length
+/** 외출 한 번에 다녀오는 장소 수. 4곳 이상이면 일기가 카드를 넘긴다 */
+export const OUTING_LEGS_MIN = 2
+export const OUTING_LEGS_MAX = 3
 
-/** 그 진화 단계에서 갈 수 있는 장소. 1단계도 최소 1곳은 나온다 */
+/** 외출이 열리는 최소 진화 단계. **1단계(알)는 나가지 않는다**(2026-08-26 사용자 결정) */
+export const OUTING_MIN_STAGE = 2
+
+/** 최근 이 횟수만큼의 (장소·사건) 조합을 피한다. `pickReview()`의 LRU와 같은 장치다 */
+export const OUTING_RECENT_AVOID = 30
+
+/**
+ * 4단계 기준 변동폭. 한 장소 안에서 사건 4 × 결과 3 = 12, 만난것 3 → 36가지.
+ * 3곳이면 C(15,3) 455 × 36³ × 기분 8 ≈ 1.7억이다.
+ */
+export const OUTING_COMBINATIONS =
+  OUTING_PLACES.length * 4 * 3 * 3 * OUTING_MOODS.length
+
+/**
+ * 그 진화 단계에서 갈 수 있는 장소.
+ *
+ * **1단계는 빈 배열이다** — 나갈 수 없다는 것이 데이터로 드러나야 호출부가 실수하지 않는다.
+ * 전에는 "최소 1곳은 나온다"로 클램프했는데, 그러면 알이 창가에 나가는 것이 정상처럼 보인다.
+ */
 export function outingPlacesForStage(stage: number): readonly (typeof OUTING_PLACES)[number][] {
-  const s = Math.max(1, Math.floor(stage))
+  const s = Math.floor(stage)
+  if (s < OUTING_MIN_STAGE) return []
   return OUTING_PLACES.filter((p) => p.stage <= s)
 }
 
+/** 진화 단계가 외출을 열 수 있는지. 화면과 API가 같은 판정을 쓴다 */
+export function canGoOuting(stage: number): boolean {
+  return outingPlacesForStage(stage).length >= OUTING_LEGS_MIN
+}
+
+/** 한 장소에서 한 일. DB에 저장하는 단위다 — 문장이 아니라 키만 담는다 */
+export type OutingLeg = {
+  place: string
+  deed: string
+  /** 결과 문장의 인덱스(0~2). 유형은 deed에서 파생되므로 저장하지 않는다 */
+  result: number
+  sight: string
+}
+
+/** 최근 회피에 쓰는 조합 키. 장소가 아니라 **(장소·사건)** 쌍이 단위다 */
+export function outingComboKey(leg: { place: string; deed: string }): string {
+  return `${leg.place}/${leg.deed}`
+}
+
 /**
- * 세 키를 문장 세 줄로 조립한다. 화면이 줄 단위로 순차 노출한다.
- * 알 수 없는 키가 오면(옛 기록·수동 수정) 그 줄만 빠지고 죽지는 않는다.
+ * 외출을 뽑는다. `rand`를 주입받는 이유는 `check:pet`이 경계를 고정하고 녹화에서 원하는
+ * 결과를 만들 수 있어야 하기 때문이다 — 커리큘럼이 무작위를 안 쓰는 것과 같은 판단이다.
+ *
+ * @param recent 최근 외출들의 `outingComboKey()` 목록. 여기 있는 (장소·사건)은 피한다.
+ *   후보가 전부 걸리면 회피를 포기한다 — 회피 때문에 외출이 실패하면 안 된다.
+ */
+export function rollOutingLegs(
+  stage: number,
+  rand: () => number = Math.random,
+  recent: readonly string[] = [],
+): OutingLeg[] {
+  const pool = outingPlacesForStage(stage)
+  if (pool.length < OUTING_LEGS_MIN) return []
+
+  const pickIndex = (n: number) => Math.min(n - 1, Math.floor(rand() * n))
+  const avoid = new Set(recent)
+
+  // 장소 수를 먼저 정하고, 후보에서 겹치지 않게 뽑는다
+  const want = Math.min(
+    pool.length,
+    OUTING_LEGS_MIN + pickIndex(OUTING_LEGS_MAX - OUTING_LEGS_MIN + 1),
+  )
+  const rest = [...pool]
+  const chosen: (typeof OUTING_PLACES)[number][] = []
+  while (chosen.length < want && rest.length > 0) {
+    chosen.push(...rest.splice(pickIndex(rest.length), 1))
+  }
+  // 가까운 곳 → 먼 곳 순으로 세운다. 여행 경로처럼 읽힌다
+  chosen.sort((a, b) => a.stage - b.stage || OUTING_PLACES.indexOf(a) - OUTING_PLACES.indexOf(b))
+
+  return chosen.map((place) => {
+    const fresh = place.deeds.filter((d) => !avoid.has(outingComboKey({ place: place.key, deed: d.key })))
+    const deeds = fresh.length > 0 ? fresh : place.deeds
+    const deed = deeds[pickIndex(deeds.length)]
+    const sight = place.sights[pickIndex(place.sights.length)]
+    return {
+      place: place.key,
+      deed: deed.key,
+      result: pickIndex(OUTING_RESULTS[deed.tag].length),
+      sight: sight.key,
+    }
+  })
+}
+
+/**
+ * 여행일기를 문단 배열로 조립한다. **한 원소가 한 문단이다** — 화면이 원소 단위로 그리므로
+ * 줄 나열이 아니라 글로 읽힌다.
+ *
+ *   [0]      도입 한 줄
+ *   [1..n]   장소마다 한 문단 (이동 + 장소 + 사건 + 결과 + 만난것)
+ *   [마지막] 기분 한 줄
+ *
+ * 알 수 없는 키가 오면 그 조각만 빠지고 죽지 않는다(옛 기록·수동 수정).
+ */
+export function outingDiary(legs: readonly OutingLeg[], moodKey: string): string[] {
+  const resolved = legs
+    .map((leg) => {
+      const place = OUTING_PLACES.find((p) => p.key === leg.place)
+      if (!place) return null
+      const deed = place.deeds.find((d) => d.key === leg.deed)
+      const sight = place.sights.find((x) => x.key === leg.sight)
+      const results = deed ? OUTING_RESULTS[deed.tag] : null
+      const result = results ? results[Math.min(results.length - 1, Math.max(0, leg.result))] : null
+      return { place, deed, sight, result }
+    })
+    .filter((x): x is NonNullable<typeof x> => x !== null)
+
+  if (resolved.length === 0) return []
+
+  const pick = <T,>(pool: readonly T[], seed: number): T => pool[seed % pool.length]
+  // 문장을 저장하지 않으므로 전환어도 저장하지 않는다. 대신 legs에서 파생시켜
+  // **같은 기록이면 항상 같은 일기가 나오게** 한다 — 새로고침에 문장이 바뀌면 안 된다
+  const seed = resolved.reduce((n, r) => n + r.place.key.length + (r.deed?.key.length ?? 0), 0)
+
+  const farthest = Math.max(...resolved.map((r) => r.place.stage))
+  const openers = OUTING_OPENERS[farthest] ?? OUTING_OPENERS[2]
+  const out = [pick(openers, seed)]
+
+  resolved.forEach((r, i) => {
+    const last = i === resolved.length - 1
+    const lead =
+      i === 0
+        ? pick(OUTING_LEAD_FIRST, seed)
+        : last && resolved.length >= 3
+          ? pick(OUTING_LEAD_LAST, seed + i)
+          : pick(OUTING_LEAD_MID, seed + i)
+    const parts = [`${lead}${r.place.text}`, r.deed?.text, r.result, r.sight?.text]
+    out.push(parts.filter((t): t is string => Boolean(t)).join(" "))
+  })
+
+  const mood = OUTING_MOODS.find((m) => m.key === moodKey)
+  if (mood) out.push(mood.text)
+  return out
+}
+
+/**
+ * **옛 기록 전용.** 스키마가 `placeKey`/`metKey`/`moodKey` 세 컬럼이던 시절의 조립이다.
+ * `legs` 마이그레이션이 들어가면 이 함수와 `OUTING_MET_LEGACY`를 함께 지운다.
+ * 새 경로는 `outingDiary(legs, moodKey)`다.
  */
 export function outingEpisode(
   placeKey: string,
@@ -747,7 +1225,11 @@ export function outingEpisode(
   moodKey: string,
 ): string[] {
   const place = OUTING_PLACES.find((p) => p.key === placeKey)
-  const met = OUTING_MET.find((m) => m.key === metKey)
+  // metKey는 두 세대가 섞여 있다 — 옛 행은 전역 MET 키, 5축 전환 뒤 행은 그 장소의 sight 키다.
+  // 장소 쪽을 먼저 본다(새 것이 우선). 둘 다 없으면 그 줄만 빠진다
+  const met =
+    place?.sights.find((x) => x.key === metKey) ??
+    OUTING_MET_LEGACY.find((m) => m.key === metKey)
   const mood = OUTING_MOODS.find((m) => m.key === moodKey)
   // 풀이 `as const`라 text가 리터럴 유니온이다. string으로 넓혀 두지 않으면
   // 아래 타입 술어(t is string)가 파라미터 타입에 assignable하지 않아 tsc가 막는다

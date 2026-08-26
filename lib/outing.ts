@@ -11,7 +11,6 @@ import {
   OUTING_COST_AFFINITY,
   OUTING_HOURS,
   OUTING_MS,
-  OUTING_MET,
   OUTING_MOODS,
   type OutingState,
   outingAwayLine,
@@ -154,7 +153,11 @@ export async function loadOutingView(
 
 export type StartOutingResult =
   | { ok: true; view: OutingView; affinity: number }
-  | { ok: false; code: "NOT_ENOUGH_AFFINITY" | "ALREADY_OUT" | "NO_TABLE"; message: string }
+  | {
+      ok: false
+      code: "NOT_ENOUGH_AFFINITY" | "ALREADY_OUT" | "NO_TABLE" | "PET_TOO_YOUNG"
+      message: string
+    }
 
 /**
  * 외출을 보낸다.
@@ -176,10 +179,23 @@ export async function startOuting(
   rand: () => number = Math.random,
 ): Promise<StartOutingResult> {
   const places = outingPlacesForStage(args.evolutionStage)
+  // 1단계(알)는 나가지 않는다(2026-08-26 사용자 결정). outingPlacesForStage가 빈 배열을
+  // 주므로 여기서 막지 않으면 pick()이 undefined를 집는다
+  if (places.length === 0) {
+    return {
+      ok: false,
+      code: "PET_TOO_YOUNG",
+      message: "펫이 한 번 자라면 밖에 나갈 수 있어요",
+    }
+  }
+
   const pick = <T>(pool: readonly T[]): T => pool[Math.min(pool.length - 1, Math.floor(rand() * pool.length))]
 
   const place = pick(places)
-  const met = pick(OUTING_MET)
+  // 만난 것은 **그 장소의** sights에서 뽑는다. 전역 풀이던 시절에는 `부엌 / 빨래 걷는
+  // 할머니가 계셨어` 같은 조합이 나왔다. 컬럼은 그대로 metKey를 쓴다 — legs 마이그레이션
+  // 전까지의 다리다(lib/pet.ts outingEpisode 주석)
+  const met = pick(place.sights)
   const mood = pick(OUTING_MOODS)
   const roll = rollOutingReward(rand)
 
