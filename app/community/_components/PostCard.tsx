@@ -1,5 +1,5 @@
-import { TRIBE, authorLabel } from "@/lib/types"
 import type { GalleryPost } from "../_lib/gallery"
+import { communityAuthorLabel, communityAuthorBadge } from "../_lib/author"
 import { timeAgo } from "../_lib/format"
 
 export function PostCard({
@@ -11,7 +11,8 @@ export function PostCard({
   showTribeBadge: boolean
   onClick: () => void
 }) {
-  const tribe = post.user.typeCode ? TRIBE[post.user.typeCode] : null
+  // 관리자면 종족 대신 "관리자"다. 이름 줄과 배지가 같은 기준으로 갈린다(_lib/author.ts)
+  const badge = communityAuthorBadge(post.user)
 
   return (
     <button
@@ -23,17 +24,17 @@ export function PostCard({
       <div className="flex items-start justify-between gap-2">
         <div>
           <p className="text-sm font-semibold text-neutral-900">
-            {post.user.typeCode ? authorLabel(post.user.nickname, post.user.typeCode) : post.user.nickname}
+            {communityAuthorLabel(post.user)}
           </p>
           <p className="text-xs text-neutral-400">{timeAgo(post.createdAt)}</p>
         </div>
 
-        {showTribeBadge && tribe && (
+        {showTribeBadge && badge && (
           <span
             className="shrink-0 rounded-full px-2.5 py-1 text-[11px] font-bold"
-            style={{ backgroundColor: `${tribe.colorHex}22`, color: tribe.colorHex }}
+            style={{ backgroundColor: `${badge.colorHex}22`, color: badge.colorHex }}
           >
-            {tribe.animal}
+            {badge.text}
           </span>
         )}
       </div>

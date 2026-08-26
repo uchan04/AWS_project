@@ -25,7 +25,8 @@ export async function GET(request: NextRequest) {
       : null
     if (!gallery) return fail("INVALID_BODY", "갤러리를 찾을 수 없어요", 400)
 
-    if (!canAccessGallery(gallery, user.typeCode)) {
+    // 글쓰기 창의 주제 추천이라 글 작성과 같은 판정이다.
+    if (!canAccessGallery(gallery, user.typeCode, user.isAdmin)) {
       return fail("FORBIDDEN", "다른 종족의 갤러리는 볼 수 없어요", 400)
     }
 

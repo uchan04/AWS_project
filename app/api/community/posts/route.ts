@@ -28,7 +28,8 @@ export async function GET(request: NextRequest) {
     const tab = request.nextUrl.searchParams.get("tab") ?? undefined
     const gallery = resolveGallery(tab, user.typeCode)
 
-    if (!canAccessGallery(gallery, user.typeCode)) {
+    // 관리자는 모든 종족 갤러리를 본다(_lib/gallery.ts).
+    if (!canAccessGallery(gallery, user.typeCode, user.isAdmin)) {
       return fail("FORBIDDEN", "다른 종족의 갤러리는 볼 수 없어요", 400)
     }
 
@@ -97,7 +98,8 @@ export async function POST(request: NextRequest) {
     if (!galleryType) return fail("INVALID_BODY", "갤러리를 찾을 수 없어요", 400)
 
     // ALL은 누구나, 종족 갤러리는 본인 종족만 쓸 수 있다.
-    if (!canAccessGallery(galleryType, user.typeCode)) {
+    // 읽기와 같은 판정이다. 관리자는 모든 종족 갤러리에 쓴다.
+    if (!canAccessGallery(galleryType, user.typeCode, user.isAdmin)) {
       return fail("FORBIDDEN", "다른 종족의 갤러리에는 글을 쓸 수 없어요", 400)
     }
 
@@ -174,8 +176,16 @@ export async function POST(request: NextRequest) {
      *
      * imageKey가 없으면 사진 쪽은 **시작조차 하지 않는다.**
      */
+    // 위기 신호를 검열보다 **먼저** 재서 moderate()에 넘긴다 (차단 30번, 2026-08-25).
+    // blocksPosting()이 false여도 isCrisis()가 true인 글이 여기까지 온다 — 사별·보도·비유·
+    // 회복 서사다. 그 글에 욕설이 섞이면 POLICY="BLANKET"의 사전 분기가 400을 내보내
+    // 아래 crisisNotice에 닿지 못한다. 이 값이 그 한 단계만 건너뛰게 한다.
+    // **대상 있는 욕설은 그대로 막힌다** — 위 containsAbuse()와 moderate() 안의
+    // containsChosungAbuse·containsGestureAbuse는 crisis와 무관하다(moderation.ts 주석).
+    const crisis = isCrisis(`${title} ${body}`)
+
     const [textResult, imageResult] = await Promise.allSettled([
-      moderate(`${title}\n\n${body}`, invokeBedrock),
+      moderate(`${title}\n\n${body}`, invokeBedrock, { crisis }),
       imageKey ? moderateImage(imageKey) : Promise.resolve(),
     ])
 
@@ -210,7 +220,9 @@ export async function POST(request: NextRequest) {
 
     const post = await prisma.post.create({
       data: { userId: user.id, galleryType, title, body, imageKey },
-      include: { user: { select: { nickname: true, typeCode: true } } },
+      // isAdmin은 작성자 표기용이다(_lib/author.ts). **필드를 더 늘리지 마라** —
+      // 이 select 절이 subTypeCode 같은 값이 응답에 새는 것을 막는 자리다.
+      include: { user: { select: { nickname: true, typeCode: true, isAdmin: true } } },
     })
 
     const granted = await grantAffinity(user, POST_AFFINITY)
@@ -232,7 +244,7 @@ export async function POST(request: NextRequest) {
     // 저장은 됐지만 걱정되는 신호는 있는 글 — blocksPosting()은 false인데 isCrisis()는
     // true인 경우다(사별·보도·비유·회복 서사). 막지는 않되 안내는 보여준다.
     // 여기 오는 글은 실제로 올라갔으므로 CRISIS_POST_NOTICE("올라갔어요…")가 사실과 맞는다.
-    const crisisNotice = isCrisis(`${title} ${body}`) ? CRISIS_POST_NOTICE : null
+    const crisisNotice = crisis ? CRISIS_POST_NOTICE : null
 
     return ok({ post, granted, crisisNotice })
   } catch (error) {

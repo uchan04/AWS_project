@@ -12,20 +12,23 @@ export async function GET(_request: NextRequest, ctx: RouteContext<"/api/communi
     const post = await prisma.post.findFirst({
       where: { id, deletedAt: null },
       include: {
-        user: { select: { nickname: true, typeCode: true } },
+        // isAdmin은 작성자 표기용이다(_lib/author.ts). 필드를 더 늘리지 마라
+        user: { select: { nickname: true, typeCode: true, isAdmin: true } },
         likes: { where: { userId: user.id }, select: { id: true } },
       },
     })
     if (!post) return fail("NOT_FOUND", "게시글을 찾을 수 없어요", 404)
 
-    if (!canAccessGallery(post.galleryType, user.typeCode)) {
+    // 관리자는 모든 종족 갤러리의 글을 본다.
+    if (!canAccessGallery(post.galleryType, user.typeCode, user.isAdmin)) {
       return fail("FORBIDDEN", "다른 종족의 갤러리는 볼 수 없어요", 400)
     }
 
     const comments = await prisma.comment.findMany({
       where: { postId: post.id, deletedAt: null },
       orderBy: { createdAt: "asc" },
-      include: { user: { select: { nickname: true, typeCode: true } } },
+      // 댓글 작성자도 같다. isAdmin만 더한다
+      include: { user: { select: { nickname: true, typeCode: true, isAdmin: true } } },
     })
 
     return ok({

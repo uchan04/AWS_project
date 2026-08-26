@@ -17,7 +17,8 @@ export async function POST(_request: NextRequest, ctx: RouteContext<"/api/commun
     })
     if (!post) return fail("NOT_FOUND", "게시글을 찾을 수 없어요", 404)
 
-    if (!canAccessGallery(post.galleryType, user.typeCode)) {
+    // 글·댓글과 같은 판정이다.
+    if (!canAccessGallery(post.galleryType, user.typeCode, user.isAdmin)) {
       return fail("FORBIDDEN", "다른 종족의 갤러리는 볼 수 없어요", 400)
     }
 

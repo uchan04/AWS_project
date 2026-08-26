@@ -2,7 +2,7 @@
 
 import { useEffect, useRef, useState } from "react"
 import type { TypeCode } from "@prisma/client"
-import { authorLabel } from "@/lib/types"
+import { communityAuthorLabel } from "../_lib/author"
 import { useModalA11y } from "@/app/components/useModalA11y"
 import { CrisisNotice } from "@/app/components/CrisisNotice"
 import { timeAgo } from "../_lib/format"
@@ -37,7 +37,8 @@ const ADMIN_DELETE_COMMENT =
 /** 댓글 확인 대기가 저절로 풀리는 시간. 대기 중인 것을 잊고 다시 누르는 사고를 막는다. */
 const COMMENT_CONFIRM_MS = 3000
 
-type DetailUser = { nickname: string; typeCode: TypeCode | null }
+// isAdmin은 서버가 내려준다(GET /api/community/posts/[id]). 작성자 표기에만 쓴다
+type DetailUser = { nickname: string; typeCode: TypeCode | null; isAdmin: boolean }
 
 type DetailComment = {
   id: string
@@ -62,8 +63,9 @@ type DetailPost = {
   user: DetailUser
 }
 
+// 글 작성자와 댓글 작성자가 같은 규칙을 쓴다 — 관리자면 종족 대신 "관리자"(_lib/author.ts)
 function authorText(user: DetailUser): string {
-  return user.typeCode ? authorLabel(user.nickname, user.typeCode) : user.nickname
+  return communityAuthorLabel(user)
 }
 
 export function PostDetailModal({
@@ -326,8 +328,18 @@ export function PostDetailModal({
             {!post.isOwn && isAdmin && (
               <div
                 aria-hidden={!confirmingDelete}
+                // max-h-96(384px)은 **안내 문구가 두 줄일 때 기준**이다. 그때 내용 높이가
+                // py-4(32) + 패널 p-3·테두리(26) + 문구 2줄(약 40) + gap-2(8) + 버튼 줄(38)로
+                // 약 144px이고, 닉네임이 길어 서너 줄이 되면 190px을 넘는다. 전에 쓰던
+                // max-h-48(192px)이 딱 그 자리에서 버튼 아랫부분을 잘랐다 — EXPAND_BASE에
+                // overflow-hidden이 있어서 넘친 만큼 그냥 사라진다. 짧은 닉네임으로는
+                // 재현되지 않아 눈에 늦게 띄었다. 여유를 두 배로 잡는다.
+                //
+                // **height: auto로 바꾸지 마라.** 위 EXPAND_BASE 주석대로 이 구조는 높이와
+                // 투명도를 함께 전환하려고 항상 렌더해 두고 max-h로 접는 것이고,
+                // auto에는 transition이 걸리지 않아 접힘 애니메이션이 사라진다.
                 className={
-                  "px-7 " + EXPAND_BASE + " " + (confirmingDelete ? "max-h-48 py-4 opacity-100" : EXPAND_CLOSED)
+                  "px-7 " + EXPAND_BASE + " " + (confirmingDelete ? "max-h-96 py-4 opacity-100" : EXPAND_CLOSED)
                 }
               >
                 <div className={EXPAND_PANEL}>
