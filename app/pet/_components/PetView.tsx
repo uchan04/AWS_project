@@ -787,67 +787,6 @@ export default function PetView({ initial }: { initial: PetState }) {
 
   return (
     <main className="pet" data-tribe={pet.typeCode ?? undefined}>
-      {/* 경험치 — **2026-08-26부터 씨앗 투입 시에만 나타난다**(사용자 결정,
-          게임 `이환`의 획득 게이지 형태). 상주하지 않는 이유는 위 expShow 주석에 있다.
-
-          같은 날 두 번째 사용자 결정으로 **오른쪽 열의 카드에서 화면 상단 중앙에
-          자동으로 열리고 자동으로 닫히는 팝업**이 됐다. 오른쪽 열에 두면 카드가
-          나타나는 순간 아래 카드 네 장이 전부 밀려 내려간다 — 먹이기 버튼을 누른
-          손가락 아래에서 레이아웃이 움직이는 것이고, 눌린 버튼이 다른 자리로 간다.
-          `position: fixed`면 문서 흐름 밖이라 아무것도 밀지 않는다.
-
-          그래서 마크업이 `.pet__grid`가 아니라 `<main>` 첫 자리에 있다. `fixed`는
-          조상에 `transform`·`filter`가 있으면 그 조상 기준이 되므로, 열 안에 두면
-          중앙 정렬이 깨질 수 있다.
-
-          닫기 버튼이 없다 — 알림이지 대화 상자가 아니다. 그래서 `useModalA11y`를
-          쓰지 않는다. 초점을 빼앗으면 먹이기 버튼을 연달아 누를 수 없다.
-          `role="status"`가 스크린리더에 읽히는 경로다 */}
-      {expShow ? (
-        <div className="pet-exp-pop" role="status" aria-live="polite">
-          <div className="pet-exp-pop__box">
-            <div className="pet-exp-pop__head">
-              {/* 제목 앞 이모지는 2026-08-24 사용자 요청으로 되살린 것이다("예전에 있던대로").
-                  design.md의 "이모지는 마스코트 자리에만"에서 벗어나는 자리다. 새 예외가
-                  아니라 이 화면이 원래 갖고 있던 예외로 돌아온 것이고, aria-hidden이라
-                  스크린리더가 읽는 이름은 글자 그대로 남는다 */}
-              <p className="pet-exp-pop__title">
-                <span aria-hidden="true">⭐</span> 경험치
-              </p>
-              <span className="pet-exp-pop__meta">
-                {ko(pet.exp)} / {ko(need)}
-              </span>
-            </div>
-            <div
-              className="pet-gauge"
-              role="progressbar"
-              aria-label="다음 레벨까지 경험치"
-              aria-valuemin={0}
-              aria-valuemax={need}
-              aria-valuenow={pet.exp}
-            >
-              {/* from이 있는 0.3초 동안은 **이전 위치**를 그린다. 그 뒤 현재 값으로 바뀌면
-                  CSS transition이 채워지는 모습을 만든다 — JS 애니메이션을 쓰지 않는다 */}
-              <div
-                className="pet-gauge__fill"
-                style={{ width: `${(expShow.from ?? progress) * 100}%` }}
-              />
-            </div>
-            {/* 지금까지 `Lv.25 마지막 진화`만 보여 줬다. 그 문구는 지금 무엇을 얼마나
-                해야 하는지 알려 주지 않는다. 벤치마크한 육성 게임은 전부 남은 개수를 쓴다
-                (2026-08-24 사용자 확정: seedsToNextStage 쪽을 쓴다) */}
-            <p className="pet-exp-pop__foot">
-              <span>현재 Lv.{pet.level}</span>
-              <span>
-                {nextStage
-                  ? `${STAGE_NAME[nextStage.stage - 1] ?? `${nextStage.stage}단계`}까지 씨앗 ${ko(nextStage.seeds)}개`
-                  : "마지막 단계예요"}
-              </span>
-            </p>
-          </div>
-        </div>
-      ) : null}
-
       {/* 재화와 상점 입구는 아래 지갑 카드가 갖는다. 상단은 제목만 남긴다.
           2026-08-24: 나무판 3개(잠깐 쉬기·외형 상점·배경 상점)를 걷었다. 상점 2개는
           지갑 카드가 이미 갖고 있어 같은 링크가 한 화면에 두 벌이었고, 잠깐 쉬기는
@@ -877,6 +816,70 @@ export default function PetView({ initial }: { initial: PetState }) {
             >
               🌟
             </button>
+
+            {/* 경험치 — **2026-08-26부터 씨앗 투입 시에만 나타난다**(사용자 결정,
+                게임 `이환`의 획득 게이지 형태). 상주하지 않는 이유는 위 expShow 주석에 있다.
+
+                같은 날 결정이 두 번 더 바뀌었다.
+                ① 오른쪽 열 카드 → 화면 상단 중앙 팝업. 카드로 두면 나타나는 순간 아래
+                   카드 네 장이 밀려 내려간다 — 방금 누른 먹이기 버튼이 손가락 아래에서
+                   움직인다. 실측 이동량 153px
+                ② 화면 기준 → **방 기준 중앙 상단**(지금). 씨앗을 먹인 결과가 오르는 곳은
+                   펫이고, 눈이 가 있는 곳도 펫이다. 화면 상단은 방 밖이라 시선이 한 번
+                   위로 튀었다가 돌아온다
+
+                그래서 마크업이 `<main>`이 아니라 `.pet-room` 안에 있다. 방이
+                `position: relative`(pet.css .pet-room)이므로 이 자리가 곧 방 기준이다.
+                방은 `overflow: hidden`이라 팝업이 방 밖으로 새지 않는다.
+
+                닫기 버튼이 없다 — 알림이지 대화 상자가 아니다. 그래서 `useModalA11y`를
+                쓰지 않는다. 초점을 빼앗으면 먹이기 버튼을 연달아 누를 수 없다.
+                `role="status"`가 스크린리더에 읽히는 경로다 */}
+            {expShow ? (
+              <div className="pet-exp-pop" role="status" aria-live="polite">
+                <div className="pet-exp-pop__box">
+                  <div className="pet-exp-pop__head">
+                    {/* 제목 앞 이모지는 2026-08-24 사용자 요청으로 되살린 것이다
+                        ("예전에 있던대로"). design.md의 "이모지는 마스코트 자리에만"에서
+                        벗어나는 자리다. 새 예외가 아니라 이 화면이 원래 갖고 있던 예외로
+                        돌아온 것이고, aria-hidden이라 스크린리더가 읽는 이름은 글자대로다 */}
+                    <p className="pet-exp-pop__title">
+                      <span aria-hidden="true">⭐</span> 경험치
+                    </p>
+                    <span className="pet-exp-pop__meta">
+                      {ko(pet.exp)} / {ko(need)}
+                    </span>
+                  </div>
+                  <div
+                    className="pet-gauge"
+                    role="progressbar"
+                    aria-label="다음 레벨까지 경험치"
+                    aria-valuemin={0}
+                    aria-valuemax={need}
+                    aria-valuenow={pet.exp}
+                  >
+                    {/* from이 있는 0.3초 동안은 **이전 위치**를 그린다. 그 뒤 현재 값으로
+                        바뀌면 CSS transition이 채워지는 모습을 만든다 —
+                        JS 애니메이션을 쓰지 않는다 */}
+                    <div
+                      className="pet-gauge__fill"
+                      style={{ width: `${(expShow.from ?? progress) * 100}%` }}
+                    />
+                  </div>
+                  {/* 지금까지 `Lv.25 마지막 진화`만 보여 줬다. 그 문구는 지금 무엇을 얼마나
+                      해야 하는지 알려 주지 않는다. 벤치마크한 육성 게임은 전부 남은 개수를
+                      쓴다 (2026-08-24 사용자 확정: seedsToNextStage 쪽을 쓴다) */}
+                  <p className="pet-exp-pop__foot">
+                    <span>현재 Lv.{pet.level}</span>
+                    <span>
+                      {nextStage
+                        ? `${STAGE_NAME[nextStage.stage - 1] ?? `${nextStage.stage}단계`}까지 씨앗 ${ko(nextStage.seeds)}개`
+                        : "마지막 단계예요"}
+                    </span>
+                  </p>
+                </div>
+              </div>
+            ) : null}
 
             {/* 여기 떠다니는 씨앗 장식 3개(🌱🌿🍃)가 있었다 — 2026-08-24 사용자 요청
                 ("주위에 둥둥 떠다니는 이모티콘들 지워줘")으로 걷었다. 펫 주위의 반짝임
