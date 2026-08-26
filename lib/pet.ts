@@ -610,3 +610,219 @@ export function breathAt(elapsedSeconds: number): {
   const last = BREATH_CYCLE[BREATH_CYCLE.length - 1]
   return { phase: last.phase, label: last.label, progress: 1, remaining: 1 }
 }
+
+// ── 펫 외출 ───────────────────────────────────────────────────────────────────
+//
+// 기획: 친밀도 200 소모 → 펫 외출 → 4시간 뒤 복귀 시 에피소드 + 랜덤 재화.
+// 계획 전문과 값의 근거는 docs/dev/pet.md "펫 외출 시스템"을 본다.
+//
+// 이 절은 **DB와 화면을 모르는 순수 함수만** 둔다. PetOuting 표가 아직 없어도(마이그레이션
+// 미적용) 컴파일되고 check:pet으로 검증된다 — 그래서 스키마 합의를 기다리지 않고 값을
+// 코드로 먼저 고정할 수 있다. 이 파일이 값의 유일한 출처이고 API·화면이 여기서 읽는다.
+
+/**
+ * 외출 1회 비용.
+ *
+ * **200인 이유는 lib/reward.ts의 AFFINITY_DAILY_CAP이 100이라서다** — 하루에 최대 100밖에
+ * 벌 수 없으므로 200은 곧 "최소 2일에 1회"다. 매일 나갈 수 있으면 사건이 아니라 일과가 된다.
+ *
+ * 여기서 AFFINITY_DAILY_CAP을 import하지 않는 것은 의도다. lib/pet.ts는 재화 규칙을 모르는
+ * 쪽으로 유지한다. 대신 check:pet이 두 파일을 함께 읽어 비율 2를 못 박으므로, 어느 한쪽을
+ * 바꾸면 "2일 1회" 페이싱이 조용히 무너지는 대신 체크에서 걸린다.
+ */
+export const OUTING_COST_AFFINITY = 200
+
+/**
+ * 다녀오는 데 걸리는 시간.
+ *
+ * 방치형 씨앗이 MS_PER_IDLE_SEED = 30분/개라 그보다 확실히 길어야 두 장치가 구분된다.
+ * 4시간이면 오전에 보내면 오후에 온다 — 하루에 한 번 들어오는 사용자도 같은 날 받는다.
+ */
+export const OUTING_HOURS = 4
+export const OUTING_MS = OUTING_HOURS * 60 * 60 * 1000
+
+/** 보상 범위. 씨앗과 별조각에 **각각** 굴린다 (둘 다 나온다) */
+export const OUTING_REWARD_MIN = 30
+export const OUTING_REWARD_MAX = 50
+
+/**
+ * 외출 보상을 뽑는다. 배율 적용 **전** 기본 수량이다 — 호출부가 calculateReward()에 넣는다.
+ *
+ * rand를 주입받는 이유: Math.random()을 안에 박으면 check:pet이 경계(30·50)를 검증할 수
+ * 없다. idleAccrual()이 now를 받는 것과 같은 이유다.
+ *
+ * **씨앗과 별조각을 둘 다 준다.** 「둘 중 하나만 랜덤」이면 2일에 한 번뿐인 이벤트에서
+ * 절반이 "씨앗만 나왔네"가 되고 사용자는 그걸 실패로 읽는다. 꽝을 만들지 않는다.
+ */
+export function rollOutingReward(rand: () => number): { seeds: number; starShards: number } {
+  const roll = () => {
+    const span = OUTING_REWARD_MAX - OUTING_REWARD_MIN + 1
+    // rand()가 1을 반환하면(경계) MAX를 넘으므로 잘라 낸다
+    return Math.min(OUTING_REWARD_MAX, OUTING_REWARD_MIN + Math.floor(rand() * span))
+  }
+  return { seeds: roll(), starShards: roll() }
+}
+
+/**
+ * 갈 수 있는 장소. **stage는 펫 진화 단계(1~4)이고, 그 단계 이하가 후보가 된다** —
+ * 펫이 자라면 갈 수 있는 범위가 밖으로 넓어진다. 사용자의 회복 범위와 같은 모양이다.
+ *
+ * 문장은 키로 저장한다(placeKey). 문장을 DB에 저장하면 나중에 문구를 다듬을 때 옛 기록이
+ * 옛 문장으로 굳는다 — PET_IDLE_LINES를 상수로 둔 것과 같은 판단이다.
+ */
+export const OUTING_PLACES = [
+  { key: "window", stage: 1, where: "창가", text: "창가에 한참 앉아 있었어." },
+  { key: "kitchen", stage: 1, where: "부엌", text: "부엌 쪽을 탐험했어." },
+  { key: "doorstep", stage: 2, where: "문 앞", text: "문 앞 계단까지 나가 봤어." },
+  { key: "alley", stage: 2, where: "골목", text: "골목 담벼락을 따라 걸었어." },
+  { key: "park", stage: 3, where: "공원", text: "동네 공원에 갔어." },
+  { key: "busstop", stage: 3, where: "정류장", text: "버스 정류장 앞에 서 있었어." },
+  { key: "river", stage: 4, where: "강가", text: "강가까지 갔다 왔어." },
+  { key: "downtown", stage: 4, where: "큰길", text: "사람 많은 길을 지나왔어." },
+] as const
+
+/** 거기서 만난 것. 전부 나에게 아무것도 요구하지 않는 것들이다 */
+export const OUTING_MET = [
+  { key: "cat", text: "고양이 한 마리가 나를 쳐다봤어." },
+  { key: "dog", text: "낮잠 자는 강아지 옆을 조용히 지나갔어." },
+  { key: "granny", text: "빨래 걷는 할머니가 계셨어." },
+  { key: "flower", text: "이름 모를 꽃이 피어 있었어." },
+  { key: "tree", text: "나보다 훨씬 큰 나무가 있었어." },
+  { key: "stranger", text: "종이봉투를 든 사람이 지나갔어." },
+] as const
+
+/**
+ * 돌아와서의 기분.
+ *
+ * **평가도 교훈도 없다.** "너도 할 수 있어" 같은 말을 넣지 않는다 — 격려는 사용자를
+ * 격려받아야 하는 위치에 세운다. 펫은 자기 얘기만 한다.
+ */
+export const OUTING_MOODS = [
+  { key: "good", text: "그냥 좋았어." },
+  { key: "scared", text: "조금 무서웠는데 괜찮았어." },
+  { key: "blank", text: "아무 생각도 안 났어." },
+  { key: "long", text: "오래 보고 있었어." },
+  { key: "missyou", text: "돌아오는 길에 네 생각이 났어." },
+] as const
+
+/**
+ * 나가 있는 동안 방에 남는 쪽지 3막. **4시간을 죽은 대기로 두지 않기 위한 장치다.**
+ *
+ * 4시간 동안 화면이 "3시간 12분 남음"만 보여 주면 그 사이의 방문은 전부 빈손이 된다.
+ * 경과 비율로 문장이 두 번 바뀌므로 들어올 때마다 새 줄이 있다 —
+ * Finch가 여정을 단계로 쪼개 보여 주는 것과 Pikmin Bloom의 엽서에서 가져왔다.
+ *
+ * `{where}`는 OUTING_PLACES.where로 채운다. 뒤에 "쯤"이 붙으므로 받침에 관계없이
+ * 조사 문제가 없다 — 여기 문장을 고칠 때 조사를 새로 넣지 않는다.
+ *
+ * **3막을 저장하지 않는다.** startedAt·returnsAt·placeKey만 있으면 계산되므로 컬럼이
+ * 늘지 않고, 새로고침해도 같은 값이 나온다.
+ */
+export const OUTING_AWAY_LINES = [
+  { key: "left", text: "방금 나갔어. 잘 다녀올게." },
+  { key: "midway", text: "지금 {where}쯤이야." },
+  { key: "back", text: "이제 돌아가는 중이야." },
+] as const
+
+export type OutingPlaceKey = (typeof OUTING_PLACES)[number]["key"]
+export type OutingMetKey = (typeof OUTING_MET)[number]["key"]
+export type OutingMoodKey = (typeof OUTING_MOODS)[number]["key"]
+
+/** 8 × 6 × 5 = 240가지 */
+export const OUTING_COMBINATIONS = OUTING_PLACES.length * OUTING_MET.length * OUTING_MOODS.length
+
+/** 그 진화 단계에서 갈 수 있는 장소. 1단계도 최소 1곳은 나온다 */
+export function outingPlacesForStage(stage: number): readonly (typeof OUTING_PLACES)[number][] {
+  const s = Math.max(1, Math.floor(stage))
+  return OUTING_PLACES.filter((p) => p.stage <= s)
+}
+
+/**
+ * 세 키를 문장 세 줄로 조립한다. 화면이 줄 단위로 순차 노출한다.
+ * 알 수 없는 키가 오면(옛 기록·수동 수정) 그 줄만 빠지고 죽지는 않는다.
+ */
+export function outingEpisode(
+  placeKey: string,
+  metKey: string,
+  moodKey: string,
+): string[] {
+  const place = OUTING_PLACES.find((p) => p.key === placeKey)
+  const met = OUTING_MET.find((m) => m.key === metKey)
+  const mood = OUTING_MOODS.find((m) => m.key === moodKey)
+  // 풀이 `as const`라 text가 리터럴 유니온이다. string으로 넓혀 두지 않으면
+  // 아래 타입 술어(t is string)가 파라미터 타입에 assignable하지 않아 tsc가 막는다
+  const lines: (string | undefined)[] = [place?.text, met?.text, mood?.text]
+  return lines.filter((t): t is string => Boolean(t))
+}
+
+/** 화면과 API가 같은 판정을 쓴다. 조건을 두 벌로 만들지 않는다 */
+export type OutingState = "IDLE" | "AWAY" | "RETURNED"
+
+/**
+ * PetOuting 행 대신 필요한 두 필드만 받는다. **Prisma 모델을 import하지 않는 것은 의도다** —
+ * 마이그레이션이 적용되기 전에도 이 함수와 check:pet이 돌아가야 한다.
+ */
+export type OutingLike = { returnsAt: Date; claimedAt: Date | null }
+
+export function outingState(o: OutingLike | null, now: Date): OutingState {
+  if (!o) return "IDLE"
+  // 수령이 끝난 외출은 없는 것과 같다 — 다음 외출을 보낼 수 있다
+  if (o.claimedAt) return "IDLE"
+  return now.getTime() < o.returnsAt.getTime() ? "AWAY" : "RETURNED"
+}
+
+/**
+ * 복귀까지 남은 밀리초. AWAY 카드의 "N시간 M분 뒤"에 쓴다.
+ * 이미 지났거나 외출이 없으면 0이다 (음수를 내보내지 않는다).
+ */
+export function outingRemainingMs(o: OutingLike | null, now: Date): number {
+  if (!o || o.claimedAt) return 0
+  return Math.max(0, o.returnsAt.getTime() - now.getTime())
+}
+
+/**
+ * 남은 시간을 사람이 읽는 한 줄로 만든다. 화면 두 곳(카드 제목·진행 게이지)이 같은
+ * 문자열을 써야 하므로 순수 함수로 둔다 — 컴포넌트마다 따로 만들면 표기가 갈린다.
+ *
+ * 분 단위로 올림한다. 남은 30초를 "0분"으로 쓰면 다 됐는데 안 온 것처럼 읽힌다.
+ */
+export function outingRemainingLabel(ms: number): string {
+  if (ms <= 0) return "곧 도착"
+  const totalMin = Math.ceil(ms / 60_000)
+  const h = Math.floor(totalMin / 60)
+  const m = totalMin % 60
+  if (h > 0 && m > 0) return `${h}시간 ${m}분`
+  if (h > 0) return `${h}시간`
+  return `${m}분`
+}
+
+/** 진행 비율 계산에는 시작 시각이 더 필요하다. outingState는 이 필드를 요구하지 않는다 */
+export type OutingProgressLike = OutingLike & { startedAt: Date }
+
+/**
+ * 0~1 사이의 경과 비율. 게이지와 3막 판정이 같은 값을 쓴다.
+ *
+ * OUTING_MS로 나누지 않고 **행의 startedAt~returnsAt 폭으로 나눈다** — 나중에
+ * OUTING_HOURS를 바꿔도 이미 나가 있는 외출의 게이지가 어긋나지 않는다.
+ */
+export function outingProgress(o: OutingProgressLike | null, now: Date): number {
+  if (!o) return 0
+  if (o.claimedAt) return 1
+  const span = o.returnsAt.getTime() - o.startedAt.getTime()
+  if (span <= 0) return 1
+  const elapsed = now.getTime() - o.startedAt.getTime()
+  return Math.min(1, Math.max(0, elapsed / span))
+}
+
+/**
+ * 나가 있는 동안 방에 남는 한 줄. 경과 3분의 1마다 바뀐다.
+ *
+ * 알 수 없는 placeKey면 `{where}` 자리를 "밖"으로 둔다 — 옛 기록이나 손으로 고친 행에서
+ * 치환되지 않은 `{where}`가 화면에 그대로 나오는 것을 막는다.
+ */
+export function outingAwayLine(placeKey: string, progress: number): string {
+  const p = Number.isFinite(progress) ? Math.min(1, Math.max(0, progress)) : 0
+  const act = p < 1 / 3 ? 0 : p < 2 / 3 ? 1 : 2
+  const where = OUTING_PLACES.find((x) => x.key === placeKey)?.where ?? "밖"
+  return OUTING_AWAY_LINES[act].text.replace("{where}", where)
+}

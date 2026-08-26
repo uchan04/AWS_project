@@ -29,16 +29,21 @@ import "../pet.css"
 // 미획득 실루엣: 이미지가 없어 지금은 점선 테두리 + 죽인 이름으로 표현한다.
 // 이미지가 오면 .pet-item--locked가 그 <img>에 filter를 걸면 된다.
 //
-// 가격은 서버가 내려준 priceAffinity만 쓴다. 등급별 가격표를 여기 복사하면
+// 가격은 서버가 내려준 priceShards만 쓴다. 등급별 가격표를 여기 복사하면
 // prisma/seed/items.ts의 PRICE_BY_RARITY와 갈라진다.
+//
+// 2026-08-25: 값을 치르는 재화가 친밀도 → **별조각**이 됐다(사용자 결정). 이 화면에서
+// 바뀌는 것은 아이콘(❤️ → ⭐)·문구·잔액 세 곳이고 구조는 그대로다. 전환 고지 한 줄을
+// 진행률 아래에 둔다 — 어제까지 친밀도로 사던 사람이 잔액이 그대로인 것을 보고
+// "내 친밀도가 어디 갔나"로 읽지 않게 하는 것이 그 줄의 일이다.
 
 export type CosmeticRow = {
   id: string
   name: string
   slot: Slot
   rarity: Rarity
-  affinityOnly: boolean
-  priceAffinity: number | null
+  /** 별조각 구매가. null이면 비매품이고 화면은 버튼 대신 "미획득"을 띄운다 */
+  priceShards: number | null
   /** 타일 미리보기 그림. CLOUDFRONT_DOMAIN이 비었으면 null이고 타일은 이름만 보인다 */
   imageUrl: string | null
   owned: boolean
@@ -48,7 +53,8 @@ export type CosmeticRow = {
 export type CosmeticListProps = {
   items: CosmeticRow[]
   progress: { owned: number; total: number }
-  affinity: number
+  /** 별조각 잔액. 외형 상점(/pet/skins)이 보는 것과 같은 값이다 (2026-08-25 전환) */
+  starShards: number
   /** .pet 스코프의 --tribe를 켜는 값. 진단 전이면 null이고 tokens.css :root 기본색으로 떨어진다 */
   typeCode: TypeCode | null
 }
@@ -93,12 +99,12 @@ const TABS: { key: Tab; label: string; icon: string; title: string }[] = [
 export default function CosmeticList({
   items: initial,
   progress: initialProgress,
-  affinity: initialAffinity,
+  starShards: initialShards,
   typeCode,
 }: CosmeticListProps) {
   const [items, setItems] = useState(initial)
   const [owned, setOwned] = useState(initialProgress.owned)
-  const [affinity, setAffinity] = useState(initialAffinity)
+  const [starShards, setStarShards] = useState(initialShards)
   const [tab, setTab] = useState<Tab>("all")
   const [pending, setPending] = useState<string | null>(null)
   const [error, setError] = useState<string | null>(null)
@@ -126,7 +132,7 @@ export default function CosmeticList({
         return
       }
 
-      setAffinity(json.data.affinity)
+      setStarShards(json.data.starShards)
       setOwned(json.data.owned)
       setItems((prev) => prev.map((row) => (row.id === item.id ? { ...row, owned: true } : row)))
       setNotice(`${item.name}을 모았어요. 착용을 눌러 바로 꾸밀 수 있어요.`)
@@ -209,21 +215,23 @@ export default function CosmeticList({
             </span>
             <h1 className="pet__title">배경 상점</h1>
             <p className="pet__lede">
-              친밀도로 모아요. 한 번에 하나만 착용해요. 별도 도감 없이 이 화면이 수집함이에요.
+              별조각으로 모아요. 한 번에 하나만 착용해요. 별도 도감 없이 이 화면이 수집함이에요.
             </p>
           </div>
 
           <div className="pet-banner__acts">
             {/* 잔액이 이 화면에만 있으므로 홈의 씨앗 HUD처럼 aria-hidden으로 묻지 않는다 */}
-            <p className="pet-hud" aria-label={`친밀도 ${ko(affinity)}`}>
+            <p className="pet-hud" aria-label={`별조각 ${ko(starShards)}`}>
               {/* --wood 변형은 2026-08-21에 지웠다. 아이콘 칸이 종족색 하나로 통일됐다.
-                  2026-08-24 사용자 요청("페이지 내의 모든 친밀도의 이모티콘은 빨간색 하트")으로
-                  💛 → ❤️다. 홈 지갑·오늘의 활동과 같은 값이어야 같은 재화로 읽힌다 */}
+                  2026-08-25 전환으로 ❤️(친밀도) → ⭐(별조각)다. 8/24에 "페이지 내의 모든
+                  친밀도는 빨간 하트"로 통일한 규칙은 그대로 살아 있다 — 여기가 더 이상
+                  친밀도를 보여주는 자리가 아니게 된 것이고, 별조각 아이콘은 홈 지갑·
+                  외형 상점과 같은 ⭐를 쓴다. 같은 재화가 화면마다 다른 그림이면 안 된다 */}
               <span className="pet-hud__icon" aria-hidden="true">
-                ❤️
+                ⭐
               </span>
               <span className="pet-hud__value" aria-hidden="true">
-                {ko(affinity)}
+                {ko(starShards)}
               </span>
             </p>
             <Link className="pet-plank" href="/pet">
@@ -245,6 +253,16 @@ export default function CosmeticList({
           {progressText}
         </span>
       </div>
+
+      {/* 재화 전환 고지 (2026-08-25). 어제까지 친밀도로 사던 화면이라 값만 바꿔 두면
+          모아 둔 친밀도가 쓸 곳 없는 숫자로 남는다 — 그 잔액이 어디로 갔는지 한 줄로
+          말한다. role은 status가 아니라 없음이다: 페이지를 열 때부터 있는 안내이고
+          방금 일어난 일이 아니라서 스크린리더가 알림으로 읽으면 오히려 튄다.
+          외출이 궁금한 사람은 펫 화면으로 가야 하므로 링크를 그 자리에 둔다 */}
+      <p className="pet-msg">
+        배경 값을 친밀도에서 별조각으로 바꿨어요. 모아 둔 친밀도는{" "}
+        <Link href="/pet">펫 외출</Link>에 써요.
+      </p>
 
       {error ? (
         <p className="pet-msg pet-msg--error" role="alert">
@@ -332,8 +350,8 @@ export default function CosmeticList({
       ) : (
         <div className="pet-shop">
           {filtered.map((item) => {
-            const price = item.affinityOnly ? item.priceAffinity : null
-            const tooPoor = price !== null && affinity < price
+            const price = item.priceShards
+            const tooPoor = price !== null && starShards < price
             // 등급 배지는 두 갈래다: 일반은 캔버스색, 희귀 이상은 종족색 칩.
             // 에픽 전용 색은 만들지 않았다(2026-08-24 사용자 결정 — 시드에 없다).
             // 글자는 RARITY_LABEL 그대로이므로 영웅·전설이 붙어도 이름은 맞는다
@@ -354,7 +372,7 @@ export default function CosmeticList({
                 ) : null}
 
                 {/* 배경 그림. 사기 전에 무엇인지 보여야 한다 — 이름과 가격만 있으면
-                    친밀도 600(6일치)을 무엇인지 모르고 내는 화면이 된다.
+                    별조각 500(약 8일치)을 무엇인지 모르고 내는 화면이 된다.
                     안 뜨면 스스로 숨어 이름만 남는다(PetRoom의 배경 <img>와 같은 처리).
                     장식이 아니라 상품 정보이므로 aria-hidden이 아니고, 이름이 옆에
                     글자로 있으므로 alt는 빈 값이다 — 읽으면 이름이 두 번 나온다 */}
@@ -387,7 +405,7 @@ export default function CosmeticList({
                 <span className="pet-item__name">{item.name}</span>
                 <span className="pet-item__meta">
                   <span aria-hidden="true">{SLOT_EMOJI[item.slot]}</span> {SLOT_LABEL[item.slot]}
-                  {price !== null ? ` · 친밀도 ${ko(price)}` : ""}
+                  {price !== null ? ` · 별조각 ${ko(price)}` : ""}
                 </span>
 
                 <div className="pet-item__act">
@@ -413,7 +431,7 @@ export default function CosmeticList({
                       aria-disabled={pending !== null || tooPoor}
                       className="pet-btn pet-btn--ghost"
                     >
-                      {tooPoor ? `${ko(price - affinity)} 부족` : `친밀도 ${ko(price)}`}
+                      {tooPoor ? `${ko(price - starShards)} 부족` : `별조각 ${ko(price)}`}
                     </button>
                   )}
                 </div>
@@ -425,7 +443,7 @@ export default function CosmeticList({
 
       {owned === 0 ? (
         <p className="pet-msg">
-          아직 모은 배경이 없어요. 친밀도는 챗봇 대화와 커뮤니티 활동으로 모을 수 있어요.
+          아직 모은 배경이 없어요. 별조각은 일일 미션 전체 완료와 출석, 펫 외출로 모을 수 있어요.
         </p>
       ) : null}
 

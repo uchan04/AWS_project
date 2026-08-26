@@ -7,13 +7,17 @@ import {
   IDLE_MAX_SEEDS,
   IDLE_SEEDS_PER_HOUR,
   MS_PER_IDLE_SEED,
+  OUTING_MS,
   PET_IDLE_LINES,
   animalEmoji,
   applySeeds,
   expProgress,
   levelUpReply,
+  outingAwayLine,
+  outingRemainingLabel,
   seedsToNextStage,
 } from "@/lib/pet"
+import type { OutingView } from "@/lib/outing"
 import { EVOLUTION_LEVEL, SEED_TO_EXP, expToNextLevel } from "@/lib/types"
 // 안내 문구의 숫자를 손으로 적지 않는다 — 값이 바뀌면 문구가 조용히 거짓이 된다.
 // ChatPanel도 같은 모듈에서 상수만 가져온다(클라이언트 컴포넌트에서 이미 쓰는 방식).
@@ -67,9 +71,9 @@ export type PetState = {
   exp: number
   evolutionStage: number
   seeds: number
-  /** 별조각. 외형 상점의 값이다 */
+  /** 별조각. **두 상점(외형·배경) 공통 값이다** (2026-08-25 전환) */
   starShards: number
-  /** 친밀도. 배경 상점의 값이다 */
+  /** 친밀도. 전환 이후 소모처는 펫 외출 하나다 (2026-08-25) */
   affinity: number
   /** 오늘 들어온 재화. 지갑에 잔액만 있으면 이 재화가 어디서 왔는지가 화면에서 끊긴다 */
   today: { seeds: number; starShards: number; affinity: number }
@@ -119,6 +123,14 @@ export type PetState = {
   missionsDone: number
   /** 누적 출석일 */
   attendanceTotal: number
+  /**
+   * 펫 외출 세 상태를 한 덩어리로 (SPEC.md 5절). 서버 렌더 시각 기준이고, 남은 시간과
+   * 소식 한 줄은 이 화면이 `returnsAt`에서 다시 계산한다(아래 카운트다운 useEffect).
+   *
+   * `available: false`면 카드를 **아예 그리지 않는다** — 마이그레이션이 아직 안 들어간
+   * DB에서 "외출은 곧 열려요" 같은 안내를 띄우면 없는 기능을 광고하는 것이 된다
+   */
+  outing: OutingView
 }
 
 // 단계 이름. 단계 임계값은 lib/types.ts의 EVOLUTION_LEVEL이 정본이라
@@ -170,6 +182,18 @@ const REACTION_MS = 3000
 /** 레벨이 오르지 않은 평범한 먹이기의 기본 대사 */
 const FEED_REPLY = "맛있어요! 힘이 나요"
 
+/**
+ * 외출 카운트다운을 다시 재는 간격.
+ *
+ * 1초가 아니라 10초다. 표시 단위가 분(`outingRemainingLabel`이 "3시간 12분"까지만 쓴다)이라
+ * 1초마다 재도 화면에 바뀌는 글자가 없고 리렌더만 60배 늘어난다. 도착 순간을 잡는 것도
+ * 10초면 충분하다 — 4시간을 기다린 사람에게 10초는 즉시다.
+ *
+ * 방치형 씨앗 타이머와 같은 규칙으로 **절대 시각(returnsAt)과 비교**한다. 남은 ms를
+ * tick마다 깎으면 배경 탭에서 타이머가 분당 1회로 줄어 시계가 멈춘다(위 nextSeedAt 주석).
+ */
+const OUTING_TICK_MS = 10_000
+
 export default function PetView({ initial }: { initial: PetState }) {
   const [pet, setPet] = useState(initial)
   const [pending, setPending] = useState(false)
@@ -199,6 +223,17 @@ export default function PetView({ initial }: { initial: PetState }) {
   const [burst, setBurst] = useState(0)
   // 다음 방치형 씨앗이 쌓이는 목표 시각(epoch ms). 0은 "아직 안 심었다"는 뜻이다
   const nextSeedAt = useRef(0)
+
+  // 펫 외출. pet과 따로 담는다 — 세 상태가 한 덩어리로 갈리고(IDLE·AWAY·RETURNED)
+  // 보내기·듣기 응답이 이 덩어리를 통째로 갈아 끼우기 때문이다
+  const [outing, setOuting] = useState(initial.outing)
+  // 남은 밀리초. 첫 값은 **서버가 준 것**이다 — 렌더에서 Date.now()를 읽으면 하이드레이션에서
+  // 어긋난다(위 nextSeedAt과 같은 이유). 마운트 뒤 아래 useEffect가 절대 시각으로 다시 잰다
+  const [outingLeft, setOutingLeft] = useState(initial.outing.remainingMs)
+  // 방금 받아 간 이야기. 수령하면 상태가 IDLE로 떨어져 에피소드가 사라지므로,
+  // 다음 외출을 보낼 때까지 이 자리에 남겨 둔다 — 이야기가 이 기능의 값이고,
+  // 재화를 받은 순간 그것이 화면에서 없어지면 재화만 남는다
+  const [story, setStory] = useState<string[]>([])
 
   // 말풍선을 덮는 반응 대사. 지금은 먹이기만 여기 온다 — 쓰다듬기는 text가 null이라
   // 파티클만 띄우고 이 값은 계속 null이다(위 reaction 주석)
@@ -231,6 +266,25 @@ export default function PetView({ initial }: { initial: PetState }) {
   // evolutionStageFor가 MAX_STAGE에서 멈추므로 카드도 그 수를 넘기지 않는다
   const stages = Array.from({ length: Math.min(pet.stageCount, MAX_STAGE) }, (_, i) => i + 1)
   const feedable = Math.min(amount, pet.seeds)
+
+  // ── 펫 외출에서 파생되는 값 ────────────────────────────────────────────────
+  //
+  // 남은 시간·진행률·소식 한 줄을 **서버가 준 문자열 대신 여기서 다시 만든다.** 4시간짜리
+  // 기다림이라 탭을 열어 둔 채 시간이 흐르는 경우가 기본이고, 그때 서버 값은 페이지를 연
+  // 시각에 멈춰 있다. 계산은 lib/pet.ts의 같은 순수 함수를 부르므로 두 벌이 되지 않는다.
+  const away = outing.state === "AWAY"
+  // 진행률을 startedAt이 아니라 남은 시간에서 거꾸로 구한다 — 그러면 화면이 시작 시각을
+  // 몰라도 되고, 값의 기준이 카운트다운과 같아진다(둘이 갈리면 게이지와 글자가 어긋난다)
+  const outingProgressNow = away
+    ? Math.min(1, Math.max(0, 1 - outingLeft / OUTING_MS))
+    : outing.progress
+  const outingLabel = away ? outingRemainingLabel(outingLeft) : outing.remainingLabel
+  // 장소 키에서 다시 만든다. 1막("방금 나갔어") → 2막("지금 공원쯤이야") → 3막("돌아가는 중")이
+  // 진행률 1/3·2/3에서 넘어간다. 키가 없으면(예전 응답) 서버 문장을 그대로 쓴다
+  const outingLine =
+    away && outing.placeKey ? outingAwayLine(outing.placeKey, outingProgressNow) : outing.awayLine
+  // 보낼 수 있는지. 부족한 양을 함께 계산해 둔다 — 각주가 "얼마나 더"를 말해야 한다
+  const outingShort = Math.max(0, outing.costAffinity - pet.affinity)
 
   // 재화 3종. 2026-08-21 사용자 결정으로 셋이 같은 칸을 쓴다 — 전에는 씨앗만 초록, 나머지
   // 둘은 나무색이었다. 색은 종족색 하나로 끝내고 구분은 이모지가 한다
@@ -404,6 +458,38 @@ export default function PetView({ initial }: { initial: PetState }) {
     return () => clearInterval(tick)
   }, [pet.idleCapped, pet.idleSeeds, initial.msToNextSeed])
 
+  // 외출 카운트다운. 방치형 타이머와 같은 방식이다 — **목표 시각(returnsAt)과 now를 비교**하고
+  // 남은 값을 깎지 않는다. 배경 탭에서 타이머가 느려져도 돌아오면 스스로 따라잡는다.
+  //
+  // 도착하면 **한 번 다시 읽는다.** 에피소드 세 줄은 서버만 알고 있다(AWAY로 렌더된 응답의
+  // episode는 빈 배열이다 — lib/outing.ts toOutingView). 그래서 여기서 상태만 RETURNED로
+  // 뒤집으면 이야기 없는 빈 카드가 되고, 새로고침해야 문장이 나온다.
+  // `done`으로 한 번만 부른다 — 응답이 늦는 동안 tick이 또 돌면 같은 요청이 겹친다
+  useEffect(() => {
+    if (outing.state !== "AWAY" || !outing.returnsAt) return
+    const target = new Date(outing.returnsAt).getTime()
+    let done = false
+
+    const sync = () => {
+      const left = Math.max(0, target - Date.now())
+      setOutingLeft(left)
+      if (left > 0 || done) return
+      done = true
+      fetch("/api/pet/outing")
+        .then((res) => res.json())
+        .then((json) => {
+          if (json?.data) setOuting(json.data)
+        })
+        // 실패해도 조용히 둔다. 다음 방문에 서버가 RETURNED로 렌더해 주므로 잃는 것이 없고,
+        // 4시간을 기다린 자리에 네트워크 오류 토스트를 띄울 이유가 없다
+        .catch(() => {})
+    }
+
+    sync()
+    const tick = setInterval(sync, OUTING_TICK_MS)
+    return () => clearInterval(tick)
+  }, [outing.state, outing.returnsAt])
+
   // 반응 대사 정리. burst에 걸어야 3초 안에 다시 누른 경우 타이머가 새로 시작한다
   useEffect(() => {
     if (!reaction) return
@@ -546,6 +632,92 @@ export default function PetView({ initial }: { initial: PetState }) {
     }
   }
 
+  /**
+   * 외출 보내기. 친밀도 200을 내고 4시간 뒤에 이야기를 갖고 돌아온다 (SPEC.md 5절).
+   *
+   * **낙관적 갱신을 하지 않는다.** 장소·만난 것·기분 3축과 보상은 서버가 뽑아 저장하므로
+   * 화면이 미리 알 수 있는 것이 없다 — 먹이기처럼 applySeeds()로 예측할 수 있는 값이 아니다.
+   * 친밀도 차감만 미리 그릴 수도 있지만, 그러면 실패했을 때(다른 탭에서 이미 보냈다)
+   * 되돌려야 하는 값이 하나 늘고 얻는 것은 400ms짜리 숫자 하나다.
+   */
+  async function sendOuting() {
+    if (pending || away || outing.state === "RETURNED") return
+    setPending(true)
+
+    try {
+      const res = await fetch("/api/pet/outing", { method: "POST" })
+      const json = await res.json()
+
+      if (!res.ok) {
+        setToast({ text: json?.error?.message ?? "잠시 후 다시 시도해 주세요", error: true })
+        return
+      }
+
+      setOuting(json.data)
+      setOutingLeft(json.data.remainingMs)
+      // 지난 이야기를 치운다. 새 외출이 시작되면 그 자리는 이번 이야기의 것이다
+      setStory([])
+      setPet((prev) => ({ ...prev, affinity: json.data.affinity }))
+      setToast({ text: `밖으로 나갔어요 · ${json.data.remainingLabel} 뒤에 돌아와요` })
+      // 상단 재화 HUD가 친밀도를 갖고 있다. 차감했으므로 알린다
+      window.dispatchEvent(new CustomEvent("user-stats-changed"))
+    } catch {
+      setToast({ text: "네트워크 연결을 확인해 주세요", error: true })
+    } finally {
+      setPending(false)
+    }
+  }
+
+  /**
+   * 돌아온 펫의 이야기를 듣고 재화를 받는다. 지급은 서버가 calculateReward()로 한다.
+   *
+   * 받은 뒤 상태는 IDLE로 떨어지지만 **이야기는 story에 남겨 화면에 둔다** — 위 story 주석.
+   */
+  async function hearOuting() {
+    if (pending || outing.state !== "RETURNED") return
+    setPending(true)
+
+    try {
+      const res = await fetch("/api/pet/outing/claim", { method: "POST" })
+      const json = await res.json()
+
+      if (!res.ok) {
+        setToast({ text: json?.error?.message ?? "잠시 후 다시 시도해 주세요", error: true })
+        return
+      }
+
+      const next = json.data
+      setStory(next.episode)
+      // 서버가 준 값으로 갈지 않고 EMPTY와 같은 IDLE로 접는다. 다음 외출 전까지 이 카드가
+      // 보여 줄 것은 보내기 버튼과 지난 이야기뿐이다
+      setOuting((prev) => ({
+        ...prev,
+        state: "IDLE",
+        returnsAt: null,
+        remainingMs: 0,
+        remainingLabel: "",
+        progress: 0,
+        awayLine: null,
+        placeKey: null,
+        episode: [],
+        reward: null,
+      }))
+      setOutingLeft(0)
+      setPet((prev) => ({ ...prev, seeds: next.seeds, starShards: next.starShards }))
+      // 반가움. 문구를 새로 만들지 않고 💗 파티클만 올린다 — 말풍선에 오는 문장은
+      // 사용자가 쓴 20문구와 먹이기 답뿐이라는 규칙을 지킨다(위 pat·react 주석)
+      react(null)
+      setToast({
+        text: `이야기를 들었어요 · 씨앗 +${ko(next.gained.seeds)} · 별조각 +${ko(next.gained.starShards)}`,
+      })
+      window.dispatchEvent(new CustomEvent("user-stats-changed"))
+    } catch {
+      setToast({ text: "네트워크 연결을 확인해 주세요", error: true })
+    } finally {
+      setPending(false)
+    }
+  }
+
   const petFace = (
     <>
       {pet.imageUrl ? (
@@ -606,7 +778,9 @@ export default function PetView({ initial }: { initial: PetState }) {
                 아니다"를 눈으로 알려 주는 표시가 되어 있었다. 같은 날 쓰다듬기 문구 자체가
                 걷혀서(위 pat 주석) 이제 이 말풍선에 오는 문장은 사용자가 쓴 20문구 아니면
                 먹이기 답 둘뿐이다. 먹이기 톤은 남긴다 — 레벨업 알림처럼 결과를 알리는 자리다 */}
-            {bubble ? (
+            {/* 외출 중에는 말풍선을 그리지 않는다. 방에 없는 펫이 방 안에서 말할 수 없다 —
+                밖에서 오는 한 줄은 아래 .pet-away 쪽지가 갖는다 */}
+            {bubble && !away ? (
               <div className="pet-welcome" data-tone={reaction?.eat ? "eat" : undefined}>
                 {/* 말풍선 모양은 사용자가 준 그림(손그림 blob + 갈고리 꼬리)을 그대로 옮긴
                     path 하나다. border-radius로는 이 모양이 안 나온다 — 굴곡이 네 군데
@@ -664,7 +838,42 @@ export default function PetView({ initial }: { initial: PetState }) {
                 그쪽은 develop에도 새 기능이 붙지 않아 지운 상태 그대로다.
                 CSS(.pet-char__sparkle[data-i])와 petSparkle 키프레임, prefers-reduced-motion
                 목록의 항목도 pet.css에서 함께 되살렸다 */}
-            <div className="pet-char" data-stage={stage}>
+            {/* 외출 중인 방 (SPEC.md 5절).
+                **이 자리의 톤이 이 기획의 성패다.** 고립은둔 서비스에서 아무도 없는 방이
+                "혼자 남았다"로 읽히면 안 되고 "곧 돌아온다"로 읽혀야 한다. 그래서 펫이 없는
+                동안 방을 비우지 않고, 펫이 남긴 쪽지를 그 자리에 둔다 — 벤치마크한 Finch가
+                새를 여행 보내는 동안 여정 카드를 남기는 것과 같은 장치다.
+                문장은 진행률에 따라 3막으로 바뀐다(위 outingLine, lib/pet.ts OUTING_AWAY_LINES).
+                남은 시간과 게이지는 여기 적지 않는다 — 오른쪽 외출 카드가 갖는다.
+                방은 펫의 목소리, 카드는 사실. 같은 것을 두 곳에 쓰지 않는다 */}
+            {away ? (
+              <div className="pet-away">
+                {/* 손으로 찢어 쓴 쪽지. 말풍선과 같은 방식이다 — SVG path 하나에
+                    면은 카드색(배경 그림 6종 위에서 명암비를 지키는 유일한 색),
+                    선은 종족색, 굵기는 vector-effect로 3px 고정 */}
+                <svg
+                  className="pet-away__paper"
+                  viewBox="0 0 208 104"
+                  preserveAspectRatio="none"
+                  aria-hidden="true"
+                >
+                  <path
+                    vectorEffect="non-scaling-stroke"
+                    d="M10 12C70 6 140 6 198 11C201 40 202 68 198 95C140 100 70 100 10 95C6 68 6 40 10 12Z"
+                  />
+                </svg>
+                {/* 이 한 줄이 있어야 현재형 문장("지금 공원쯤이야")이 앞뒤가 맞는다.
+                    쪽지만 두면 나갈 때 써 두고 간 글이 되어 시간이 흐르는 것과 어긋난다 */}
+                <p className="pet-away__from">밖에서 온 소식</p>
+                <p className="pet-away__text">{outingLine}</p>
+              </div>
+            ) : null}
+
+            {/* hidden으로 접는다(외출 중). 조건부 렌더로 이 50줄을 감싸는 것과 결과가 같다 —
+                display: none은 탭 순서와 접근성 트리에서도 빠지므로 쓰다듬기 버튼이 남지 않는다.
+                .pet-char가 display: grid를 갖고 있어 UA의 [hidden] 규칙을 덮으므로
+                pet.css에 .pet-char[hidden] 한 줄이 함께 있다 */}
+            <div className="pet-char" data-stage={stage} hidden={away}>
               {/* 반짝임 3개. 위치·타이밍이 각각 달라 pet.css가 data-i로 구분한다 */}
               <span className="pet-char__sparkle" data-i="1" aria-hidden="true">
                 ✨
@@ -791,6 +1000,120 @@ export default function PetView({ initial }: { initial: PetState }) {
         </div>
 
         <div className="pet__col pet__col--side">
+          {/* 펫 외출 (SPEC.md 5절, 계획은 docs/dev/pet.md "펫 외출 시스템").
+              친밀도 200 → 4시간 → 이야기 세 줄 + 씨앗·별조각.
+
+              **available: false면 카드가 아예 없다.** 마이그레이션(PetOuting)이 아직 안 들어간
+              DB에서는 lib/outing.ts가 그렇게 내려보낸다 — 있지도 않은 기능을 "곧 열려요"로
+              광고하는 것보다 없는 편이 낫고, 이 화면의 다른 카드는 그대로 돈다.
+
+              자리를 오른쪽 열 **맨 위**로 잡았다. 왼쪽 열에 둘 수 없는 것이 골격 때문이다
+              (.pet__col--room이 grid-template-rows: 1fr auto라 세 번째 카드를 넣으면 방과
+              지갑의 높이 계산이 깨진다 — pet.css .pet__col--side 주석). 오른쪽 열 안에서
+              맨 위인 이유는 이것이 **새로 생긴 주 동작**이라서다: 좁은 화면에서 방 → 지갑
+              다음이 이 카드라 방에 남은 쪽지를 본 사람이 곧바로 남은 시간을 만난다.
+              오늘의 활동이 맨 아래인 것과 같은 판단이다("지금 할 수 있는 것"이 먼저다) */}
+          {outing.available ? (
+            <div className="pet-card pet-card--outing" data-state={outing.state}>
+              <div className="pet-card__head">
+                <p className="pet-card__title">
+                  {/* 이 화면 카드 제목은 전부 이모지 하나로 시작한다(위 경험치 카드 주석).
+                      🚪는 다른 넷(⭐🌱🌿📊🪙)과 겹치지 않고 재화 아이콘도 아니다 */}
+                  <span aria-hidden="true">🚪</span> 펫 외출
+                </p>
+                <span className="pet-card__meta">
+                  {away ? `${outingLabel} 뒤` : `친밀도 ${ko(outing.costAffinity)}`}
+                </span>
+              </div>
+
+              {away ? (
+                <>
+                  {/* 게이지 골격은 경험치·방치형 카드와 **같은 클래스**다. 채움색만 기본
+                      종족색을 쓴다 — 초록(--pet-gauge--seed)은 씨앗 전용이고 이 막대는
+                      시간이다. aria는 퍼센트로 준다: 남은 ms를 읽어 주면 소용이 없다 */}
+                  <div
+                    className="pet-gauge"
+                    role="progressbar"
+                    aria-label="돌아오기까지"
+                    aria-valuemin={0}
+                    aria-valuemax={100}
+                    aria-valuenow={Math.round(outingProgressNow * 100)}
+                  >
+                    <div
+                      className="pet-gauge__fill"
+                      style={{ width: `${outingProgressNow * 100}%` }}
+                    />
+                  </div>
+                  {/* 각주 골격도 다른 카드와 같다(왼쪽 설명 / 오른쪽 강조 한 덩어리).
+                      버튼을 두지 않는다 — 기다리는 동안 누를 것이 있으면 기다림이 과제가 된다 */}
+                  <p className="pet-card__foot">
+                    <span>밖에 나갔어요</span>
+                    <em>{outingLabel} 뒤 도착</em>
+                  </p>
+                </>
+              ) : outing.state === "RETURNED" ? (
+                <>
+                  {/* 이야기 세 줄. 장소 → 만난 것 → 기분 순이고 문장은 lib/pet.ts에 있다.
+                      key에 문장을 쓴다 — 세 줄이 서로 다른 풀에서 오므로 겹칠 수 없다 */}
+                  <ul className="pet-story">
+                    {outing.episode.map((line) => (
+                      <li key={line}>{line}</li>
+                    ))}
+                  </ul>
+                  <button
+                    type="button"
+                    className="pet-btn pet-btn--block"
+                    onClick={hearOuting}
+                    disabled={pending}
+                    aria-disabled={pending}
+                  >
+                    이야기 듣기
+                  </button>
+                  {/* 받을 양을 누르기 **전에** 보여 준다. 저장값이 아니라 스킨 배율까지 얹은
+                      실지급액이다(lib/outing.ts toOutingView reward 주석) */}
+                  <p className="pet-card__foot">
+                    <span>돌아왔어요</span>
+                    {outing.reward ? (
+                      <em>
+                        씨앗 +{ko(outing.reward.seeds)} · 별조각 +{ko(outing.reward.starShards)}
+                      </em>
+                    ) : null}
+                  </p>
+                </>
+              ) : (
+                <>
+                  {/* 방금 들은 이야기는 다음 외출을 보낼 때까지 남는다(위 story 주석).
+                      --past는 글자를 흐리게 하는 변형이다 — 지금 일이 아니라 지난 일이다 */}
+                  {story.length > 0 ? (
+                    <ul className="pet-story pet-story--past">
+                      {story.map((line) => (
+                        <li key={line}>{line}</li>
+                      ))}
+                    </ul>
+                  ) : null}
+                  <button
+                    type="button"
+                    className="pet-btn pet-btn--block"
+                    onClick={sendOuting}
+                    disabled={pending || outingShort > 0}
+                    aria-disabled={pending || outingShort > 0}
+                  >
+                    외출 보내기
+                  </button>
+                  {/* 부족하면 남은 양을 말한다. 어디서 친밀도를 얻는지는 챗봇·커뮤니티인데
+                      (page.tsx 친밀도 주석) 그 링크를 여기 두지 않는다 — 이 카드는 오른쪽 열
+                      다섯 장 중 하나이고, 각 카드가 각주에 링크를 갖기 시작하면 화면이
+                      권유로 덮인다. 씨앗 0개 안내(.pet-empty)에 링크가 있는 것은 그 카드가
+                      **주 동작이 막힌 상태**이기 때문이고, 외출은 부가 동작이다 */}
+                  <p className="pet-card__foot">
+                    <span>{outing.hours}시간 뒤에 이야기를 갖고 돌아와요</span>
+                    {outingShort > 0 ? <em>친밀도 {ko(outingShort)} 더 필요해요</em> : null}
+                  </p>
+                </>
+              )}
+            </div>
+          ) : null}
+
           {/* 경험치 */}
           <div className="pet-card">
             <div className="pet-card__head">
