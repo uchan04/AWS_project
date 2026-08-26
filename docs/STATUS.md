@@ -242,7 +242,7 @@
 - **32 (모임 진단 게이트)**: `join` 라우트에 `NOT_DIAGNOSED` 게이트를 **모임 조회보다 앞**에 넣고 `meetups/page.tsx`도 `/community`로 보낸다. 라우트가 본체다 — 페이지만 막으면 API는 열려 있다
 - **e2e 단정 2건을 함께 넣었다**(80 → 82건). 32번 단정은 **없는 모임 id**를 쓴다 — 게이트가 조회보다 앞이라 `NOT_FOUND`가 아니라 `NOT_DIAGNOSED`가 와야 한다. 순서가 뒤집히면 단정이 깨진다. e2e 계정은 `isAdmin`이 아니라 실재하는 모임으로는 못 잰다
 - **근본 원인은 남아 있다.** "위기가 다른 판정을 이긴다"는 규칙이 여전히 모듈이 아니라 라우트의 줄 순서에 있다. 30번을 고치니 31번이 나왔고, 세 번째 관문이 생기면 같은 역전이 또 난다. 처방은 `docs/모듈-재배치-계획.md` 1번(8/28 이후)이고 **D 판단이다**
-
+- **차단 30번이 `ecfa05c`~`dd4d8aa` 사이에 다시 열려 있었다** (2026-08-26 D 발견·수정, `356a268`·`304d311`). `moderate()`의 `{ crisis }`를 두 라우트가 넘기지 않고 있었다 — 아래 121행과 `docs/dev/community.md` "검열과 위기 신호의 순서" 절이 넘긴다고 적고 있었지만 코드는 아니었다. `check:community`는 모듈을 직접 부르고 e2e 사별 단정에는 욕설이 없어 두 검사가 다 비껴갔다. e2e 82 → **86건**. **근본 원인 항목의 증거가 하나 늘었다** — 30번이 같은 자리에서 두 번 났다. 세부와 되돌릴 지점은 `docs/dev/community.md` 맨 아래 절.
 인프라 차단은 해소됐다(RDS·Cognito·S3·Bedrock 완료). 단 **AWS 리소스 생성이 끝난 것과 `.env`에 값이 온 것은 다르다** — 2026-08-20 로컬 `.env` 확인 결과 채워진 값은 `DATABASE_URL`(+`AWS_REGION`·`BEDROCK_REGION`·`DEV_AUTH_BYPASS=true`)뿐이고 `COGNITO_USER_POOL_ID`·`COGNITO_CLIENT_ID`·`BEDROCK_MODEL_ID`·`BEDROCK_VISION_MODEL_ID`·`S3_BUCKET`·`CLOUDFRONT_DOMAIN`은 **전부 빈 문자열**이다. E에게 개별 공유받아야 한다. 코드가 실제로 읽는 키는 9개이고 `.env`에 다 있다(키 누락은 없다 — 값만 없다). 영향:
 - **빌드·DB·펫·미션·진단은 막히지 않는다.** `DEV_AUTH_BYPASS=true` + `lib/auth.ts` 지연 생성(차단 3) 덕이다
 - **`CLOUDFRONT_DOMAIN`은 이제 아무 코드도 읽지 않는다 (2026-08-22, A).** CloudFront가 모든 경로에 403을 줘서 시트에서 잘라낸 30장을 `public/art/` 아래에 굽고(`scripts/slice-art.ts`) `lib/assets.ts`가 거기서 읽는다. **펫·치장 그림이 이모지로 떨어지는 것은 이제 스킨 미착용이거나 파일이 실제로 없을 때뿐이다.** 이 문서와 `docs/dev/pet.md`·`docs/기능체크리스트.md`의 "`CLOUDFRONT_DOMAIN` 대기" 서술은 낡은 것이다. 사용자 업로드(미션 사진·글 이미지)만 계속 S3 presigned URL이다
