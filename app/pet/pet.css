@@ -3273,9 +3273,9 @@
   .pet-card--wallet {
     order: 3;
   }
-  .pet-card--exp {
-    order: 4;
-  }
+  /* order: 4는 경험치 카드 자리였다. 그 카드는 2026-08-26에 화면 상단 중앙 팝업
+     (.pet-exp-pop)이 되어 그리드에서 빠졌다. 남은 번호는 당기지 않았다 —
+     order는 간격이 있어도 순서가 같고, 당기면 나머지 다섯 줄이 함께 바뀐다 */
   .pet-card--feed {
     order: 6;
   }
@@ -3287,7 +3287,7 @@
   .pet__col--room > *:not(.pet-room):not(.pet-card--wallet) {
     order: 8;
   }
-  .pet__col--side > *:not(.pet-card--outing):not(.pet-card--exp):not(.pet-card--feed):not(.pet-card--today) {
+  .pet__col--side > *:not(.pet-card--outing):not(.pet-card--feed):not(.pet-card--today) {
     order: 5;
   }
 
@@ -3533,14 +3533,176 @@
 /* 경험치 카드는 이제 씨앗 투입 시에만 나타난다(PetView expShow 주석).
    채워지는 모습은 .pet-gauge__fill의 transition이 만든다 — JS 애니메이션이 없다.
    전환 시간을 여기서 늘려 잡는다: 기본값은 즉시에 가까워서 올라가는 게 안 보인다 */
-.pet-card--exp .pet-gauge__fill {
+/* ── 경험치 팝업 (2026-08-26 두 번째 결정) ────────────────────────────────── */
+/*
+ * 씨앗을 먹인 직후 **화면 상단 중앙**에 스스로 열리고 2.6초 뒤 스스로 닫힌다.
+ * 그전에는 오른쪽 열의 카드였다. 카드로 두면 나타나는 순간 아래 카드 네 장이
+ * 밀려 내려간다 — 방금 누른 먹이기 버튼이 손가락 아래에서 움직인다.
+ * fixed는 문서 흐름 밖이라 아무것도 밀지 않는다.
+ *
+ * 오버레이(어두운 배경)를 깔지 않는다. 알림이지 대화 상자가 아니고, 뒤를 덮으면
+ * 연달아 먹이는 동작이 막힌다. 그래서 pointer-events: none이다 — 팝업이 떠 있는
+ * 2.6초 동안에도 그 아래를 누를 수 있다.
+ *
+ * 닫기 버튼도 없다. 있으면 "닫아야 하는 것"이 되고, 하루에 여러 번 뜨는 알림에
+ * 매번 닫기를 요구하면 그게 일이 된다.
+ */
+
+.pet-exp-pop {
+  position: fixed;
+  /* env()는 iOS 노치·주소창 아래를 피한다. 지원하지 않는 브라우저는 1rem이다 */
+  top: max(1rem, env(safe-area-inset-top, 0px));
+  left: 0;
+  right: 0;
+  z-index: var(--z-toast);
+  display: grid;
+  justify-items: center;
+  padding-inline: var(--space-sm);
+  pointer-events: none;
+}
+
+/*
+ * Apple liquid glass(2025 디자인 언어)를 이 화면 색으로 옮긴 것. 네 겹이다.
+ *
+ *   1. 반투명 배경    뒤가 비쳐야 유리다. 위가 밝고 아래가 옅은 사선 그라디언트
+ *   2. backdrop-filter  뒤를 흐리고(blur) 채도를 올린다(saturate) — 유리의 핵심
+ *   3. 안쪽 하이라이트  inset 1px 흰 선. 유리 두께의 위쪽 모서리에 빛이 걸린 것
+ *   4. 바깥 그림자     크고 옅게. 화면에서 떠 있는 것으로 읽히게 한다
+ *
+ * blur만으로는 유리가 안 된다 — 3번이 없으면 그냥 흐린 사각형이다.
+ * saturate가 없으면 뒤의 종족색이 회색으로 빠져 유리가 플라스틱이 된다.
+ */
+.pet-exp-pop__box {
+  position: relative;
+  width: min(22rem, 100%);
+  display: grid;
+  gap: 0.5rem;
+  padding: 0.875rem 1.125rem 0.75rem;
+  border-radius: 1.5rem;
+  overflow: hidden;
+  /* backdrop-filter를 못 쓰는 브라우저용 기본값. 이쪽은 더 불투명해야 글자가 읽힌다 */
+  background: linear-gradient(165deg, rgb(255 255 255 / 0.92), rgb(255 255 255 / 0.78));
+  border: 1px solid rgb(255 255 255 / 0.6);
+  box-shadow:
+    inset 0 1px 0 rgb(255 255 255 / 0.85),
+    inset 0 -1px 1px rgb(255 255 255 / 0.35),
+    0 1.25rem 2.5rem -0.75rem rgb(42 31 20 / 0.32),
+    0 0.125rem 0.5rem rgb(42 31 20 / 0.1);
+  animation: petExpPop 2.6s var(--ease-out) forwards;
+}
+
+@supports (backdrop-filter: blur(1px)) or (-webkit-backdrop-filter: blur(1px)) {
+  .pet-exp-pop__box {
+    /* 지원하면 배경을 걷어 실제로 뒤가 비치게 한다. 두 값 다 필요하다:
+       blur가 뒤를 지우고, saturate가 지워진 색을 되살린다 */
+    background: linear-gradient(165deg, rgb(255 255 255 / 0.5), rgb(255 255 255 / 0.24));
+    -webkit-backdrop-filter: blur(1.5rem) saturate(180%);
+    backdrop-filter: blur(1.5rem) saturate(180%);
+  }
+}
+
+/* 상단을 가로지르는 반사광 한 줄. 유리를 "표면"으로 만드는 것이 이 한 겹이다 —
+   빼면 균일한 반투명 면이 되고 재질이 사라진다. 각도(105deg)를 상자 그라디언트
+   (165deg)와 어긋나게 둬서 빛이 다른 방향에서 오는 것으로 읽힌다 */
+.pet-exp-pop__box::before {
+  content: "";
+  position: absolute;
+  inset: 0 0 auto;
+  height: 45%;
+  background: linear-gradient(
+    105deg,
+    rgb(255 255 255 / 0) 12%,
+    rgb(255 255 255 / 0.55) 38%,
+    rgb(255 255 255 / 0) 68%
+  );
+  pointer-events: none;
+}
+
+.pet-exp-pop__head {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: var(--space-xs);
+}
+
+.pet-exp-pop__title {
+  margin: 0;
+  font-size: var(--text-label);
+  font-weight: 600;
+  color: var(--color-ink);
+}
+
+.pet-exp-pop__meta {
+  font-size: var(--text-caption);
+  font-variant-numeric: tabular-nums;
+  color: var(--color-ink-2);
+}
+
+.pet-exp-pop__foot {
+  margin: 0;
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: var(--space-xs);
+  font-size: var(--text-caption);
+  color: var(--color-ink-2);
+}
+
+/* 채워지는 모습은 .pet-gauge__fill의 transition이 만든다 — JS 애니메이션이 없다.
+   전환 시간을 여기서 늘려 잡는다: 기본값은 즉시에 가까워서 올라가는 게 안 보인다 */
+.pet-exp-pop .pet-gauge__fill {
   transition: width 0.8s cubic-bezier(0.22, 0.61, 0.36, 1);
 }
 
-/* 모션을 끈 사용자에게는 채워지는 연출을 주지 않는다. 카드는 그대로 나타나고
-   게이지가 **최종값으로 바로** 보인다 — 애니메이션 없이도 정보는 전달돼야 한다 */
+/* 여닫기를 키프레임 하나로 처리한다. 길이(2.6초)가 PetView의 unmount 타이머와 같은
+   값이라, 나가는 연출이 끝나는 시점에 요소가 사라진다. 상태 하나로 여닫이가 되므로
+   `exiting` 같은 두 번째 state가 필요 없다 — 값을 두 곳에서 맞추는 대신 한 곳에서 맞춘다 */
+@keyframes petExpPop {
+  0% {
+    opacity: 0;
+    transform: translateY(-0.875rem) scale(0.94);
+  }
+  /* 살짝 지나쳤다 되돌아오는 구간(8% → 14%). 유리가 튀어나오는 느낌을 만든다 */
+  8% {
+    opacity: 1;
+    transform: translateY(0.125rem) scale(1.015);
+  }
+  14% {
+    transform: translateY(0) scale(1);
+  }
+  84% {
+    opacity: 1;
+    transform: translateY(0) scale(1);
+  }
+  100% {
+    opacity: 0;
+    transform: translateY(-0.5rem) scale(0.98);
+  }
+}
+
+/* 모션을 끈 사용자에게는 채워지는 연출도, 튀어나오는 연출도 주지 않는다.
+   대신 **사라지지 않게** 두지는 않는다 — 여기서 animation: none을 쓰면 팝업이
+   2.6초 동안 최종 상태(opacity 0)가 아니라 시작 상태로 남아 보이지 않게 된다.
+   그래서 애니메이션을 끄는 대신 페이드만 남긴 키프레임으로 갈아탄다 */
 @media (prefers-reduced-motion: reduce) {
-  .pet-card--exp .pet-gauge__fill {
+  .pet-exp-pop .pet-gauge__fill {
     transition: none;
+  }
+  .pet-exp-pop__box {
+    animation-name: petExpPopFade;
+  }
+  .pet-exp-pop__box::before {
+    display: none;
+  }
+}
+
+@keyframes petExpPopFade {
+  0%,
+  100% {
+    opacity: 0;
+  }
+  6%,
+  90% {
+    opacity: 1;
   }
 }

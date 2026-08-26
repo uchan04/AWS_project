@@ -787,6 +787,67 @@ export default function PetView({ initial }: { initial: PetState }) {
 
   return (
     <main className="pet" data-tribe={pet.typeCode ?? undefined}>
+      {/* 경험치 — **2026-08-26부터 씨앗 투입 시에만 나타난다**(사용자 결정,
+          게임 `이환`의 획득 게이지 형태). 상주하지 않는 이유는 위 expShow 주석에 있다.
+
+          같은 날 두 번째 사용자 결정으로 **오른쪽 열의 카드에서 화면 상단 중앙에
+          자동으로 열리고 자동으로 닫히는 팝업**이 됐다. 오른쪽 열에 두면 카드가
+          나타나는 순간 아래 카드 네 장이 전부 밀려 내려간다 — 먹이기 버튼을 누른
+          손가락 아래에서 레이아웃이 움직이는 것이고, 눌린 버튼이 다른 자리로 간다.
+          `position: fixed`면 문서 흐름 밖이라 아무것도 밀지 않는다.
+
+          그래서 마크업이 `.pet__grid`가 아니라 `<main>` 첫 자리에 있다. `fixed`는
+          조상에 `transform`·`filter`가 있으면 그 조상 기준이 되므로, 열 안에 두면
+          중앙 정렬이 깨질 수 있다.
+
+          닫기 버튼이 없다 — 알림이지 대화 상자가 아니다. 그래서 `useModalA11y`를
+          쓰지 않는다. 초점을 빼앗으면 먹이기 버튼을 연달아 누를 수 없다.
+          `role="status"`가 스크린리더에 읽히는 경로다 */}
+      {expShow ? (
+        <div className="pet-exp-pop" role="status" aria-live="polite">
+          <div className="pet-exp-pop__box">
+            <div className="pet-exp-pop__head">
+              {/* 제목 앞 이모지는 2026-08-24 사용자 요청으로 되살린 것이다("예전에 있던대로").
+                  design.md의 "이모지는 마스코트 자리에만"에서 벗어나는 자리다. 새 예외가
+                  아니라 이 화면이 원래 갖고 있던 예외로 돌아온 것이고, aria-hidden이라
+                  스크린리더가 읽는 이름은 글자 그대로 남는다 */}
+              <p className="pet-exp-pop__title">
+                <span aria-hidden="true">⭐</span> 경험치
+              </p>
+              <span className="pet-exp-pop__meta">
+                {ko(pet.exp)} / {ko(need)}
+              </span>
+            </div>
+            <div
+              className="pet-gauge"
+              role="progressbar"
+              aria-label="다음 레벨까지 경험치"
+              aria-valuemin={0}
+              aria-valuemax={need}
+              aria-valuenow={pet.exp}
+            >
+              {/* from이 있는 0.3초 동안은 **이전 위치**를 그린다. 그 뒤 현재 값으로 바뀌면
+                  CSS transition이 채워지는 모습을 만든다 — JS 애니메이션을 쓰지 않는다 */}
+              <div
+                className="pet-gauge__fill"
+                style={{ width: `${(expShow.from ?? progress) * 100}%` }}
+              />
+            </div>
+            {/* 지금까지 `Lv.25 마지막 진화`만 보여 줬다. 그 문구는 지금 무엇을 얼마나
+                해야 하는지 알려 주지 않는다. 벤치마크한 육성 게임은 전부 남은 개수를 쓴다
+                (2026-08-24 사용자 확정: seedsToNextStage 쪽을 쓴다) */}
+            <p className="pet-exp-pop__foot">
+              <span>현재 Lv.{pet.level}</span>
+              <span>
+                {nextStage
+                  ? `${STAGE_NAME[nextStage.stage - 1] ?? `${nextStage.stage}단계`}까지 씨앗 ${ko(nextStage.seeds)}개`
+                  : "마지막 단계예요"}
+              </span>
+            </p>
+          </div>
+        </div>
+      ) : null}
+
       {/* 재화와 상점 입구는 아래 지갑 카드가 갖는다. 상단은 제목만 남긴다.
           2026-08-24: 나무판 3개(잠깐 쉬기·외형 상점·배경 상점)를 걷었다. 상점 2개는
           지갑 카드가 이미 갖고 있어 같은 링크가 한 화면에 두 벌이었고, 잠깐 쉬기는
@@ -1182,61 +1243,6 @@ export default function PetView({ initial }: { initial: PetState }) {
                 </>
               )}
             </div>
-          ) : null}
-
-          {/* 경험치 — **2026-08-26부터 씨앗 투입 시에만 나타난다**(사용자 결정,
-              게임 `이환`의 획득 게이지 형태). 상주하지 않는 이유는 위 expShow 주석에 있다.
-              먹이기 직후 약 2.6초 동안 나타났다가 사라진다 */}
-          {expShow ? (
-          <div className="pet-card pet-card--exp screen-enter">
-            <div className="pet-card__head">
-              {/* 제목 앞 이모지는 2026-08-24 사용자 요청으로 되살린 것이다("예전에 있던대로").
-                  836cd2b(Figma 이관)에 ⭐ 경험치 · 🌿 씨앗 투입 · 🌟 진화 단계가 있었고
-                  d56d813에서 걷혔다. 보유 재화 카드는 안에 이미 🌱❤️⭐ 아이콘 3개가 있어서
-                  처음에는 제외했는데, 같은 날 사용자 요청으로 👛(→ 같은 날 🪙)을 붙여
-                  다섯 장 전부가 됐다.
-                  design.md의 "이모지는 마스코트 자리에만"에서 벗어나는 자리다. 새 예외가
-                  아니라 이 화면이 원래 갖고 있던 예외로 돌아온 것이고, 전부 aria-hidden이라
-                  스크린리더가 읽는 카드 이름은 글자 그대로 남는다 */}
-              <p className="pet-card__title">
-                <span aria-hidden="true">⭐</span> 경험치
-              </p>
-              <span className="pet-card__meta">
-                {ko(pet.exp)} / {ko(need)}
-              </span>
-            </div>
-            <div
-              className="pet-gauge"
-              role="progressbar"
-              aria-label="다음 레벨까지 경험치"
-              aria-valuemin={0}
-              aria-valuemax={need}
-              aria-valuenow={pet.exp}
-            >
-              {/* 게이지 안에 {exp} / {need}를 겹쳐 쓰던 것을 지웠다 (2026-08-23).
-                  바로 위 .pet-card__meta가 **같은 문자열**을 이미 쓴다 — 8px 간격으로
-                  같은 숫자가 두 번이었다. 지운 쪽이 게이지 안이다:
-                  움직이는 그라디언트 위 글자라 대비가 채움률에 따라 변한다.
-                  배경 상점의 .pet-gauge__value는 그 게이지의 **유일한** 라벨이라 남는다 */}
-              {/* from이 있는 0.3초 동안은 **이전 위치**를 그린다. 그 뒤 현재 값으로 바뀌면
-                  CSS transition이 채워지는 모습을 만든다 — JS 애니메이션을 쓰지 않는다 */}
-              <div
-                className="pet-gauge__fill"
-                style={{ width: `${(expShow.from ?? progress) * 100}%` }}
-              />
-            </div>
-            {/* 지금까지 `Lv.25 마지막 진화`만 보여 줬다. 그 문구는 지금 무엇을 얼마나
-                해야 하는지 알려 주지 않는다. 벤치마크한 육성 게임은 전부 남은 개수를 쓴다
-                (2026-08-24 사용자 확정: seedsToNextStage 쪽을 쓴다) */}
-            <p className="pet-card__foot">
-              <span>현재 Lv.{pet.level}</span>
-              <span>
-                {nextStage
-                  ? `${STAGE_NAME[nextStage.stage - 1] ?? `${nextStage.stage}단계`}까지 씨앗 ${ko(nextStage.seeds)}개`
-                  : "마지막 단계예요"}
-              </span>
-            </p>
-          </div>
           ) : null}
 
           {/* 방치형 수확. 2026-08-21 사용자 결정으로 아이콘 칸 + 숫자를 왼쪽에 두던 한 줄을
