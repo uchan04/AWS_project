@@ -119,7 +119,8 @@ export default function HomeDashboard({
           </div>
           {/* 활성 스킨의 현재 단계 그림. 아트는 public/art/pets에 구워져 있다(scripts/slice-art.ts).
               파일이 없거나 스킨 미착용이면 종족 이모지로 떨어진다 — Sidebar와 같은 방식이다.
-              onError로 떨어뜨리는 이유: 이미지 404는 서버가 알 수 없어 서버에서 미리 고를 수 없다 */}
+              onError로 떨어뜨리는 이유: 이미지 404는 서버가 알 수 없어 서버에서 미리 고를 수 없다.
+              2026-08-26 사용자 요청으로 위아래로 떠 있던 hm-float 애니메이션을 뺐다 — 사진으로 고정 */}
           {petImage ? (
              
             <ArtImage
@@ -130,11 +131,11 @@ export default function HomeDashboard({
               // 정사각으로 넘기면 마스코트 칸이 26px 높아져 헤더가 밀린다
               width={88}
               height={62}
-              className="hm-home__mascot hm-home__mascot--img hm-float"
+              className="hm-home__mascot hm-home__mascot--img"
               fallbackDisplay="block"
             />
           ) : null}
-          <span className="hm-home__mascot hm-float" aria-hidden="true" style={{ display: petImage ? "none" : "block" }}>
+          <span className="hm-home__mascot" aria-hidden="true" style={{ display: petImage ? "none" : "block" }}>
             {tribe.emoji}
           </span>
         </div>
