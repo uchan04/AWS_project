@@ -20,6 +20,7 @@ import {
 import type { OutingView } from "@/lib/outing"
 import { EVOLUTION_LEVEL, SEED_TO_EXP, expToNextLevel } from "@/lib/types"
 import { ArtImage } from "@/app/components/ArtImage"
+import { CurrencyIcon } from "@/app/components/CurrencyIcon"
 import PetRoom from "./PetRoom"
 import "@/styles/tokens.css"
 import "../pet.css"
@@ -283,9 +284,9 @@ export default function PetView({ initial }: { initial: PetState }) {
   // 친밀도 이모지도 같은 요청으로 💛 → ❤️다("페이지 내의 모든 친밀도"). 노란 하트는
   // 이 카드에서 ⭐·🌱과 같은 노란·연두 계열이라 세 줄이 한 색으로 뭉쳐 보였다
   const wallet = [
-    { name: "씨앗", icon: "🌱", value: pet.seeds },
-    { name: "친밀도", icon: "❤️", value: pet.affinity },
-    { name: "별조각", icon: "⭐", value: pet.starShards },
+    { name: "씨앗", icon: <CurrencyIcon currency="seed" size={18} />, value: pet.seeds },
+    { name: "친밀도", icon: <CurrencyIcon currency="affinity" size={18} />, value: pet.affinity },
+    { name: "별조각", icon: <CurrencyIcon currency="starShard" size={18} />, value: pet.starShards },
   ]
 
   // 여기서 오늘 들어온 재화의 출처 문장(sourceLines)을 만들었다 — "오늘 미션으로 씨앗 +45",
@@ -333,11 +334,12 @@ export default function PetView({ initial }: { initial: PetState }) {
   // text를 미리 만드는 이유: 재화 셋은 "+N"이고 출석은 "N일"이라 접두사·단위가 다르다.
   // 렌더에서 분기하면 칸마다 다른 서식이 JSX에 흩어진다.
   const todayTiles = [
-    { name: "받은 씨앗", icon: "🌱", text: `+${ko(pet.today.seeds)}`, seed: true },
-    { name: "받은 별조각", icon: "⭐", text: `+${ko(pet.today.starShards)}`, seed: false },
-    // 친밀도 이모지는 2026-08-24 사용자 요청으로 💛 → ❤️다. 지갑 줄과 같은 값을 쓴다 —
-    // 같은 재화가 두 카드에서 다른 그림이면 같은 것인지 알 수 없다
-    { name: "받은 친밀도", icon: "❤️", text: `+${ko(pet.today.affinity)}`, seed: false },
+    { name: "받은 씨앗", icon: <CurrencyIcon currency="seed" size={22} />, text: `+${ko(pet.today.seeds)}`, seed: true },
+    { name: "받은 별조각", icon: <CurrencyIcon currency="starShard" size={22} />, text: `+${ko(pet.today.starShards)}`, seed: false },
+    // 친밀도 이모지는 2026-08-24 사용자 요청으로 💛 → ❤️였다가, 2026-08-26 모꼬지 재화
+    // 에셋으로 다시 바뀌었다. 지갑 줄과 같은 값을 쓴다 — 같은 재화가 두 카드에서
+    // 다른 그림이면 같은 것인지 알 수 없다
+    { name: "받은 친밀도", icon: <CurrencyIcon currency="affinity" size={22} />, text: `+${ko(pet.today.affinity)}`, seed: false },
     { name: "출석일수", icon: "📅", text: `${ko(pet.attendanceDays)}일`, seed: false },
   ]
 
@@ -1125,7 +1127,7 @@ export default function PetView({ initial }: { initial: PetState }) {
                     카드 높이는 그대로다 — 줄 높이를 정하는 쪽이 여전히 4.5rem 버튼이다 */}
                 <div className="pet-card__head">
                   <p className="pet-card__title">
-                    <span aria-hidden="true">🌱</span> 그동안 쌓인 씨앗
+                    <CurrencyIcon currency="seed" size={16} /> 그동안 쌓인 씨앗
                   </p>
                   {/* "N개"에서 "N / 100개"로 늘렸다. 경험치 카드가 게이지 위에 같은 형태로
                       현재/최대를 적는다 — 분모가 없으면 막대가 어디서 끝나는지 알 수 없다 */}

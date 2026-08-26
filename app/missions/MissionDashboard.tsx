@@ -4,6 +4,7 @@ import { useState, useRef, useEffect, useCallback } from "react"
 import styles from "./mission-ui.module.css"
 import { AttendanceCalendar } from "./AttendanceCalendar"
 import { useModalA11y } from "@/app/components/useModalA11y"
+import { CurrencyIcon } from "@/app/components/CurrencyIcon"
 import type { TypeCode } from "@prisma/client"
 import type { DashboardDTO, MissionDTO } from "@/lib/missions/dashboard"
 import { applyCompletion } from "@/lib/missions/optimistic"
@@ -382,7 +383,7 @@ function MissionModal({
                 borderRadius: 99,
               }}
             >
-              🌱 씨앗 +{mission.reward.seeds}
+              <CurrencyIcon currency="seed" size={13} /> 씨앗 +{mission.reward.seeds}
             </span>
             {mission.reward.starShards > 0 && (
               <span
@@ -394,7 +395,7 @@ function MissionModal({
                   borderRadius: 99,
                 }}
               >
-                💎 별조각 +{mission.reward.starShards}
+                <CurrencyIcon currency="starShard" size={13} /> 별조각 +{mission.reward.starShards}
               </span>
             )}
             {mission.reward.affinity > 0 && (
@@ -407,7 +408,7 @@ function MissionModal({
                   borderRadius: 99,
                 }}
               >
-                💖 친밀도 +{mission.reward.affinity}
+                <CurrencyIcon currency="affinity" size={13} /> 친밀도 +{mission.reward.affinity}
               </span>
             )}
           </div>
@@ -669,9 +670,9 @@ function StepSection({ title, subtitle, missions, color, bg, unlocked = true, pr
               )}
               {!m.completed && (
                 <div style={{ marginTop: 8, fontSize: 10, color: "#7A6B58", display: "flex", flexWrap: "wrap", gap: 4, justifyContent: "center" }}>
-                  {m.reward.seeds > 0 && <span>🌱 {m.reward.seeds}</span>}
-                  {m.reward.affinity > 0 && <span>💖 {m.reward.affinity}</span>}
-                  {m.reward.starShards > 0 && <span>⭐ {m.reward.starShards}</span>}
+                  {m.reward.seeds > 0 && <span><CurrencyIcon currency="seed" size={12} /> {m.reward.seeds}</span>}
+                  {m.reward.affinity > 0 && <span><CurrencyIcon currency="affinity" size={12} /> {m.reward.affinity}</span>}
+                  {m.reward.starShards > 0 && <span><CurrencyIcon currency="starShard" size={12} /> {m.reward.starShards}</span>}
                 </div>
               )}
             </button>
@@ -740,9 +741,9 @@ function DailyFocusCard({ mission, color, bg, remaining, onSelect }: DailyFocusC
             {mission.title}
           </p>
           <p style={{ fontSize: 12, color: "#7A6B58", margin: "6px 0 0", display: "flex", gap: 8 }}>
-            {mission.reward.seeds > 0 && <span>🌱 {mission.reward.seeds}</span>}
-            {mission.reward.affinity > 0 && <span>💖 {mission.reward.affinity}</span>}
-            {mission.reward.starShards > 0 && <span>⭐ {mission.reward.starShards}</span>}
+            {mission.reward.seeds > 0 && <span><CurrencyIcon currency="seed" size={12} /> {mission.reward.seeds}</span>}
+            {mission.reward.affinity > 0 && <span><CurrencyIcon currency="affinity" size={12} /> {mission.reward.affinity}</span>}
+            {mission.reward.starShards > 0 && <span><CurrencyIcon currency="starShard" size={12} /> {mission.reward.starShards}</span>}
           </p>
         </span>
       </div>

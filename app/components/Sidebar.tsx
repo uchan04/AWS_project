@@ -9,6 +9,7 @@ import type { TypeCode } from "@prisma/client"
 import styles from "./Sidebar.module.css"
 import { useModalA11y } from "./useModalA11y"
 import { ArtImage } from "./ArtImage"
+import { CurrencyIcon } from "./CurrencyIcon"
 
 function getBgColor(hex: string): string {
   // colorHex → 배경색 (약한 톤)
@@ -262,9 +263,9 @@ export function Sidebar({ profile }: { profile: SidebarProfile | null }) {
               </div>
             </div>
             <div style={{ display: "flex", flexDirection: "column", gap: 3, fontSize: 11, color: "#7A6B58", marginTop: 8 }}>
-              <span>🌱 씨앗 {profile.seeds}개</span>
-              <span>💖 친밀도 {profile.affinity}</span>
-              <span>⭐ 별조각 {profile.starShards}</span>
+              <span><CurrencyIcon currency="seed" size={12} /> 씨앗 {profile.seeds}개</span>
+              <span><CurrencyIcon currency="affinity" size={12} /> 친밀도 {profile.affinity}</span>
+              <span><CurrencyIcon currency="starShard" size={12} /> 별조각 {profile.starShards}</span>
             </div>
           </div>
         )}
