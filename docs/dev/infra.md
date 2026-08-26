@@ -11,6 +11,7 @@
 - 2026-08-24 완료: **`develop` → `main` 배포**(fast-forward 31커밋 `79741d0..d1c1cda`, Amplify job 14 SUCCEED). 배포본 실측 통과 — 이미지 41/41, 페이지 9장 200, 미인증 API 401, 로그아웃 303 `location: /login`, 로그인 401(500 아님 → `SESSION_SECRET` 정상). 아래 "로컬 `.env`에서만 깨지는 것 2건" 절도 함께 참고
 - 2026-08-24 완료: **`feat/infra`에 `develop` 26커밋 머지 후 푸시**(`44e9817..6db5435`, 충돌 0건). `main`만 Amplify에 연결돼 있어 배포는 안 걸린다. 미들웨어 리다이렉트 규칙을 정정했다 — 아래 "위 규칙은 Route Handler에만 맞다" 절
 - 2026-08-24 완료: **로컬 전수 실행 검증.** 개발 서버(:3000, 인증 13경로)와 프로덕션 빌드(:3100, 보호 6 + 공개 3 + API 3) 양쪽에서 확인. 같은 작업에서 `DEV_AUTH_BYPASS=true`가 빌드를 깨뜨리는 것을 찾았다 — 아래 "로컬 `.env`에서만 깨지는 것" 3번
+- 2026-08-24 완료: **커뮤니티 글 이미지 업로드 경로**(D 요청). `lib/uploads.ts` + `POST /api/upload/community/presign` + `npm run check:uploads`. 미션용 `lib/missions/upload.ts`는 한 줄도 안 고쳤다 — 아래 "커뮤니티 글 이미지 업로드" 절. 같은 작업에서 **버킷이 prefix 구분 없이 전체 공개인 것을 실측으로 확정했다**(같은 절 마지막)
 - 2026-08-24 **미해결**: RDS 커넥션 고갈이 재발했고 조치가 하나도 안 남았다(아래 전용 절). 저절로 회복된 것이라 그대로 재발한다
 - ~~진행 중: `PetSkin.avatarKey` — DB 적용만 남았다~~ → **완료 ←2026-08-25 실측(A).** `_prisma_migrations` 9행의 `finished_at`이 전부 채워져 있고 `PetSkin` 6행의 `avatarKey`가 `fox_avatar`·`cat_avatar`·`bear_avatar`로 실제 값이다. **"`main` 머지 전에 적용해야 한다"는 조건은 충족됐다.** 아래 "다음 할 일" 8번도 함께 지울 항목이다
 - 진행 중: Amplify GitHub 연동은 완료(아래 앱 ID 참고). Google 로그인 전 구간 실사용 검증(브라우저로 실제 계정 로그인)은 아직 안 했다 — OAuth 동의 화면이 "테스트" 상태면 등록된 테스트 사용자만 된다(아래 "막힌 것" 참고)
@@ -28,6 +29,9 @@
 - `lib/api.ts` — `ok()` / `fail()` 응답 헬퍼
 - `prisma/seed.ts` — 시드 엔트리
 - `app/globals.css` — 종족 컬러 토큰 3종(`--color-canine` `--color-feline` `--color-ursine`) 추가
+- `lib/uploads.ts` — 커뮤니티 글 이미지 presign 발급·소유권 판정·업로드 후 검증(`generateCommunityPresignedUrl()` / `isOwnCommunityKey()` / `verifyCommunityObject()`). 미션용(`lib/missions/upload.ts`, B 소유)과 **일부러 분리**했다
+- `app/api/upload/community/presign/route.ts` — `missionId` 없이 부르는 presign. 10분 20회 레이트 리밋
+- `scripts/check-uploads.ts` — `npm run check:uploads`. 키 규칙·커뮤니티 상한과 함께 **미션 상한이 그대로인지**를 단정한다
 
 ## 삭제한 파일
 - `app/components/BottomNav.tsx` — **2026-08-20 삭제.** B가 내비게이션을 사이드바(`app/components/Sidebar.tsx`)로 교체하며 `app/layout.tsx`에서 뺐고(`65308c4`), 이후 아무도 import하지 않는 고아 파일이었다(레포 전체 검색으로 확인). `docs/STATUS.md` 차단 13번 참고
@@ -56,6 +60,7 @@
 7. **(사용자 승인 필요) `idle_session_timeout` 설정과 내 고아 커넥션 12개 정리** — 커넥션 고갈 절 처방 3번. Claude가 두 번 시도했고 권한 정책에 막혔다
 8. **(사용자 승인 필요) `avatarKey` 마이그레이션 적용** — `npx prisma migrate deploy && npx prisma generate`. `prisma/schema.prisma` 변경이라 팀 공지 동반
 9. **(사용자 직접) `.env.example`에 `SESSION_SECRET`·`DEV_AUTH_BYPASS=false` 추가** — Claude는 `.env*` 접근이 권한 차단이다
+10. **(팀 결정) 미션 사진이 URL만 알면 공개로 읽히는 것을 그대로 둘지** — 아래 "커뮤니티 글 이미지 업로드" 마지막 절. 막으려면 CloudFront 비헤이비어 분리 + 미션 사진 presigned GET이고 B 코드까지 바뀐다. 데모까지는 유지가 무난하다는 판단이지만 내 결정 사항이 아니다
 
 ## Amplify 배포 (연동 완료)
 
@@ -257,6 +262,55 @@ FATAL: remaining connection slots are reserved for roles with the SUPERUSER attr
 - 마이그레이션은 **손으로 썼다**(`prisma migrate dev`를 돌리지 않았다. `CLAUDE.md` 5절 — 스키마 담당 1인만 실행한다)
 
 **아직 DB에 안 들어갔다.** `npx prisma migrate deploy`가 권한 정책에 막혔다(공유 프로덕션 DB 쓰기). 코드·스키마·시드·마이그레이션 파일은 다 있고 `npx prisma generate` + `DEV_AUTH_BYPASS=false npm run build`는 통과(exit 0)했다. `prisma/schema.prisma`는 **전원 합의 파일**이라 적용 시 팀 공지가 필요하다.
+
+## 커뮤니티 글 이미지 업로드 (2026-08-24, D 요청)
+
+D가 `Post.imageKey`를 채울 수 없다고 요청해 왔다. 원인은 세 겹이었다.
+
+1. `POST /api/upload/presign`이 **`missionId` 필수**다. 없으면 400이고, 있어도 `loadCompletableMission()`을 통과하고 `requiresPhoto`인 사진 미션이어야 한다
+2. `lib/missions/upload.ts:generatePresignedUrl()`이 키를 `missions/{userId}/{missionId}/…`로 **고정**한다. `verifyS3Object()`도 같은 prefix를 요구한다
+3. 상한이 **3MB · jpg·png**다. 글 이미지는 5MB · jpg·png·webp가 필요하다
+
+### 미션 쪽을 고치지 않고 경로를 새로 뒀다
+
+`lib/missions/upload.ts`의 `ALLOWED_TYPES`·`MAX_SIZE`는 **모듈 상수**이고 `verifyS3Object()`가 같은 값을 읽는다. 커뮤니티에 맞춰 5MB·webp로 올리면 **미션 사진 검증이 함께 느슨해진다** — 미션 사진은 `lib/missions/vision.ts`가 Bedrock 비전 모델에 그대로 넘기는 입력이라 상한이 곧 방어선이다. 파라미터화하는 방법도 있지만 그 파일은 **B 소유**이고(`CLAUDE.md` 2절), 남의 검증 경로를 리팩터링해서 여는 것보다 옆에 하나 두는 쪽이 사고 범위가 작다.
+
+대가는 presign 기계장치(`S3Client` + `getSignedUrl`)가 두 벌이 된 것이다. 그래서 **두 파일이 공유하는 불변식을 `lib/uploads.ts` 머리 주석에 적어 뒀다**: ① 키는 서버가 정한다(클라이언트 파일명을 쓰지 않는다) ② 첫 세그먼트가 용도를 가른다 ③ 두 번째 세그먼트는 항상 `userId`다. ③ 덕에 S3를 부르지 않고 키만 보고 소유권을 판정한다.
+
+한쪽만 고쳐 조용히 어긋나는 것은 `npm run check:uploads`가 막는다 — **커뮤니티 상한과 함께 "미션은 여전히 webp를 거부하고 3MB다"까지 단정한다.** 미션 쪽을 올리면 이 스크립트가 실패한다.
+
+덤으로 막은 구멍 하나: 미션 코드의 확장자 결정이 `contentType === "image/jpeg" ? "jpg" : "png"` 삼항이라 **그대로 복사하면 webp가 `.png` 키로 올라간다.** 커뮤니티는 `COMMUNITY_EXT` map 하나로 허용 타입과 확장자를 같은 자리에서 정한다.
+
+### D에게 넘긴 계약
+
+```
+POST /api/upload/community/presign
+  요청  { contentType: "image/jpeg" | "image/png" | "image/webp", fileSize: number }
+  응답  { data: { uploadUrl, s3Key, expiresIn: 300 } }
+  실패  401 UNAUTHORIZED / 400 INVALID_INPUT · INVALID_FILE · TOO_MANY_ATTEMPTS / 500 UPLOAD_NOT_CONFIGURED
+```
+
+`uploadUrl`에 파일을 그대로 `PUT`한다(헤더는 `Content-Type`만, 요청에 보낸 값과 같아야 한다 — 서명에 포함된다). 유효 시간 5분.
+
+**`Post.imageKey`에 저장하기 전에 `isOwnCommunityKey(s3Key, user.id)`를 반드시 통과시킨다.** 안 하면 클라이언트가 보낸 아무 키나 저장되므로 `missions/{남의 id}/…`를 자기 글 이미지로 걸어 **남의 미션 사진을 커뮤니티에 노출**할 수 있다. 파일이 실제로 올라왔는지·타입·크기까지 볼 때는 `verifyCommunityObject({ s3Key, userId })`를 쓴다(HeadObject 1회). 두 함수 다 `lib/uploads.ts`에 있고, 실패는 `UploadError`(`code`·`status` 포함)로 던진다.
+
+표시는 `lib/assets.ts`의 `cdnUrl(s3Key)`다 — presigned GET을 만들 필요가 없다. 근거는 아래.
+
+발급 시 `fileSize` 검사는 **권고**다. presigned PUT은 실제 업로드 크기를 강제하지 못한다(강제하려면 서명에 `Content-Length`를 박아야 하고, 브라우저가 보내는 값과 1바이트만 어긋나도 원인이 안 보이는 403이 된다). 실제 상한은 `verifyCommunityObject()`가 지킨다.
+
+레이트 리밋은 이 라우트에만 있다(10분 20회, `userId` 기준). 미션 presign은 발급 횟수가 미션 개수에 자연히 묶이지만 글 이미지에는 그런 관문이 없어서, 인증만 통과하면 공개 버킷에 쓸 수 있는 URL을 무제한으로 받는 형태가 된다.
+
+### 업로드 버킷은 prefix 구분 없이 전체 공개다 (실측)
+
+`lib/assets.ts:11`이 "사용자 업로드는 `cdnUrl()` 경로가 아니다"라고 적어 둬서 글 이미지에 presigned GET이 필요한지 확인했다. **필요 없다** — 2026-08-24 CLI 실측:
+
+- CloudFront(`diros91hbap9v`) origin이 업로드 버킷 `welli-uploads-185236887369` **바로 그것**이다(정적 에셋용 별도 버킷이 아니다)
+- 버킷 정책이 OAC에 `s3:GetObject`를 `arn:…:welli-uploads-185236887369/*`로 허용한다 — **prefix 제한이 없다**
+- 배포에 캐시 비헤이비어가 기본 하나뿐이고 path pattern 제한이 없다
+
+즉 `cdnUrl()`로 그대로 보인다. **뒷면을 같이 적는다: 그래서 `missions/`·`mission-photos/`의 미션 사진도 URL만 알면 누구나 읽는다.** 키에 16바이트 난수가 들어가 추측은 어렵지만 그건 접근 제어가 아니고, 사진 미션 완료 응답이나 로그로 키가 한 번 새면 끝이다. 글 이미지는 공개가 의도이므로 이번 작업으로 나빠진 것은 없다 — **원래 그랬다는 것이 이번에 확인된 것이다.** 고치려면 prefix별 비헤이비어 분리 + 미션 사진은 presigned GET이고, 공유 인프라·B 코드 양쪽을 건드리므로 팀 결정 사항으로 올린다(`docs/STATUS.md` E 행).
+
+**같은 이유로 `lib/uploads.ts`에 사적인 사진 용도를 새로 붙이지 않는다.** 붙이려면 prefix 단위 접근 제어가 먼저다.
 
 ## GitHub 레포·브랜치
 
