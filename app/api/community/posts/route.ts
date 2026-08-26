@@ -176,8 +176,16 @@ export async function POST(request: NextRequest) {
      *
      * imageKey가 없으면 사진 쪽은 **시작조차 하지 않는다.**
      */
+    // 위기 신호를 검열보다 **먼저** 재서 moderate()에 넘긴다 (차단 30번, 2026-08-25).
+    // blocksPosting()이 false여도 isCrisis()가 true인 글이 여기까지 온다 — 사별·보도·비유·
+    // 회복 서사다. 그 글에 욕설이 섞이면 POLICY="BLANKET"의 사전 분기가 400을 내보내
+    // 아래 crisisNotice에 닿지 못한다. 이 값이 그 한 단계만 건너뛰게 한다.
+    // **대상 있는 욕설은 그대로 막힌다** — 위 containsAbuse()와 moderate() 안의
+    // containsChosungAbuse·containsGestureAbuse는 crisis와 무관하다(moderation.ts 주석).
+    const crisis = isCrisis(`${title} ${body}`)
+
     const [textResult, imageResult] = await Promise.allSettled([
-      moderate(`${title}\n\n${body}`, invokeBedrock),
+      moderate(`${title}\n\n${body}`, invokeBedrock, { crisis }),
       imageKey ? moderateImage(imageKey) : Promise.resolve(),
     ])
 
@@ -236,7 +244,7 @@ export async function POST(request: NextRequest) {
     // 저장은 됐지만 걱정되는 신호는 있는 글 — blocksPosting()은 false인데 isCrisis()는
     // true인 경우다(사별·보도·비유·회복 서사). 막지는 않되 안내는 보여준다.
     // 여기 오는 글은 실제로 올라갔으므로 CRISIS_POST_NOTICE("올라갔어요…")가 사실과 맞는다.
-    const crisisNotice = isCrisis(`${title} ${body}`) ? CRISIS_POST_NOTICE : null
+    const crisisNotice = crisis ? CRISIS_POST_NOTICE : null
 
     return ok({ post, granted, crisisNotice })
   } catch (error) {
