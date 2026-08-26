@@ -1,6 +1,6 @@
 import type { TypeCode, User } from "@prisma/client"
 import { prisma } from "@/lib/prisma"
-import { petImageUrl } from "@/lib/assets"
+import { avatarUrl, petImageUrl } from "@/lib/assets"
 import { cappedStage } from "@/lib/pet"
 import { listClaimedDates } from "./attendance"
 import { getTodayKey, getToday } from "./reset"
@@ -71,6 +71,12 @@ export type DashboardDTO = {
   userTypeCode: TypeCode | null
   /** 미션 모달의 캐릭터 칸에 쓰는 펫 이미지. 스킨이 없거나 CDN 미설정이면 null(이모지로 떨어진다) */
   petImageUrl: string | null
+  /**
+   * 상단 마스코트 자리에 쓰는 사이드바용 종족 아바타(PetSkin.avatarKey). 2026-08-26 사용자
+   * 요청으로 그 자리의 종족 이모지를 이 그림으로 바꿨다 — petImageUrl(성장 단계 그림)과는
+   * 다른 자리다(사이드바·내 계정 모달과 같은 규칙, lib/profile.ts 참고). null이면 이모지로 떨어진다
+   */
+  avatarUrl: string | null
 }
 
 /**
@@ -148,7 +154,7 @@ export async function buildDashboard(user: User): Promise<DashboardDTO> {
       user.activePetSkinId
         ? prisma.petSkin.findUnique({
             where: { id: user.activePetSkinId },
-            select: { imageKeyBase: true, stageCount: true },
+            select: { imageKeyBase: true, stageCount: true, avatarKey: true },
           })
         : Promise.resolve(null),
     ])
@@ -258,6 +264,7 @@ export async function buildDashboard(user: User): Promise<DashboardDTO> {
     },
     userTypeCode: user.typeCode,
     petImageUrl: petImage,
+    avatarUrl: avatarUrl(activeSkin?.avatarKey),
   }
 }
 

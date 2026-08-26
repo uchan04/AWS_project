@@ -62,6 +62,7 @@ function fixture(): DashboardDTO {
     // 컴파일이 통과했던 것이다. DTO를 TypeCode로 좁혀서 이제 잡힌다
     userTypeCode: "INDEPENDENT_LOW_INCOME",
     petImageUrl: null,
+    avatarUrl: null,
   }
 }
 

@@ -961,7 +961,21 @@ export default function MissionDashboard({
   return (
     <div style={{ padding: "32px 20px", maxWidth: 840, margin: "0 auto" }}>
       <header style={{ textAlign: "center", marginBottom: 32 }}>
-        <div style={{ fontSize: 64, marginBottom: 12 }}>{mascotEmoji}</div>
+        {/* 2026-08-26 사용자 요청으로 종족 이모지를 사이드바와 같은 종족 아바타 그림으로
+            바꿨다(PetSkin.avatarKey). 스킨이 없거나 그림이 없으면 이모지로 떨어진다 —
+            사이드바 Avatar()와 같은 폴백 규칙이다 */}
+        {dashboard.avatarUrl ? (
+          // eslint-disable-next-line @next/next/no-img-element
+          <img
+            src={dashboard.avatarUrl}
+            alt=""
+            width={64}
+            height={64}
+            style={{ display: "inline-block", marginBottom: 12, borderRadius: "50%" }}
+          />
+        ) : (
+          <div style={{ fontSize: 64, marginBottom: 12 }}>{mascotEmoji}</div>
+        )}
         <h1
           style={{
             fontFamily: "var(--font-display)",
