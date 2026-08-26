@@ -19,6 +19,7 @@ export default async function CommunityPage(props: PageProps<"/community">) {
   const tab = typeof searchParams.tab === "string" ? searchParams.tab : undefined
 
   let myTypeCode: TypeCode | null
+  let isAdmin: boolean
   let gallery: GalleryTab
   let posts: GalleryPost[]
   let notices: MeetupNoticeItem[]
@@ -27,6 +28,7 @@ export default async function CommunityPage(props: PageProps<"/community">) {
   try {
     const user = await getCurrentUser()
     myTypeCode = user.typeCode
+    isAdmin = user.isAdmin
     gallery = resolveGallery(tab, user.typeCode)
     posts = await listGalleryPosts(gallery)
     // 모임 화면에 들르지 않아도 무산 사실은 알아야 한다. 커뮤니티 첫 화면에도 같은 배너를 띄운다.
@@ -78,7 +80,7 @@ export default async function CommunityPage(props: PageProps<"/community">) {
           첫 번째 이야기를 들려주세요.
         </p>
       ) : (
-        <PostList posts={posts} showTribeBadge={gallery === "ALL"} />
+        <PostList posts={posts} showTribeBadge={gallery === "ALL"} isAdmin={isAdmin} />
       )}
     </main>
   )

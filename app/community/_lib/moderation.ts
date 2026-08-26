@@ -264,6 +264,23 @@ const DICT_PAT: ReadonlyArray<readonly [string, RegExp]> = DICT_WORDS.map(
   (w) => [w, buildPattern(w)] as const,
 );
 
+/**
+ * 초성 한 글자로 줄인 욕. "ㅈ같다" 는 좆같다 의 축약이다.
+ * 자모 분해형에서는 못 잡는다 — ㅈ같다 는 ㅈㄱㅏㅌㄷㅏ 라서
+ * 좆같(ㅈㅗㅈㄱㅏㅌ) 패턴과 어긋난다. 조합된 형태에서 본다.
+ *
+ * 앞에 다른 자음이 붙은 경우는 뺀다. 공백을 지우면 "ㅇㅈ 같은 생각"(인정)이
+ * "ㅇㅈ같은" 이 되어 걸리기 때문이다. "개ㅈ같다" 처럼 앞이 완성형이면 잡는다.
+ */
+const ABBREV_PAT: ReadonlyArray<readonly [string, RegExp]> = [
+  ["ㅈ같", /(?<![ㄱ-ㅎ])ㅈ같/u],
+  ["ㅈ됐", /(?<![ㄱ-ㅎ])ㅈ됐/u],
+  ["ㅈ망", /(?<![ㄱ-ㅎ])ㅈ망/u],
+  ["ㅈㄲ", /(?<![ㄱ-ㅎ])ㅈㄲ/u],
+  ["ㅈ까", /(?<![ㄱ-ㅎ])ㅈ까/u],
+  ["ㅈ빠", /(?<![ㄱ-ㅎ])ㅈ빠/u],
+] as const;
+
 /** 반복 문자를 접은 형태로 저장한다("asshole" → "ashole"). 입력도 같은 방식으로 접힌다. */
 const DICT_LATIN = ["fuck", "shit", "bitch", "ashole", "retard", "cunt", "whore", "niger", "fagot"];
 
@@ -298,6 +315,8 @@ export function findProfanity(text: string): string[] {
   const en = normalizeEn(text);
   const hits: string[] = [];
   for (const [w, re] of DICT_PAT) if (re.test(ko)) hits.push(w);
+  const composed = [text, normalizeForPolicy(text), squeeze(text)];
+  for (const [w, re] of ABBREV_PAT) if (composed.some((f) => re.test(f))) hits.push(w);
   for (const [w, re] of DICT_LATIN_PAT) if (re.test(en)) hits.push(w);
   return hits;
 }
@@ -344,6 +363,8 @@ export const JUDGE_SYSTEM = `너는 커뮤니티 게시물 판정기다. 오직 
 - 욕설이 한 글자도 없어도 상대를 낮잡아 부르거나 조롱하면 BLOCK이다.
   예: "너 임마 청년임?", "그 나이 먹고 그것도 몰라?"
 - 변형 표기(병@신, ㅄ, 시1발)도 욕설로 본다.
+- 초성으로 줄인 욕도 욕설로 본다. ㅈ까 · ㅈ같다 · ㅅㄲ · ㅄ · ㅗ 같은 것들이다.
+  짧아서 무해해 보여도 상대에게 던지는 말이면 BLOCK이다.
 - 힘듦, 우울, 외로움, 무기력을 털어놓는 글은 OK다. 이 커뮤니티의 존재 이유다.
 - 남을 위로하거나 공감하는 글은 거친 단어가 섞여 있어도 OK다.
 - 정치·종교 의견 자체는 BLOCK이 아니다. 사람을 공격할 때만 BLOCK이다.
@@ -451,20 +472,43 @@ export async function moderate(
 
   if (!MODEL_JUDGE || !invokeModel || text.trim().length === 0) return passthrough;
 
+  /*
+   * 계측만 한다. 판정은 한 줄도 바꾸지 않는다 — 아래 분기의 반환값은 전부 그대로이고,
+   * settle() 은 로그를 남기고 받은 것을 그대로 돌려주는 항등 함수다.
+   *
+   * catch 가 조용히 삼키던 것을 남긴다. fail-open 은 유지한다(사용자 응답은 그대로
+   * passthrough) — 다만 Bedrock 이 죽어 있어도 아무 흔적이 없던 것이 문제였다.
+   */
+  const startedAt = Date.now();
+
   try {
-    const judged = parseJudgement(await invokeModel(JUDGE_SYSTEM, buildJudgePrompt(text)));
-    if (!judged) return passthrough;
-    if (judged.verdict === "BLOCK") return block(judged.reason || "문맥 판정", "model", BLOCK_MESSAGE);
+    const raw = await invokeModel(JUDGE_SYSTEM, buildJudgePrompt(text));
+    const elapsedMs = Date.now() - startedAt;
+
+    const judged = parseJudgement(raw);
+
+    const settle = (result: ModerationResult): ModerationResult => {
+      // 모델이 뭐라고 했는지와 최종 반환이 무엇인지를 나란히 남긴다. 둘은 자주 다르다 —
+      // 모델 OK·WARN 은 사전 계층 결과(passthrough)를 그대로 돌려주기 때문이다.
+      console.warn(
+        `[moderation] 모델=${judged?.verdict ?? "파싱실패"} 반환=${result.verdict} · ${elapsedMs}ms · source=${result.source}`,
+      );
+      return result;
+    };
+
+    if (!judged) return settle(passthrough);
+    if (judged.verdict === "BLOCK") return settle(block(judged.reason || "문맥 판정", "model", BLOCK_MESSAGE));
     if (judged.verdict === "SELF") {
-      return {
+      return settle({
         verdict: "SELF",
         message: "",
         hits: [judged.reason || "자기표현"],
         source: "model",
-      };
+      });
     }
-    return passthrough;
-  } catch {
+    return settle(passthrough);
+  } catch (error) {
+    console.warn(`[moderation] 모델 판정 실패 · ${Date.now() - startedAt}ms · 통과시킨다(fail-open)`, error);
     return passthrough;
   }
 }
