@@ -194,7 +194,7 @@ export function ChatPanel({ onClose }: { onClose?: () => void }) {
   }
 
   return (
-    <div className="fixed inset-0 z-50">
+    <div className="fixed inset-0 z-[300]">
       {onClose && <div className="absolute inset-0 bg-black/30" onClick={onClose} />}
 
       <div

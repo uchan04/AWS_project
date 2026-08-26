@@ -27,9 +27,9 @@ import {
   OUTING_LEGS_MAX,
   OUTING_MIN_STAGE,
   OUTING_LOCK_MESSAGE,
+  outingNeedAffinityMessage,
   OUTING_TITLE_SUFFIX,
   outingTitle,
-  OUTING_LOCK_FOOT,
   OUTING_RECENT_AVOID,
   OUTING_REWARD_MAX,
   OUTING_REWARD_MIN,
@@ -804,10 +804,27 @@ assert.deepEqual(
   ],
 )
 assert.equal(OUTING_AWAY_LINES.length, 3)
+// 2026-08-26 사용자 요청으로 크레용 손글씨 말투로 바뀌었다(lib/pet.ts 주석)
 assert.deepEqual(
   OUTING_AWAY_LINES.map((l) => l.text),
-  ["방금 나갔어. 잘 다녀올게.", "지금 {where}쯤이야.", "이제 돌아가는 중이야."],
+  ["주인! 나 다녀올게!", "나 지금 {where}쯤이야!", "주인! 이제 돌아가는 중이야!"],
 )
+// 주인을 부르는 줄은 **처음과 끝에만** 둔다. 세 줄 다 부르면 조르는 톤이 된다
+assert.deepEqual(
+  OUTING_AWAY_LINES.map((l) => l.text.startsWith("주인!")),
+  [true, false, true],
+  "주인 호칭은 left·back 두 줄에만 있어야 한다",
+)
+// 느낌표는 호칭("주인!")과 문장 끝에 각각 하나까지다. 호칭을 떼고 센다 —
+// 그 안에서 둘이 되면("나 다녀올게! 진짜!") 손글씨가 아니라 고함으로 읽힌다
+for (const l of OUTING_AWAY_LINES) {
+  const body = l.text.replace(/^주인!\s*/, "")
+  assert.equal(
+    (body.match(/!/g) ?? []).length,
+    1,
+    `${l.key}: 호칭을 뗀 문장의 느낌표는 하나여야 한다 ("${l.text}")`,
+  )
+}
 
 // 전환어. 이것이 없으면 문단이 순간이동한다
 assert.equal(Object.keys(OUTING_OPENERS).length, 3)
@@ -1099,12 +1116,12 @@ assert.equal(outingProgress({ startedAt: outNow, returnsAt: outNow, claimedAt: n
 
 // ── 나가 있는 동안의 3막 ──────────────────────────────────────────────────────
 // 경과 3분의 1마다 바뀐다. 4시간이면 0~80분 / 80~160분 / 160~240분이다
-assert.equal(outingAwayLine("park", 0), "방금 나갔어. 잘 다녀올게.")
-assert.equal(outingAwayLine("park", 0.32), "방금 나갔어. 잘 다녀올게.")
-assert.equal(outingAwayLine("park", 1 / 3), "지금 공원쯤이야.")
-assert.equal(outingAwayLine("park", 0.65), "지금 공원쯤이야.")
-assert.equal(outingAwayLine("park", 2 / 3), "이제 돌아가는 중이야.")
-assert.equal(outingAwayLine("park", 1), "이제 돌아가는 중이야.")
+assert.equal(outingAwayLine("park", 0), "주인! 나 다녀올게!")
+assert.equal(outingAwayLine("park", 0.32), "주인! 나 다녀올게!")
+assert.equal(outingAwayLine("park", 1 / 3), "나 지금 공원쯤이야!")
+assert.equal(outingAwayLine("park", 0.65), "나 지금 공원쯤이야!")
+assert.equal(outingAwayLine("park", 2 / 3), "주인! 이제 돌아가는 중이야!")
+assert.equal(outingAwayLine("park", 1), "주인! 이제 돌아가는 중이야!")
 // 장소마다 중간 문장이 달라야 3막이 의미가 있다 — 8곳 전부 다른 문장이 나온다
 const midwayLines = OUTING_PLACES.map((p) => outingAwayLine(p.key, 0.5))
 assert.equal(new Set(midwayLines).size, OUTING_PLACES.length)
@@ -1113,10 +1130,10 @@ for (const line of midwayLines) {
   assert.ok(!line.includes("{"), `치환되지 않은 자리가 남았다: "${line}"`)
 }
 // 알 수 없는 키·범위 밖 값에서도 "{where}"를 노출하지 않는다
-assert.equal(outingAwayLine("없는곳", 0.5), "지금 밖쯤이야.")
-assert.equal(outingAwayLine("park", -1), "방금 나갔어. 잘 다녀올게.")
-assert.equal(outingAwayLine("park", 99), "이제 돌아가는 중이야.")
-assert.equal(outingAwayLine("park", Number.NaN), "방금 나갔어. 잘 다녀올게.")
+assert.equal(outingAwayLine("없는곳", 0.5), "나 지금 밖쯤이야!")
+assert.equal(outingAwayLine("park", -1), "주인! 나 다녀올게!")
+assert.equal(outingAwayLine("park", 99), "주인! 이제 돌아가는 중이야!")
+assert.equal(outingAwayLine("park", Number.NaN), "주인! 나 다녀올게!")
 
 // ── 1단계 외출 잠금 문구 (2026-08-26 사용자 결정) ──────────────────────────────
 //
@@ -1134,10 +1151,9 @@ assert.ok(
   OUTING_LOCK_MESSAGE.includes("아기"),
   `잠금 문구의 단계 이름이 STAGE_NAME[1]("아기")과 다르다: "${OUTING_LOCK_MESSAGE}"`,
 )
-assert.ok(OUTING_LOCK_FOOT.includes("알"), `잠금 각주에 현재 단계 이름이 없다: "${OUTING_LOCK_FOOT}"`)
 
 // 못 하는 것을 알리는 자리에 지시를 붙이지 않는다 — 미션 문구와 같은 규칙이다
-for (const line of [OUTING_LOCK_MESSAGE, OUTING_LOCK_FOOT]) {
+for (const line of [OUTING_LOCK_MESSAGE]) {
   for (const bad of [...BANNED_TONE, "하세요", "해보세요", "주세요", "!"]) {
     assert.ok(!line.includes(bad), `잠금 문구에 금지 표현 "${bad}"가 있다: "${line}"`)
   }
@@ -1191,5 +1207,25 @@ for (const suffix of OUTING_TITLE_SUFFIX) {
     `뒷말이 받침에 따라 갈리는 조사로 시작한다: "${suffix}"`,
   )
 }
+
+// ── 친밀도 부족 안내 (2026-08-26 사용자 지시) ─────────────────────────────────
+//
+// 각주로 늘 떠 있던 `친밀도 200 부족`을 걷고 **누를 때만** 말하게 했다.
+// 1단계 잠금(OUTING_LOCK_MESSAGE)과 같은 규칙을 지키는지 기계로 본다.
+
+for (const short of [1, 7, 200, 1234]) {
+  const m = outingNeedAffinityMessage(short)
+  assert.ok(m.includes(short.toLocaleString("ko-KR")), `부족한 양이 안 들어 있다: "${m}"`)
+  // 조사를 `친밀도가`로 앞에 붙인다 — 숫자 뒤에 `이/가`를 두면 그 숫자의 **읽는 소리**로
+  // 갈린다(30이 / 5가). 이 단정이 그 실수를 막는다
+  assert.ok(m.startsWith("친밀도가 "), `조사가 숫자 뒤로 갔다: "${m}"`)
+  assert.ok(m.length <= 40, `안내가 40자를 넘는다(${m.length}): "${m}"`)
+  for (const bad of [...BANNED_TONE, "!", "하세요", "해보세요", "주세요", "부족"]) {
+    assert.ok(!m.includes(bad), `안내에 금지 표현 "${bad}"가 있다: "${m}"`)
+  }
+}
+// 음수·소수도 0으로 눌린다 (화면이 Math.max로 막지만 여기서도 안전해야 한다)
+assert.ok(outingNeedAffinityMessage(-5).includes("0"))
+assert.ok(outingNeedAffinityMessage(3.7).includes("3"))
 
 console.log("pet 체크 통과")

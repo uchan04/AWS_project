@@ -51,6 +51,6 @@ export default async function SettingsPage() {
 
   // passwordHash 자체는 클라이언트로 내리지 않는다. "있는지"만 넘긴다
   return (
-    <SettingsForm email={user.email} hasPassword={Boolean(user.passwordHash)} />
+    <SettingsForm email={user.email} hasPassword={Boolean(user.passwordHash)} nickname={user.nickname} typeCode={user.typeCode} />
   )
 }

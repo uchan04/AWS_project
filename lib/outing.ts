@@ -336,6 +336,77 @@ export async function startOuting(
   }
 }
 
+/** 여행일기 보관함이 한 번에 보여 주는 개수. 10건이면 최근 약 5일치다(하루 최대 2회) */
+export const OUTING_HISTORY_LIMIT = 10
+
+export type OutingHistoryItem = {
+  id: string
+  /** 목록의 한 줄. `outingTitle()`이 저장된 legs에서 계산한다 */
+  title: string
+  /** 돌아온 시각(ISO). 목록과 일기 상단이 같은 값을 쓴다 */
+  returnedAt: string
+  episode: string[]
+  gained: { seeds: number; starShards: number }
+}
+
+/**
+ * 여행일기 보관함 (2026-08-26 사용자 요청). **이미 수령한 외출만** 최근 것부터 준다.
+ *
+ * `claimedAt: { not: null }`인 이유 — 아직 안 받은 건은 보관함에 있으면 안 된다.
+ * 그 건은 방의 외출 버튼이 `이야기 듣기`로 들고 있고, 보관함에서 먼저 읽어 버리면
+ * **누르기 전에 다 보여 주는 것**이 되어 수령 동작이 뜻을 잃는다.
+ *
+ * 정렬 기준이 `returnsAt`이지 `claimedAt`이 아니다. 사용자가 기억하는 것은 *언제 다녀왔나*이고,
+ * 며칠 뒤에 몰아서 받으면 수령 순서가 다녀온 순서와 어긋난다.
+ *
+ * **표가 없으면 빈 배열이다.** 마이그레이션이 안 들어간 DB에서 보관함이 화면을 죽이지 않는다
+ * (`isMissingTable`이 P2021·P2022를 함께 잡는다 — 이 파일 위쪽 주석).
+ *
+ * 재화는 `calculateReward()`를 통과시켜 준다. 저장값(gotSeeds)은 배율 적용 **전**이고,
+ * 수령 당시 화면이 보여 준 숫자는 배율이 얹힌 값이다 — 보관함이 그때와 다른 숫자를 보이면
+ * 기록으로서 값을 잃는다. **다만 그 사이에 스킨을 바꿨으면 지금 배율로 계산된다** —
+ * 정확히 맞추려면 지급액을 컬럼으로 저장해야 하고 그건 스키마 변경이다(전원 합의 사항).
+ * 지금 스킨 6종은 전부 `effectType = NONE`이라 두 값이 같다.
+ */
+export async function listOutingHistory(
+  userId: string,
+  skin: PetSkin | null,
+  limit: number = OUTING_HISTORY_LIMIT,
+): Promise<OutingHistoryItem[]> {
+  let rows
+  try {
+    rows = await prisma.petOuting.findMany({
+      where: { userId, claimedAt: { not: null } },
+      orderBy: { returnsAt: "desc" },
+      take: Math.max(1, Math.min(50, Math.floor(limit))),
+      select: {
+        id: true,
+        returnsAt: true,
+        legs: true,
+        placeKey: true,
+        metKey: true,
+        moodKey: true,
+        gotSeeds: true,
+        gotShards: true,
+      },
+    })
+  } catch (error) {
+    if (isMissingTable(error)) return []
+    throw error
+  }
+
+  return rows.map((row) => ({
+    id: row.id,
+    title: outingTitleFor(row),
+    returnedAt: row.returnsAt.toISOString(),
+    episode: outingLines(row),
+    gained: {
+      seeds: calculateReward(skin, { seeds: row.gotSeeds }).seeds ?? 0,
+      starShards: calculateReward(skin, { starShards: row.gotShards }).starShards ?? 0,
+    },
+  }))
+}
+
 export type ClaimOutingResult =
   | {
       ok: true

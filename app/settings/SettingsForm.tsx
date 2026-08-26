@@ -7,6 +7,8 @@
 
 import Link from "next/link"
 import { useState } from "react"
+import type { TypeCode } from "@prisma/client"
+import { NICKNAME_MAX, isValidNickname } from "@/lib/types"
 import "@/styles/tokens.css"
 
 type ApiBody = { data?: unknown; error?: { code: string; message: string } }
@@ -28,10 +30,20 @@ const PASSWORD_MIN = 8
 export default function SettingsForm({
   email,
   hasPassword,
+  nickname,
+  typeCode,
 }: {
   email: string | null
   hasPassword: boolean
+  nickname: string
+  typeCode: TypeCode | null
 }) {
+  const [currentNickname, setCurrentNickname] = useState(nickname)
+  const [nickSubmitting, setNickSubmitting] = useState(false)
+  const [nickError, setNickError] = useState<string | null>(null)
+  const [nickDone, setNickDone] = useState(false)
+  const nickValid = isValidNickname(currentNickname)
+
   const [current, setCurrent] = useState("")
   const [next, setNext] = useState("")
   const [pwSubmitting, setPwSubmitting] = useState(false)
@@ -42,6 +54,30 @@ export default function SettingsForm({
   const [withdrawInput, setWithdrawInput] = useState("")
   const [wdSubmitting, setWdSubmitting] = useState(false)
   const [wdError, setWdError] = useState<string | null>(null)
+
+  async function onChangeNickname(event: React.FormEvent) {
+    event.preventDefault()
+    if (!nickValid || currentNickname === nickname) return
+    setNickSubmitting(true)
+    setNickError(null)
+    setNickDone(false)
+    try {
+      const response = await fetch("/api/diagnosis/nickname", {
+        method: "PATCH",
+        headers: { "content-type": "application/json" },
+        body: JSON.stringify({ nickname: currentNickname }),
+      })
+      const parsed = await response.json().catch(() => ({}))
+      if (!response.ok || parsed?.error) {
+        throw new Error(parsed?.error?.message ?? "잠시 후 다시 시도해 주세요")
+      }
+      setNickDone(true)
+    } catch (caught) {
+      setNickError(caught instanceof Error ? caught.message : "잠시 후 다시 시도해 주세요")
+    } finally {
+      setNickSubmitting(false)
+    }
+  }
 
   async function onChangePassword(event: React.FormEvent) {
     event.preventDefault()
@@ -77,7 +113,7 @@ export default function SettingsForm({
   }
 
   return (
-    <main className="hm hm--canvas">
+    <main className="hm hm--canvas" data-tribe={typeCode ?? undefined}>
       <div className="hm__col hm-auth">
         <div className="hm-card">
           <div className="hm-card__head">
@@ -87,10 +123,52 @@ export default function SettingsForm({
             로그인 정보: {email ?? "이메일 없음"}
             {hasPassword ? " (이메일·비밀번호)" : " (Google)"}
           </p>
-          <p className="hm__note">
-            이름을 바꾸려면 <Link href="/diagnosis/result" className="hm-link">결과 화면</Link>에서
-            바꿀 수 있어요.
-          </p>
+        </div>
+
+        <div className="hm-card">
+          <div className="hm-card__head">
+            <h2 className="hm-card__title">이름 바꾸기</h2>
+          </div>
+          <form className="hm-auth__form" onSubmit={onChangeNickname}>
+            <div className="hm-field">
+              <label className="hm-field__label" htmlFor="nickname">
+                새 이름
+              </label>
+              <input
+                id="nickname"
+                type="text"
+                required
+                maxLength={NICKNAME_MAX}
+                value={currentNickname}
+                onChange={(event) => setCurrentNickname(event.target.value)}
+                className="hm-field__input"
+                aria-describedby="nickname-help"
+              />
+              <p className="hm-field__help" id="nickname-help">
+                2~12자로 정해 주세요.
+              </p>
+            </div>
+
+            {nickError && (
+              <p role="alert" className="hm-field__help hm-field__help--error">
+                {nickError}
+              </p>
+            )}
+            {nickDone && (
+              <p role="status" className="hm-field__help">
+                이름을 바꿨어요.
+              </p>
+            )}
+
+            <button
+              type="submit"
+              disabled={nickSubmitting || !nickValid || currentNickname === nickname}
+              className="hm-btn hm-card__cta"
+              aria-disabled={nickSubmitting || !nickValid || currentNickname === nickname}
+            >
+              {nickSubmitting ? "바꾸고 있어요…" : "이름 바꾸기"}
+            </button>
+          </form>
         </div>
 
         <div className="hm-card">
@@ -156,6 +234,7 @@ export default function SettingsForm({
                 disabled={pwSubmitting}
                 className="hm-btn hm-card__cta"
                 aria-disabled={pwSubmitting}
+                style={{ backgroundColor: typeCode ? "var(--tribe)" : undefined, borderColor: typeCode ? "var(--tribe)" : undefined }}
               >
                 {pwSubmitting ? "바꾸고 있어요…" : "비밀번호 바꾸기"}
               </button>

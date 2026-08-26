@@ -11,7 +11,6 @@ export type DiagnosisView = {
   typeCode: TypeCode
   adjective: Adjective
   nickname: string
-  family: string
   animal: string
   colorHex: string
 }

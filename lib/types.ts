@@ -9,27 +9,21 @@ import type { Adjective, TypeCode } from "@prisma/client"
 // emoji는 펫 이미지가 S3에 올라오기 전까지 쓰는 마스코트 자리다. 항상 aria-hidden으로 넣는다.
 export const TRIBE: Record<
   TypeCode,
-  { family: string; animal: string; emoji: string; colorName: string; colorHex: string }
+  { animal: string; emoji: string; colorHex: string }
 > = {
   HEALTH_EMOTION: {
-    family: "개과",
     animal: "여우",
     emoji: "🦊",
-    colorName: "노을 주황",
     colorHex: "#E8956A",
   },
   INDEPENDENT_LOW_INCOME: {
-    family: "고양잇과",
     animal: "고양이",
     emoji: "🐱",
-    colorName: "새벽 파랑",
     colorHex: "#6A95C8",
   },
   FAMILY_LIVING: {
-    family: "곰과",
     animal: "곰",
     emoji: "🐻",
-    colorName: "이끼 초록",
     colorHex: "#7AAE82",
   },
 }
@@ -56,7 +50,7 @@ export function defaultNickname(typeCode: TypeCode, adjective: Adjective): strin
 
 /** 커뮤니티·프로필 작성자 표기. 종족은 변경 불가이므로 항상 함께 노출한다. */
 export function authorLabel(nickname: string, typeCode: TypeCode): string {
-  return `${nickname} · ${TRIBE[typeCode].family}`
+  return `${nickname} · ${TRIBE[typeCode].animal}`
 }
 
 export const NICKNAME_MIN = 2

@@ -268,6 +268,21 @@ async function main() {
 
     const buy = await call("POST", "/api/pet/skins/buy", { skinId: "not-a-skin" })
     record("없는 스킨 구매는 500이 아니다", buy.status !== 500, { status: buy.status, body: buy.body })
+
+    // 여행일기 보관함 (2026-08-26). 갓 만든 계정은 친밀도 0이라 외출을 보낼 수 없어서
+    // **빈 목록이 정상이다.** 그것이 이 단정의 값이다 — 아직 아무것도 안 한 사람에게
+    // 보관함이 500을 내거나 남의 기록을 보여 주면 여기서 걸린다.
+    // `claimedAt`으로 걸러지는지(안 받은 건이 목록에 없는지)는 친밀도 200이 필요해
+    // e2e로 못 잰다 — 브라우저 실측으로 확인했고 근거는 docs/dev/pet.md에 있다.
+    const hist = await call("GET", "/api/pet/outing/history")
+    const histData = hist.body.data as { items?: unknown[]; limit?: number } | undefined
+    record("여행일기 보관함 조회", hist.status === 200, hist.body.error)
+    record(
+      "기록이 없으면 빈 목록이다 (500이 아니다)",
+      Array.isArray(histData?.items) && histData.items.length === 0,
+      histData,
+    )
+    record("보관함 상한이 10건이다", histData?.limit === 10, histData)
   }
 
   // --- 6. 커뮤니티 ---

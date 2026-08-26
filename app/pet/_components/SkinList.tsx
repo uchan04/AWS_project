@@ -1,11 +1,9 @@
 "use client"
 
 import { useState, type SyntheticEvent } from "react"
-import Link from "next/link"
 import type { TypeCode } from "@prisma/client"
 import { animalEmoji } from "@/lib/pet"
 import { ArtImage } from "@/app/components/ArtImage"
-import { CurrencyIcon } from "@/app/components/CurrencyIcon"
 import { TRIBE } from "@/lib/types"
 import "@/styles/tokens.css"
 import "../pet.css"
@@ -139,49 +137,8 @@ export default function SkinList({
   const sectionTitle = TABS.find((t) => t.key === tab)!.title
 
   return (
-    <main className="pet pet--shop" data-tribe={typeCode ?? undefined}>
-      <header className="pet-banner">
-        <span className="pet-banner__deco" data-i="1" aria-hidden="true">
-          🌿
-        </span>
-        <span className="pet-banner__deco" data-i="2" aria-hidden="true">
-          🍃
-        </span>
-        <span className="pet-banner__deco" data-i="3" aria-hidden="true">
-          🌸
-        </span>
-        <span className="pet-banner__deco" data-i="4" aria-hidden="true">
-          ✨
-        </span>
+    <div className="pet-section" data-tribe={typeCode ?? undefined}>
 
-        <div className="pet-banner__inner">
-          <div>
-            <span className="pet-banner__eyebrow" aria-hidden="true">
-              ✦ APPEARANCE SHOP ✦
-            </span>
-            <h1 className="pet__title">외형 상점</h1>
-            <p className="pet__lede">
-              레벨과 경험치는 외형이 아니라 나에게 붙어 있어요. 바꿔도 그대로예요.
-            </p>
-          </div>
-
-          <div className="pet-banner__acts">
-            {/* 잔액이 이 화면에만 있으므로 홈의 씨앗 HUD처럼 aria-hidden으로 묻지 않는다 */}
-            <p className="pet-hud" aria-label={`별조각 ${ko(starShards)}`}>
-              {/* --wood 변형은 2026-08-21에 지웠다. 아이콘 칸이 종족색 하나로 통일됐다 */}
-              <span className="pet-hud__icon" aria-hidden="true">
-                <CurrencyIcon currency="starShard" size={18} />
-              </span>
-              <span className="pet-hud__value" aria-hidden="true">
-                {ko(starShards)}
-              </span>
-            </p>
-            <Link className="pet-plank" href="/pet">
-              <span aria-hidden="true">🐾</span> 펫으로
-            </Link>
-          </div>
-        </div>
-      </header>
 
       {error ? (
         <p className="pet-msg pet-msg--error" role="alert">
@@ -194,43 +151,6 @@ export default function SkinList({
         </p>
       ) : null}
 
-      {/* 지금 데리고 있는 외형 한 장. 격자 안의 --on 칸과 같은 면을 쓴다(pet.css .pet-hero) */}
-      {active ? (
-        <div className="pet-hero">
-          <span className="pet-hero__face">
-            {active.imageUrl ? (
-              // eslint-disable-next-line @next/next/no-img-element
-              <img
-                className="pet-hero__img"
-                src={active.imageUrl}
-                alt=""
-                aria-hidden="true"
-                decoding="async"
-                onError={swapToEmoji}
-              />
-            ) : null}
-            <span aria-hidden="true" style={{ display: active.imageUrl ? "none" : "grid" }}>
-              {animalEmoji(active.name)}
-            </span>
-          </span>
-
-          <div className="pet-hero__body">
-            <span className="pet-hero__eyebrow">
-              {active.isDefault ? "기본 외형 · 진단으로 받았어요" : "상점에서 데려왔어요"}
-            </span>
-            <span className="pet-hero__name">{active.name}</span>
-            <span className="pet-hero__meta">{TRIBE[active.typeCode].family}</span>
-          </div>
-
-          <span className="pet-hero__badge">
-            함께하는 중 <span aria-hidden="true">🐾</span>
-          </span>
-        </div>
-      ) : null}
-
-      <div className="pet-divider" aria-hidden="true">
-        🌼
-      </div>
 
       {/* role="tab"을 쓰지 않는다 — 패널이 하나이고 화살표 키 이동까지 만들 화면이 아니다.
           누른 상태는 aria-pressed가 나른다 */}
@@ -320,7 +240,7 @@ export default function SkinList({
                   {animalEmoji(skin.name)}
                 </span>
                 <span className="pet-item__name">{skin.name}</span>
-                <span className="pet-item__meta">{tribe.family}</span>
+                <span className="pet-item__meta">{tribe.animal}</span>
 
                 <div className="pet-item__act">
                   {skin.active ? (
@@ -356,13 +276,6 @@ export default function SkinList({
         </div>
       )}
 
-      <div className="pet-foot-deco" aria-hidden="true">
-        <span>🍀</span>
-        <span>✦</span>
-        <span>🌸</span>
-        <span>✦</span>
-        <span>🍀</span>
-      </div>
-    </main>
+    </div>
   )
 }

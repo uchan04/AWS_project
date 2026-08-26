@@ -66,6 +66,7 @@ function cspFor(nonce: string): string {
     "style-src 'self' 'unsafe-inline'",
     // blob: 은 업로드 전 미리보기(URL.createObjectURL), data: 는 인라인 아이콘
     `img-src 'self' blob: data: ${S3_HOST}${CDN_HOST ? ` ${CDN_HOST}` : ""}`,
+    `media-src 'self' ${S3_HOST}${CDN_HOST ? ` ${CDN_HOST}` : ""}`,
     "font-src 'self'",
     // presigned PUT은 S3로 직접 나간다. 나머지는 우리 API·채팅 스트림
     `connect-src 'self' ${S3_HOST}${isDev ? " ws: wss:" : ""}`,
