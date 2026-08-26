@@ -581,6 +581,25 @@
 .pet-room__book[data-tone="3"] {
   fill: #d8bc86;
 }
+
+/* 책장 위 "일기장" 딱지 (2026-08-26 사용자 요청).
+   **서체가 --font-body(기기 한국어 시스템 서체)인 이유는 전송량이다.** --font-crayon은
+   app/layout.tsx가 "펫 외출 쪽지 한 곳뿐이고 늘리지 않는다"고 못 박아 둔 서체이고,
+   --font-display(Gowun Dodum)는 웹폰트라 이 세 글자 때문에 unicode-range 조각을 더 받을
+   수 있다. 13px짜리 가구 딱지에 그 값을 치를 이유가 없다 — 시스템 서체는 0KB다.
+
+   font-size가 10(좌표)인 것은 화면에서 약 12~15px이 되는 값이다: 이 SVG는 slice로
+   방을 덮으므로 배율이 방 크기에 따라 1.17~1.48로 변한다(10 × 1.17 = 11.7px,
+   10 × 1.48 = 14.8px). px로 주면 배율을 두 번 먹어 방이 커질 때 글자만 작아 보인다.
+
+   색은 --color-muted다. 벽(--tribe 22% + #fffaf2)이 밝은 면이라 잉크색은 딱지가 아니라
+   제목처럼 무거워지고, 이 글자는 가구에 붙은 메모여야 한다 */
+.pet-room__shelf-label {
+  fill: var(--color-muted);
+  font-family: var(--font-body);
+  font-size: 10px;
+  text-anchor: middle;
+}
 .pet-room__rug {
   fill: color-mix(in oklch, var(--tribe) 48%, var(--color-card));
   opacity: 0.55;
