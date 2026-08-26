@@ -3,7 +3,7 @@ import { getCurrentUser, getCurrentUserWithSkin, UnauthorizedError } from "@/lib
 import { prisma } from "@/lib/prisma"
 import { ok, fail } from "@/lib/api"
 import { GalleryType } from "@prisma/client"
-import { resolveGallery, canViewGallery, canPostToGallery, listGalleryPosts } from "@/app/community/_lib/gallery"
+import { resolveGallery, canAccessGallery, listGalleryPosts } from "@/app/community/_lib/gallery"
 import { TITLE_MAX, BODY_MAX, IMAGE_KEY_MAX } from "@/app/community/_lib/limits"
 import { isAttachableImageKey } from "@/app/community/_lib/imageKey"
 import { grantAffinity, POST_AFFINITY } from "@/app/community/_lib/affinity"
@@ -28,8 +28,8 @@ export async function GET(request: NextRequest) {
     const tab = request.nextUrl.searchParams.get("tab") ?? undefined
     const gallery = resolveGallery(tab, user.typeCode)
 
-    // 읽기다. 관리자는 모든 종족 갤러리를 본다(_lib/gallery.ts).
-    if (!canViewGallery(gallery, user.typeCode, user.isAdmin)) {
+    // 관리자는 모든 종족 갤러리를 본다(_lib/gallery.ts).
+    if (!canAccessGallery(gallery, user.typeCode, user.isAdmin)) {
       return fail("FORBIDDEN", "다른 종족의 갤러리는 볼 수 없어요", 400)
     }
 
@@ -98,8 +98,8 @@ export async function POST(request: NextRequest) {
     if (!galleryType) return fail("INVALID_BODY", "갤러리를 찾을 수 없어요", 400)
 
     // ALL은 누구나, 종족 갤러리는 본인 종족만 쓸 수 있다.
-    // 쓰기다. **관리자도 자기 종족에만 쓴다** — isAdmin을 넘길 자리가 아예 없다.
-    if (!canPostToGallery(galleryType, user.typeCode)) {
+    // 읽기와 같은 판정이다. 관리자는 모든 종족 갤러리에 쓴다.
+    if (!canAccessGallery(galleryType, user.typeCode, user.isAdmin)) {
       return fail("FORBIDDEN", "다른 종족의 갤러리에는 글을 쓸 수 없어요", 400)
     }
 

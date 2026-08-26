@@ -8,14 +8,7 @@ import { HopeBanner } from "./_components/HopeBanner"
 import { PostList } from "./_components/PostList"
 import { WriteModal } from "./_components/WriteModal"
 import { RulesModal } from "./_components/RulesModal"
-import {
-  resolveGallery,
-  canViewGallery,
-  canPostToGallery,
-  listGalleryPosts,
-  type GalleryTab,
-  type GalleryPost,
-} from "./_lib/gallery"
+import { resolveGallery, canAccessGallery, listGalleryPosts, type GalleryTab, type GalleryPost } from "./_lib/gallery"
 import { MeetupNotice } from "./meetups/_components/MeetupNotice"
 import { pendingMeetupNotices, type MeetupNoticeItem } from "./meetups/_lib/notice"
 
@@ -42,7 +35,7 @@ export default async function CommunityPage(props: PageProps<"/community">) {
     // 비관리자가 tab=<다른 종족>을 직접 붙이면 이 검사에서 전체 탭으로 떨어진다.
     // 라우트(GET /api/community/posts)도 같은 쌍을 쓴다.
     const requested = resolveGallery(tab, user.typeCode)
-    gallery = canViewGallery(requested, user.typeCode, user.isAdmin) ? requested : "ALL"
+    gallery = canAccessGallery(requested, user.typeCode, user.isAdmin) ? requested : "ALL"
     posts = await listGalleryPosts(gallery)
     // 모임 화면에 들르지 않아도 무산 사실은 알아야 한다. 커뮤니티 첫 화면에도 같은 배너를 띄운다.
     notices = await pendingMeetupNotices(user.id)
@@ -72,33 +65,18 @@ export default async function CommunityPage(props: PageProps<"/community">) {
           <h1 className="text-xl font-bold text-neutral-900">커뮤니티</h1>
           <p className="mt-1 text-sm text-neutral-500">
             {/* "나만 볼 수 있어요"는 관리자에게 사실이 아니다 — 관리자는 모든 종족을 본다.
-                관리자 신분 자체는 탭 줄이 한 번만 알리므로(GalleryTabs) 여기서는
-                **이 갤러리에서 무엇을 할 수 있는지**만 말한다. 문구가 겹치지 않게 나눴다 */}
+                관리자는 읽기·쓰기가 모두 열려 갤러리마다 할 수 있는 일이 다르지 않으므로
+                한 갈래로 둔다. 신분은 탭 줄이 한 번만 알린다(GalleryTabs) */}
             {gallery === "ALL"
               ? "모든 종족이 함께하는 열린 공간이에요"
-              : !isAdmin
-                ? `${TRIBE[gallery].animal} 종족 전용 공간이에요 · 나만 볼 수 있어요`
-                : canPostToGallery(gallery, myTypeCode)
-                  ? `${TRIBE[gallery].animal} 종족 갤러리예요 · 내 종족이라 글을 쓸 수 있어요`
-                  : `${TRIBE[gallery].animal} 종족 갤러리예요 · 관리자로 보는 중이라 글은 쓸 수 없어요`}
+              : isAdmin
+                ? `${TRIBE[gallery].animal} 종족 갤러리예요`
+                : `${TRIBE[gallery].animal} 종족 전용 공간이에요 · 나만 볼 수 있어요`}
           </p>
         </div>
         <div className="flex items-center gap-2">
           <RulesModal />
-          {/* 관리자가 남의 종족 갤러리를 볼 때는 쓸 수 없다(서버가 막는다). 눌러서 400을 받는
-              것보다 낫게, 아예 못 누르는 상태로 이유를 보여준다. 서버 판정과 같은 함수를 쓴다 */}
-          {canPostToGallery(gallery, myTypeCode) ? (
-            <WriteModal gallery={gallery} myTypeCode={myTypeCode} />
-          ) : (
-            <button
-              type="button"
-              disabled
-              title="다른 종족 갤러리에는 글을 쓸 수 없어요"
-              className="cursor-not-allowed rounded-xl border border-neutral-200 px-5 py-2.5 text-sm font-semibold text-neutral-400"
-            >
-              ✏️ 글 쓰기
-            </button>
-          )}
+          <WriteModal gallery={gallery} myTypeCode={myTypeCode} />
         </div>
       </div>
 

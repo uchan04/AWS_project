@@ -3,7 +3,7 @@ import type { NextRequest } from "next/server"
 import { getCurrentUser, UnauthorizedError } from "@/lib/auth"
 import { prisma } from "@/lib/prisma"
 import { ok, fail } from "@/lib/api"
-import { canPostToGallery } from "@/app/community/_lib/gallery"
+import { canAccessGallery } from "@/app/community/_lib/gallery"
 
 // 좋아요에는 친밀도 지급이 없다(SPEC.md 8절). 재화를 건드리지 않으므로 getCurrentUser로 충분하다.
 export async function POST(_request: NextRequest, ctx: RouteContext<"/api/community/posts/[id]/like">) {
@@ -17,8 +17,8 @@ export async function POST(_request: NextRequest, ctx: RouteContext<"/api/commun
     })
     if (!post) return fail("NOT_FOUND", "게시글을 찾을 수 없어요", 404)
 
-    // 쓰기다. 좋아요도 남기는 동작이라 관리자 우회를 주지 않는다.
-    if (!canPostToGallery(post.galleryType, user.typeCode)) {
+    // 글·댓글과 같은 판정이다.
+    if (!canAccessGallery(post.galleryType, user.typeCode, user.isAdmin)) {
       return fail("FORBIDDEN", "다른 종족의 갤러리는 볼 수 없어요", 400)
     }
 

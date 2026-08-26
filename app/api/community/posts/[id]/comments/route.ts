@@ -2,7 +2,7 @@ import type { NextRequest } from "next/server"
 import { getCurrentUserWithSkin, UnauthorizedError } from "@/lib/auth"
 import { prisma } from "@/lib/prisma"
 import { ok, fail } from "@/lib/api"
-import { canPostToGallery } from "@/app/community/_lib/gallery"
+import { canAccessGallery } from "@/app/community/_lib/gallery"
 import { COMMENT_MAX } from "@/app/community/_lib/limits"
 import { grantAffinity, COMMENT_AFFINITY } from "@/app/community/_lib/affinity"
 import { recordAttempt, retryAfter } from "@/lib/ratelimit"
@@ -43,8 +43,9 @@ export async function POST(request: NextRequest, ctx: RouteContext<"/api/communi
     })
     if (!post) return fail("NOT_FOUND", "게시글을 찾을 수 없어요", 404)
 
-    // 쓰기다. 관리자도 자기 종족에만 댓글을 단다.
-    if (!canPostToGallery(post.galleryType, user.typeCode)) {
+    // 글 작성과 같은 판정이다. 관리자는 모든 종족 갤러리에 댓글을 단다 —
+    // 자기 공지에 답글을 못 다는 상태가 되면 안 된다.
+    if (!canAccessGallery(post.galleryType, user.typeCode, user.isAdmin)) {
       return fail("FORBIDDEN", "다른 종족의 갤러리는 볼 수 없어요", 400)
     }
 
