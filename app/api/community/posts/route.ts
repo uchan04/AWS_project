@@ -3,7 +3,7 @@ import { getCurrentUser, getCurrentUserWithSkin, UnauthorizedError } from "@/lib
 import { prisma } from "@/lib/prisma"
 import { ok, fail } from "@/lib/api"
 import { GalleryType } from "@prisma/client"
-import { resolveGallery, canAccessGallery, listGalleryPosts } from "@/app/community/_lib/gallery"
+import { resolveGallery, canViewGallery, canPostToGallery, listGalleryPosts } from "@/app/community/_lib/gallery"
 import { TITLE_MAX, BODY_MAX, IMAGE_KEY_MAX } from "@/app/community/_lib/limits"
 import { isAttachableImageKey } from "@/app/community/_lib/imageKey"
 import { grantAffinity, POST_AFFINITY } from "@/app/community/_lib/affinity"
@@ -28,7 +28,8 @@ export async function GET(request: NextRequest) {
     const tab = request.nextUrl.searchParams.get("tab") ?? undefined
     const gallery = resolveGallery(tab, user.typeCode)
 
-    if (!canAccessGallery(gallery, user.typeCode)) {
+    // 읽기다. 관리자는 모든 종족 갤러리를 본다(_lib/gallery.ts).
+    if (!canViewGallery(gallery, user.typeCode, user.isAdmin)) {
       return fail("FORBIDDEN", "다른 종족의 갤러리는 볼 수 없어요", 400)
     }
 
@@ -97,7 +98,8 @@ export async function POST(request: NextRequest) {
     if (!galleryType) return fail("INVALID_BODY", "갤러리를 찾을 수 없어요", 400)
 
     // ALL은 누구나, 종족 갤러리는 본인 종족만 쓸 수 있다.
-    if (!canAccessGallery(galleryType, user.typeCode)) {
+    // 쓰기다. **관리자도 자기 종족에만 쓴다** — isAdmin을 넘길 자리가 아예 없다.
+    if (!canPostToGallery(galleryType, user.typeCode)) {
       return fail("FORBIDDEN", "다른 종족의 갤러리에는 글을 쓸 수 없어요", 400)
     }
 
@@ -210,7 +212,9 @@ export async function POST(request: NextRequest) {
 
     const post = await prisma.post.create({
       data: { userId: user.id, galleryType, title, body, imageKey },
-      include: { user: { select: { nickname: true, typeCode: true } } },
+      // isAdmin은 작성자 표기용이다(_lib/author.ts). **필드를 더 늘리지 마라** —
+      // 이 select 절이 subTypeCode 같은 값이 응답에 새는 것을 막는 자리다.
+      include: { user: { select: { nickname: true, typeCode: true, isAdmin: true } } },
     })
 
     const granted = await grantAffinity(user, POST_AFFINITY)

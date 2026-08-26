@@ -2,7 +2,7 @@ import type { NextRequest } from "next/server"
 import { getCurrentUserWithSkin, UnauthorizedError } from "@/lib/auth"
 import { prisma } from "@/lib/prisma"
 import { ok, fail } from "@/lib/api"
-import { canAccessGallery } from "@/app/community/_lib/gallery"
+import { canPostToGallery } from "@/app/community/_lib/gallery"
 import { COMMENT_MAX } from "@/app/community/_lib/limits"
 import { grantAffinity, COMMENT_AFFINITY } from "@/app/community/_lib/affinity"
 import { recordAttempt, retryAfter } from "@/lib/ratelimit"
@@ -43,7 +43,8 @@ export async function POST(request: NextRequest, ctx: RouteContext<"/api/communi
     })
     if (!post) return fail("NOT_FOUND", "게시글을 찾을 수 없어요", 404)
 
-    if (!canAccessGallery(post.galleryType, user.typeCode)) {
+    // 쓰기다. 관리자도 자기 종족에만 댓글을 단다.
+    if (!canPostToGallery(post.galleryType, user.typeCode)) {
       return fail("FORBIDDEN", "다른 종족의 갤러리는 볼 수 없어요", 400)
     }
 
@@ -87,7 +88,8 @@ export async function POST(request: NextRequest, ctx: RouteContext<"/api/communi
     const [comment] = await prisma.$transaction([
       prisma.comment.create({
         data: { postId: post.id, userId: user.id, body },
-        include: { user: { select: { nickname: true, typeCode: true } } },
+        // isAdmin은 작성자 표기용이다(_lib/author.ts). 필드를 더 늘리지 마라
+        include: { user: { select: { nickname: true, typeCode: true, isAdmin: true } } },
       }),
       prisma.post.update({ where: { id: post.id }, data: { commentCount: { increment: 1 } } }),
     ])

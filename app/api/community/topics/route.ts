@@ -2,7 +2,7 @@ import type { NextRequest } from "next/server"
 import { getCurrentUser, UnauthorizedError } from "@/lib/auth"
 import { ok, fail } from "@/lib/api"
 import { GalleryType } from "@prisma/client"
-import { canAccessGallery } from "@/app/community/_lib/gallery"
+import { canPostToGallery } from "@/app/community/_lib/gallery"
 import { pickTopics } from "@/app/community/_lib/topics"
 
 // GET /api/community/topics?gallery=ALL — 글쓰기 창의 주제 추천 3개(SPEC 8절).
@@ -25,7 +25,8 @@ export async function GET(request: NextRequest) {
       : null
     if (!gallery) return fail("INVALID_BODY", "갤러리를 찾을 수 없어요", 400)
 
-    if (!canAccessGallery(gallery, user.typeCode)) {
+    // 글쓰기 창의 주제 추천이라 쓰기 쪽이다.
+    if (!canPostToGallery(gallery, user.typeCode)) {
       return fail("FORBIDDEN", "다른 종족의 갤러리는 볼 수 없어요", 400)
     }
 

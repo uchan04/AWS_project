@@ -2,7 +2,7 @@
 
 import { useEffect, useRef, useState } from "react"
 import type { TypeCode } from "@prisma/client"
-import { authorLabel } from "@/lib/types"
+import { communityAuthorLabel } from "../_lib/author"
 import { useModalA11y } from "@/app/components/useModalA11y"
 import { CrisisNotice } from "@/app/components/CrisisNotice"
 import { timeAgo } from "../_lib/format"
@@ -37,7 +37,8 @@ const ADMIN_DELETE_COMMENT =
 /** 댓글 확인 대기가 저절로 풀리는 시간. 대기 중인 것을 잊고 다시 누르는 사고를 막는다. */
 const COMMENT_CONFIRM_MS = 3000
 
-type DetailUser = { nickname: string; typeCode: TypeCode | null }
+// isAdmin은 서버가 내려준다(GET /api/community/posts/[id]). 작성자 표기에만 쓴다
+type DetailUser = { nickname: string; typeCode: TypeCode | null; isAdmin: boolean }
 
 type DetailComment = {
   id: string
@@ -62,8 +63,9 @@ type DetailPost = {
   user: DetailUser
 }
 
+// 글 작성자와 댓글 작성자가 같은 규칙을 쓴다 — 관리자면 종족 대신 "관리자"(_lib/author.ts)
 function authorText(user: DetailUser): string {
-  return user.typeCode ? authorLabel(user.nickname, user.typeCode) : user.nickname
+  return communityAuthorLabel(user)
 }
 
 export function PostDetailModal({
