@@ -2,6 +2,7 @@ import Link from "next/link"
 import type { TypeCode } from "@prisma/client"
 import { TRIBE } from "@/lib/types"
 import { avatarUrl } from "@/lib/assets"
+import { LogoutButton } from "./LogoutButton"
 
 // 소유자: A. 진단 전 홈 = 시작 화면. Figma 인트로 구성(왼쪽 글, 오른쪽 안내 카드).
 //
@@ -64,10 +65,12 @@ export function Intro({ authed }: { authed: boolean }) {
           <Link href={authed ? "/diagnosis" : "/signup"} className="hm-btn">
             시작하기
           </Link>
-          {!authed && (
+          {!authed ? (
             <Link href="/login" className="hm-link">
               이미 계정이 있어요
             </Link>
+          ) : (
+            <LogoutButton />
           )}
         </div>
 

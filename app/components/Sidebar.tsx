@@ -272,8 +272,8 @@ export function Sidebar({ profile }: { profile: SidebarProfile | null }) {
             </div>
             <div style={{ display: "flex", flexDirection: "column", gap: 3, fontSize: 11, color: "#7A6B58", marginTop: 8 }}>
               <span><CurrencyIcon currency="seed" size={12} /> 씨앗 {profile.seeds}개</span>
-              <span><CurrencyIcon currency="affinity" size={12} /> 친밀도 {profile.affinity}</span>
-              <span><CurrencyIcon currency="starShard" size={12} /> 별조각 {profile.starShards}</span>
+              <span><CurrencyIcon currency="affinity" size={12} /> 친밀도 {profile.affinity}개</span>
+              <span><CurrencyIcon currency="starShard" size={12} /> 별조각 {profile.starShards}개</span>
             </div>
           </div>
         )}
