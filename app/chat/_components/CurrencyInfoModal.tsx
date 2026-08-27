@@ -82,24 +82,24 @@ export function CurrencyInfoModal() {
             aria-modal="true"
             aria-labelledby="currency-info-title"
             tabIndex={-1}
-            className="max-h-[85vh] w-full max-w-sm overflow-y-auto rounded-3xl bg-white p-6 shadow-2xl"
+            className="max-h-[85vh] w-full max-w-sm overflow-y-auto rounded-3xl bg-card p-6 shadow-2xl"
             onClick={(event) => event.stopPropagation()}
           >
             <div className="mb-4 flex items-start justify-between gap-3">
-              <h2 id="currency-info-title" className="text-base font-bold text-neutral-900">
+              <h2 id="currency-info-title" className="font-display text-lg text-ink">
                 재화는 이렇게 모여요
               </h2>
               <button
                 type="button"
                 onClick={close}
                 aria-label="재화 안내 창 닫기"
-                className="flex h-8 w-8 shrink-0 items-center justify-center rounded-full bg-neutral-100 text-neutral-500 hover:bg-neutral-200"
+                className="flex h-8 w-8 shrink-0 items-center justify-center rounded-full bg-paper-2 text-muted hover:bg-rule"
               >
                 ✕
               </button>
             </div>
 
-            <div className="flex flex-col gap-4 text-xs text-neutral-600">
+            <div className="flex flex-col gap-4 text-xs text-ink-2">
               {/* 씨앗. **다섯 경로를 다 적는다(2026-08-27).** 한때 셋으로 줄였다가 되돌렸다 —
                   빠졌던 단계 미션(+22~58)과 펫 외출(+30~50)이 남긴 셋보다 수급량이 커서,
                   줄인 목록이 "이렇게 조금씩 모인다"는 잘못된 인상을 줬다.
@@ -108,7 +108,7 @@ export function CurrencyInfoModal() {
                   시간당 +2와 최대 100 lib/pet.ts(IDLE_SEEDS_PER_HOUR·IDLE_MAX_SEEDS) ·
                   출석 +10~40 lib/missions/attendance.ts */}
               <section>
-                <p className="mb-2 font-semibold text-neutral-800">🌱 씨앗</p>
+                <p className="mb-2 font-semibold text-ink-2">🌱 씨앗</p>
                 <ul className="flex flex-col gap-1">
                   <li>미션을 하나 마치면 +10~15</li>
                   <li>단계 미션을 올라가면 +22~58</li>
@@ -120,15 +120,15 @@ export function CurrencyInfoModal() {
 
               {/* 친밀도. ChatPanel의 ℹ 패널 문구를 그대로 옮겼다. 수치 출처는 app/community/_lib/affinity.ts */}
               <section>
-                <p className="mb-2 font-semibold text-neutral-800">❤️ 친밀도</p>
+                <p className="mb-2 font-semibold text-ink-2">❤️ 친밀도</p>
                 <ul className="flex flex-col gap-1">
                   <li>챗봇 대화 1턴 +5 · 오늘 최대 40</li>
                   <li>커뮤니티 글 작성 +20</li>
                   <li>댓글 달기 +5</li>
                   <li>오프라인 모임 신청 +10</li>
-                  <li className="text-neutral-500">위 세 가지(커뮤니티)는 오늘 최대 60</li>
+                  <li className="text-muted">위 세 가지(커뮤니티)는 오늘 최대 60</li>
                 </ul>
-                <p className="mt-2 text-neutral-500">
+                <p className="mt-2 text-muted">
                   대화만으로 하루치를 다 채울 수는 없어요. 나머지는 사람과 닿는 쪽에서 쌓여요.
                 </p>
               </section>
@@ -136,7 +136,7 @@ export function CurrencyInfoModal() {
               {/* 별조각. 출처: 단계 미션 +1~8 lib/missions/bands.ts(rewardForStage의 band-2) ·
                   출석 4일차 5, 7일차 20 lib/missions/attendance.ts · 외출 +30~50 lib/pet.ts */}
               <section>
-                <p className="mb-2 font-semibold text-neutral-800">⭐ 별조각</p>
+                <p className="mb-2 font-semibold text-ink-2">⭐ 별조각</p>
                 <ul className="flex flex-col gap-1">
                   <li>단계 미션을 올라가면 +1~8</li>
                   <li>출석 4일차 +5, 7일차 +20</li>

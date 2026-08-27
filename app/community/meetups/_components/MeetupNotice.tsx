@@ -9,7 +9,7 @@ import { FadeIn, Spinner } from "./transitions"
 /**
  * 모임 상태 변경 알림 배너. 결성(CONFIRMED)과 무산(CANCELED)을 함께 다룬다.
  * 껍데기 어휘는 HopeBanner의 중립 배너와 같다
- * (rounded-2xl border border-neutral-200 bg-neutral-50 p-5 + 좌측 아이콘).
+ * (rounded-card border border-rule bg-paper p-5 + 좌측 아이콘).
  *
  * 문구는 양쪽 모두 사실만 전한다. 무산에 "아쉽게도"·"죄송합니다"를 붙이지 않는 것과 같은 이유로
  * 결성에도 "축하합니다"·"드디어"를 붙이지 않는다 — 과장은 다음 약속을 부담으로 만든다.
@@ -57,7 +57,7 @@ export function MeetupNotice({ notices }: { notices: MeetupNoticeItem[] }) {
   return (
     <div
       className={
-        "flex flex-col gap-4 rounded-2xl border border-neutral-200 bg-neutral-50 p-5 motion-safe:transition motion-safe:duration-300 motion-safe:ease-out " +
+        "flex flex-col gap-4 rounded-card border border-rule bg-paper p-5 motion-safe:transition motion-safe:duration-300 motion-safe:ease-out " +
         (entered ? "" : "motion-safe:-translate-y-2 motion-safe:opacity-0")
       }
     >
@@ -91,7 +91,7 @@ export function MeetupNotice({ notices }: { notices: MeetupNoticeItem[] }) {
       )}
 
       {error && (
-        <FadeIn key={error} className="block text-xs text-red-500">
+        <FadeIn key={error} className="block text-xs text-error">
           {error}
         </FadeIn>
       )}
@@ -102,7 +102,7 @@ export function MeetupNotice({ notices }: { notices: MeetupNoticeItem[] }) {
           type="button"
           onClick={handleConfirm}
           disabled={pending}
-          className="inline-flex items-center rounded-xl border border-neutral-900 bg-neutral-900 px-5 py-2 text-sm font-semibold text-white transition duration-150 disabled:cursor-not-allowed disabled:opacity-40"
+          className="inline-flex items-center rounded-xl border border-accent bg-accent px-5 py-2 text-base font-display text-accent-ink transition duration-150 disabled:cursor-not-allowed disabled:opacity-40"
         >
           {pending && <Spinner />}
           확인
@@ -134,10 +134,10 @@ function NoticeGroup({
       </span>
 
       <div className="flex min-w-0 flex-col gap-2">
-        <p className="text-base leading-relaxed text-neutral-900">{headline}</p>
+        <p className="text-base leading-relaxed text-ink">{headline}</p>
 
         {isSingle && showDetailWhenSingle && (
-          <p className="text-xs text-neutral-400">
+          <p className="text-xs text-muted">
             {meetupDateTime(notices[0].startsAt)}
             {" · "}
             {notices[0].place}
@@ -147,9 +147,9 @@ function NoticeGroup({
         {!isSingle && (
           <ul className="flex flex-col gap-1">
             {notices.map((notice) => (
-              <li key={notice.meetupId} className="text-sm text-neutral-600">
+              <li key={notice.meetupId} className="text-sm text-ink-2">
                 {notice.title}
-                <span className="text-xs text-neutral-400">
+                <span className="text-xs text-muted">
                   {" · "}
                   {meetupDateTime(notice.startsAt)}
                   {" · "}
@@ -162,7 +162,7 @@ function NoticeGroup({
 
         <Link
           href="/community/meetups"
-          className="w-fit text-sm font-semibold text-neutral-500 underline underline-offset-4 transition duration-150 hover:text-neutral-700"
+          className="w-fit text-sm font-semibold text-muted underline underline-offset-4 transition duration-150 hover:text-ink-2"
         >
           {linkLabel}
         </Link>

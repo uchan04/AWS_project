@@ -86,11 +86,11 @@ export default async function MeetupsPage() {
   } catch (error) {
     console.error("[/community/meetups]", error)
     return (
-      <main className="mx-auto flex max-w-3xl flex-col gap-6 p-4 sm:p-6">
-        <h1 className="text-xl font-bold text-neutral-900">오프라인 모임</h1>
-        <div className="rounded-2xl bg-white p-8 text-center">
-          <p className="text-sm text-neutral-700">로그인이 필요해요</p>
-          <p className="mt-2 text-sm leading-relaxed text-neutral-500">
+      <main className="mx-auto flex max-w-5xl flex-col gap-5 p-4 sm:p-6">
+        <h1 className="font-display text-xl text-ink">오프라인 모임</h1>
+        <div className="rounded-card bg-card p-8 text-center">
+          <p className="text-sm text-ink-2">로그인이 필요해요</p>
+          <p className="mt-2 text-sm leading-relaxed text-muted">
             진단을 아직 안 했다면 진단을 먼저 완료해 주세요.
           </p>
         </div>
@@ -99,14 +99,14 @@ export default async function MeetupsPage() {
   }
 
   return (
-    <main className="mx-auto flex max-w-3xl flex-col gap-6 p-4 sm:p-6">
+    <main className="mx-auto flex max-w-5xl flex-col gap-5 p-4 sm:p-6">
       <MeetupNotice notices={notices} />
 
       {/* 제목 줄의 배치는 커뮤니티 첫 화면과 같다 — 왼쪽에 제목, 오른쪽에 보조 동작 */}
       <div className="flex flex-wrap items-end justify-between gap-3">
         <div>
-          <h1 className="text-xl font-bold text-neutral-900">오프라인 모임</h1>
-          <p className="mt-1 text-sm text-neutral-500">천천히, 준비됐을 때 나가면 돼요</p>
+          <h1 className="font-display text-xl text-ink">오프라인 모임</h1>
+          <p className="mt-1 text-sm text-muted">천천히, 준비됐을 때 나가면 돼요</p>
         </div>
 
         {/* 신청한 것이 없어도 버튼은 늘 둔다. 빈 상태 문구는 모달 안에 있다 —

@@ -19,7 +19,7 @@ import { COMMENT_MAX, remaining } from "../_lib/limits"
  */
 const EXPAND_BASE = "overflow-hidden motion-safe:transition-all motion-safe:duration-200 motion-safe:ease-out"
 const EXPAND_CLOSED = "max-h-0 opacity-0"
-const EXPAND_PANEL = "flex flex-col gap-2 rounded-xl border border-neutral-200 bg-neutral-50 p-3"
+const EXPAND_PANEL = "flex flex-col gap-2 rounded-xl border border-rule bg-paper p-3"
 
 /*
  * 버튼 규격(2026-08-26). 이 모달의 버튼이 radius 3종(lg/xl/full)·글자 3종(sm/xs/[11px])·
@@ -33,20 +33,20 @@ const EXPAND_PANEL = "flex flex-col gap-2 rounded-xl border border-neutral-200 b
  * 또는 흰 배경(보조)이다.
  */
 const BUTTON_BASE =
-  "inline-flex items-center rounded-xl px-4 py-2 text-sm font-semibold transition duration-150 disabled:cursor-not-allowed disabled:opacity-40"
+  "inline-flex items-center rounded-xl px-4 py-2 text-base font-display transition duration-150 disabled:cursor-not-allowed disabled:opacity-40"
 const BUTTON_COMPACT =
-  "inline-flex items-center rounded-xl px-3 py-1.5 text-xs font-semibold transition duration-150 disabled:cursor-not-allowed disabled:opacity-40"
+  "inline-flex items-center rounded-xl px-3 py-1.5 text-sm font-display transition duration-150 disabled:cursor-not-allowed disabled:opacity-40"
 
-const PRIMARY_BUTTON = BUTTON_BASE + " bg-neutral-900 text-white hover:bg-neutral-700"
-const QUIET_BUTTON = BUTTON_BASE + " border border-neutral-300 bg-white text-neutral-600 hover:bg-neutral-50"
+const PRIMARY_BUTTON = BUTTON_BASE + " bg-accent text-accent-ink hover:bg-accent-2"
+const QUIET_BUTTON = BUTTON_BASE + " border border-rule bg-card text-ink-2 hover:bg-paper"
 
 /**
  * 지우는 버튼(1단계 진입). 테두리와 글자만 빨강이고 **채움 배경은 쓰지 않는다** —
  * 채움 빨강은 확인을 받은 뒤의 2단계 확정(DANGER_BUTTON) 자리라 급이 다르다.
  * 본인 글이든 남의 글이든 같은 모양이다. 파괴적이라는 사실이 주인보다 중요하다.
  */
-const DELETE_BUTTON = BUTTON_COMPACT + " border border-red-300 bg-white text-red-600 hover:bg-red-50"
-const DANGER_BUTTON = BUTTON_BASE + " bg-red-500 text-white hover:bg-red-600"
+const DELETE_BUTTON = BUTTON_COMPACT + " border border-red-300 bg-card text-error hover:bg-red-50"
+const DANGER_BUTTON = BUTTON_BASE + " bg-red-500 text-accent-ink hover:bg-red-600"
 
 /** 댓글 확인 대기가 저절로 풀리는 시간. 대기 중인 것을 잊고 다시 누르는 사고를 막는다. */
 const COMMENT_CONFIRM_MS = 3000
@@ -303,15 +303,15 @@ export function PostDetailModal({
         aria-modal="true"
         aria-label={post ? post.title : "게시글"}
         tabIndex={-1}
-        className="flex max-h-[90vh] w-full max-w-2xl flex-col overflow-hidden rounded-3xl bg-white shadow-2xl"
+        className="flex max-h-[90vh] w-full max-w-2xl flex-col overflow-hidden rounded-3xl bg-card shadow-2xl"
         onClick={(e) => e.stopPropagation()}
       >
         {loading ? (
-          <div className="p-10 text-center text-sm text-neutral-500" role="status" aria-live="polite">
+          <div className="p-10 text-center text-sm text-muted" role="status" aria-live="polite">
             불러오는 중...
           </div>
         ) : error || !post ? (
-          <div className="flex flex-col gap-4 p-10 text-center text-sm text-neutral-500">
+          <div className="flex flex-col gap-4 p-10 text-center text-sm text-muted">
             <p role="alert">{error ?? "게시글을 찾을 수 없어요"}</p>
             <button
               type="button"
@@ -323,10 +323,10 @@ export function PostDetailModal({
           </div>
         ) : (
           <>
-            <div className="flex items-center justify-between border-b border-neutral-200 px-7 py-5">
+            <div className="flex items-center justify-between border-b border-rule px-7 py-5">
               <div>
-                <p className="text-sm font-semibold text-neutral-900">{authorText(post.user)}</p>
-                <p className="text-xs text-neutral-400">{timeAgo(new Date(post.createdAt))}</p>
+                <p className="text-sm font-semibold text-ink">{authorText(post.user)}</p>
+                <p className="text-xs text-muted">{timeAgo(new Date(post.createdAt))}</p>
               </div>
               <div className="flex items-center gap-2">
                 {(post.isOwn || isAdmin) && (
@@ -344,7 +344,7 @@ export function PostDetailModal({
                   type="button"
                   onClick={onClose}
                   aria-label="게시글 창 닫기"
-                  className="flex h-9 w-9 items-center justify-center rounded-full bg-neutral-100 text-neutral-500 hover:bg-neutral-200"
+                  className="flex h-9 w-9 items-center justify-center rounded-full bg-paper-2 text-muted hover:bg-rule"
                 >
                   ✕
                 </button>
@@ -370,7 +370,7 @@ export function PostDetailModal({
               >
                 <div className={EXPAND_PANEL}>
                   {/* 닉네임을 넣는다. 남의 글이라는 사실이 문구에서 드러나야 한다 */}
-                  <p className="text-xs leading-relaxed text-neutral-600">
+                  <p className="text-xs leading-relaxed text-ink-2">
                     {post.user.nickname} 님의 글입니다. 지우면 되돌릴 수 없어요.
                   </p>
                   <div className="flex gap-2">
@@ -396,8 +396,8 @@ export function PostDetailModal({
             )}
 
             <div className="flex-1 overflow-y-auto px-7 py-6">
-              <h2 className="mb-2 text-lg font-bold break-words text-neutral-900">{post.title}</h2>
-              <p className="mb-6 text-[15px] leading-relaxed break-words whitespace-pre-wrap text-neutral-800">{post.body}</p>
+              <h2 className="font-display mb-2 text-lg break-words text-ink">{post.title}</h2>
+              <p className="mb-6 text-[15px] leading-relaxed break-words whitespace-pre-wrap text-ink-2">{post.body}</p>
 
               {/* 상세에서는 원본 비율 그대로 본다. 목록 카드만 16:9로 자른다(PostCard 주석 참고).
                   next/image를 쓰지 않는 이유는 미션 화면과 같다 — 설정에 없는 hostname이면 throw한다. */}
@@ -406,7 +406,7 @@ export function PostDetailModal({
                 <img
                   src={post.imageUrl}
                   alt="글에 첨부된 사진"
-                  className="mb-6 h-auto w-full rounded-xl bg-neutral-100"
+                  className="mb-6 h-auto w-full rounded-xl bg-paper-2"
                 />
               )}
 
@@ -419,14 +419,14 @@ export function PostDetailModal({
                 좋아요 {post.likeCount}
               </button>
 
-              <div className="border-t border-neutral-200 pt-5">
-                <p className="mb-4 text-xs text-neutral-500">댓글 {post.commentCount}개</p>
+              <div className="border-t border-rule pt-5">
+                <p className="mb-4 text-xs text-muted">댓글 {post.commentCount}개</p>
                 <div className="flex flex-col gap-4">
                   {comments.map((comment) => (
-                    <div key={comment.id} className="rounded-xl bg-neutral-50 p-4">
+                    <div key={comment.id} className="rounded-xl bg-paper p-4">
                       <div className="mb-1 flex items-center gap-2">
-                        <span className="text-sm font-semibold text-neutral-900">{authorText(comment.user)}</span>
-                        <span className="text-xs text-neutral-400">{timeAgo(new Date(comment.createdAt))}</span>
+                        <span className="text-sm font-semibold text-ink">{authorText(comment.user)}</span>
+                        <span className="text-xs text-muted">{timeAgo(new Date(comment.createdAt))}</span>
                         {(comment.isOwn || isAdmin) && (
                           <button
                             type="button"
@@ -452,23 +452,23 @@ export function PostDetailModal({
                           </button>
                         )}
                       </div>
-                      <p className="text-sm leading-relaxed break-words text-neutral-700">{comment.body}</p>
+                      <p className="text-sm leading-relaxed break-words text-ink-2">{comment.body}</p>
                     </div>
                   ))}
                 </div>
               </div>
             </div>
 
-            <div className="flex flex-col gap-2 border-t border-neutral-200 px-7 py-4">
+            <div className="flex flex-col gap-2 border-t border-rule px-7 py-4">
               {/* 좋아요·댓글 결과는 화면 아래 작은 글씨로만 뜬다.
                   live region이 없으면 눌러도 아무 일도 안 일어난 것처럼 읽힌다 */}
               {actionError && (
-                <p role="alert" className="text-xs text-red-500">
+                <p role="alert" className="text-xs text-error">
                   {actionError}
                 </p>
               )}
               {affinityNotice && (
-                <p role="status" aria-live="polite" className="text-xs text-neutral-400">
+                <p role="status" aria-live="polite" className="text-xs text-muted">
                   {affinityNotice}
                 </p>
               )}
@@ -485,7 +485,7 @@ export function PostDetailModal({
                   aria-label="댓글"
                   // maxLength는 UX다. 실제 거절은 서버가 한다
                   maxLength={COMMENT_MAX}
-                  className="min-w-0 flex-1 rounded-xl border border-neutral-300 bg-neutral-50 px-4 py-2.5 text-sm text-neutral-900 placeholder:text-neutral-400 outline-none focus:border-neutral-500"
+                  className="min-w-0 flex-1 rounded-xl border border-rule bg-paper px-4 py-2.5 text-sm text-ink placeholder:text-muted outline-none focus:border-rule-2"
                 />
                 <button
                   type="button"

@@ -103,10 +103,10 @@ export function MeetupList({
           key={notice.seq}
           role="status"
           className={
-            "flex items-start justify-between gap-3 rounded-2xl border px-4 py-3 transition duration-200 ease-out " +
+            "flex items-start justify-between gap-3 rounded-card border px-4 py-3 transition duration-200 ease-out " +
             (noticeShown ? "" : "motion-safe:-translate-y-2 motion-safe:opacity-0") +
             // 결성은 강조색, 무산은 중립 회색. 무산은 알리되 축하할 일이 아니다.
-            (isConfirmNotice ? "" : " border-neutral-200 bg-neutral-100 text-neutral-600")
+            (isConfirmNotice ? "" : " border-rule bg-paper-2 text-ink-2")
           }
           style={
             isConfirmNotice
@@ -142,13 +142,13 @@ export function MeetupList({
       )}
 
       {meetups.length === 0 ? (
-        <p className="py-24 text-center text-sm leading-relaxed text-neutral-500">
+        <p className="py-24 text-center text-sm leading-relaxed text-muted">
           아직 열린 모임이 없어요.
           <br />
           모임이 열리면 여기에서 안내할게요.
         </p>
       ) : (
-        <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
+        <div className="grid grid-cols-1 items-stretch gap-4 sm:grid-cols-2">
           {meetups.map((meetup, index) => (
             <MeetupCard
               key={meetup.id}

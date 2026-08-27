@@ -24,6 +24,8 @@
   --color-muted: #7a6b58; /* AA 맞춘 값. 더 밝게 바꾸지 않는다 */
   --color-rule: #ddd0bc;
   --color-rule-2: #8f8069; /* 입력창 테두리. 종이색 대비 3.39:1 */
+  --color-rule-hover: #b6a892; /* 카드 hover 전용. 입력창에는 --color-rule-2를 쓴다.
+                                  rule(#DDD0BC)과 rule-2(#8F8069)의 중점 */
   --color-accent: #4b7a5b; /* 주색. CTA */
   --color-accent-2: #3c6349;
   --color-accent-ink: #fdfbf5;
