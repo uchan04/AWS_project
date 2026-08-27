@@ -43,6 +43,7 @@ export type PetIconName =
   | "community"
   | "mission"
   | "meetup"
+  | "rest"
 
 export function PetIcon({ name }: { name: PetIconName }) {
   return (
@@ -174,6 +175,14 @@ function shapes(name: PetIconName) {
     // 점 셋을 갖고 있어서 26px에서 둘이 닮는다. 가운데 획만 짧아 목록으로 읽힌다
     case "menu":
       return <path data-f="stem" d="M4.6 7.6h14.8M4.6 12h10.4M4.6 16.4h14.8" />
+
+    // 잠시 쉬어가기 (초승달)
+    case "rest":
+      return (
+        <>
+          <path data-f="tan" d="M19.5 13.5A7 7 0 1 1 10.5 4.5A5.5 5.5 0 0 0 19.5 13.5Z" />
+        </>
+      )
 
     // 외출 잠김. 자물쇠다 — 몸통 한 칸 + 위로 걸린 고리 + 가운데 열쇠 구멍.
     // 🔒 이모지가 있던 자리다(외출 버튼이 1단계나 친밀도 부족일 때). 같은 줄에 SVG와

@@ -3367,26 +3367,6 @@
 
 /* ── 토스트 ──────────────────────────────────────────────────────────────── */
 
-/* 쉬는 화면(/pet/rest) 입구. 상단 나무판을 걷으면서 유일한 입구가 사라져 여기로 내렸다.
-   각주 크기다 — 눈에 띄는 자리에서 쉬기를 권하면 "쉬어라"는 지시가 된다.
-   밑줄은 남긴다. 이 크기·이 색에서 밑줄까지 빼면 링크로 안 읽힌다 */
-.pet__rest {
-  margin: var(--space-xs) 0 0;
-  text-align: center;
-  font-size: var(--text-label);
-}
-
-.pet__rest a {
-  color: var(--color-muted);
-  text-decoration: underline;
-  text-underline-offset: 0.2em;
-}
-
-.pet__rest a:hover {
-  color: var(--tribe-cta);
-}
-
-.pet-toast {
   position: fixed;
   bottom: var(--space-lg);
   left: 50%;
