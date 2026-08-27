@@ -127,7 +127,6 @@ export default function SkinList({
       : tab === "shop"
         ? skins.filter((row) => !row.owned)
         : skins
-  const sectionTitle = TABS.find((t) => t.key === tab)!.title
 
   return (
     <div className="pet-section" data-tribe={typeCode ?? undefined}>
@@ -145,9 +144,15 @@ export default function SkinList({
       ) : null}
 
 
-      {/* role="tab"을 쓰지 않는다 — 패널이 하나이고 화살표 키 이동까지 만들 화면이 아니다.
-          누른 상태는 aria-pressed가 나른다 */}
-      <div className="pet-tabs">
+      <div className="pet-shop-head" style={{ marginBottom: "16px" }}>
+        <h2 className="pet-shop-head__title">
+          <span className="pet-shop-head__bar" aria-hidden="true" />
+          펫 외형
+        </h2>
+        <span className="pet-shop-head__count">{filtered.length}개</span>
+      </div>
+
+      <div className="pet-tabs" style={{ marginBottom: "16px" }}>
         {TABS.map((t) => (
           <button
             key={t.key}
@@ -161,14 +166,6 @@ export default function SkinList({
             <span>{t.label}</span>
           </button>
         ))}
-      </div>
-
-      <div className="pet-shop-head">
-        <h2 className="pet-shop-head__title">
-          <span className="pet-shop-head__bar" aria-hidden="true" />
-          {sectionTitle}
-        </h2>
-        <span className="pet-shop-head__count">{filtered.length}개</span>
       </div>
 
       {filtered.length === 0 ? (
