@@ -619,70 +619,130 @@ function StepSection({ title, subtitle, missions, color, bg, unlocked = true, pr
         )}
       </div>
 
-      {focusCard}
+      {focusCard ? (
+        <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 12, alignItems: "stretch" }}>
+          {/* 왼쪽: 포커스 카드 — 오른쪽 2*2와 높이를 맞춘다 */}
+          <div style={{ display: "flex", flexDirection: "column", alignSelf: "stretch" }}>
+            {focusCard}
+          </div>
+          {/* 오른쪽: 나머지 최대 4개 2*2 그리드 */}
+          <div
+            style={{
+              display: "grid",
+              gridTemplateColumns: "1fr 1fr",
+              gap: 12,
+            }}
+          >
+            {missions.map((m) => {
+              const locked = !unlocked
+              const emoji = getEmojiForMission(m.title)
+              return (
+                <button
+                  key={m.id}
+                  onClick={() => !locked && onSelect(m)}
+                  disabled={locked}
+                  style={{
+                    display: "flex",
+                    flexDirection: "column",
+                    alignItems: "center",
+                    justifyContent: "center",
+                    background: m.completed ? bg : "#FDFBF5",
+                    border: `1.5px solid ${m.completed ? color : "#EDE5D0"}`,
+                    borderRadius: 16,
+                    padding: "14px 10px",
+                    cursor: locked ? "not-allowed" : "pointer",
+                    textAlign: "center",
+                    opacity: locked ? 0.5 : 1,
+                    transition: "all 0.15s",
+                  }}
+                  className={styles.missionCard}
+                >
+                  <div style={{ fontSize: 28, marginBottom: 6 }}>{locked ? "🔒" : emoji}</div>
+                  <p
+                    style={{
+                      fontFamily: "var(--font-display)",
+                      fontSize: 12,
+                      color: "#2A1F14",
+                      margin: 0,
+                      lineHeight: 1.4,
+                      fontWeight: m.completed ? 700 : 500,
+                    }}
+                  >
+                    {m.title}
+                  </p>
+                  {m.completed && (
+                    <span style={{ fontSize: 11, color, marginTop: 4, display: "block" }}>✓ 완료</span>
+                  )}
+                  {!m.completed && (
+                    <div style={{ marginTop: 6, fontSize: 10, color: "#7A6B58", display: "flex", flexWrap: "wrap", gap: 4, justifyContent: "center" }}>
+                      {m.reward.seeds > 0 && <span><CurrencyIcon currency="seed" size={12} /> {m.reward.seeds}</span>}
+                      {m.reward.affinity > 0 && <span><CurrencyIcon currency="affinity" size={12} /> {m.reward.affinity}</span>}
+                      {m.reward.starShards > 0 && <span><CurrencyIcon currency="starShard" size={12} /> {m.reward.starShards}</span>}
+                    </div>
+                  )}
+                </button>
+              )
+            })}
+          </div>
+        </div>
+      ) : (
+        <div
+          style={{
+            display: "grid",
+            gridTemplateColumns: "repeat(auto-fit, minmax(160px, 1fr))",
+            gap: 12,
+          }}
+        >
+          {missions.map((m) => {
+            const locked = !unlocked
+            const emoji = getEmojiForMission(m.title)
 
-      {/* auto-fit이다. auto-fill이 아니다 (2026-08-24 제보).
-          auto-fill은 컨테이너에 들어가는 트랙을 **개수와 무관하게** 다 만들어 둔다 —
-          800px / minmax(160px) = 4트랙인데 단계 미션은 3개라 4번째 칸이 빈 채로 남고
-          카드 3장이 191px로 쪼그라들었다(단계당 미션이 4개였던 시절의 배치다).
-          auto-fit은 빈 트랙을 접어서 3장이 258px씩 한 줄을 채운다.
-          개수를 3으로 못 박지 않는 이유는 이 컴포넌트를 일일 미션도 쓰기 때문이다 —
-          그쪽은 완료·집중 카드 선정에 따라 0~5개로 변한다. */}
-      <div
-        style={{
-          display: "grid",
-          gridTemplateColumns: "repeat(auto-fit, minmax(160px, 1fr))",
-          gap: 12,
-        }}
-      >
-        {missions.map((m) => {
-          const locked = !unlocked
-          const emoji = getEmojiForMission(m.title)
-
-          return (
-            <button
-              key={m.id}
-              onClick={() => !locked && onSelect(m)}
-              disabled={locked}
-              style={{
-                background: m.completed ? bg : "#FDFBF5",
-                border: `1.5px solid ${m.completed ? color : "#EDE5D0"}`,
-                borderRadius: 16,
-                padding: "18px 14px",
-                cursor: locked ? "not-allowed" : "pointer",
-                textAlign: "center",
-                opacity: locked ? 0.5 : 1,
-                transition: "all 0.15s",
-              }}
-              className={styles.missionCard}
-            >
-              <div style={{ fontSize: 32, marginBottom: 8 }}>{locked ? "🔒" : emoji}</div>
-              <p
+            return (
+              <button
+                key={m.id}
+                onClick={() => !locked && onSelect(m)}
+                disabled={locked}
                 style={{
-                  fontFamily: "var(--font-display)",
-                  fontSize: 13,
-                  color: "#2A1F14",
-                  margin: 0,
-                  lineHeight: 1.4,
-                  fontWeight: m.completed ? 700 : 500,
+                  background: m.completed ? bg : "#FDFBF5",
+                  border: `1.5px solid ${m.completed ? color : "#EDE5D0"}`,
+                  borderRadius: 16,
+                  padding: "18px 14px",
+                  cursor: locked ? "not-allowed" : "pointer",
+                  textAlign: "center",
+                  opacity: locked ? 0.5 : 1,
+                  transition: "all 0.15s",
                 }}
+                className={styles.missionCard}
               >
-                {m.title}
-              </p>
-              {m.completed && (
-                <span style={{ fontSize: 11, color, marginTop: 6, display: "block" }}>✓ 완료</span>
-              )}
-              {!m.completed && (
-                <div style={{ marginTop: 8, fontSize: 10, color: "#7A6B58", display: "flex", flexWrap: "wrap", gap: 4, justifyContent: "center" }}>
-                  {m.reward.seeds > 0 && <span><CurrencyIcon currency="seed" size={12} /> {m.reward.seeds}</span>}
-                  {m.reward.affinity > 0 && <span><CurrencyIcon currency="affinity" size={12} /> {m.reward.affinity}</span>}
-                  {m.reward.starShards > 0 && <span><CurrencyIcon currency="starShard" size={12} /> {m.reward.starShards}</span>}
-                </div>
-              )}
-            </button>
-          )
-        })}
-      </div>
+                <div style={{ fontSize: 32, marginBottom: 8 }}>{locked ? "🔒" : emoji}</div>
+                <p
+                  style={{
+                    fontFamily: "var(--font-display)",
+                    fontSize: 13,
+                    color: "#2A1F14",
+                    margin: 0,
+                    lineHeight: 1.4,
+                    fontWeight: m.completed ? 700 : 500,
+                  }}
+                >
+                  {m.title}
+                </p>
+                {m.completed && (
+                  <span style={{ fontSize: 11, color, marginTop: 6, display: "block" }}>✓ 완료</span>
+                )}
+                {!m.completed && (
+                  <div style={{ marginTop: 8, fontSize: 10, color: "#7A6B58", display: "flex", flexWrap: "wrap", gap: 4, justifyContent: "center" }}>
+                    {m.reward.seeds > 0 && <span><CurrencyIcon currency="seed" size={12} /> {m.reward.seeds}</span>}
+                    {m.reward.affinity > 0 && <span><CurrencyIcon currency="affinity" size={12} /> {m.reward.affinity}</span>}
+                    {m.reward.starShards > 0 && <span><CurrencyIcon currency="starShard" size={12} /> {m.reward.starShards}</span>}
+                  </div>
+                )}
+              </button>
+            )
+          })}
+        </div>
+      )}
+
     </section>
   )
 }
@@ -716,46 +776,43 @@ function DailyFocusCard({ mission, color, bg, remaining, onSelect }: DailyFocusC
       onClick={() => onSelect(mission)}
       className={styles.missionCard}
       style={{
-        display: "block",
+        display: "flex",
+        flexDirection: "column",
+        flex: 1,
         width: "100%",
+        height: "100%",
         textAlign: "left",
         background: bg,
         border: `2px solid ${color}`,
         borderRadius: 20,
         padding: "20px 22px",
-        marginBottom: 14,
         cursor: "pointer",
       }}
     >
-      <span style={{ fontSize: 12, fontWeight: 700, color }}>오늘 이거 하나만</span>
-      <div style={{ display: "flex", alignItems: "center", gap: 14, marginTop: 10 }}>
-        <span style={{ fontSize: 40, lineHeight: 1 }} aria-hidden="true">
+      <span style={{ fontSize: 12, fontWeight: 700, color, marginBottom: 12, textAlign: "center", width: "100%", display: "block" }}>오늘은 이거 하나만 해 봐요</span>
+      <div style={{ display: "flex", flexDirection: "column", alignItems: "center", justifyContent: "center", flex: 1, gap: 10 }}>
+        <span style={{ fontSize: 48, lineHeight: 1 }} aria-hidden="true">
           {getEmojiForMission(mission.title)}
         </span>
-        <span style={{ minWidth: 0 }}>
-          <p
-            style={{
-              fontFamily: "var(--font-display)",
-              fontSize: 17,
-              color: "#2A1F14",
-              margin: 0,
-              lineHeight: 1.4,
-            }}
-          >
-            {mission.title}
-          </p>
-          <p style={{ fontSize: 12, color: "#7A6B58", margin: "6px 0 0", display: "flex", gap: 8 }}>
-            {mission.reward.seeds > 0 && <span><CurrencyIcon currency="seed" size={12} /> {mission.reward.seeds}</span>}
-            {mission.reward.affinity > 0 && <span><CurrencyIcon currency="affinity" size={12} /> {mission.reward.affinity}</span>}
-            {mission.reward.starShards > 0 && <span><CurrencyIcon currency="starShard" size={12} /> {mission.reward.starShards}</span>}
-          </p>
-        </span>
+        <p
+          style={{
+            fontFamily: "var(--font-display)",
+            fontSize: 16,
+            color: "#2A1F14",
+            margin: 0,
+            lineHeight: 1.4,
+            textAlign: "center",
+          }}
+        >
+          {mission.title}
+        </p>
+        <p style={{ fontSize: 12, color: "#7A6B58", margin: 0, display: "flex", gap: 8, flexWrap: "wrap", justifyContent: "center" }}>
+          {mission.reward.seeds > 0 && <span><CurrencyIcon currency="seed" size={12} /> {mission.reward.seeds}</span>}
+          {mission.reward.affinity > 0 && <span><CurrencyIcon currency="affinity" size={12} /> {mission.reward.affinity}</span>}
+          {mission.reward.starShards > 0 && <span><CurrencyIcon currency="starShard" size={12} /> {mission.reward.starShards}</span>}
+        </p>
       </div>
-      {/* 남은 개수를 숨기지 않는다. 하나만 보여 주는 것과 나머지를 감추는 것은 다르다 —
-          감추면 "다 했나?" 확인하러 새로고침하게 된다 */}
-      <p style={{ fontSize: 11, color: "#7A6B58", margin: "12px 0 0" }}>
-        {remaining > 0 ? `나머지 ${remaining}개는 아래에 있어요` : "오늘 남은 건 이거 하나예요"}
-      </p>
+
     </button>
   )
 }
@@ -1028,20 +1085,33 @@ export default function MissionDashboard({
         </div>
       )}
 
-      <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(140px, 1fr))", gap: 12, marginBottom: 24 }}>
+      <div style={{ display: "grid", gridTemplateColumns: "repeat(3, 1fr)", gap: 12, marginBottom: 24 }}>
         <ProgressCard
-          title="오늘 달성률"
-          value={`${dashboard.progress.dailyCompleted} / ${dashboard.progress.dailyTotal}`}
+          title="오늘 클리어한 미션 개수"
+          value={`${dashboard.progress.dailyCompleted}개`}
           color={color}
           bg={bg}
         />
         <ProgressCard
-          title="이번 주"
-          value={`${dashboard.progress.weeklyCompleted} / ${dashboard.progress.weeklyTotal}`}
+          title="이번 주 클리어 한 미션 개수"
+          value={`${dashboard.progress.weeklyCompleted}개`}
           color={color}
           bg={bg}
         />
-        <ProgressCard title="연속 달성" value={`${dashboard.progress.streak}일`} color={color} bg={bg} />
+        {(() => {
+          const currentStage = dashboard.stageMissions.find((sm) => sm.stage === dashboard.stages.current)
+          const remaining = currentStage
+            ? currentStage.missions.length - currentStage.completedCount
+            : null
+          return (
+            <ProgressCard
+              title="다음 단계까지 남은 미션"
+              value={dashboard.stages.graduated ? "졸업" : remaining !== null ? `${remaining}개` : "-"}
+              color={color}
+              bg={bg}
+            />
+          )
+        })()}
       </div>
 
       <div style={{ marginBottom: 36 }}>
@@ -1060,19 +1130,15 @@ export default function MissionDashboard({
       </div>
 
       {(() => {
-        // 아직 안 한 일일 미션 중 첫 번째를 오늘의 하나로 잡는다. 서버가 이미
-        // order로 정렬해 내려준다(lib/missions/dashboard.ts) — 여기서 다시 정렬하지 않는다.
         const undone = dashboard.dailyMissions.filter((m) => !m.completed)
         const focus = undone[0]
-        // focus는 아래 목록에서 뺀다. 같은 미션이 두 번 나오면 두 번째 것을 눌러도
-        // 같은 모달이 열려 사용자는 카드가 두 개인 이유를 찾게 된다
         const rest = focus ? dashboard.dailyMissions.filter((m) => m.id !== focus.id) : dashboard.dailyMissions
 
         return (
           <>
             <StepSection
               title="일일 미션"
-              subtitle={focus ? "나머지는 여기 있어요" : "오늘 다 했어요. 내일 또 만나요"}
+              subtitle={dashboard.dailyMissions.every((m) => m.completed) ? "오늘 다 했어요. 내일 또 만나요" : undefined}
               missions={rest}
               color={color}
               bg={bg}
@@ -1095,13 +1161,9 @@ export default function MissionDashboard({
       })()}
 
       {(() => {
-        // 모든 단계 표시 (잠김 포함)
         const allMissions = dashboard.stageMissions
         if (allMissions.length === 0) return null
 
-        // 서버는 지금 단계 앞뒤 2칸만 보내준다(lib/missions/dashboard.ts STAGE_WINDOW).
-        // 기본으로 보여줄 칸은 "지금 서 있는 단계"다 — 100단계 캐러셀을 1단계부터 열면
-        // 37단계 사용자가 화살표를 36번 눌러야 한다
         const defaultIndex = Math.max(
           0,
           allMissions.findIndex((sm) => sm.stage === dashboard.stages.current),
@@ -1116,37 +1178,7 @@ export default function MissionDashboard({
 
         return (
           <div style={{ marginBottom: 36 }}>
-            <div>
-              <div
-                style={{
-                  display: "flex",
-                  alignItems: "baseline",
-                  justifyContent: "space-between",
-                  gap: 8,
-                }}
-              >
-                <h2
-                  style={{
-                    fontFamily: "var(--font-display)",
-                    fontSize: 19,
-                    color: "#2A1F14",
-                    margin: "0 0 4px",
-                  }}
-                >
-                  단계 미션
-                </h2>
-                <span style={{ fontSize: 12, color: "#7A6B58" }}>
-                  {dashboard.stages.current} / {dashboard.stages.total} 단계
-                </span>
-              </div>
-              <p style={{ fontSize: 12, color: "#7A6B58", margin: "0 0 14px" }}>
-                {dashboard.stages.graduated
-                  ? "100단계를 모두 지났어요. 여기까지 온 것 자체가 결과예요."
-                  : "3개 중 2개를 하면 다음 단계가 열려요"}
-              </p>
-            </div>
             <div style={{ position: "relative" }}>
-              {/* 왼쪽 화살표. ◀만 두면 스크린리더가 문자 이름을 읽거나 아무것도 읽지 않는다 */}
               <button
                 type="button"
                 aria-label="이전 단계 보기"
@@ -1169,15 +1201,11 @@ export default function MissionDashboard({
               >
                 ◀
               </button>
-
-              {/* 오른쪽 화살표 */}
               <button
                 type="button"
                 aria-label="다음 단계 보기"
                 onClick={() => {
-                  if (hasNext) {
-                    setStageIndexOverride(Math.min(allMissions.length - 1, currentStageIndex + 1))
-                  }
+                  if (hasNext) setStageIndexOverride(Math.min(allMissions.length - 1, currentStageIndex + 1))
                 }}
                 disabled={!hasNext}
                 style={{
@@ -1197,7 +1225,6 @@ export default function MissionDashboard({
               >
                 ▶
               </button>
-
               <StepSection
                 title={`${currentMission.stage}단계 · ${currentMission.bandLabel}`}
                 missions={currentMission.missions}
@@ -1216,6 +1243,7 @@ export default function MissionDashboard({
           </div>
         )
       })()}
+
 
       {selected && (
         <MissionModal
