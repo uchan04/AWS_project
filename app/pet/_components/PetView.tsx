@@ -1928,8 +1928,8 @@ export default function PetView({ initial }: { initial: PetState }) {
               maxWidth: "90%", 
               maxHeight: "90%",
               borderRadius: "var(--radius-card)",
-              border: "var(--pet-chip-ring)",
-              boxShadow: "0 12px 40px rgba(0,0,0,0.3)",
+              border: "8px solid var(--color-card)",
+              boxShadow: "0 16px 48px rgba(0,0,0,0.4)",
               backgroundColor: "var(--color-card)"
             }}
           />
