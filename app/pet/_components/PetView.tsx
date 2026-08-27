@@ -1089,10 +1089,10 @@ export default function PetView({ initial }: { initial: PetState }) {
                 outing.available
                   ? { icon: <PetIcon name="diary" />, label: "여행일기", go: openHistory, on: modal === "history" }
                   : null,
-                { icon: <PetIcon name="chart" />, label: "오늘의 활동", go: () => setModal("today"), on: modal === "today" },
-                { icon: <PetIcon name="shop" />, label: "상점", go: () => router.push("/pet/shop"), on: false },
-                { icon: <PetIcon name="info" />, label: "펫 정보", go: () => setModal("info"), on: modal === "info" },
                 { icon: <PetIcon name="rest" />, label: "잠시 쉬어가기", go: () => router.push("/pet/rest"), on: false },
+                { icon: <PetIcon name="shop" />, label: "상점", go: () => router.push("/pet/shop"), on: false },
+                { icon: <PetIcon name="chart" />, label: "오늘의 활동", go: () => setModal("today"), on: modal === "today" },
+                { icon: <PetIcon name="info" />, label: "펫 정보", go: () => setModal("info"), on: modal === "info" },
               ]
                 // `filter` + 타입 술어였다. 아이콘이 이모지 문자열에서 JSX로 바뀌면서 술어에
                 // 적을 타입이 `JSX.Element`가 되고, 그러면 아이콘을 바꿀 때마다 이 줄도 같이
@@ -1897,7 +1897,7 @@ export default function PetView({ initial }: { initial: PetState }) {
       {playingAnimation ? (
         <div
           style={{
-            position: "fixed",
+            position: "absolute",
             top: 0,
             left: 0,
             right: 0,
@@ -1933,7 +1933,7 @@ export default function PetView({ initial }: { initial: PetState }) {
       {outing.state === "RETURNED" && !hasSeenReturnPopup ? (
         <div
           style={{
-            position: "fixed",
+            position: "absolute",
             top: 0,
             left: 0,
             right: 0,
