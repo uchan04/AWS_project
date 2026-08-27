@@ -10,6 +10,7 @@ import styles from "./Sidebar.module.css"
 import { useModalA11y } from "./useModalA11y"
 import { ArtImage } from "./ArtImage"
 import { CurrencyIcon } from "./CurrencyIcon"
+import { CurrencyInfoModal } from "@/app/chat/_components/CurrencyInfoModal"
 
 function getBgColor(hex: string): string {
   // colorHex → 배경색 (약한 톤)
@@ -268,6 +269,7 @@ export function Sidebar({ profile }: { profile: SidebarProfile | null }) {
                   {tribe?.emoji || "🌱"} {familyLabel}
                 </p>
               </div>
+              <CurrencyInfoModal />
             </div>
             <div style={{ display: "flex", flexDirection: "column", gap: 3, fontSize: 11, color: "#7A6B58", marginTop: 8 }}>
               <span><CurrencyIcon currency="seed" size={12} /> 씨앗 {profile.seeds}개</span>
