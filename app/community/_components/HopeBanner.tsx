@@ -1,36 +1,32 @@
-import { TRIBE } from "@/lib/types"
-import type { GalleryTab } from "../_lib/gallery"
-import { pickHopeMessage } from "../_lib/banner"
+import { HOPE_BANNER, PROMO_BANNERS, bannerUrl } from "../_lib/banners"
+import { HopeCarousel, type CarouselBanner } from "./HopeCarousel"
 
 /**
- * 희망 문구 배너(SPEC.md 9절). 서버 컴포넌트다 — 상호작용이 없어 클라이언트로 내릴 이유가 없다.
+ * 커뮤니티 메인 캐러셀(SPEC.md 9절). **서버 컴포넌트로 남긴다** — 상태가 필요한 회전은
+ * `HopeCarousel`("use client")이 맡고, 여기는 키를 URL로 바꾸는 일만 한다.
  *
- * 색은 유저의 종족이 아니라 지금 보고 있는 gallery를 따른다. 전체 탭에서는 중립색,
- * 종족 갤러리에서는 그 종족색이라 배너가 "지금 어느 공간에 있는지"를 같이 알려준다.
+ * **2026-08-27: 슬라이드가 전부 이미지가 됐다.** 희망 문구도 텍스트로 그리지 않고
+ * 이미지 한 장으로 만들어 첫 장에 둔다. 그래서 이 컴포넌트에서 갤러리를 알 필요가 없어졌다 —
+ * 종족색·이모지·주간 문구 계산이 전부 빠지고 `gallery` prop도 지웠다.
+ * 갤러리별 희망 이미지가 필요해지면 `_lib/banners.ts`의 HOPE_BANNER를 Record로 바꾸고
+ * 여기서 고르면 된다(그 파일 주석 참고).
+ *
+ * **URL이 하나도 만들어지지 않으면 null을 반환한다.** CLOUDFRONT_DOMAIN이 비어 있는
+ * 로컬이 그 경우다. 예전에는 문구 슬라이드가 텍스트라 그것만 남았지만, 이제 전부
+ * 이미지라 남을 것이 없다 — 빈 액자를 그리느니 자리를 비운다.
  */
-export function HopeBanner({ gallery }: { gallery: GalleryTab }) {
-  const isAll = gallery === "ALL"
-  const tribe = isAll ? null : TRIBE[gallery]
+export function HopeBanner() {
+  /*
+   * 키를 절대 URL로 바꾼다. bannerUrl()이 null이면(도메인 미설정) 그 장을 뺀다.
+   * 희망 이미지가 첫 장이다 — 배너는 외부 기관 홍보이고 희망 문구는 이 서비스가 하는
+   * 말이라, 처음 보이는 것이 남의 배너면 순서가 뒤집힌다.
+   */
+  const banners: CarouselBanner[] = [HOPE_BANNER, ...PROMO_BANNERS].flatMap((banner) => {
+    const src = bannerUrl(banner.key)
+    return src ? [{ src, alt: banner.alt, href: banner.href }] : []
+  })
 
-  return (
-    <div
-      className={"flex items-center gap-4 rounded-2xl border p-5 " + (isAll ? "border-neutral-200 bg-neutral-50" : "")}
-      // 종족색은 Tailwind로 표현할 수 없어 인라인이다. 22/55는 PostCard의 연한 배경 관습을 따른다.
-      style={tribe ? { backgroundColor: `${tribe.colorHex}22`, borderColor: `${tribe.colorHex}55` } : undefined}
-    >
-      <span aria-hidden="true" className="text-4xl">
-        {tribe ? tribe.emoji : "🌿"}
-      </span>
-      {/* 라벨과 문구는 한 <p> 안의 인라인 span 두 개다. 세로로 쌓지 않는다. */}
-      <p className="text-base leading-relaxed text-neutral-900">
-        {tribe && (
-          // 글자라 종족색 원본을 쓴다. 22/55 알파는 면(배경·테두리)용이라 글자에 쓰면 안 읽힌다.
-          <span className="font-bold" style={{ color: tribe.colorHex }}>
-            {tribe.animal}족에게:{" "}
-          </span>
-        )}
-        {pickHopeMessage(gallery)}
-      </p>
-    </div>
-  )
+  if (banners.length === 0) return null
+
+  return <HopeCarousel banners={banners} />
 }

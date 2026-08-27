@@ -27,6 +27,45 @@ const WALL_H = 210 // 300의 70%
 const STRIPE_COUNT = 13
 const PLANK_COUNT = 9
 
+// ── 책장 (2026-08-26 사용자 요청으로 화분을 갈았다) ────────────────────────────
+//
+// **x가 24 → 64로 옮겨 간 이유는 잘림이다.** 이 SVG는 preserveAspectRatio="xMidYMid slice"
+// 라서 방이 세로로 길어지면 좌우가 잘린다. 방 폭 352 · 높이 352일 때 배율이
+// max(352/400, 352/300) = 1.173이고 잘려 나가는 폭이 한쪽 (469 − 352) / 2 = 58.5px =
+// **50 좌표**다. 옛 화분(x 16~56)은 그 안에 거의 다 들어가서 화면에서는 왼쪽 끝에 초록
+// 조각만 보였다. 64에서 시작하면 그 폭에서도, 넓은 방(잘림 7좌표)에서도 온전히 보인다.
+// 벽에 붙여 세운 물건이라는 읽기는 그대로다 — 왼쪽 여백이 조금 늘어난 것뿐이다.
+const SHELF_X = 64
+const SHELF_W = 60
+const SHELF_TOP = 126
+const SHELF_BOTTOM = 204 // 걸레받이 윗선. 옛 화분 밑면과 같은 값이라 서는 자리가 안 바뀐다
+const SHELF_BOARD_H = 4
+// 선반 4장의 윗면 y. 첫 장이 천판, 마지막이 밑판이고 사이 두 장이 칸을 셋으로 가른다
+const SHELF_BOARDS = [SHELF_TOP, 152, 178, SHELF_BOTTOM - SHELF_BOARD_H]
+
+// 칸마다 책 5권. 폭을 조금씩 달리해 손으로 꽂은 것처럼 보이게 한다 —
+// 다 같은 폭이면 격자로 읽혀 책장이 아니라 표가 된다.
+// 좌우로 5씩 들여 시작하므로 안쪽 폭이 50이고, 폭 합(35) + 틈 4 = 39이라 오른쪽이
+// 11만큼 빈다. **꽉 채우지 않는 것이 의도다** — 다 채우면 책이 벽에 눌린 것으로 보인다.
+const SHELF_ROWS = [
+  { base: 152, widths: [7, 5, 9, 6, 8] },
+  { base: 178, widths: [6, 9, 5, 8, 7] },
+  { base: SHELF_BOTTOM - SHELF_BOARD_H, widths: [8, 6, 7, 5, 9] },
+]
+
+// 책 사각형을 미리 계산한다. JSX 안에서 x를 누적하면 map이 부수효과를 갖게 된다.
+// 높이는 18/16/14 셋을 돌린다 — 위 칸 높이가 가장 낮은 곳(밑칸 18)에서도 위 선반에
+// 닿지 않는 값이다(밑칸: 200 − 18 = 182, 그 위 선반 밑면이 182).
+const SHELF_BOOKS = SHELF_ROWS.flatMap((row, ri) => {
+  let x = SHELF_X + 5
+  return row.widths.map((w, bi) => {
+    const h = 18 - ((ri + bi) % 3) * 2
+    const book = { key: `${ri}-${bi}`, x, y: row.base - h, w, h, tone: (ri * 2 + bi) % 4 }
+    x += w + 1
+    return book
+  })
+})
+
 export default function PetRoom({ imageUrl }: { imageUrl?: string | null }) {
   return (
     <>
@@ -92,15 +131,78 @@ function RoomSvg() {
       <line className="pet-room__frame-bar" x1={332} y1={15} x2={332} y2={129} />
       <line className="pet-room__frame-bar" x1={288} y1={72} x2={376} y2={72} />
 
-      {/* 커튼 */}
-      <path className="pet-room__curtain" d="M 288 15 Q 296 72 288 129 L 280 129 L 280 15 Z" />
-      <path className="pet-room__curtain" d="M 376 15 Q 368 72 376 129 L 384 129 L 384 15 Z" />
+      {/* 창틀 선반. 창 아래에 붙는 널이고 그 위에 화분이 앉는다 (2026-08-26 사용자 요청).
+          창 아래 끝이 y=129이므로 선반 윗면을 거기에 맞춘다. 좌우로 6씩 내밀어(282~382)
+          창틀보다 넓게 — 선반이 창과 같은 폭이면 벽에서 튀어나온 널로 안 읽힌다 */}
+      <rect className="pet-room__sill" x={282} y={129} width={100} height={6} rx={2} />
 
-      {/* 화분 */}
-      <rect className="pet-room__pot" x={24} y={180} width={24} height={24} rx={3} />
-      <ellipse className="pet-room__leaf" cx={36} cy={180} rx={20} ry={9} />
-      <ellipse className="pet-room__leaf" cx={28} cy={171} rx={12} ry={12} />
-      <ellipse className="pet-room__leaf" cx={44} cy={171} rx={12} ry={12} />
+      {/* 창틀 화분 (2026-08-26 사용자 요청 "창문틀에 화분도 올려줘").
+          선반 윗면(y=129)에 밑면을 붙인다. 자리는 창의 **왼쪽 3분의 1**이다 — 이 SVG는
+          slice로 잘려서 오른쪽이 먼저 사라지므로(좁은 방에서 보이는 x가 50~350) 창 안에서도
+          왼쪽에 두는 쪽이 오래 남는다.
+          화분은 아래가 좁은 사다리꼴 + 테두리 띠, 잎은 방 안 책장과 겹치지 않는 작은 셋이다 */}
+      <path className="pet-room__pot" d="M296 116h18l-2.5 13h-13z" />
+      <rect className="pet-room__pot-rim" x={294} y={113} width={22} height={4} rx={1.5} />
+      <ellipse className="pet-room__sprout" cx={299} cy={108} rx={5} ry={7} />
+      <ellipse className="pet-room__sprout" cx={311} cy={108} rx={5} ry={7} />
+      <ellipse className="pet-room__sprout" cx={305} cy={103} rx={5} ry={8} />
+
+      {/* 커튼 (2026-08-26 사용자 요청으로 다시 그렸다).
+          전에는 창 좌우에 8좌표짜리 얇은 조각 두 장이라 커튼으로 안 읽혔다.
+          지금은 봉 + 좌우 드레이프 두 장이고, 드레이프 안쪽 변에 주름 두 번을 넣었다
+          (Q 두 번 = 접힌 천). 폭은 22좌표씩이라 창 유리를 8좌표만 덮는다 — 창밖 하늘을
+          가리지 않으면서 천이 걸려 있는 것으로 보이는 최소 폭이다 */}
+      <rect className="pet-room__rod" x={272} y={9} width={120} height={4} rx={2} />
+      <circle className="pet-room__rod-cap" cx={274} cy={11} r={4} />
+      <circle className="pet-room__rod-cap" cx={390} cy={11} r={4} />
+      <path
+        className="pet-room__curtain"
+        d="M276 13h22c-6 14 6 26-2 40s4 26-2 40 4 20 0 27h-18z"
+      />
+      <path
+        className="pet-room__curtain"
+        d="M388 13h-22c6 14-6 26 2 40s-4 26 2 40-4 20 0 27h18z"
+      />
+
+      {/* 책장. 2026-08-26 사용자 요청으로 화분(pot + leaf 3장)을 갈았다.
+          뒷판을 먼저 깔고 선반 4장을 그 위에, 책을 맨 위에 둔다 — 순서를 바꾸면
+          불투명한 뒷판이 책을 덮는다 (파일 위 SHELF_* 상수의 좌표 근거 참고) */}
+      <rect
+        className="pet-room__shelf"
+        x={SHELF_X}
+        y={SHELF_TOP}
+        width={SHELF_W}
+        height={SHELF_BOTTOM - SHELF_TOP}
+        rx={2}
+      />
+      {SHELF_BOOKS.map((b) => (
+        <rect
+          className="pet-room__book"
+          data-tone={b.tone}
+          key={b.key}
+          x={b.x}
+          y={b.y}
+          width={b.w}
+          height={b.h}
+          rx={1}
+        />
+      ))}
+      {SHELF_BOARDS.map((y) => (
+        <rect
+          className="pet-room__shelf-board"
+          key={y}
+          x={SHELF_X}
+          y={y}
+          width={SHELF_W}
+          height={SHELF_BOARD_H}
+          rx={1}
+        />
+      ))}
+      {/* 여기에 책장 위 "일기장" 딱지(`.pet-room__shelf-label`)가 있었다 —
+          천판 위 6좌표, 책장 가로 가운데, --font-body 10좌표였다.
+          **2026-08-26 같은 날 사용자 요청으로 지웠다.** 되살릴 값은 그 한 줄이고
+          자리는 `x={SHELF_X + SHELF_W / 2} y={SHELF_TOP - 6}`이다.
+          CSS 규칙도 함께 걷었다(pet.css의 그 자리 주석) */}
 
       {/* 러그 */}
       <ellipse className="pet-room__rug" cx={200} cy={246} rx={120} ry={24} />

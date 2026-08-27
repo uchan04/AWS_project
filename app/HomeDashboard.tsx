@@ -114,7 +114,7 @@ export default function HomeDashboard({
             <p className="hm__note">{greeting || " "}</p>
             <h1 className="hm-home__name">{nickname}</h1>
             <span className="hm-pill">
-              <span aria-hidden="true">{tribe.emoji}</span> {tribe.family}
+              <span aria-hidden="true">{tribe.emoji}</span> {tribe.animal}
             </span>
           </div>
           {/* 활성 스킨의 현재 단계 그림. 아트는 public/art/pets에 구워져 있다(scripts/slice-art.ts).
@@ -205,7 +205,6 @@ export default function HomeDashboard({
           <div className="hm-card hm-card--tribe">
             <div className="hm-card__head">
               <h2 className="hm-card__title">키우기</h2>
-              <span className="hm__note">{tribe.colorName}</span>
             </div>
             <p className="hm__note">씨앗을 모아 함께 자라요.</p>
             <Link href="/pet" className="hm-btn hm-card__cta">

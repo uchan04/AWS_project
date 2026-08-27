@@ -2,7 +2,6 @@ import { redirect } from "next/navigation"
 import type { TypeCode } from "@prisma/client"
 import { UnauthorizedError, getCurrentUser } from "@/lib/auth"
 import { TRIBE } from "@/lib/types"
-import Link from "next/link"
 import { GalleryTabs } from "./_components/GalleryTabs"
 import { HopeBanner } from "./_components/HopeBanner"
 import { PostList } from "./_components/PostList"
@@ -46,24 +45,24 @@ export default async function CommunityPage(props: PageProps<"/community">) {
     if (error instanceof UnauthorizedError) redirect("/login?next=%2Fcommunity")
     console.error("[/community]", error)
     return (
-      <main className="mx-auto flex max-w-3xl flex-col gap-6 p-4 sm:p-6">
-        <h1 className="text-xl font-bold text-neutral-900">커뮤니티</h1>
-        <div className="rounded-2xl bg-white p-8 text-center">
-          <p className="text-sm text-neutral-700">글을 불러오지 못했어요</p>
-          <p className="mt-2 text-sm leading-relaxed text-neutral-500">잠시 후 다시 들어와 주세요.</p>
+      <main className="mx-auto flex max-w-5xl flex-col gap-5 p-4 sm:p-6">
+        <h1 className="font-display text-xl text-ink">커뮤니티</h1>
+        <div className="rounded-card bg-card p-8 text-center">
+          <p className="text-sm text-ink-2">글을 불러오지 못했어요</p>
+          <p className="mt-2 text-sm leading-relaxed text-muted">잠시 후 다시 들어와 주세요.</p>
         </div>
       </main>
     )
   }
 
   return (
-    <main className="mx-auto flex max-w-3xl flex-col gap-6 p-4 sm:p-6">
+    <main className="mx-auto flex max-w-5xl flex-col gap-5 p-4 sm:p-6">
       <MeetupNotice notices={notices} />
 
       <div className="flex flex-wrap items-end justify-between gap-3">
         <div>
-          <h1 className="text-xl font-bold text-neutral-900">커뮤니티</h1>
-          <p className="mt-1 text-sm text-neutral-500">
+          <h1 className="font-display text-xl text-ink">커뮤니티</h1>
+          <p className="mt-1 text-sm text-muted">
             {/* "나만 볼 수 있어요"는 관리자에게 사실이 아니다 — 관리자는 모든 종족을 본다.
                 관리자는 읽기·쓰기가 모두 열려 갤러리마다 할 수 있는 일이 다르지 않으므로
                 한 갈래로 둔다. 신분은 탭 줄이 한 번만 알린다(GalleryTabs) */}
@@ -82,29 +81,13 @@ export default async function CommunityPage(props: PageProps<"/community">) {
 
       <GalleryTabs active={gallery} myTypeCode={myTypeCode} isAdmin={isAdmin} />
 
-      {/* 오프라인 모임 입구 (2026-08-26, A). **사이드바 `모임` 탭을 여기로 내렸다** —
-          모임은 커뮤니티의 한 형태이고 탭 하나를 쓸 만큼의 사용 빈도가 아니다
-          (탭 5 → 3, app/components/Sidebar.tsx 주석).
-          라우트(`/community/meetups`)는 그대로다. 탭 대신 이 줄이 유일한 입구가 되므로
-          위쪽(탭 바로 아래)에 둔다 — 글 목록 아래에 두면 스크롤해야 찾는다.
-          `MeetupNotice`가 이미 맨 위에 있으므로 알림이 있을 때는 그쪽이 먼저 눈에 온다 */}
-      <Link
-        href="/community/meetups"
-        className="flex items-center justify-between rounded-2xl border border-neutral-200 bg-white px-4 py-3 text-sm transition-colors hover:bg-neutral-50"
-      >
-        <span className="flex items-center gap-2 font-semibold text-neutral-900">
-          <span aria-hidden="true">🤝</span> 오프라인 모임
-        </span>
-        <span className="text-neutral-500">보러 가기 →</span>
-      </Link>
-
       {/* 희망 문구 배너(SPEC 9절). 탭 아래에 둔다 — 배너 문구가 지금 고른 탭에 따라
           갈리므로("고양잇과족에게:"), 원인인 탭이 결과인 배너보다 위에 있어야 읽힌다.
           위에 두면 아래 탭을 눌러 위가 바뀌는 순서가 된다 */}
-      <HopeBanner gallery={gallery} />
+      <HopeBanner />
 
       {posts.length === 0 ? (
-        <p className="py-24 text-center text-sm leading-relaxed text-neutral-500">
+        <p className="py-24 text-center text-sm leading-relaxed text-muted">
           아직 글이 없어요.
           <br />
           첫 번째 이야기를 들려주세요.

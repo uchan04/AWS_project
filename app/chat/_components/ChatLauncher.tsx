@@ -3,6 +3,7 @@
 import { useEffect, useState } from "react"
 import { usePathname } from "next/navigation"
 import { CHAT_BUBBLES } from "../_lib/bubbles"
+import { CHAT_OPEN_EVENT } from "../_lib/events"
 import { ChatPanel } from "./ChatPanel"
 
 // 챗봇 버튼을 띄우는 화면. 홈·미션·키우기·커뮤니티 네 곳만이다(2026-08-21 확정 흐름).
@@ -44,6 +45,19 @@ export function ChatLauncher({ diagnosed }: { diagnosed: boolean }) {
     return () => window.clearTimeout(timer)
   }, [])
 
+  // **밖에서 여는 창구** (2026-08-26 사용자 요청, A 구현 — D 통보).
+  // 펫 화면이 자기 HUD에 챗봇 버튼을 갖게 되면서 필요해졌다. 이벤트로 둔 이유는
+  // `_lib/events.ts` 주석에 있다 — 요약하면 layout.tsx가 서버 컴포넌트라 상태를 못 들고,
+  // 그래서 이 래퍼가 상태를 갖고 있는 구조 자체가 props 전달을 막는다.
+  //
+  // 이 컴포넌트가 안 그려지는 화면(진단 전·허용 목록 밖)에서는 리스너도 없으므로
+  // 이벤트를 쏴도 아무 일이 없다 — 그쪽이 맞다. 챗봇이 없어야 하는 화면이다.
+  useEffect(() => {
+    const onOpen = () => setOpen(true)
+    window.addEventListener(CHAT_OPEN_EVENT, onOpen)
+    return () => window.removeEventListener(CHAT_OPEN_EVENT, onOpen)
+  }, [])
+
   // 마운트된 프레임에 최종 상태를 칠하면 전환이 생기지 않는다. 한 프레임 뒤에 올린다.
   useEffect(() => {
     if (!bubble) return
@@ -56,26 +70,34 @@ export function ChatLauncher({ diagnosed }: { diagnosed: boolean }) {
   // 패널이 열려 있는 동안에는 말풍선도 함께 사라진다 — 이미 말을 걸고 있는데 또 부를 이유가 없다.
   if (open) return <ChatPanel onClose={() => setOpen(false)} />
 
-  // 크기: 2026-08-24 사용자 요청("챗봇 아이콘의 크기를 1.5배 더 키워줘", 펫 화면에서 봤다).
-  // 이 버튼은 전역 오버레이라 네 화면(홈·미션·펫·커뮤니티)에서 함께 커진다 — 펫 화면만
-  // 키우려면 펫 CSS에 예외를 두어야 하고, 그러면 화면을 옮길 때 아이콘 크기가 바뀌어
-  // 보인다. 사용자가 네 화면 다 키우는 쪽으로 결정했다.
-  // h-12/w-12(48px) → 4.5rem(72px), 이모지 text-xl(20px) → text-3xl(30px)로 둘 다 1.5배다
-  // (원만 키우면 여백만 늘고, 이모지만 키우면 원에 꽉 찬다).
-  // 챗봇은 D 담당이고 이 파일도 D의 것이다 — className 한 줄만 바꿨고 D에게 알린다.
+  // **`/pet`에서는 떠 있는 버튼과 말풍선을 감춘다** (2026-08-26 사용자 요청).
+  // 그 화면이 챗봇 버튼을 자기 HUD(우측 스택)에 갖고 있어서 두 벌이 되고, 전역 오버레이가
+  // `fixed top-4 right-4`라 좁은 화면에서 페이지 머리("나의 펫")를 덮는 문제도 있었다
+  // (C가 2026-08-26 기록에 "이번 변경과 무관한 기존 상태이고 D 파일이다"로 남긴 것).
   //
-  // 머지(2026-08-24, C): develop이 같은 날 이 컴포넌트에 말풍선을 넣었다(c31f802).
-  // **말풍선 구조는 develop 것을 그대로 쓰고, 크기만 위 결정대로 얹었다.** 말풍선은 D가
-  // 만든 기능이고 크기는 사용자 요청이라 둘 중 하나를 버릴 이유가 없다. 바뀐 것은
-  // 아래 버튼의 h-12 w-12 text-xl → h-[4.5rem] w-[4.5rem] text-3xl 한 줄뿐이고,
-  // develop이 새로 넣은 shrink-0·바깥 div·gap-2는 손대지 않았다
+  // **위 리스너보다 아래에 둔다.** 감추는 것은 버튼뿐이고 패널은 그대로 열린다 —
+  // 이 return이 리스너 등록보다 위에 오면 훅이 조건부로 호출돼 규칙 위반이다.
+  //
+  // 정확히 "/pet"만이다. `/pet/skins`·`/pet/cosmetics`·`/pet/rest`에는 HUD가 없으므로
+  // 접두사로 감추면 그 세 화면에서 챗봇에 닿을 길이 사라진다.
+
+  // 크기: **2026-08-26 사용자 요청으로 1.5배를 되돌렸다.** h-12 w-12 text-xl(48px·20px)이
+  // 원래 값이고 D가 쓴 그대로다.
+  //
+  // 내력: 2026-08-24에 사용자 요청("챗봇 아이콘의 크기를 1.5배 더 키워줘")으로
+  // h-[4.5rem] w-[4.5rem] text-3xl(72px·30px)로 키웠다(08c054e). 전역 오버레이라 네 화면
+  // (홈·미션·펫·커뮤니티)이 함께 커졌고, 같은 사용자가 08-26에 되돌리기로 결정했다.
+  // **되돌린 것은 이 className 한 줄뿐이다** — develop이 같은 날 넣은 말풍선 구조
+  // (c31f802의 바깥 div·gap-2·shrink-0)는 그때도 손대지 않았고 지금도 그대로다.
+  //
+  // 챗봇은 D 담당이고 이 파일도 D의 것이다 — 키울 때도 되돌릴 때도 D에게 알린다.
   return (
-    <div className="fixed top-4 right-4 z-40 flex items-center gap-2">
+    <div className="fixed top-4 right-4 z-[200] flex items-center gap-2">
       {bubble && !dismissed && (
         // 버튼 왼쪽에 붙는다. 나타날 때 버튼 쪽에서 밀려나오도록 오른쪽에서 들어온다.
         <div
           className={
-            "flex items-center gap-0.5 rounded-2xl bg-white py-1.5 pr-1.5 pl-3.5 shadow-lg transition duration-200 ease-out " +
+            "flex items-center gap-0.5 rounded-2xl bg-card py-1.5 pr-1.5 pl-3.5 shadow-lg transition duration-200 ease-out " +
             (bubbleShown ? "" : "motion-safe:translate-x-2 motion-safe:opacity-0")
           }
         >
@@ -84,7 +106,7 @@ export function ChatLauncher({ diagnosed }: { diagnosed: boolean }) {
           <button
             type="button"
             onClick={() => setOpen(true)}
-            className="text-sm whitespace-nowrap text-neutral-700 transition duration-150 hover:text-neutral-900"
+            className="text-sm whitespace-nowrap text-ink-2 transition duration-150 hover:text-ink"
           >
             {bubble}
           </button>
@@ -92,7 +114,7 @@ export function ChatLauncher({ diagnosed }: { diagnosed: boolean }) {
             type="button"
             onClick={() => setDismissed(true)}
             aria-label="말풍선 닫기"
-            className="flex h-6 w-6 shrink-0 items-center justify-center rounded-full text-xs text-neutral-400 transition duration-150 hover:bg-neutral-100 hover:text-neutral-600"
+            className="flex h-6 w-6 shrink-0 items-center justify-center rounded-full text-xs text-muted transition duration-150 hover:bg-paper-2 hover:text-ink-2"
           >
             ✕
           </button>
@@ -103,7 +125,7 @@ export function ChatLauncher({ diagnosed }: { diagnosed: boolean }) {
         type="button"
         onClick={() => setOpen(true)}
         aria-label="마음 친구 열기"
-        className="flex h-[4.5rem] w-[4.5rem] shrink-0 items-center justify-center rounded-full bg-white text-3xl shadow-lg transition hover:bg-neutral-50"
+        className="flex h-12 w-12 shrink-0 items-center justify-center rounded-full bg-card text-xl shadow-lg transition hover:bg-paper"
       >
         💬
       </button>

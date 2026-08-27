@@ -10,6 +10,7 @@ import styles from "./Sidebar.module.css"
 import { useModalA11y } from "./useModalA11y"
 import { ArtImage } from "./ArtImage"
 import { CurrencyIcon } from "./CurrencyIcon"
+import { CurrencyInfoModal } from "@/app/chat/_components/CurrencyInfoModal"
 
 function getBgColor(hex: string): string {
   // colorHex → 배경색 (약한 톤)
@@ -31,18 +32,19 @@ function getTribeEmoji(typeCode: TypeCode | null): string {
 // 정적으로 커밋돼 있다 — CloudFront가 아니라 avatarUrl()과 같은 경로다(lib/assets.ts
 // 주석 참고). 원본은 400~700px이라 표시 크기(20~22px)에는 과했다. sips -Z 200으로
 // 줄여 5장 합계 637KB → 116KB로 낮췄다.
-// **2026-08-26: 탭 5 → 3 (사용자 결정).** 뺀 둘의 근거가 다르다.
+// **2026-08-26: 탭 5 → 3, 그 뒤 모임 복원으로 4 (사용자 결정).** 뺐던 둘의 근거가 달랐다.
 //
 // `홈` — 실측하니 카드 3장 중 고유 정보가 0이었다(app/page.tsx 리다이렉트 주석).
 //        `/`는 진단 전 입구로 남고 진단을 마치면 /pet으로 보낸다. 그래서 `나의 펫`이 홈이다
-// `모임` — 커뮤니티의 한 형태이고 탭 하나를 쓸 만큼의 사용 빈도가 아니다. 커뮤니티 화면의
-//        `오프라인 모임` 입구로 내렸다(app/community/page.tsx). 라우트는 그대로다
+// `모임` — 커뮤니티 화면 안의 입구로 내렸다가 **탭으로 되돌렸다(2026-08-26, 사용자 결정).**
+//        진입 경로를 하나로 두기로 해서 커뮤니티 화면의 입구 줄은 지웠다(app/community/page.tsx)
 //
 // iOS HIG 하단 탭 상한이 5개다 — 5개를 쓰고 있으면 확장 여유가 0이다. 3개면 여유가 생긴다.
 const TABS: { href: string; label: string; icon: string; desc: string }[] = [
   { href: "/pet", label: "나의 펫", icon: "/images/nav_pet.png", desc: "함께 성장해요" },
   { href: "/missions", label: "미션", icon: "/images/nav_missions.png", desc: "작은 한 걸음" },
   { href: "/community", label: "커뮤니티", icon: "/images/nav_community.png", desc: "같은 종족 이야기" },
+  { href: "/community/meetups", label: "모임", icon: "/images/nav_meetup.png", desc: "오프라인에서 만나기" },
 ]
 
 /**
@@ -195,7 +197,7 @@ export function Sidebar({ profile }: { profile: SidebarProfile | null }) {
   const tribe = profile.typeCode ? TRIBE[profile.typeCode] : null
   const color = tribe?.colorHex || "#7A6B58"
   const bg = getBgColor(color)
-  const familyLabel = tribe?.family || "미분류"
+  const familyLabel = tribe?.animal || "미분류"
   const joinDate = new Date(profile.createdAt).toLocaleDateString("ko-KR", {
     year: "numeric",
     month: "long",
@@ -267,6 +269,7 @@ export function Sidebar({ profile }: { profile: SidebarProfile | null }) {
                   {tribe?.emoji || "🌱"} {familyLabel}
                 </p>
               </div>
+              <CurrencyInfoModal />
             </div>
             <div style={{ display: "flex", flexDirection: "column", gap: 3, fontSize: 11, color: "#7A6B58", marginTop: 8 }}>
               <span><CurrencyIcon currency="seed" size={12} /> 씨앗 {profile.seeds}개</span>
@@ -486,33 +489,7 @@ export function Sidebar({ profile }: { profile: SidebarProfile | null }) {
               </div>
 
               <div style={{ display: "flex", flexDirection: "column", gap: 8 }}>
-                {/* 재진단은 잠겼다(lib/diagnosis/flags.ts, 2026-08-22 A). 같은 자리를 이름 바꾸기로 쓴다 —
-                    결과 화면에 이름 입력이 이미 있고, 그 화면으로 가는 입구가 하단 탭뿐이었다 */}
-                <button
-                  onClick={() => {
-                    router.push("/diagnosis/result")
-                  }}
-                  style={{
-                    width: "100%",
-                    padding: "12px",
-                    background: "#F5F0E8",
-                    border: "1px solid #DDD0BC",
-                    borderRadius: 12,
-                    fontSize: 13,
-                    color: "#5A4A3A",
-                    cursor: "pointer",
-                    fontWeight: 500,
-                    transition: "all 0.15s",
-                  }}
-                  onMouseEnter={(e) => {
-                    e.currentTarget.style.background = "#F0EAD8"
-                  }}
-                  onMouseLeave={(e) => {
-                    e.currentTarget.style.background = "#F5F0E8"
-                  }}
-                >
-                  이름 바꾸기
-                </button>
+                {/* 재진단은 잠겼다(lib/diagnosis/flags.ts, 2026-08-22 A). */}
                 {/* 계정 설정(비밀번호 변경·탈퇴) 입구. 2026-08-22 A 추가 —
                     가입 이후 계정을 손댈 수 있는 화면이 하나도 없었다 */}
                 <button

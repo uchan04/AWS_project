@@ -152,9 +152,8 @@ export default function DiagnosisResultPage() {
             </span>
             <span className="hm-plate__eyebrow">당신은</span>
             <span className="hm-plate__animal">
-              {tribe.family} · {tribe.animal}
+              {tribe.animal}
             </span>
-            <span className="hm-plate__caption">{tribe.colorName}</span>
           </div>
 
           <div className="hm-result__side">

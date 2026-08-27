@@ -196,7 +196,6 @@ export function AttendanceCalendar({
           </span>
           <span className={styles.attCellDay}>
             {day}
-            <span className={styles.attCellSuffix}>일</span>
           </span>
         </div>
       )
@@ -222,12 +221,6 @@ export function AttendanceCalendar({
         </span>
         <span className={styles.attCellDay}>
           {day}
-          <span className={styles.attCellSuffix}>일</span>
-          {status === "claimed" && (
-            <span className={styles.attCellCheck} aria-hidden="true">
-              ✓
-            </span>
-          )}
         </span>
       </button>
     )
@@ -244,101 +237,105 @@ export function AttendanceCalendar({
       <button
         key={key}
         type="button"
-        className={styles.attMonthCell}
+        className={styles.attCell}
         style={cellStyle(status, isToday)}
         disabled={!claimable || claiming}
         aria-current={isToday ? "date" : undefined}
         aria-label={dayAriaLabel(key, status)}
         onClick={claimable ? handleClaim : undefined}
       >
-        {day}
-        {status === "claimed" && (
-          <span className={styles.attCellCheck} aria-hidden="true">
-            ✓
-          </span>
-        )}
+        <span className={styles.attCellWeekday} aria-hidden="true">
+          {WEEKDAYS[weekdayOf(key)]}
+        </span>
+        <span className={styles.attCellDay}>{day}</span>
       </button>
     )
   }
 
   return (
-    <section className={styles.attCard} style={{ background: bg, border: `1.5px solid ${color}33` }}>
-      <div className={styles.attHead}>
-        <h3 className={styles.attTitle}>출석 캘린더</h3>
-
-        {/* 연월 글자를 누르면 월간 기록으로 바뀐다 */}
-        <button
-          type="button"
-          className={styles.attMonthLabel}
-          aria-expanded={monthly}
-          aria-controls={GRID_ID}
-          aria-label={monthly ? `${formatMonthTitle(shownMonth)}, 주간 보기로 돌아가기` : `${formatMonthTitle(shownMonth)}, 이번 달 기록 보기`}
-          onClick={() => setMonthly((v) => !v)}
-        >
-          {formatMonthTitle(shownMonth)}
-          <span className={styles.attMonthCaret} aria-hidden="true">
-            {monthly ? "⌃" : "⌄"}
-          </span>
-        </button>
-      </div>
-
-      {/* 주간과 월간은 같은 자리에서 교체된다. 동시에 보여주지 않는다 */}
-      <div id={GRID_ID}>
-        {monthly ? (
-          loadingMonth || !monthReady ? (
-            <div className={styles.attSkeleton} aria-hidden="true" />
+    <>
+      <h2
+        style={{
+          fontFamily: "var(--font-display)",
+          fontSize: 19,
+          color: "#2A1F14",
+          margin: "0 0 14px",
+        }}
+      >
+        출석 캘린더
+      </h2>
+      <section className={styles.attCard} style={{ background: bg, border: `1.5px solid ${color}33` }}>
+        <div className={styles.attHead} style={{ display: "flex", justifyContent: "space-between", alignItems: "center" }}>
+          {claimedToday ? (
+            <p className={styles.attStatusDone} style={{ color, margin: 0 }}>오늘 출석은 이미 받았어요</p>
+          ) : claiming ? (
+            <p className={styles.attStatusPrompt} style={{ margin: 0 }}>출석 중...</p>
           ) : (
-            <>
-              <div className={styles.attWeekdays}>
-                {WEEKDAYS.map((label) => (
-                  <span key={label} className={styles.attWeekday} aria-hidden="true">
-                    {label}
-                  </span>
-                ))}
-              </div>
-              {monthGrid(shownMonth).map((week, wi) => (
-                <div key={wi} className={styles.attMonthWeek}>
-                  {week.map((key, di) =>
-                    key ? (
-                      renderMonthCell(key)
-                    ) : (
-                      <div key={`pad-${wi}-${di}`} className={styles.attPad} aria-hidden="true" />
-                    )
-                  )}
-                </div>
-              ))}
-            </>
-          )
-        ) : (
-          <div className={styles.attDays}>
-            {win.dateKeys.map((key) => renderCell(key))}
-            {/* 말일 구간은 7칸을 못 채운다. 다음 달 날짜를 섞지 않고 열만 비워 둔다 */}
-            {Array.from({ length: 7 - win.dateKeys.length }, (_, i) => (
-              <div key={`empty-${i}`} className={styles.attPad} aria-hidden="true" />
-            ))}
-          </div>
-        )}
-      </div>
-
-      {monthError && (
-        <div className={styles.attErrorRow}>
-          <span className={styles.attError}>{monthError}</span>
-          <button type="button" className={styles.attRetry} onClick={() => setRetryTick((t) => t + 1)}>
-            다시 시도
+            <p className={styles.attStatusPrompt} style={{ margin: 0 }}>오늘 날짜를 눌러 출석해요</p>
+          )}
+          {/* 글자를 누르면 주간/월간 기록으로 바뀐다 */}
+          <button
+            type="button"
+            className={styles.attMonthLabel}
+            aria-expanded={monthly}
+            aria-controls={GRID_ID}
+            aria-label={monthly ? "주간 보기로 돌아가기" : "이번 달 기록 보기"}
+            onClick={() => setMonthly((v) => !v)}
+          >
+            {monthly ? "한 달 출석 보기" : "이번 주 출석 보기"}
+            <span className={styles.attMonthCaret} aria-hidden="true">
+              {monthly ? "⌃" : "⌄"}
+            </span>
           </button>
         </div>
-      )}
 
-      <div className={styles.attStatus}>
-        {claimedToday ? (
-          <p className={styles.attStatusDone} style={{ color }}>
-            ✓ 오늘 출석은 이미 받았어요
-          </p>
-        ) : (
-          <p className={styles.attStatusPrompt}>{claiming ? "출석 중..." : "오늘 날짜를 눌러 출석해요"}</p>
+        {/* 주간과 월간은 같은 자리에서 교체된다. 동시에 보여주지 않는다 */}
+        <div id={GRID_ID}>
+          {monthly ? (
+            loadingMonth || !monthReady ? (
+              <div className={styles.attSkeleton} aria-hidden="true" />
+            ) : (
+              <>
+
+                {monthGrid(shownMonth).map((week, wi) => (
+                  <div key={wi} className={styles.attMonthWeek}>
+                    {week.map((key, di) =>
+                      key ? (
+                        renderMonthCell(key)
+                      ) : (
+                        <div key={`pad-${wi}-${di}`} className={styles.attPad} aria-hidden="true" />
+                      )
+                    )}
+                  </div>
+                ))}
+              </>
+            )
+          ) : (
+            <div className={styles.attDays}>
+              {win.dateKeys.map((key) => renderCell(key))}
+              {/* 말일 구간은 7칸을 못 채운다. 다음 달 날짜를 섞지 않고 열만 비워 둔다 */}
+              {Array.from({ length: 7 - win.dateKeys.length }, (_, i) => (
+                <div key={`empty-${i}`} className={styles.attPad} aria-hidden="true" />
+              ))}
+            </div>
+          )}
+        </div>
+
+        {monthError && (
+          <div className={styles.attErrorRow}>
+            <span className={styles.attError}>{monthError}</span>
+            <button type="button" className={styles.attRetry} onClick={() => setRetryTick((t) => t + 1)}>
+              다시 시도
+            </button>
+          </div>
         )}
-        {claimError && <p className={styles.attError}>{claimError}</p>}
-      </div>
-    </section>
+
+        {claimError && (
+          <div className={styles.attStatus}>
+            <p className={styles.attError}>{claimError}</p>
+          </div>
+        )}
+      </section>
+    </>
   )
 }

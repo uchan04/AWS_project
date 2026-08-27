@@ -1,9 +1,9 @@
 "use client"
 
 import { useState } from "react"
-import Link from "next/link"
+
 import type { Rarity, Slot, TypeCode } from "@prisma/client"
-import { CurrencyIcon } from "@/app/components/CurrencyIcon"
+
 import "@/styles/tokens.css"
 import "../pet.css"
 
@@ -110,6 +110,7 @@ export default function CosmeticList({
   const [pending, setPending] = useState<string | null>(null)
   const [error, setError] = useState<string | null>(null)
   const [notice, setNotice] = useState<string | null>(null)
+  const [previewItem, setPreviewItem] = useState<CosmeticRow | null>(null)
 
   // 구매. 성공하면 그 타일만 보유로 바꾸고 잔액·진행률을 서버 값으로 맞춘다.
   // 착용은 하지 않는다 — 서버도 equipped: false로 만든다(슬롯당 1개 규칙 때문에
@@ -177,94 +178,16 @@ export default function CosmeticList({
     }
   }
 
-  const progressText = `${owned} / ${initialProgress.total} 수집`
 
-  // 착용 중 카드는 한 장이다. 슬롯이 셋이면 동시에 셋을 착용할 수 있으므로 이 화면의
-  // 주인인 배경을 먼저 찾고, 없으면 착용 중인 아무것이나 세운다
-  const active =
-    items.find((row) => row.equipped && row.slot === "BACKGROUND") ??
-    items.find((row) => row.equipped) ??
-    null
   const filtered =
     tab === "owned"
       ? items.filter((row) => row.owned)
       : tab === "shop"
         ? items.filter((row) => !row.owned)
         : items
-  const sectionTitle = TABS.find((t) => t.key === tab)!.title
 
   return (
-    <main className="pet pet--shop" data-tribe={typeCode ?? undefined}>
-      <header className="pet-banner">
-        <span className="pet-banner__deco" data-i="1" aria-hidden="true">
-          🌿
-        </span>
-        <span className="pet-banner__deco" data-i="2" aria-hidden="true">
-          🍃
-        </span>
-        <span className="pet-banner__deco" data-i="3" aria-hidden="true">
-          🌸
-        </span>
-        <span className="pet-banner__deco" data-i="4" aria-hidden="true">
-          ✨
-        </span>
-
-        <div className="pet-banner__inner">
-          <div>
-            <span className="pet-banner__eyebrow" aria-hidden="true">
-              ✦ BACKGROUND SHOP ✦
-            </span>
-            <h1 className="pet__title">배경 상점</h1>
-            <p className="pet__lede">
-              별조각으로 모아요. 한 번에 하나만 착용해요. 별도 도감 없이 이 화면이 수집함이에요.
-            </p>
-          </div>
-
-          <div className="pet-banner__acts">
-            {/* 잔액이 이 화면에만 있으므로 홈의 씨앗 HUD처럼 aria-hidden으로 묻지 않는다 */}
-            <p className="pet-hud" aria-label={`별조각 ${ko(starShards)}`}>
-              {/* --wood 변형은 2026-08-21에 지웠다. 아이콘 칸이 종족색 하나로 통일됐다.
-                  2026-08-25 전환으로 ❤️(친밀도) → ⭐(별조각)다. 8/24에 "페이지 내의 모든
-                  친밀도는 빨간 하트"로 통일한 규칙은 그대로 살아 있다 — 여기가 더 이상
-                  친밀도를 보여주는 자리가 아니게 된 것이고, 별조각 아이콘은 홈 지갑·
-                  외형 상점과 같은 ⭐를 쓴다. 같은 재화가 화면마다 다른 그림이면 안 된다 */}
-              <span className="pet-hud__icon" aria-hidden="true">
-                <CurrencyIcon currency="starShard" size={18} />
-              </span>
-              <span className="pet-hud__value" aria-hidden="true">
-                {ko(starShards)}
-              </span>
-            </p>
-            <Link className="pet-plank" href="/pet">
-              <span aria-hidden="true">🐾</span> 펫으로
-            </Link>
-          </div>
-        </div>
-      </header>
-
-      {/* 수집 진행률. 별도 도감 화면 대신 이 게이지가 겸한다 (SPEC.md 5절 "제외한 것") */}
-      <div className="pet-gauge" role="img" aria-label={progressText}>
-        <div
-          className="pet-gauge__fill"
-          style={{
-            width: initialProgress.total > 0 ? `${(owned / initialProgress.total) * 100}%` : "0%",
-          }}
-        />
-        <span className="pet-gauge__value" aria-hidden="true">
-          {progressText}
-        </span>
-      </div>
-
-      {/* 재화 전환 고지 (2026-08-25). 어제까지 친밀도로 사던 화면이라 값만 바꿔 두면
-          모아 둔 친밀도가 쓸 곳 없는 숫자로 남는다 — 그 잔액이 어디로 갔는지 한 줄로
-          말한다. role은 status가 아니라 없음이다: 페이지를 열 때부터 있는 안내이고
-          방금 일어난 일이 아니라서 스크린리더가 알림으로 읽으면 오히려 튄다.
-          외출이 궁금한 사람은 펫 화면으로 가야 하므로 링크를 그 자리에 둔다 */}
-      <p className="pet-msg">
-        배경 값을 친밀도에서 별조각으로 바꿨어요. 모아 둔 친밀도는{" "}
-        <Link href="/pet">펫 외출</Link>에 써요.
-      </p>
-
+    <div className="pet-section" data-tribe={typeCode ?? undefined}>
       {error ? (
         <p className="pet-msg pet-msg--error" role="alert">
           {error}
@@ -276,48 +199,15 @@ export default function CosmeticList({
         </p>
       ) : null}
 
-      {/* 지금 걸어 둔 것 한 장. 격자 안의 --on 칸과 같은 면을 쓴다(pet.css .pet-hero) */}
-      {active ? (
-        <div className="pet-hero">
-          <span className="pet-hero__face">
-            {active.imageUrl ? (
-              // 방·타일과 같은 크롭이다 — 그림 6장에 남은 흰 여백을 1.2배 확대로 밀어낸다
-              // eslint-disable-next-line @next/next/no-img-element
-              <img
-                className="pet-hero__img pet-hero__img--bg"
-                src={active.imageUrl}
-                alt=""
-                aria-hidden="true"
-                decoding="async"
-                onError={(e) => {
-                  e.currentTarget.style.display = "none"
-                }}
-              />
-            ) : null}
-          </span>
-
-          <div className="pet-hero__body">
-            <span className="pet-hero__eyebrow">
-              <span aria-hidden="true">{SLOT_EMOJI[active.slot]}</span> {SLOT_LABEL[active.slot]} ·
-              지금 방에 걸려 있어요
-            </span>
-            <span className="pet-hero__name">{active.name}</span>
-            <span className="pet-hero__meta">{RARITY_LABEL[active.rarity]}</span>
-          </div>
-
-          <span className="pet-hero__badge">
-            꾸미는 중 <span aria-hidden="true">✨</span>
-          </span>
-        </div>
-      ) : null}
-
-      <div className="pet-divider" aria-hidden="true">
-        🌼
+      <div className="pet-shop-head" style={{ marginBottom: "16px" }}>
+        <h2 className="pet-shop-head__title">
+          <span className="pet-shop-head__bar" aria-hidden="true" />
+          방 배경
+        </h2>
+        <span className="pet-shop-head__count">{filtered.length}개</span>
       </div>
 
-      {/* role="tab"을 쓰지 않는다 — 패널이 하나이고 화살표 키 이동까지 만들 화면이 아니다.
-          누른 상태는 aria-pressed가 나른다 */}
-      <div className="pet-tabs">
+      <div className="pet-tabs" style={{ marginBottom: "16px" }}>
         {TABS.map((t) => (
           <button
             key={t.key}
@@ -333,14 +223,6 @@ export default function CosmeticList({
         ))}
       </div>
 
-      <div className="pet-shop-head">
-        <h2 className="pet-shop-head__title">
-          <span className="pet-shop-head__bar" aria-hidden="true" />
-          {sectionTitle}
-        </h2>
-        <span className="pet-shop-head__count">{filtered.length}개</span>
-      </div>
-
       {filtered.length === 0 ? (
         <div className="pet-empty">
           <span className="pet-empty__face" aria-hidden="true">
@@ -349,7 +231,7 @@ export default function CosmeticList({
           <span>이 칸에 보여 줄 아이템이 없어요</span>
         </div>
       ) : (
-        <div className="pet-shop">
+        <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 gap-3">
           {filtered.map((item) => {
             const price = item.priceShards
             const tooPoor = price !== null && starShards < price
@@ -382,7 +264,7 @@ export default function CosmeticList({
                   // 그림 6장에 추출이 덜 된 흰 여백이 남아 있어 pet.css가 <img>를
                   // 1.2배로 확대하는데, 자르는 쪽(overflow: hidden)이 없으면 확대분이
                   // 타일 밖으로 삐져나온다. 방은 .pet-room이 그 역할을 이미 한다
-                  <span className="pet-item__thumb">
+                  <span className="pet-item__thumb" onClick={() => setPreviewItem(item)} style={{ cursor: "pointer" }}>
                     {/* eslint-disable-next-line @next/next/no-img-element */}
                     <img
                       className="pet-item__img"
@@ -406,23 +288,31 @@ export default function CosmeticList({
                 <span className="pet-item__name">{item.name}</span>
                 <span className="pet-item__meta">
                   <span aria-hidden="true">{SLOT_EMOJI[item.slot]}</span> {SLOT_LABEL[item.slot]}
-                  {price !== null ? ` · 별조각 ${ko(price)}` : ""}
+                  {price !== null ? <> · ⭐ {ko(price)}</> : ""}
                 </span>
 
                 <div className="pet-item__act">
-                  {item.owned ? (
+                  {item.equipped ? (
                     <button
                       type="button"
                       onClick={() => toggle(item)}
                       disabled={pending !== null}
                       aria-disabled={pending !== null}
-                      aria-pressed={item.equipped}
                       className="pet-btn pet-btn--ghost"
                     >
-                      {item.equipped ? "벗기" : "착용"}
+                      벗기
+                    </button>
+                  ) : item.owned ? (
+                    <button
+                      type="button"
+                      onClick={() => toggle(item)}
+                      disabled={pending !== null}
+                      aria-disabled={pending !== null}
+                      className="pet-btn pet-btn--ghost"
+                    >
+                      착용
                     </button>
                   ) : price === null ? (
-                    // 비매품. 지금 시드에는 없지만 이벤트 지급 아이템이 생기면 여기로 온다
                     <span className="pet-item__meta">미획득</span>
                   ) : (
                     <button
@@ -432,7 +322,7 @@ export default function CosmeticList({
                       aria-disabled={pending !== null || tooPoor}
                       className="pet-btn pet-btn--ghost"
                     >
-                      {tooPoor ? `${ko(price - starShards)} 부족` : `별조각 ${ko(price)}`}
+                      별조각 {ko(price)}
                     </button>
                   )}
                 </div>
@@ -448,13 +338,52 @@ export default function CosmeticList({
         </p>
       ) : null}
 
-      <div className="pet-foot-deco" aria-hidden="true">
-        <span>🍀</span>
-        <span>✦</span>
-        <span>🌸</span>
-        <span>✦</span>
-        <span>🍀</span>
-      </div>
-    </main>
+      {previewItem && (
+        <div style={{
+          position: "fixed", top: 0, left: 0, right: 0, bottom: 0,
+          backgroundColor: "rgba(0,0,0,0.8)", zIndex: 999,
+          display: "flex", flexDirection: "column",
+          alignItems: "center", justifyContent: "center",
+          padding: "20px"
+        }} onClick={() => setPreviewItem(null)}>
+          <div style={{
+            backgroundColor: "var(--color-paper, #fff)",
+            borderRadius: "16px",
+            padding: "20px",
+            maxWidth: "1500px",
+            width: "95vw",
+            position: "relative"
+          }} onClick={e => e.stopPropagation()}>
+            <button onClick={() => setPreviewItem(null)} style={{ position: "absolute", top: "16px", right: "16px", background: "transparent", border: "none", fontSize: "24px", cursor: "pointer", color: "var(--color-text, #333)" }}>✕</button>
+            <h3 style={{ margin: "0 0 16px 0", fontSize: "20px", textAlign: "center", color: "var(--color-text, #333)" }}>{previewItem.name}</h3>
+            {previewItem.imageUrl && (
+              // eslint-disable-next-line @next/next/no-img-element
+              <img src={previewItem.imageUrl} style={{ width: "100%", maxHeight: "70vh", objectFit: "contain", borderRadius: "8px", marginBottom: "16px" }} alt="" />
+            )}
+            <div style={{ display: "flex", justifyContent: "center", gap: "12px" }}>
+              {previewItem.owned ? (
+                <button 
+                  className="pet-btn pet-btn--ghost" 
+                  onClick={() => { toggle(previewItem); setPreviewItem(null); }}
+                  disabled={pending !== null}
+                >
+                  {previewItem.equipped ? "벗기" : "착용"}
+                </button>
+              ) : previewItem.priceShards !== null ? (
+                <button 
+                  className="pet-btn pet-btn--ghost"
+                  onClick={() => { buy(previewItem); setPreviewItem(null); }}
+                  disabled={pending !== null || starShards < previewItem.priceShards}
+                >
+                  별조각 {ko(previewItem.priceShards)} 구매
+                </button>
+              ) : (
+                <span>미획득</span>
+              )}
+            </div>
+          </div>
+        </div>
+      )}
+    </div>
   )
 }

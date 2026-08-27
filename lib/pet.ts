@@ -1061,10 +1061,30 @@ export const OUTING_LEAD_MID = [
 ] as const
 export const OUTING_LEAD_LAST = ["마지막으로 ", "돌아오기 전에 "] as const
 
+/**
+ * 나가 있는 동안 방에 남는 쪽지 3막. **4시간을 죽은 대기로 두지 않기 위한 장치다.**
+ *
+ * 4시간 동안 화면이 "3시간 12분 남음"만 보여 주면 그 사이의 방문은 전부 빈손이 된다.
+ * 경과 비율로 문장이 두 번 바뀌므로 들어올 때마다 새 줄이 있다 —
+ * Finch가 여정을 단계로 쪼개 보여 주는 것과 Pikmin Bloom의 엽서에서 가져왔다.
+ *
+ * `{where}`는 OUTING_PLACES.where로 채운다. 뒤에 "쯤"이 붙으므로 받침에 관계없이
+ * 조사 문제가 없다 — 여기 문장을 고칠 때 조사를 새로 넣지 않는다.
+ *
+ * **3막을 저장하지 않는다.** startedAt·returnsAt·placeKey만 있으면 계산되므로 컬럼이
+ * 늘지 않고, 새로고침해도 같은 값이 나온다.
+ *
+ * 2026-08-26 사용자 요청으로 세 줄을 **크레용으로 쓴 손글씨 말투**로 다시 썼다.
+ * 화면이 이 문장을 손글씨 서체(--font-crayon)로 그리므로 어투가 서체와 맞아야 한다 —
+ * "방금 나갔어."처럼 담담한 문장을 크레용으로 쓰면 서체만 겉도는 것으로 읽힌다.
+ * 규칙 둘을 지켰다: **주인을 부르는 줄은 처음과 끝에만 둔다**(세 줄 다 부르면 조르는 톤이
+ * 된다) · **느낌표는 한 줄에 하나까지**. 여전히 격려도 교훈도 없다 — OUTING_MOODS 주석과
+ * 같은 이유로 펫은 자기 얘기만 한다.
+ */
 export const OUTING_AWAY_LINES = [
-  { key: "left", text: "방금 나갔어. 잘 다녀올게." },
-  { key: "midway", text: "지금 {where}쯤이야." },
-  { key: "back", text: "이제 돌아가는 중이야." },
+  { key: "left", text: "주인! 나 다녀올게!" },
+  { key: "midway", text: "나 지금 {where}쯤이야!" },
+  { key: "back", text: "주인! 이제 돌아가는 중이야!" },
 ] as const
 
 export type OutingPlaceKey = (typeof OUTING_PLACES)[number]["key"]
@@ -1122,8 +1142,28 @@ export function canGoOuting(stage: number): boolean {
  */
 export const OUTING_LOCK_MESSAGE = `아기(Lv.${EVOLUTION_LEVEL.STAGE2})가 되면 밖에 나갈 수 있어요`
 
-/** 잠긴 카드 각주의 왼쪽 줄. 위 문장보다 짧아야 한 줄에 들어온다 */
-export const OUTING_LOCK_FOOT = "지금은 알이라 방에서 지내요"
+/* OUTING_LOCK_FOOT("지금은 알이라 방에서 지내요")가 여기 있었다 — 잠긴 **카드**의 각주
+   왼쪽 줄이었다. 2026-08-26 밤 머지로 그 카드가 원형 버튼 하나가 되면서 두 줄을 둘 자리가
+   없어졌다. 지금 그 몫은 둘이 나눠 갖는다: 버튼 아래 짧은 한 줄(`Lv.5부터`)과 눌렀을 때의
+   토스트(OUTING_LOCK_MESSAGE). **읽는 곳이 없는 상수는 남기지 않는다** */
+
+/**
+ * 친밀도가 모자라 아직 못 나갈 때 (2026-08-26 사용자 지시).
+ *
+ * 전에는 버튼 아래 각주(`친밀도 200 부족`)로 늘 떠 있었다. **부족을 반복해서 알리는 것은
+ * 이 대상에게 특히 나쁘다** — 8/26에 카드를 접었던 것과 같은 이유이고, 그때 접은 각주가
+ * 원형 버튼의 `note`로 되살아나 있었다. 지금은 **누를 때만** 말한다.
+ *
+ * 조사를 `친밀도가`로 고정한 이유: 뒤에 숫자가 오면 `이/가`가 그 숫자의 **읽는 소리**로
+ * 갈린다(30이 / 5가). 앞에 붙이면 숫자와 무관하다.
+ *
+ * 1단계 잠금(OUTING_LOCK_MESSAGE)과 같은 규칙을 지킨다 — 명령형을 쓰지 않고, 어디서
+ * 친밀도를 얻는지도 여기서 말하지 않는다(그 링크가 붙으면 안내가 권유가 된다).
+ */
+export function outingNeedAffinityMessage(short: number): string {
+  const n = Math.max(0, Math.floor(short))
+  return `친밀도가 ${n.toLocaleString("ko-KR")} 더 모이면 밖에 나갈 수 있어요`
+}
 
 /**
  * 여행일기 제목의 뒷말. 인덱스가 **결과 인덱스**(0 좋음 / 1 보통 / 2 덤덤)다.

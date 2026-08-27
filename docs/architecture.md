@@ -15,8 +15,9 @@ flowchart TB
         SSR["Route Handlers\n/api/diagnosis · /api/missions · /api/pet\n/api/gacha · /api/community · /api/chat · /api/auth"]
     end
 
-    subgraph Auth["Amazon Cognito"]
-        Pool[["User Pool\n이메일 + 비밀번호"]]
+    subgraph Auth["인증 (하이브리드)"]
+        Pool[["Cognito User Pool\n(소셜 연동)"]]
+        LocalAuth[["자체 DB 로그인\n(쿠키 세션)"]]
     end
 
     subgraph DB["Amazon RDS — PostgreSQL"]
@@ -39,7 +40,8 @@ flowchart TB
     end
 
     User -- "HTTPS" --> SSR
-    SSR -- "Access Token 검증" --> Pool
+    SSR -- "토큰 검증 (Cognito)" --> Pool
+    SSR -- "세션 검증 (Local)" --> LocalAuth
     SSR -- "쿼리 (Prisma)" --> Postgres
     SSR -- "문항 다듬기 · enum 변환 · 챗봇 · 주제 추천" --> Sonnet
     SSR -- "presigned URL 발급" --> Bucket
@@ -67,9 +69,9 @@ flowchart TB
 > `app/layout.tsx:40`의 `APP_ORIGIN` 폴백도 같은 값이다. `d36bhb2dnkr0oj`는 CLI로 먼저 만들었다가
 > GitHub를 연결하지 않은 앱이다. `docs/dev/infra.md` 49·51·55행에도 옛 id가 남아 있다.
 | RDS PostgreSQL | `welli-db`, `db.t4g.micro`, PG 16.4 | 애플리케이션 데이터 전체, Prisma ORM | ARM(`t4g`) 인스턴스로 비용 최적화, 자동 백업 7일 |
-| Cognito | User Pool `us-east-1_EhWWTXiQJ` | 이메일+비밀번호 인증, 인증코드 비활성 | 인증·토큰 관리를 관리형 서비스에 위임 |
+| Cognito & Local | User Pool `us-east-1_EhWWTXiQJ` + 자체 DB | 소셜 연동(Cognito) 및 자체 DB 로그인 | 하이브리드 인증 구조 채택 |
 | Bedrock | `us.anthropic.claude-sonnet-5` (us-east-1) | 진단 문항 다듬기, 자유 답변→enum 변환, 챗봇, 커뮤니티 주제 추천 | 모델 단일화로 호출 경로·버그 표면 최소화 |
-| S3 | `welli-uploads-185236887369` (비공개) | 사진 미션 업로드, 펫·치장 이미지 원본 | 퍼블릭 액세스 완전 차단, presigned URL로만 입출력 |
+| S3 | `welli-uploads-185236887369` (비공개) | 사진 미션 업로드, 펫/치장 이미지 및 **애니메이션 영상(mp4)** | 퍼블릭 액세스 완전 차단, presigned URL로만 입출력 |
 | CloudFront | 배포 `E384TUNL0Z75C5` (`diros91hbap9v.cloudfront.net`) | S3 정적 자원 CDN | OAC로 S3를 비공개로 유지한 채 캐싱·HTTPS 제공 |
 | CloudWatch + SNS | 대시보드 `welli-dashboard`, 알람 `welli-rds-cpu-high` | RDS CPU·연결수·스토리지·메모리 모니터링, CPU 70% 알람 | 운영 모니터링 체계 보유 |
 
@@ -102,7 +104,7 @@ sequenceDiagram
 
 ## 4. 보안 설명 카드
 
-- **인증**: Cognito 관리형 사용자 풀, 액세스 토큰을 API 요청마다 검증(`lib/auth.ts`)
+- **인증**: 하이브리드 인증 (Cognito 소셜 연동 + 자체 DB 계정 쿠키 세션), API 요청 시 `lib/auth.ts`에서 통합 검증
 - **전송 계층**: Amplify Hosting·CloudFront 전 구간 HTTPS 강제
 - **DB 접근**: Prisma parameterized query로 SQL Injection 차단
 - **파일 접근**: S3 버킷은 퍼블릭 액세스 완전 차단, CloudFront는 OAC로만 원본 접근, 사용자 업로드·조회는 presigned URL 한정
@@ -117,7 +119,7 @@ sequenceDiagram
 - RDS `db.t4g.micro`(ARM) → 동급 x86 대비 비용 절감
 - 정적 자원(S3)과 동적 렌더링(Amplify)을 분리해 CloudFront 캐싱 효율 확보
 - Bedrock 모델을 Claude Sonnet 5 단일로 고정 → 모델 분기·요금 추적 단순화
-- DB 커넥션은 Prisma 커넥션 풀로 제한해 동시 접속 급증에 대비
+- DB 커넥션은 서버리스(Amplify) 환경의 고갈을 막기 위해 `connection_limit=2`를 설정하여 인스턴스당 풀 크기를 강력히 제한
 
 ---
 

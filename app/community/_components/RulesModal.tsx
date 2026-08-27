@@ -96,7 +96,7 @@ export function RulesModal() {
         type="button"
         onClick={() => setOpen(true)}
         // 주 CTA("글 쓰기") 옆이라 조용하게 둔다. 채움 배경을 쓰지 않는다.
-        className="rounded-xl border border-neutral-300 px-4 py-2.5 text-sm font-semibold text-neutral-600 transition duration-150 hover:bg-neutral-50 focus-visible:ring-2 focus-visible:ring-neutral-900 focus-visible:ring-offset-2 focus-visible:outline-none"
+        className="rounded-xl border border-rule px-4 py-2.5 text-base font-display text-ink-2 transition duration-150 hover:bg-paper focus-visible:ring-2 focus-visible:ring-focus focus-visible:ring-offset-2 focus-visible:outline-none"
       >
         이용 규칙
       </button>
@@ -110,22 +110,22 @@ export function RulesModal() {
             aria-modal="true"
             aria-labelledby="community-rules-title"
             tabIndex={-1}
-            className="w-full max-w-lg rounded-3xl bg-white p-8 shadow-2xl"
+            className="w-full max-w-lg rounded-3xl bg-card p-8 shadow-2xl"
             onClick={(e) => e.stopPropagation()}
           >
             <div className="mb-5 flex items-start justify-between gap-3">
               <div>
                 {/* 경고가 아니라 환영이다. 규칙을 읽는 첫 문장이 겁을 주면 안 된다 */}
-                <h2 id="community-rules-title" className="text-base font-bold text-neutral-900">
+                <h2 id="community-rules-title" className="font-display text-lg text-ink">
                   여기는 편하게 이야기하는 곳이에요
                 </h2>
-                <p className="mt-1 text-sm text-neutral-500">함께 쓰는 공간이라 몇 가지만 약속해요.</p>
+                <p className="mt-1 text-sm text-muted">함께 쓰는 공간이라 몇 가지만 약속해요.</p>
               </div>
               <button
                 type="button"
                 onClick={close}
                 aria-label="이용 규칙 창 닫기"
-                className="flex h-8 w-8 shrink-0 items-center justify-center rounded-full bg-neutral-100 text-neutral-500 hover:bg-neutral-200"
+                className="flex h-8 w-8 shrink-0 items-center justify-center rounded-full bg-paper-2 text-muted hover:bg-rule"
               >
                 ✕
               </button>
@@ -133,11 +133,11 @@ export function RulesModal() {
 
             <ol className="flex flex-col gap-2">
               {RULES.map((rule, index) => (
-                <li key={rule} className="flex items-start gap-3 rounded-xl bg-neutral-50 p-3">
-                  <span className="flex h-6 w-6 shrink-0 items-center justify-center rounded-full bg-white text-xs font-bold text-neutral-500">
+                <li key={rule} className="flex items-start gap-3 rounded-xl bg-paper p-3">
+                  <span className="flex h-6 w-6 shrink-0 items-center justify-center rounded-full bg-card text-xs font-bold text-muted">
                     {index + 1}
                   </span>
-                  <span className="text-sm leading-relaxed text-neutral-700">{rule}</span>
+                  <span className="text-sm leading-relaxed text-ink-2">{rule}</span>
                 </li>
               ))}
             </ol>
@@ -146,7 +146,7 @@ export function RulesModal() {
               <button
                 type="button"
                 onClick={close}
-                className="rounded-xl bg-neutral-900 px-6 py-2.5 text-sm font-bold text-white transition duration-150 hover:bg-neutral-700"
+                className="rounded-xl bg-accent px-6 py-2.5 text-base font-display text-accent-ink transition duration-150 hover:bg-accent-2"
               >
                 확인
               </button>
