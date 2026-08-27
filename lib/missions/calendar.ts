@@ -133,16 +133,35 @@ export function sameWindow(a: AttendanceWindow, b: AttendanceWindow): boolean {
  * 월간 달력 격자. 일요일 시작 7열, 월 시작 전·종료 후는 null(빈 칸)이다.
  * null 칸은 화면에서 클릭 불가·접근성 트리 제외로 처리한다.
  */
-export function monthGrid(key: MonthKey): (DateKey | null)[][] {
+export function monthGrid(key: MonthKey): DateKey[][] {
   const { year, month } = parseMonthKey(key)
   const last = lastDayOfMonth(year, month)
   const lead = new Date(Date.UTC(year, month - 1, 1)).getUTCDay()
 
-  const cells: (DateKey | null)[] = Array(lead).fill(null)
-  for (let d = 1; d <= last; d++) cells.push(dateKey(year, month, d))
-  while (cells.length % 7 !== 0) cells.push(null)
+  const cells: DateKey[] = []
+  
+  // 이전 달 날짜 채우기
+  const prevMonthDate = new Date(Date.UTC(year, month - 1, 0))
+  const prevLastDay = prevMonthDate.getUTCDate()
+  const prevYear = prevMonthDate.getUTCFullYear()
+  const prevMonth = prevMonthDate.getUTCMonth() + 1
+  for (let i = lead - 1; i >= 0; i--) {
+    cells.push(dateKey(prevYear, prevMonth, prevLastDay - i))
+  }
 
-  const weeks: (DateKey | null)[][] = []
+  // 이번 달 날짜 채우기
+  for (let d = 1; d <= last; d++) cells.push(dateKey(year, month, d))
+
+  // 다음 달 날짜 채우기
+  const nextMonthDate = new Date(Date.UTC(year, month, 1))
+  const nextYear = nextMonthDate.getUTCFullYear()
+  const nextMonth = nextMonthDate.getUTCMonth() + 1
+  let nextDay = 1
+  while (cells.length % 7 !== 0) {
+    cells.push(dateKey(nextYear, nextMonth, nextDay++))
+  }
+
+  const weeks: DateKey[][] = []
   for (let i = 0; i < cells.length; i += 7) weeks.push(cells.slice(i, i + 7))
   return weeks
 }

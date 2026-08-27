@@ -25,9 +25,12 @@ import {
   kstDateKey,
   monthGrid,
   msUntilNextKstMidnight,
+  nextWindow,
   parseDateKey,
+  prevWindow,
   weekdayOf,
   windowFor,
+  windowFromParts,
   windowMonthKey,
 } from "@/lib/missions/calendar"
 import styles from "./mission-ui.module.css"
@@ -137,6 +140,30 @@ export function AttendanceCalendar({
     return () => document.removeEventListener("visibilitychange", handleVisible)
   }, [todayKey, jumpToToday, onRefresh])
 
+  function handlePrev() {
+    if (monthly) {
+      setWin((w) => {
+        const m = w.month === 1 ? 12 : w.month - 1
+        const y = w.month === 1 ? w.year - 1 : w.year
+        return windowFromParts(y, m, 1)
+      })
+    } else {
+      setWin((w) => prevWindow(w))
+    }
+  }
+
+  function handleNext() {
+    if (monthly) {
+      setWin((w) => {
+        const m = w.month === 12 ? 1 : w.month + 1
+        const y = w.month === 12 ? w.year + 1 : w.year
+        return windowFromParts(y, m, 1)
+      })
+    } else {
+      setWin((w) => nextWindow(w))
+    }
+  }
+
   async function handleClaim() {
     if (claiming || claimedToday) return
     setClaiming(true)
@@ -231,23 +258,25 @@ export function AttendanceCalendar({
     const status = dayStatus(key, todayKey, claimedSet)
     const { day } = parseDateKey(key)
     const isToday = key === todayKey
-    const claimable = status === "today" && !claimedToday
 
     return (
       <button
         key={key}
         type="button"
         className={styles.attCell}
-        style={cellStyle(status, isToday)}
-        disabled={!claimable || claiming}
+        style={{
+          ...cellStyle(status, isToday),
+          opacity: !key.startsWith(shownMonth) ? 0.3 : 1,
+          minHeight: 50,
+          padding: 8,
+          justifyContent: "center",
+        }}
+        disabled={claimedToday || claiming}
         aria-current={isToday ? "date" : undefined}
         aria-label={dayAriaLabel(key, status)}
-        onClick={claimable ? handleClaim : undefined}
+        onClick={!claimedToday ? handleClaim : undefined}
       >
-        <span className={styles.attCellWeekday} aria-hidden="true">
-          {WEEKDAYS[weekdayOf(key)]}
-        </span>
-        <span className={styles.attCellDay}>{day}</span>
+        <span className={styles.attCellDay} style={{ fontSize: 14 }}>{day}</span>
       </button>
     )
   }
@@ -259,57 +288,88 @@ export function AttendanceCalendar({
           fontFamily: "var(--font-display)",
           fontSize: 19,
           color: "#2A1F14",
-          margin: "0 0 14px",
+          margin: "0 0 24px",
         }}
       >
         출석 캘린더
       </h2>
-      <section className={styles.attCard} style={{ background: bg, border: `1.5px solid ${color}33` }}>
-        <div className={styles.attHead} style={{ display: "flex", justifyContent: "space-between", alignItems: "center" }}>
-          {claimedToday ? (
-            <p className={styles.attStatusDone} style={{ color, margin: 0 }}>오늘 출석은 이미 받았어요</p>
-          ) : claiming ? (
-            <p className={styles.attStatusPrompt} style={{ margin: 0 }}>출석 중...</p>
-          ) : (
-            <p className={styles.attStatusPrompt} style={{ margin: 0 }}>오늘 날짜를 눌러 출석해요</p>
-          )}
-          {/* 글자를 누르면 주간/월간 기록으로 바뀐다 */}
-          <button
-            type="button"
-            className={styles.attMonthLabel}
-            aria-expanded={monthly}
-            aria-controls={GRID_ID}
-            aria-label={monthly ? "주간 보기로 돌아가기" : "이번 달 기록 보기"}
-            onClick={() => setMonthly((v) => !v)}
-          >
-            {monthly ? "한 달 출석 보기" : "이번 주 출석 보기"}
-            <span className={styles.attMonthCaret} aria-hidden="true">
-              {monthly ? "⌃" : "⌄"}
-            </span>
-          </button>
+      <section className={styles.attCard} style={{ background: bg, border: `1.5px solid ${color}33`, display: "flex", flexDirection: "column", paddingTop: 16 }}>
+        <div style={{ padding: "0 4px", marginBottom: 12, display: "flex", flexDirection: "column", gap: 16 }}>
+          
+          {/* 상단 라인: 중앙에 8월 달력 이동기 */}
+          <div style={{ display: "flex", justifyContent: "center", alignItems: "center" }}>
+            <button type="button" onClick={handlePrev} aria-label="이전" style={{ border: "none", background: "none", cursor: "pointer", padding: "4px 12px" }}>
+              <span style={{ fontSize: 14 }}>&lt;</span>
+            </button>
+            <h3 style={{ margin: 0, fontSize: 24, color: "#2A1F14", fontFamily: "var(--font-display)", minWidth: 100, textAlign: "center" }}>
+              {monthly ? `${parseInt(shownMonth.split("-")[1], 10)}월` : (
+                (() => {
+                  const d = new Date(win.dateKeys[0])
+                  const firstDay = new Date(d.getFullYear(), d.getMonth(), 1).getDay()
+                  const weekNum = Math.ceil((d.getDate() + firstDay) / 7)
+                  return `${d.getMonth() + 1}월 ${weekNum}주차`
+                })()
+              )}
+            </h3>
+            <button type="button" onClick={handleNext} aria-label="다음" style={{ border: "none", background: "none", cursor: "pointer", padding: "4px 12px" }}>
+              <span style={{ fontSize: 14 }}>&gt;</span>
+            </button>
+          </div>
+
+          {/* 하단 라인: 왼쪽(상태 문구) - 오른쪽(토글 버튼) */}
+          <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center" }}>
+            <div style={{ flex: 1, textAlign: "left" }}>
+              {claimedToday ? (
+                <p className={styles.attStatusDone} style={{ color, margin: 0, fontSize: 13, fontWeight: 700 }}>오늘 출석은 이미 받았어요!</p>
+              ) : claiming ? (
+                <p className={styles.attStatusPrompt} style={{ margin: 0, fontSize: 13, fontWeight: 700 }}>출석 중...</p>
+              ) : (
+                <p className={styles.attStatusPrompt} style={{ margin: 0, fontSize: 13, fontWeight: 700 }}>오늘 날짜를 눌러 출석해요</p>
+              )}
+            </div>
+            
+            <button
+              type="button"
+              className={styles.attMonthLabel}
+              aria-expanded={monthly}
+              aria-controls={GRID_ID}
+              aria-label={monthly ? "주간 보기로 돌아가기" : "이번 달 기록 보기"}
+              onClick={() => setMonthly((v) => !v)}
+              style={{ marginLeft: 8 }}
+            >
+              {monthly ? "이번 달" : "이번 주"}
+              <span className={styles.attMonthCaret} aria-hidden="true">
+                {monthly ? "⌃" : "⌄"}
+              </span>
+            </button>
+          </div>
         </div>
 
         {/* 주간과 월간은 같은 자리에서 교체된다. 동시에 보여주지 않는다 */}
         <div id={GRID_ID}>
           {monthly ? (
-            loadingMonth || !monthReady ? (
-              <div className={styles.attSkeleton} aria-hidden="true" />
-            ) : (
-              <>
-
-                {monthGrid(shownMonth).map((week, wi) => (
-                  <div key={wi} className={styles.attMonthWeek}>
-                    {week.map((key, di) =>
-                      key ? (
-                        renderMonthCell(key)
-                      ) : (
-                        <div key={`pad-${wi}-${di}`} className={styles.attPad} aria-hidden="true" />
-                      )
-                    )}
-                  </div>
+            <div style={{ display: "flex", flexDirection: "column", gap: 8 }}>
+              {/* 요일 띠 (각각 둥근 사각형) */}
+              <div style={{ display: "grid", gridTemplateColumns: "repeat(7, 1fr)", gap: 8 }}>
+                {WEEKDAYS.map((w) => (
+                  <span key={w} style={{ textAlign: "center", padding: "6px 0", background: "#1E3A8A", borderRadius: 8, color: "white", fontSize: 12, fontWeight: 700 }}>{w}</span>
                 ))}
-              </>
-            )
+              </div>
+              
+              <div>
+                {loadingMonth || !monthReady ? (
+                  <div className={styles.attSkeleton} aria-hidden="true" />
+                ) : (
+                  <>
+                    {monthGrid(shownMonth).map((week, wi) => (
+                      <div key={wi} className={styles.attMonthWeek}>
+                        {week.map((key) => renderMonthCell(key))}
+                      </div>
+                    ))}
+                  </>
+                )}
+              </div>
+            </div>
           ) : (
             <div className={styles.attDays}>
               {win.dateKeys.map((key) => renderCell(key))}

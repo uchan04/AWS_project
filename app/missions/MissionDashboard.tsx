@@ -352,7 +352,7 @@ function MissionModal({
               mascotEmoji
             )}
           </div>
-          <p style={{ margin: "12px 0 0", fontSize: 12, color: "#7A6B58", fontWeight: 500 }}>{caption}</p>
+
           <div style={{ marginTop: 20, paddingTop: 20, borderTop: `1px solid ${color}33` }}>
             <div style={{ fontSize: 28, marginBottom: 6 }}>{emoji}</div>
             <h2
@@ -588,9 +588,9 @@ interface StepSectionProps {
 
 function StepSection({ title, subtitle, missions, color, bg, unlocked = true, progress, focusCard, onSelect }: StepSectionProps) {
   return (
-    <section style={{ marginBottom: 36 }}>
-      <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: 14 }}>
-        <div>
+    <section style={{ marginBottom: 64 }}>
+      <div style={{ display: "flex", alignItems: "flex-end", justifyContent: "space-between", marginBottom: 8 }}>
+        <div style={{ marginBottom: 16 }}>
           <h2
             style={{
               fontFamily: "var(--font-display)",
@@ -604,18 +604,16 @@ function StepSection({ title, subtitle, missions, color, bg, unlocked = true, pr
           {subtitle && <p style={{ fontSize: 12, color: "#7A6B58", margin: "4px 0 0" }}>{subtitle}</p>}
         </div>
         {progress && (
-          <span
+          <div
             style={{
-              fontSize: 13,
-              fontWeight: 700,
-              color,
-              background: bg,
-              padding: "6px 14px",
-              borderRadius: 99,
+              fontFamily: "var(--font-display)",
+              fontSize: 14,
+              color: "#000",
+              textAlign: "right",
             }}
           >
             {progress}
-          </span>
+          </div>
         )}
       </div>
 
@@ -766,11 +764,13 @@ interface DailyFocusCardProps {
   mission: MissionDTO
   color: string
   bg: string
+  mascotEmoji: string
+  petImageUrl: string | null
   remaining: number
   onSelect: (m: MissionDTO) => void
 }
 
-function DailyFocusCard({ mission, color, bg, remaining, onSelect }: DailyFocusCardProps) {
+function DailyFocusCard({ mission, color, bg, mascotEmoji, petImageUrl, remaining, onSelect }: DailyFocusCardProps) {
   return (
     <button
       onClick={() => onSelect(mission)}
@@ -789,28 +789,32 @@ function DailyFocusCard({ mission, color, bg, remaining, onSelect }: DailyFocusC
         cursor: "pointer",
       }}
     >
-      <span style={{ fontSize: 12, fontWeight: 700, color, marginBottom: 12, textAlign: "center", width: "100%", display: "block" }}>오늘은 이거 하나만 해 봐요</span>
-      <div style={{ display: "flex", flexDirection: "column", alignItems: "center", justifyContent: "center", flex: 1, gap: 10 }}>
-        <span style={{ fontSize: 48, lineHeight: 1 }} aria-hidden="true">
+      <div style={{ display: "flex", alignItems: "center", justifyContent: "center", marginBottom: 12, width: "100%" }}>
+        <span style={{ fontSize: 14, fontWeight: 700, color, textAlign: "center" }}>오늘은 이거 하나만 해 봐요!</span>
+      </div>
+      <div style={{ display: "flex", flexDirection: "column", alignItems: "center", justifyContent: "center", flex: 1, gap: 24 }}>
+        <span style={{ fontSize: 58, lineHeight: 1 }} aria-hidden="true">
           {getEmojiForMission(mission.title)}
         </span>
-        <p
-          style={{
-            fontFamily: "var(--font-display)",
-            fontSize: 16,
-            color: "#2A1F14",
-            margin: 0,
-            lineHeight: 1.4,
-            textAlign: "center",
-          }}
-        >
-          {mission.title}
-        </p>
-        <p style={{ fontSize: 12, color: "#7A6B58", margin: 0, display: "flex", gap: 8, flexWrap: "wrap", justifyContent: "center" }}>
-          {mission.reward.seeds > 0 && <span><CurrencyIcon currency="seed" size={12} /> {mission.reward.seeds}</span>}
-          {mission.reward.affinity > 0 && <span><CurrencyIcon currency="affinity" size={12} /> {mission.reward.affinity}</span>}
-          {mission.reward.starShards > 0 && <span><CurrencyIcon currency="starShard" size={12} /> {mission.reward.starShards}</span>}
-        </p>
+        <div style={{ display: "flex", flexDirection: "column", alignItems: "center", gap: 6 }}>
+          <p
+            style={{
+              fontFamily: "var(--font-display)",
+              fontSize: 19,
+              color: "#2A1F14",
+              margin: 0,
+              lineHeight: 1.4,
+              textAlign: "center",
+            }}
+          >
+            {mission.title}
+          </p>
+          <p style={{ fontSize: 14, color: "#7A6B58", margin: 0, display: "flex", gap: 8, flexWrap: "wrap", justifyContent: "center" }}>
+            {mission.reward.seeds > 0 && <span><CurrencyIcon currency="seed" size={14} /> {mission.reward.seeds}</span>}
+            {mission.reward.affinity > 0 && <span><CurrencyIcon currency="affinity" size={14} /> {mission.reward.affinity}</span>}
+            {mission.reward.starShards > 0 && <span><CurrencyIcon currency="starShard" size={14} /> {mission.reward.starShards}</span>}
+          </p>
+        </div>
       </div>
 
     </button>
@@ -833,15 +837,18 @@ function ProgressCard({ title, value, color, bg }: ProgressCardProps) {
         background: bg,
         border: `1.5px solid ${color}33`,
         borderRadius: 16,
-        padding: "14px 18px",
+        padding: "12px",
         textAlign: "center",
+        display: "flex",
+        flexDirection: "column",
+        justifyContent: "center",
       }}
     >
-      <p style={{ fontSize: 12, color: "#7A6B58", margin: "0 0 6px" }}>{title}</p>
+      <p style={{ fontSize: 12, color: "#7A6B58", margin: "0 0 8px" }}>{title}</p>
       <p
         style={{
           fontFamily: "var(--font-display)",
-          fontSize: 22,
+          fontSize: 24,
           color,
           fontWeight: 700,
           margin: 0,
@@ -1085,16 +1092,16 @@ export default function MissionDashboard({
         </div>
       )}
 
-      <div style={{ display: "grid", gridTemplateColumns: "repeat(3, 1fr)", gap: 12, marginBottom: 24 }}>
+      <div style={{ display: "grid", gridTemplateColumns: "repeat(3, 1fr)", gap: 12, marginBottom: 64 }}>
         <ProgressCard
-          title="오늘 클리어한 미션 개수"
-          value={`${dashboard.progress.dailyCompleted}개`}
+          title="오늘 클리어한 미션"
+          value={String(dashboard.progress.dailyCompleted)}
           color={color}
           bg={bg}
         />
         <ProgressCard
-          title="이번 주 클리어 한 미션 개수"
-          value={`${dashboard.progress.weeklyCompleted}개`}
+          title="이번 주 클리어 한 미션"
+          value={String(dashboard.progress.weeklyCompleted)}
           color={color}
           bg={bg}
         />
@@ -1106,7 +1113,7 @@ export default function MissionDashboard({
           return (
             <ProgressCard
               title="다음 단계까지 남은 미션"
-              value={dashboard.stages.graduated ? "졸업" : remaining !== null ? `${remaining}개` : "-"}
+              value={dashboard.stages.graduated ? "졸업" : remaining !== null ? String(remaining) : "-"}
               color={color}
               bg={bg}
             />
@@ -1114,7 +1121,7 @@ export default function MissionDashboard({
         })()}
       </div>
 
-      <div style={{ marginBottom: 36 }}>
+      <div style={{ marginBottom: 64 }}>
         <AttendanceCalendar
           cycleDay={dashboard.attendance.cycleDay}
           claimedToday={dashboard.attendance.claimedToday}
@@ -1149,6 +1156,8 @@ export default function MissionDashboard({
                     mission={focus}
                     color={color}
                     bg={bg}
+                    mascotEmoji={mascotEmoji}
+                    petImageUrl={dashboard.avatarUrl}
                     remaining={undone.length - 1}
                     onSelect={setSelected}
                   />
