@@ -559,9 +559,9 @@
   place-items: center;
   /* 44px 터치 하한 아래인데, 이 레일은 **마우스 전용**이라(위 미디어 쿼리) 그 하한이
      요구하는 손가락 표적이 아니다. 커서 표적은 24px이 하한이고 40px은 그 위다 */
-  width: 2.5rem;
-  height: 2.5rem;
-  font-size: var(--text-body);
+  width: 3.75rem;
+  height: 3.75rem;
+  font-size: calc(var(--text-body) * 1.5);
   line-height: 1;
   flex: 0 0 auto;
 }
@@ -574,7 +574,7 @@
   opacity: 0;
   padding-inline: 0;
   font-family: var(--font-display);
-  font-size: var(--text-label);
+  font-size: calc(var(--text-label) * 1.5);
   font-weight: 600;
   color: var(--color-ink);
   white-space: nowrap;
@@ -588,7 +588,7 @@
    그 안에 들어간다(실측). `:focus-visible`을 함께 두는 것은 키보드에 hover가 없기 때문이다 */
 .pet-rail__btn:hover .pet-rail__label,
 .pet-rail__btn:focus-visible .pet-rail__label {
-  max-width: 5.5rem;
+  max-width: 8.25rem;
   opacity: 1;
   padding-inline: var(--space-2xs);
 }
@@ -600,7 +600,7 @@
 }
 
 .pet-rail__btn[data-active="true"] .pet-rail__label {
-  max-width: 5.5rem;
+  max-width: 8.25rem;
   opacity: 1;
   padding-inline: var(--space-2xs);
 }
@@ -957,7 +957,7 @@
      기본값은 stageCount = 1인 단일 형태 캐릭터가 쓰는 중간 크기다
      (9 → 18 → 14.4 → 15.4rem). 단계별 값은 아래 :has() 네 줄에 있고, 여기서 한 번 상한을
      씌워 아래 세 곳(.pet-char__img·.pet-char__shadow·말풍선 자리)이 같은 값을 읽는다 */
-  --pet-char-size: 15.4rem;
+  --pet-char-size: 23.1rem;
   /* 78vw 상한은 좁은 화면에서 그림이 방 폭보다 커지는 것을 막는다 — 방이
      overflow: hidden이라 넘치면 좌우가 잘린다. 좁은 화면에는 방 높이(19.5rem) 때문에
      세로 상한이 하나 더 붙는다(파일 끝 "좁은 화면" 절) */
@@ -1184,19 +1184,19 @@
    때문이다(4단 고양이의 아래 여백이 3.3%로 24장 중 최소).
    **이 값을 올리면 발이 방 밖으로 잘린다.** 그림을 갈면 여백부터 다시 재야 한다 */
 .pet-room:has(.pet-char[data-stage="1"]) {
-  --pet-char-size: 10.7rem;
+  --pet-char-size: 16.05rem;
   --pet-char-sink: 0.08;
 }
 .pet-room:has(.pet-char[data-stage="2"]) {
-  --pet-char-size: 13.7rem;
+  --pet-char-size: 20.55rem;
   --pet-char-sink: 0.08;
 }
 .pet-room:has(.pet-char[data-stage="3"]) {
-  --pet-char-size: 16.7rem;
+  --pet-char-size: 25.05rem;
   --pet-char-sink: 0.05;
 }
 .pet-room:has(.pet-char[data-stage="4"]) {
-  --pet-char-size: 19.7rem;
+  --pet-char-size: 29.55rem;
   --pet-char-sink: 0.02;
 }
 
