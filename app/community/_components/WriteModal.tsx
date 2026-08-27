@@ -259,7 +259,7 @@ export function WriteModal({ gallery, myTypeCode }: { gallery: GalleryTab; myTyp
         }}
         // 배경이 인라인 색(WRITE_ACCENT)이라 hover:bg-*로는 못 건드린다. 색과 무관한 그림자·이동·축소로 반응을 만든다.
         // 이동·확대만 motion-safe:로 감싼다 — prefers-reduced-motion에서도 그림자는 남아야 무엇을 누르는지 보인다.
-        className="rounded-xl px-5 py-2.5 text-sm font-semibold text-white shadow-sm transition duration-150 hover:shadow-lg focus-visible:shadow-lg focus-visible:ring-2 focus-visible:ring-neutral-900 focus-visible:ring-offset-2 focus-visible:outline-none active:shadow-sm motion-safe:hover:-translate-y-0.5 motion-safe:hover:scale-[1.02] motion-safe:focus-visible:-translate-y-0.5 motion-safe:active:translate-y-0 motion-safe:active:scale-[0.98]"
+        className="rounded-xl px-5 py-2.5 text-sm font-semibold text-accent-ink shadow-sm transition duration-150 hover:shadow-lg focus-visible:shadow-lg focus-visible:ring-2 focus-visible:ring-focus focus-visible:ring-offset-2 focus-visible:outline-none active:shadow-sm motion-safe:hover:-translate-y-0.5 motion-safe:hover:scale-[1.02] motion-safe:focus-visible:-translate-y-0.5 motion-safe:active:translate-y-0 motion-safe:active:scale-[0.98]"
         style={{ backgroundColor: WRITE_ACCENT }}
       >
         ✏️ 글 쓰기
@@ -285,12 +285,12 @@ export function WriteModal({ gallery, myTypeCode }: { gallery: GalleryTab; myTyp
              * p-8을 컨테이너에서 떼어 머리·본문·바닥에 나눠 넣었다. 컨테이너에 두면
              * 스크롤바가 안쪽 여백 바깥에 생긴다. max-w-lg는 그대로다.
              */
-            className="flex max-h-[90vh] w-full max-w-lg flex-col overflow-hidden rounded-3xl bg-white shadow-2xl"
+            className="flex max-h-[90vh] w-full max-w-lg flex-col overflow-hidden rounded-3xl bg-card shadow-2xl"
             onClick={(e) => e.stopPropagation()}
           >
             {/* 머리: 스크롤하지 않는다. pt-8·px-8은 예전 컨테이너 p-8, pb-5는 예전 mb-5다 */}
             <div className="flex items-center justify-between px-8 pt-8 pb-5">
-              <h2 id="write-modal-title" className="text-base font-bold text-neutral-900">
+              <h2 id="write-modal-title" className="text-base font-bold text-ink">
                 {crisisNotice
                   ? crisisSaved
                     ? "글이 올라갔어요"
@@ -303,7 +303,7 @@ export function WriteModal({ gallery, myTypeCode }: { gallery: GalleryTab; myTyp
                 type="button"
                 onClick={close}
                 aria-label="글쓰기 창 닫기"
-                className="flex h-8 w-8 items-center justify-center rounded-full bg-neutral-100 text-neutral-500 hover:bg-neutral-200"
+                className="flex h-8 w-8 items-center justify-center rounded-full bg-paper-2 text-muted hover:bg-rule"
               >
                 ✕
               </button>
@@ -324,12 +324,12 @@ export function WriteModal({ gallery, myTypeCode }: { gallery: GalleryTab; myTyp
               <>
                 <CrisisNotice message={crisisNotice} />
                 {!crisisSaved && (
-                  <p className="mt-3 text-xs leading-relaxed text-neutral-500">
+                  <p className="mt-3 text-xs leading-relaxed text-muted">
                     전화가 어렵게 느껴지면 아래 글은 그대로 두었다가 나중에 올려도 괜찮아요.
                     {CRISIS_BLOCKED_HOTLINE}번은 24시간 열려 있어요.
                   </p>
                 )}
-                {!crisisSaved && <div className="mt-4 mb-5 border-b border-neutral-200" />}
+                {!crisisSaved && <div className="mt-4 mb-5 border-b border-rule" />}
               </>
             ) : null}
 
@@ -339,7 +339,7 @@ export function WriteModal({ gallery, myTypeCode }: { gallery: GalleryTab; myTyp
                 **제목만 채운다** — 본문을 대신 써 주면 그 문장이 그 사람의 하루를 규정한다. */}
             {topics.length > 0 && (
               <div className="mb-4">
-                <p className="mb-2 text-xs text-neutral-400" role="status" aria-live="polite">
+                <p className="mb-2 text-xs text-muted" role="status" aria-live="polite">
                   선택하면 제목이 채워져요
                 </p>
                 <div className="flex flex-col gap-2">
@@ -349,7 +349,7 @@ export function WriteModal({ gallery, myTypeCode }: { gallery: GalleryTab; myTyp
                       type="button"
                       onClick={() => setTitle(topic)}
                       // 세로로 나열되므로 이동 효과는 넣지 않는다. 테두리 색만 진해져 "고를 수 있는 것"임을 드러낸다.
-                      className="rounded-xl border border-neutral-200 px-4 py-2.5 text-left transition duration-150 hover:border-neutral-400 hover:bg-neutral-50 focus-visible:border-neutral-400 focus-visible:bg-neutral-50 focus-visible:ring-2 focus-visible:ring-neutral-900 focus-visible:ring-offset-2 focus-visible:outline-none"
+                      className="rounded-xl border border-rule px-4 py-2.5 text-left transition duration-150 hover:border-rule-hover hover:bg-paper focus-visible:border-rule-hover focus-visible:bg-paper focus-visible:ring-2 focus-visible:ring-focus focus-visible:ring-offset-2 focus-visible:outline-none"
                     >
                       <span className="block text-sm font-semibold" style={{ color: tribeColor }}>
                         {topic}
@@ -369,10 +369,10 @@ export function WriteModal({ gallery, myTypeCode }: { gallery: GalleryTab; myTyp
               aria-label="제목"
               // maxLength는 UX다. 실제 거절은 서버(app/api/community/posts/route.ts)가 한다
               maxLength={TITLE_MAX}
-              className="mb-1 w-full rounded-xl border border-neutral-300 bg-neutral-50 px-4 py-2.5 text-sm text-neutral-900 placeholder:text-neutral-400 outline-none focus:border-neutral-500"
+              className="mb-1 w-full rounded-xl border border-rule bg-paper px-4 py-2.5 text-sm text-ink placeholder:text-muted outline-none focus:border-rule-2"
             />
             {/* 제목은 100자를 쓸 일이 드물어 20자 남았을 때만 띄운다 — 늘 띄우면 잔소리가 된다 */}
-            <p className="mb-2 h-4 text-right text-xs text-neutral-400">
+            <p className="mb-2 h-4 text-right text-xs text-muted">
               {remaining(title, TITLE_MAX) <= 20 ? `${title.length} / ${TITLE_MAX}자` : ""}
             </p>
 
@@ -383,12 +383,12 @@ export function WriteModal({ gallery, myTypeCode }: { gallery: GalleryTab; myTyp
               aria-label="본문"
               rows={6}
               maxLength={BODY_MAX}
-              className="mb-1 w-full resize-none rounded-xl border border-neutral-300 bg-neutral-50 px-4 py-3 text-sm leading-relaxed text-neutral-900 placeholder:text-neutral-400 outline-none focus:border-neutral-500"
+              className="mb-1 w-full resize-none rounded-xl border border-rule bg-paper px-4 py-3 text-sm leading-relaxed text-ink placeholder:text-muted outline-none focus:border-rule-2"
             />
             {/* 본문은 길게 쓰다가 잘리면 놀란다. 늘 띄우고 200자 남으면 색을 바꾼다 */}
             <p
               className={`mb-3 text-right text-xs ${
-                remaining(body, BODY_MAX) <= 200 ? "text-amber-600" : "text-neutral-400"
+                remaining(body, BODY_MAX) <= 200 ? "text-amber-600" : "text-muted"
               }`}
               aria-live="polite"
             >
@@ -399,7 +399,7 @@ export function WriteModal({ gallery, myTypeCode }: { gallery: GalleryTab; myTyp
                 흐름은 "게시하기" → presign → uploadUrl에 PUT → 받은 s3Key를 글 POST의
                 imageKey로. 고르는 시점에는 아무것도 올리지 않는다(고아 객체 방지). */}
             {attachDisabled ? (
-              <p className="mb-3 text-xs text-neutral-400">사진 첨부는 지금 이용할 수 없어요</p>
+              <p className="mb-3 text-xs text-muted">사진 첨부는 지금 이용할 수 없어요</p>
             ) : previewUrl ? (
               <div className="relative mb-3">
                 {/* next/image를 쓰지 않는 이유는 목록 카드와 같다. 여기는 blob: URL이라 더 그렇다 */}
@@ -407,19 +407,19 @@ export function WriteModal({ gallery, myTypeCode }: { gallery: GalleryTab; myTyp
                 <img
                   src={previewUrl}
                   alt="첨부한 사진 미리보기"
-                  className="max-h-56 w-full rounded-xl border border-neutral-200 object-cover"
+                  className="max-h-56 w-full rounded-xl border border-rule object-cover"
                 />
                 <button
                   type="button"
                   onClick={clearFile}
                   disabled={pending}
-                  className="absolute top-2 right-2 rounded-lg bg-black/60 px-3 py-1.5 text-xs font-semibold text-white transition hover:bg-black/75 disabled:opacity-40"
+                  className="absolute top-2 right-2 rounded-lg bg-black/60 px-3 py-1.5 text-xs font-semibold text-accent-ink transition hover:bg-black/75 disabled:opacity-40"
                 >
                   제거
                 </button>
               </div>
             ) : (
-              <label className="mb-3 flex cursor-pointer items-center justify-center gap-2 rounded-xl border border-dashed border-neutral-300 px-4 py-3 text-xs text-neutral-500 transition hover:border-neutral-400 hover:bg-neutral-50">
+              <label className="mb-3 flex cursor-pointer items-center justify-center gap-2 rounded-xl border border-dashed border-rule px-4 py-3 text-xs text-muted transition hover:border-rule-hover hover:bg-paper">
                 <input
                   ref={fileInputRef}
                   type="file"
@@ -433,7 +433,7 @@ export function WriteModal({ gallery, myTypeCode }: { gallery: GalleryTab; myTyp
             )}
 
             {error && (
-              <p role="alert" className="mb-3 text-xs text-red-500">
+              <p role="alert" className="mb-3 text-xs text-error">
                 {error}
               </p>
             )}
@@ -452,7 +452,7 @@ export function WriteModal({ gallery, myTypeCode }: { gallery: GalleryTab; myTyp
                 <button
                   type="button"
                   onClick={close}
-                  className="rounded-xl bg-neutral-900 px-6 py-2.5 text-sm font-bold text-white transition hover:bg-neutral-700"
+                  className="rounded-xl bg-accent px-6 py-2.5 text-sm font-bold text-accent-ink transition hover:bg-accent-2"
                 >
                   닫기
                 </button>
@@ -465,7 +465,7 @@ export function WriteModal({ gallery, myTypeCode }: { gallery: GalleryTab; myTyp
                   type="button"
                   onClick={handleSubmit}
                   disabled={pending || uploading || !title.trim() || !body.trim()}
-                  className="rounded-xl px-6 py-2.5 text-sm font-bold text-white transition disabled:cursor-not-allowed disabled:opacity-40"
+                  className="rounded-xl px-6 py-2.5 text-sm font-bold text-accent-ink transition disabled:cursor-not-allowed disabled:opacity-40"
                   style={{ backgroundColor: tribeColor }}
                 >
                   {uploading ? "사진 올리는 중…" : checking ? "확인하는 중…" : "게시하기"}

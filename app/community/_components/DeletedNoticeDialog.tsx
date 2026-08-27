@@ -96,9 +96,9 @@ export function DeletedNoticeDialog() {
         aria-modal="true"
         aria-labelledby="deleted-notice-title"
         tabIndex={-1}
-        className="w-full max-w-lg rounded-3xl bg-white p-8 shadow-2xl"
+        className="w-full max-w-lg rounded-3xl bg-card p-8 shadow-2xl"
       >
-        <h2 id="deleted-notice-title" className="text-base font-bold text-neutral-900">
+        <h2 id="deleted-notice-title" className="text-base font-bold text-ink">
           작성하신 {what} 커뮤니티 이용규칙에 따라 삭제되었어요
         </h2>
 
@@ -106,25 +106,25 @@ export function DeletedNoticeDialog() {
           {notices.map((notice) => (
             <li
               key={`${notice.kind}-${notice.id}`}
-              className="flex items-start gap-2 rounded-xl border border-neutral-200 bg-neutral-50 p-3"
+              className="flex items-start gap-2 rounded-xl border border-rule bg-paper p-3"
             >
-              <span className="shrink-0 rounded-full bg-white px-2 py-0.5 text-[11px] font-semibold text-neutral-500">
+              <span className="shrink-0 rounded-full bg-card px-2 py-0.5 text-[11px] font-semibold text-muted">
                 {notice.kind === "POST" ? "글" : "댓글"}
               </span>
               {/* 댓글은 title이 "달렸던 글의 제목"이다. 그게 문구로 드러나야 한다 */}
-              <span className="min-w-0 text-sm leading-relaxed break-words text-neutral-700">
+              <span className="min-w-0 text-sm leading-relaxed break-words text-ink-2">
                 {notice.kind === "POST" ? notice.title : `'${notice.title}'에 남긴 댓글`}
               </span>
             </li>
           ))}
         </ul>
 
-        <p className="mt-4 text-xs leading-relaxed text-neutral-500">
+        <p className="mt-4 text-xs leading-relaxed text-muted">
           커뮤니티는 그대로 이용하실 수 있어요. 다시 이야기를 올리셔도 괜찮아요.
         </p>
 
         {error && (
-          <p role="alert" className="mt-3 text-xs text-red-500">
+          <p role="alert" className="mt-3 text-xs text-error">
             {error}
           </p>
         )}
@@ -134,7 +134,7 @@ export function DeletedNoticeDialog() {
             type="button"
             onClick={handleConfirm}
             disabled={pending}
-            className="inline-flex items-center rounded-xl bg-neutral-900 px-6 py-2.5 text-sm font-bold text-white transition duration-150 hover:bg-neutral-700 disabled:cursor-not-allowed disabled:opacity-40"
+            className="inline-flex items-center rounded-xl bg-accent px-6 py-2.5 text-sm font-bold text-accent-ink transition duration-150 hover:bg-accent-2 disabled:cursor-not-allowed disabled:opacity-40"
           >
             확인
           </button>

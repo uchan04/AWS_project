@@ -28,16 +28,16 @@ const EXPAND_CLOSED = "max-h-0 opacity-0"
 // 버튼 규격은 MeetupCard와 같은 값이다. 같은 화면에서 두 벌이 되지 않게 맞춰 둔다.
 const BUTTON_BASE =
   "inline-flex items-center rounded-xl px-4 py-2 text-sm font-semibold transition duration-150 disabled:cursor-not-allowed disabled:opacity-40"
-const QUIET_BUTTON = BUTTON_BASE + " border border-neutral-300 bg-white text-neutral-600 hover:bg-neutral-50"
+const QUIET_BUTTON = BUTTON_BASE + " border border-rule bg-card text-ink-2 hover:bg-paper"
 
 export function CancelJoinConfirm({
   open,
   pending,
   onKeep,
   onConfirm,
-  // 패널 배경. 카드는 회색 바탕 위가 아니라 흰 카드 안이라 bg-neutral-50을,
-  // 모달의 회색 항목 안에서는 bg-white를 쓴다. 그 외에는 같다.
-  panelClassName = "flex flex-col gap-2 rounded-xl border border-neutral-200 bg-neutral-50 p-3",
+  // 패널 배경. 카드는 회색 바탕 위가 아니라 흰 카드 안이라 bg-paper을,
+  // 모달의 회색 항목 안에서는 bg-card를 쓴다. 그 외에는 같다.
+  panelClassName = "flex flex-col gap-2 rounded-xl border border-rule bg-paper p-3",
 }: {
   open: boolean
   pending: boolean
@@ -49,7 +49,7 @@ export function CancelJoinConfirm({
     <div aria-hidden={!open} className={EXPAND_BASE + " " + (open ? "max-h-64 opacity-100" : EXPAND_CLOSED)}>
       <div className={panelClassName}>
         {/* 취소를 나무라지 않는다. 결정을 되묻거나 이유를 캐지 않는다 */}
-        <p className="text-xs leading-relaxed text-neutral-600">
+        <p className="text-xs leading-relaxed text-ink-2">
           이 모임 신청을 취소할게요. 마음이 바뀌면 자리가 남아 있는 동안 다시 신청할 수 있어요.
         </p>
         <div className="flex gap-2">
@@ -61,7 +61,7 @@ export function CancelJoinConfirm({
             type="button"
             onClick={onConfirm}
             disabled={!open || pending}
-            className={BUTTON_BASE + " bg-red-500 text-white hover:bg-red-600"}
+            className={BUTTON_BASE + " bg-red-500 text-accent-ink hover:bg-red-600"}
           >
             {pending ? "취소하는 중…" : "신청 취소하기"}
           </button>

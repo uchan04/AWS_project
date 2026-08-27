@@ -33,7 +33,7 @@ export function GalleryTabs({
   // 종족 탭은 배경이 인라인 종족 색이라 hover:bg-*를 못 쓴다 — 두 탭의 반응을 그림자·이동으로 맞춘다.
   const INACTIVE_HOVER = "hover:shadow-md motion-safe:hover:-translate-y-0.5 motion-safe:focus-visible:-translate-y-0.5"
   const FOCUS_RING =
-    "focus-visible:ring-2 focus-visible:ring-neutral-900 focus-visible:ring-offset-2 focus-visible:outline-none"
+    "focus-visible:ring-2 focus-visible:ring-focus focus-visible:ring-offset-2 focus-visible:outline-none"
 
   /*
    * 관리자면 종족 3종 전부, 아니면 내 종족 하나만. 진단 전(myTypeCode === null)인 일반
@@ -57,8 +57,8 @@ export function GalleryTabs({
           FOCUS_RING +
           " " +
           (isAll
-            ? "border-neutral-900 bg-neutral-900 text-white"
-            : "border-neutral-300 bg-white text-neutral-600 hover:bg-neutral-50 " + INACTIVE_HOVER)
+            ? "border-accent bg-accent text-accent-ink"
+            : "border-rule bg-card text-ink-2 hover:bg-paper " + INACTIVE_HOVER)
         }
       >
         전체 커뮤니티
@@ -91,7 +91,7 @@ export function GalleryTabs({
       {/* 관리자 표시는 여기 한 곳뿐이다. 링크가 아니라 설명이라 탭으로 오해되지 않게
           테두리·배경 없이 둔다 */}
       {isAdmin && (
-        <span className="self-center text-xs text-neutral-400">관리자라서 모든 종족 갤러리가 보여요</span>
+        <span className="self-center text-xs text-muted">관리자라서 모든 종족 갤러리가 보여요</span>
       )}
     </nav>
   )

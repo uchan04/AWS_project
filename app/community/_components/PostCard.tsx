@@ -61,16 +61,16 @@ export function PostCard({
       type="button"
       onClick={onClick}
       // 카드가 여러 개 나열되므로 scale은 쓰지 않는다(격자가 흔들린다). 그림자 한 단계 + 2px 부양만.
-      className="flex h-full w-full min-w-0 flex-col gap-3 rounded-2xl border border-neutral-200 bg-white p-5 text-left transition duration-150 hover:border-neutral-300 hover:shadow-md focus-visible:border-neutral-300 focus-visible:shadow-md focus-visible:ring-2 focus-visible:ring-neutral-900 focus-visible:ring-offset-2 focus-visible:outline-none motion-safe:hover:-translate-y-0.5 motion-safe:focus-visible:-translate-y-0.5"
+      className="flex h-full w-full min-w-0 flex-col gap-3 rounded-card border border-rule bg-card p-5 text-left transition duration-150 hover:border-rule-hover hover:shadow-md focus-visible:border-rule-hover focus-visible:shadow-md focus-visible:ring-2 focus-visible:ring-focus focus-visible:ring-offset-2 focus-visible:outline-none motion-safe:hover:-translate-y-0.5 motion-safe:focus-visible:-translate-y-0.5"
     >
       {/* 1단 제목. 카드에서 가장 강한 요소다. 2줄까지 허용하고 그 뒤는 자른다 —
           1줄로 자르면 긴 제목이 대부분 잘리고, 풀어두면 카드 높이가 제목 길이를 탄다 */}
-      <p className="line-clamp-2 text-lg leading-snug font-bold break-words text-neutral-900">{post.title}</p>
+      <p className="line-clamp-2 text-lg leading-snug font-bold break-words text-ink">{post.title}</p>
 
       {/* 2단 메타. 작성자와 시각을 한 줄로 합쳤다 — 제목을 세우려면 나머지가 물러나야 한다.
           이름이 길 때 줄어드는 것은 이름뿐이다(truncate). 시각과 배지는 shrink-0으로 지킨다.
           **종족은 여기 쓰지 않는다** — 같은 줄 오른쪽 배지가 이미 말한다(아래 authorText 주석) */}
-      <div className="flex items-center gap-2 text-xs text-neutral-400">
+      <div className="flex items-center gap-2 text-xs text-muted">
         <span className="min-w-0 truncate">{authorText}</span>
         <span className="shrink-0">· {timeAgo(post.createdAt)}</span>
 
@@ -91,16 +91,16 @@ export function PostCard({
           본문: whitespace-pre-line으로 작성자가 나눈 문단을 살리되, line-clamp-4로 길이를 묶는다.
           클램프가 없으면 긴 글 하나가 행 전체를 늘린다 */}
       {post.imageUrl ? (
-        <div className="aspect-[16/9] w-full overflow-hidden rounded-xl bg-neutral-100">
+        <div className="aspect-[16/9] w-full overflow-hidden rounded-xl bg-paper-2">
           {/* eslint-disable-next-line @next/next/no-img-element */}
           <img src={post.imageUrl} alt="" className="h-full w-full object-cover" />
         </div>
       ) : (
-        <p className="line-clamp-4 text-sm leading-relaxed break-words whitespace-pre-line text-neutral-600">{post.body}</p>
+        <p className="line-clamp-4 text-sm leading-relaxed break-words whitespace-pre-line text-ink-2">{post.body}</p>
       )}
 
       {/* 4단 액션. mt-auto로 카드 바닥에 붙인다 — 내용이 짧아도 같은 행의 다른 카드와 줄이 맞는다 */}
-      <div className="mt-auto flex gap-4 text-xs text-neutral-400">
+      <div className="mt-auto flex gap-4 text-xs text-muted">
         <span>좋아요 {post.likeCount}</span>
         <span>댓글 {post.commentCount}</span>
       </div>

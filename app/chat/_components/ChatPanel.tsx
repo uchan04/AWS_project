@@ -197,22 +197,22 @@ export function ChatPanel({ onClose }: { onClose?: () => void }) {
         aria-modal={onClose ? "true" : undefined}
         aria-label="마음 친구와 대화"
         tabIndex={-1}
-        className="absolute inset-y-0 right-0 flex w-[460px] flex-col bg-white shadow-2xl"
+        className="absolute inset-y-0 right-0 flex w-[460px] flex-col bg-card shadow-2xl"
       >
-        <div className="border-b border-neutral-200 px-6 py-5">
+        <div className="border-b border-rule px-6 py-5">
           <div className="flex items-center gap-3">
             <div className="h-10 w-10 shrink-0 rounded-full" style={{ backgroundColor: accentColor }} />
             <div className="min-w-0 flex-1">
-              <p className="text-sm font-bold text-neutral-900">마음 친구</p>
+              <p className="text-sm font-bold text-ink">마음 친구</p>
               {/* 친밀도 문구는 여기 두지 않는다(2026-08-27). 게이지에서 12px과 버튼 두 개
                   건너에 있어 그 막대가 무엇을 재는지 읽히지 않았고, truncate가 걸려 있어
                   패널이 좁아지면 그 꼬리부터 잘렸다. 게이지 바로 아래로 내렸다 */}
-              <p className="truncate text-xs text-neutral-500">공감과 경청만 해요</p>
+              <p className="truncate text-xs text-muted">공감과 경청만 해요</p>
             </div>
             <button
               type="button"
               onClick={() => setInfoOpen((v) => !v)}
-              className="flex h-8 w-8 shrink-0 items-center justify-center rounded-full text-sm text-neutral-400 hover:bg-neutral-100"
+              className="flex h-8 w-8 shrink-0 items-center justify-center rounded-full text-sm text-muted hover:bg-paper-2"
               aria-label="친밀도 안내"
             >
               ℹ
@@ -220,14 +220,14 @@ export function ChatPanel({ onClose }: { onClose?: () => void }) {
             <button
               type="button"
               onClick={onClose}
-              className="flex h-8 w-8 shrink-0 items-center justify-center rounded-full text-neutral-400 hover:bg-neutral-100"
+              className="flex h-8 w-8 shrink-0 items-center justify-center rounded-full text-muted hover:bg-paper-2"
               aria-label="닫기"
             >
               ✕
             </button>
           </div>
 
-          <div className="mt-3 h-1.5 w-full overflow-hidden rounded-full bg-neutral-100">
+          <div className="mt-3 h-1.5 w-full overflow-hidden rounded-full bg-paper-2">
             <div
               className="h-full rounded-full transition-all"
               style={{
@@ -240,7 +240,7 @@ export function ChatPanel({ onClose }: { onClose?: () => void }) {
           {/* 게이지 라벨. 위 헤더가 아니라 **바 바로 아래 4px**에 붙여 둘이 한 덩어리로 읽히게 한다.
               라벨은 바의 왼쪽 끝, 수치는 오른쪽 끝이라 막대의 눈금처럼 읽힌다 —
               한 줄만 쓰므로 높이도 늘지 않는다 */}
-          <div className="mt-1 flex items-center justify-between text-xs text-neutral-500">
+          <div className="mt-1 flex items-center justify-between text-xs text-muted">
             <span>오늘 받은 친밀도</span>
             <span>
               {chatAffinityToday} / {AFFINITY_CAP_BY_SOURCE.CHAT}
@@ -251,8 +251,8 @@ export function ChatPanel({ onClose }: { onClose?: () => void }) {
               재화가 늘 보이는 사이드바로 옮겼다(app/chat/_components/AffinityInfoModal.tsx).
               여기 남는 것은 챗봇 자신에 대한 것뿐이다 */}
           {infoOpen && (
-            <div className="mt-4 rounded-xl bg-neutral-50 p-4 text-xs text-neutral-600">
-              <p className="mb-2 font-semibold text-neutral-800">마음 친구의 원칙</p>
+            <div className="mt-4 rounded-xl bg-paper p-4 text-xs text-ink-2">
+              <p className="mb-2 font-semibold text-ink-2">마음 친구의 원칙</p>
               <ul className="flex flex-col gap-1">
                 <li>공감과 경청에만 집중해요</li>
                 <li>조언이나 해결책을 제시하지 않아요</li>
@@ -264,14 +264,14 @@ export function ChatPanel({ onClose }: { onClose?: () => void }) {
 
         <div className="flex-1 overflow-y-auto px-5 py-5">
           {loading ? (
-            <p role="status" aria-live="polite" className="py-10 text-center text-sm text-neutral-400">
+            <p role="status" aria-live="polite" className="py-10 text-center text-sm text-muted">
               불러오는 중...
             </p>
           ) : unauthorized ? null : messages.length === 0 ? (
             <div className="flex flex-col gap-5 py-6">
               <div>
-                <p className="text-base font-bold text-neutral-900">안녕하세요, {nickname}</p>
-                <p className="mt-1 text-sm text-neutral-500">오늘 어떤 하루를 보내셨나요?</p>
+                <p className="text-base font-bold text-ink">안녕하세요, {nickname}</p>
+                <p className="mt-1 text-sm text-muted">오늘 어떤 하루를 보내셨나요?</p>
               </div>
               {typeCode && (
                 <div className="flex flex-col gap-2">
@@ -280,7 +280,7 @@ export function ChatPanel({ onClose }: { onClose?: () => void }) {
                       key={text}
                       type="button"
                       onClick={() => setInput(text)}
-                      className="rounded-xl border border-neutral-200 px-4 py-2.5 text-left text-sm text-neutral-600 hover:bg-neutral-50"
+                      className="rounded-xl border border-rule px-4 py-2.5 text-left text-sm text-ink-2 hover:bg-paper"
                     >
                       {text}
                     </button>
@@ -296,31 +296,31 @@ export function ChatPanel({ onClose }: { onClose?: () => void }) {
                     {/* whitespace-pre-wrap: Shift+Enter로 넣은 줄바꿈이 그대로 보여야 한다.
                         없으면 여러 줄로 쓴 말이 한 덩어리로 뭉친다 */}
                     <div
-                      className="max-w-[75%] rounded-2xl rounded-tr-sm px-4 py-2.5 text-sm whitespace-pre-wrap text-white"
+                      className="max-w-[75%] rounded-2xl rounded-tr-sm px-4 py-2.5 text-sm whitespace-pre-wrap text-accent-ink"
                       style={{ backgroundColor: accentColor }}
                     >
                       {message.content}
                     </div>
-                    <span className="mt-1 text-[11px] text-neutral-400">{timeAgo(new Date(message.createdAt))}</span>
+                    <span className="mt-1 text-[11px] text-muted">{timeAgo(new Date(message.createdAt))}</span>
                   </div>
                 ) : (
                   <div key={message.id} className="flex items-start gap-2">
-                    <div className="h-7 w-7 shrink-0 rounded-full bg-neutral-200" />
+                    <div className="h-7 w-7 shrink-0 rounded-full bg-paper-2" />
                     <div className="flex flex-col items-start">
                       {/* 위기 고정 응답(lib/safety.ts CRISIS_REPLY)은 상담 번호를 빈 줄로
                           띄워 한 줄에 세운다. pre-wrap이 없으면 그 줄이 문장 속에 묻힌다 */}
-                      <div className="max-w-[75%] rounded-2xl rounded-tl-sm bg-neutral-100 px-4 py-2.5 text-sm whitespace-pre-wrap text-neutral-800">
+                      <div className="max-w-[75%] rounded-2xl rounded-tl-sm bg-paper-2 px-4 py-2.5 text-sm whitespace-pre-wrap text-ink-2">
                         {message.content}
                       </div>
-                      <span className="mt-1 text-[11px] text-neutral-400">{timeAgo(new Date(message.createdAt))}</span>
+                      <span className="mt-1 text-[11px] text-muted">{timeAgo(new Date(message.createdAt))}</span>
                     </div>
                   </div>
                 )
               )}
               {streaming && (
                 <div className="flex items-start gap-2">
-                  <div className="h-7 w-7 shrink-0 rounded-full bg-neutral-200" />
-                  <div className="max-w-[75%] rounded-2xl rounded-tl-sm bg-neutral-100 px-4 py-2.5 text-sm whitespace-pre-wrap text-neutral-800">
+                  <div className="h-7 w-7 shrink-0 rounded-full bg-paper-2" />
+                  <div className="max-w-[75%] rounded-2xl rounded-tl-sm bg-paper-2 px-4 py-2.5 text-sm whitespace-pre-wrap text-ink-2">
                     {streamingText ? (
                       streamingText
                     ) : (
@@ -331,20 +331,20 @@ export function ChatPanel({ onClose }: { onClose?: () => void }) {
                       <div className="py-1">
                         <div className="flex gap-1">
                           <span
-                            className="h-1.5 w-1.5 animate-bounce rounded-full bg-neutral-400"
+                            className="h-1.5 w-1.5 animate-bounce rounded-full bg-muted"
                             style={{ animationDelay: "0ms" }}
                           />
                           <span
-                            className="h-1.5 w-1.5 animate-bounce rounded-full bg-neutral-400"
+                            className="h-1.5 w-1.5 animate-bounce rounded-full bg-muted"
                             style={{ animationDelay: "150ms" }}
                           />
                           <span
-                            className="h-1.5 w-1.5 animate-bounce rounded-full bg-neutral-400"
+                            className="h-1.5 w-1.5 animate-bounce rounded-full bg-muted"
                             style={{ animationDelay: "300ms" }}
                           />
                         </div>
                         {typeCode ? (
-                          <p className="mt-1.5 text-[11px] text-neutral-500">
+                          <p className="mt-1.5 text-[11px] text-muted">
                             {withSubject(TRIBE[typeCode].animal)} 당신의 이야기에 고개를 끄덕이고
                             있어요…
                           </p>
@@ -373,7 +373,7 @@ export function ChatPanel({ onClose }: { onClose?: () => void }) {
               : ""}
         </p>
 
-        <div className="border-t border-neutral-200 px-5 py-4">
+        <div className="border-t border-rule px-5 py-4">
           {!loading && !bedrockConfigured && !unauthorized && (
             <p className="mb-2 rounded-lg bg-amber-50 px-3 py-2 text-xs text-amber-700">
               개발 모드 · AI 응답은 아직 연결되지 않았어요
@@ -385,17 +385,17 @@ export function ChatPanel({ onClose }: { onClose?: () => void }) {
           )}
 
           {error && (
-            <p role="alert" className="mb-2 text-xs leading-relaxed text-red-600">
+            <p role="alert" className="mb-2 text-xs leading-relaxed text-error">
               {error}
             </p>
           )}
 
           {unauthorized ? (
-            <p className="rounded-lg bg-neutral-50 px-3 py-2.5 text-xs text-neutral-500">
+            <p className="rounded-lg bg-paper px-3 py-2.5 text-xs text-muted">
               로그인해야 마음 친구와 대화할 수 있어요
             </p>
           ) : !typeCode ? (
-            <p className="rounded-lg bg-neutral-50 px-3 py-2.5 text-xs text-neutral-500">
+            <p className="rounded-lg bg-paper px-3 py-2.5 text-xs text-muted">
               진단을 먼저 완료해야 마음 친구와 대화할 수 있어요
             </p>
           ) : (
@@ -408,13 +408,13 @@ export function ChatPanel({ onClose }: { onClose?: () => void }) {
                 placeholder="오늘 하루는 어땠나요?"
                 aria-label="보낼 말"
                 rows={1}
-                className="max-h-32 flex-1 resize-none rounded-xl border border-neutral-300 bg-neutral-50 px-4 py-2.5 text-sm text-neutral-900 placeholder:text-neutral-400 outline-none focus:border-neutral-500"
+                className="max-h-32 flex-1 resize-none rounded-xl border border-rule bg-paper px-4 py-2.5 text-sm text-ink placeholder:text-muted outline-none focus:border-rule-2"
               />
               <button
                 type="button"
                 onClick={() => sendMessage(input)}
                 disabled={sending || streaming || !input.trim()}
-                className="flex h-10 w-10 shrink-0 items-center justify-center rounded-full text-white transition disabled:opacity-40"
+                className="flex h-10 w-10 shrink-0 items-center justify-center rounded-full text-accent-ink transition disabled:opacity-40"
                 style={{ backgroundColor: accentColor }}
                 aria-label="전송"
               >

@@ -194,11 +194,11 @@ export function MeetupCreateModal({ onCreated }: { onCreated: () => void }) {
   }
 
   const FIELD_BASE =
-    "w-full rounded-xl border bg-neutral-50 px-4 py-2.5 text-sm text-neutral-900 placeholder:text-neutral-400 outline-none motion-safe:transition motion-safe:duration-300 motion-safe:ease-out"
+    "w-full rounded-xl border bg-paper px-4 py-2.5 text-sm text-ink placeholder:text-muted outline-none motion-safe:transition motion-safe:duration-300 motion-safe:ease-out"
 
   // 강조는 링을 한 번 켰다 끄는 것으로 끝내고, 그 뒤에는 붉은 테두리만 남긴다.
   function fieldClass(field: FieldName) {
-    if (!shownInvalid.includes(field)) return FIELD_BASE + " border-neutral-300 focus:border-neutral-500"
+    if (!shownInvalid.includes(field)) return FIELD_BASE + " border-rule focus:border-rule-2"
     return (
       FIELD_BASE +
       " border-red-400 focus:border-red-500 " +
@@ -215,7 +215,7 @@ export function MeetupCreateModal({ onCreated }: { onCreated: () => void }) {
       <button
         type="button"
         onClick={open}
-        className="rounded-xl border border-neutral-900 bg-neutral-900 px-5 py-2.5 text-sm font-semibold text-white shadow-sm transition duration-150 hover:shadow-lg focus-visible:ring-2 focus-visible:ring-neutral-900 focus-visible:ring-offset-2 focus-visible:outline-none motion-safe:hover:-translate-y-0.5"
+        className="rounded-xl border border-accent bg-accent px-5 py-2.5 text-sm font-semibold text-accent-ink shadow-sm transition duration-150 hover:shadow-lg focus-visible:ring-2 focus-visible:ring-focus focus-visible:ring-offset-2 focus-visible:outline-none motion-safe:hover:-translate-y-0.5"
       >
         모임 개설
       </button>
@@ -229,16 +229,16 @@ export function MeetupCreateModal({ onCreated }: { onCreated: () => void }) {
         >
           <div
             className={
-              "max-h-full w-full max-w-lg overflow-y-auto rounded-3xl bg-white p-8 shadow-2xl motion-safe:transition motion-safe:duration-150 motion-safe:ease-out " +
+              "max-h-full w-full max-w-lg overflow-y-auto rounded-3xl bg-card p-8 shadow-2xl motion-safe:transition motion-safe:duration-150 motion-safe:ease-out " +
               (entered ? "" : "motion-safe:scale-95 motion-safe:opacity-0")
             }
           >
             <div className="mb-5 flex items-center justify-between">
-              <h2 className="text-base font-bold text-neutral-900">오프라인 모임 개설</h2>
+              <h2 className="text-base font-bold text-ink">오프라인 모임 개설</h2>
               <button
                 type="button"
                 onClick={close}
-                className="flex h-8 w-8 items-center justify-center rounded-full bg-neutral-100 text-neutral-500 hover:bg-neutral-200"
+                className="flex h-8 w-8 items-center justify-center rounded-full bg-paper-2 text-muted hover:bg-rule"
               >
                 ✕
               </button>
@@ -274,17 +274,17 @@ export function MeetupCreateModal({ onCreated }: { onCreated: () => void }) {
                 <button
                   type="button"
                   onClick={() => startsAtRef.current?.blur()}
-                  className="shrink-0 rounded-xl border border-neutral-300 bg-white px-4 py-2.5 text-sm font-medium text-neutral-600 transition duration-150 hover:bg-neutral-100"
+                  className="shrink-0 rounded-xl border border-rule bg-card px-4 py-2.5 text-sm font-medium text-ink-2 transition duration-150 hover:bg-paper-2"
                 >
                   완료
                 </button>
               </div>
-              {startsAtLabel && <p className="mt-1.5 text-xs text-neutral-500">{startsAtLabel} 시작</p>}
+              {startsAtLabel && <p className="mt-1.5 text-xs text-muted">{startsAtLabel} 시작</p>}
             </div>
 
             <div className="mb-3 flex gap-2">
               <label className="flex-1">
-                <span className="mb-1 block text-xs text-neutral-400">최소 인원</span>
+                <span className="mb-1 block text-xs text-muted">최소 인원</span>
                 <input
                   type="number"
                   min={1}
@@ -294,7 +294,7 @@ export function MeetupCreateModal({ onCreated }: { onCreated: () => void }) {
                 />
               </label>
               <label className="flex-1">
-                <span className="mb-1 block text-xs text-neutral-400">정원</span>
+                <span className="mb-1 block text-xs text-muted">정원</span>
                 <input
                   type="number"
                   min={1}
@@ -314,19 +314,19 @@ export function MeetupCreateModal({ onCreated }: { onCreated: () => void }) {
             />
 
             {error && (
-              <FadeIn key={error} className="mb-3 block text-xs text-red-500">
+              <FadeIn key={error} className="mb-3 block text-xs text-error">
                 {error}
               </FadeIn>
             )}
 
             <div className="flex items-center justify-end gap-3">
               {shownInvalid.length > 0 && (
-                <FadeIn className="text-xs text-red-500">표시된 칸을 모두 채워주세요.</FadeIn>
+                <FadeIn className="text-xs text-error">표시된 칸을 모두 채워주세요.</FadeIn>
               )}
               <button
                 type="button"
                 onClick={close}
-                className="rounded-xl border border-neutral-300 bg-white px-5 py-2.5 text-sm font-medium text-neutral-600 transition duration-150 hover:bg-neutral-100"
+                className="rounded-xl border border-rule bg-card px-5 py-2.5 text-sm font-medium text-ink-2 transition duration-150 hover:bg-paper-2"
               >
                 취소
               </button>
@@ -334,7 +334,7 @@ export function MeetupCreateModal({ onCreated }: { onCreated: () => void }) {
                 type="button"
                 onClick={handleSubmit}
                 aria-busy={pending}
-                className="inline-flex items-center rounded-xl border border-neutral-900 bg-neutral-900 px-6 py-2.5 text-sm font-bold text-white transition duration-150"
+                className="inline-flex items-center rounded-xl border border-accent bg-accent px-6 py-2.5 text-sm font-bold text-accent-ink transition duration-150"
               >
                 {pending && <Spinner />}
                 개설하기

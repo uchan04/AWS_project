@@ -26,7 +26,7 @@ export function HopeBanner({ gallery }: { gallery: GalleryTab }) {
       className={
         // 왼쪽은 각지게(rounded-r-xl) — 모서리를 둥글리면 accent bar가 끊겨 다시 카드로 읽힌다.
         "flex items-center gap-4 rounded-r-xl border-l-4 px-5 py-4 " +
-        (isAll ? "border-l-neutral-300 bg-neutral-50" : "")
+        (isAll ? "border-l-rule bg-paper" : "")
       }
       // 종족색은 Tailwind로 표현할 수 없어 인라인이다. 배경 22는 PostCard의 연한 배경 관습을 따른다.
       // bar는 얇아서 알파를 섞으면 안 보인다 — 원색을 그대로 쓴다.
@@ -36,7 +36,7 @@ export function HopeBanner({ gallery }: { gallery: GalleryTab }) {
         {tribe ? tribe.emoji : "🌿"}
       </span>
       {/* 라벨과 문구는 한 <p> 안의 인라인 span 두 개다. 세로로 쌓지 않는다. */}
-      <p className="text-base leading-relaxed text-neutral-900">
+      <p className="text-base leading-relaxed text-ink">
         {tribe && (
           // 글자라 종족색 원본을 쓴다. 22/55 알파는 면(배경·테두리)용이라 글자에 쓰면 안 읽힌다.
           <span className="font-bold" style={{ color: tribe.colorHex }}>
