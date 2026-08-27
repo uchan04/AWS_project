@@ -38,18 +38,18 @@ export type CommunityAuthor = {
   isAdmin: boolean
 }
 
-/** 이름 줄. "부지런한 곰 · 곰과" 또는 "부지런한 곰 · 관리자" */
+/** 이름 줄. "부지런한 곰 · 곰" 또는 "부지런한 곰 · 관리자" */
 export function communityAuthorLabel(user: CommunityAuthor): string {
   if (user.isAdmin) return `${user.nickname} · ${ADMIN_LABEL}`
   return user.typeCode ? authorLabel(user.nickname, user.typeCode) : user.nickname
 }
 
 /**
- * 이름 옆 배지. **이름 줄과 같은 기준으로 갈린다** — 이름은 "관리자"인데 배지는 "곰과"면
+ * 이름 옆 배지. **이름 줄과 같은 기준으로 갈린다** — 이름은 "관리자"인데 배지는 "곰"이면
  * 어긋난다. 진단 전이고 관리자도 아니면 null이라 호출부가 배지를 그리지 않는다.
  */
 export function communityAuthorBadge(user: CommunityAuthor): { text: string; colorHex: string } | null {
   if (user.isAdmin) return { text: ADMIN_LABEL, colorHex: ADMIN_COLOR }
   if (!user.typeCode) return null
-  return { text: TRIBE[user.typeCode].family, colorHex: TRIBE[user.typeCode].colorHex }
+  return { text: TRIBE[user.typeCode].animal, colorHex: TRIBE[user.typeCode].colorHex }
 }
