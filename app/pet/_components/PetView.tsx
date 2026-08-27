@@ -1914,7 +1914,7 @@ export default function PetView({ initial }: { initial: PetState }) {
             autoPlay
             playsInline
             muted
-            src={cdnUrl(`pets/${pet.typeCode === "HEALTH_EMOTION" ? "fox" : pet.typeCode === "INDEPENDENT_LOW_INCOME" ? "cat" : "bear"}_${playingAnimation}.webm`) || undefined}
+            src={cdnUrl(`pets/${pet.typeCode === "HEALTH_EMOTION" ? "fox" : pet.typeCode === "INDEPENDENT_LOW_INCOME" ? "cat" : "bear"}_${playingAnimation}.mp4`) || undefined}
             onEnded={handleAnimEnded}
             onError={handleAnimEnded}
             style={{ maxWidth: "100%", maxHeight: "100%" }}
