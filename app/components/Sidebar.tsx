@@ -249,21 +249,20 @@ export function Sidebar({ profile }: { profile: SidebarProfile | null }) {
             <div style={{ display: "flex", alignItems: "center", gap: 10, marginBottom: 10 }}>
               <Avatar imageUrl={avatar} emoji={getTribeEmoji(profile.typeCode)} size={40} />
               <div style={{ flex: 1, minWidth: 0 }}>
-                <div style={{ display: "flex", alignItems: "center", gap: 6, marginBottom: 2 }}>
+                <div style={{ display: "flex", alignItems: "flex-start", gap: 6, marginBottom: 2 }}>
                   <p
                     style={{
                       margin: 0,
                       fontFamily: "var(--font-display)",
                       fontSize: 14,
                       color: "#2A1F14",
-                      overflow: "hidden",
-                      textOverflow: "ellipsis",
-                      whiteSpace: "nowrap",
+                      wordBreak: "break-all",
+                      lineHeight: 1.3,
                     }}
                   >
                     {profile.nickname}
                   </p>
-                  <span style={{ fontSize: 11, color: "#9A8A76", fontWeight: 600 }}>Lv.{profile.level}</span>
+                  <span style={{ fontSize: 11, color: "#9A8A76", fontWeight: 600, flexShrink: 0, marginTop: 2 }}>Lv.{profile.level}</span>
                 </div>
                 <p style={{ margin: 0, fontSize: 11, color, fontWeight: 700 }}>
                   {tribe?.emoji || "🌱"} {familyLabel}
@@ -474,7 +473,7 @@ export function Sidebar({ profile }: { profile: SidebarProfile | null }) {
                   plain
                 />
                 <div style={{ textAlign: "left" }}>
-                  <p style={{ fontFamily: "var(--font-display)", fontSize: 18, color: "#2A1F14", margin: "0 0 3px" }}>
+                  <p style={{ fontFamily: "var(--font-display)", fontSize: 18, color: "#2A1F14", margin: "0 0 3px", wordBreak: "break-all" }}>
                     {profile.nickname}
                   </p>
                   <p style={{ margin: 0, fontSize: 12, color, fontWeight: 700 }}>{familyLabel}</p>
