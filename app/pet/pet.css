@@ -1231,10 +1231,7 @@
      22 − 7 − 0.5 = 14.5rem이 되어 4단 자리(그림이 세로 상한 17rem에 잡혀 13.8rem)와
      3단 자리(13.5rem)가 둘 다 들어온다 — 방이 19.5rem일 때는 상한이 12rem이라 3·4단
      말풍선이 20~24px 낮게 앉아 머리에 8~11px 겹쳤다. 그것이 이번 요청의 절반이었다 */
-  bottom: min(
-    calc(var(--pet-char-w) * 0.81),
-    100% - var(--pet-bubble-min-h) - var(--space-2xs)
-  );
+  bottom: calc(var(--pet-char-w) * 0.81);
   left: 50%;
   transform: translateX(-50%);
   /* 펫(--z-raised)보다 **딱 하나** 위. 말풍선 꼬리가 캐릭터 쪽으로 내려가므로 겹칠 때
@@ -1335,7 +1332,9 @@
   text-align: center;
   margin: 0;
   color: var(--color-ink);
-  font-size: var(--text-label);
+  font-family: var(--font-display);
+  font-weight: 600;
+  font-size: calc(var(--text-label) * 1.5);
   /* 두 줄 이상이 되므로 줄 간격을 조금 넓힌다. 위로하는 문장을 빽빽하게 쓰지 않는다 */
   line-height: 1.6;
   /* 대사가 "왔어? 나 방금 네 생각하고 있었어!"처럼 두 마디로 되어 있어서
@@ -1700,7 +1699,7 @@
 .pet-char__burst span {
   position: absolute;
   bottom: 35%;
-  font-size: var(--text-md);
+  font-size: calc(var(--text-md) * 1.5);
   animation: petBurst 900ms var(--ease-out) both;
 }
 .pet-char__burst span[data-i="1"] {
