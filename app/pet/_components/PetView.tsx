@@ -1924,7 +1924,14 @@ export default function PetView({ initial }: { initial: PetState }) {
             src={cdnUrl(`pets/${pet.typeCode === "HEALTH_EMOTION" ? "fox" : pet.typeCode === "INDEPENDENT_LOW_INCOME" ? "cat" : "bear"}_${playingAnimation}.mp4`) || undefined}
             onEnded={handleAnimEnded}
             onError={handleAnimEnded}
-            style={{ maxWidth: "100%", maxHeight: "100%" }}
+            style={{ 
+              maxWidth: "90%", 
+              maxHeight: "90%",
+              borderRadius: "var(--radius-card)",
+              border: "8px solid var(--color-card)",
+              boxShadow: "0 16px 48px rgba(0,0,0,0.4)",
+              backgroundColor: "var(--color-card)"
+            }}
           />
         </div>
       ) : null}
