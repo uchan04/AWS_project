@@ -5,13 +5,7 @@ import { useModalA11y } from "@/app/components/useModalA11y"
 import type { TypeCode } from "@prisma/client"
 import { TRIBE, withSubject } from "@/lib/types"
 import { timeAgo } from "@/app/community/_lib/format"
-import {
-  POST_AFFINITY,
-  COMMENT_AFFINITY,
-  CHAT_TURN_AFFINITY,
-  MEETUP_JOIN_AFFINITY,
-  AFFINITY_CAP_BY_SOURCE,
-} from "@/app/community/_lib/affinity"
+import { AFFINITY_CAP_BY_SOURCE } from "@/app/community/_lib/affinity"
 import { CHAT_STARTERS } from "@/app/chat/_lib/starters"
 import { isCrisis, CRISIS_HOTLINE, CRISIS_HOTLINE_LABEL } from "@/lib/safety"
 import { CrisisNotice } from "@/app/components/CrisisNotice"
@@ -210,9 +204,10 @@ export function ChatPanel({ onClose }: { onClose?: () => void }) {
             <div className="h-10 w-10 shrink-0 rounded-full" style={{ backgroundColor: accentColor }} />
             <div className="min-w-0 flex-1">
               <p className="text-sm font-bold text-neutral-900">마음 친구</p>
-              <p className="truncate text-xs text-neutral-500">
-                공감과 경청만 해요 · 오늘 대화로 받은 친밀도 {chatAffinityToday}/{AFFINITY_CAP_BY_SOURCE.CHAT}
-              </p>
+              {/* 친밀도 문구는 여기 두지 않는다(2026-08-27). 게이지에서 12px과 버튼 두 개
+                  건너에 있어 그 막대가 무엇을 재는지 읽히지 않았고, truncate가 걸려 있어
+                  패널이 좁아지면 그 꼬리부터 잘렸다. 게이지 바로 아래로 내렸다 */}
+              <p className="truncate text-xs text-neutral-500">공감과 경청만 해요</p>
             </div>
             <button
               type="button"
@@ -242,23 +237,21 @@ export function ChatPanel({ onClose }: { onClose?: () => void }) {
             />
           </div>
 
+          {/* 게이지 라벨. 위 헤더가 아니라 **바 바로 아래 4px**에 붙여 둘이 한 덩어리로 읽히게 한다.
+              라벨은 바의 왼쪽 끝, 수치는 오른쪽 끝이라 막대의 눈금처럼 읽힌다 —
+              한 줄만 쓰므로 높이도 늘지 않는다 */}
+          <div className="mt-1 flex items-center justify-between text-xs text-neutral-500">
+            <span>오늘 받은 친밀도</span>
+            <span>
+              {chatAffinityToday} / {AFFINITY_CAP_BY_SOURCE.CHAT}
+            </span>
+          </div>
+
+          {/* 친밀도 획득 규칙은 여기 없다(2026-08-27). 서비스 전체의 규칙이라
+              재화가 늘 보이는 사이드바로 옮겼다(app/chat/_components/AffinityInfoModal.tsx).
+              여기 남는 것은 챗봇 자신에 대한 것뿐이다 */}
           {infoOpen && (
             <div className="mt-4 rounded-xl bg-neutral-50 p-4 text-xs text-neutral-600">
-              <p className="mb-2 font-semibold text-neutral-800">친밀도는 이렇게 쌓여요</p>
-              <ul className="mb-3 flex flex-col gap-1">
-                <li>
-                  챗봇 대화 1턴 +{CHAT_TURN_AFFINITY} · 오늘 최대 {AFFINITY_CAP_BY_SOURCE.CHAT}
-                </li>
-                <li>커뮤니티 글 작성 +{POST_AFFINITY}</li>
-                <li>댓글 달기 +{COMMENT_AFFINITY}</li>
-                <li>오프라인 모임 신청 +{MEETUP_JOIN_AFFINITY}</li>
-                <li className="text-neutral-500">
-                  위 세 가지(커뮤니티)는 오늘 최대 {AFFINITY_CAP_BY_SOURCE.COMMUNITY}
-                </li>
-              </ul>
-              <p className="mb-3 text-neutral-500">
-                대화만으로 하루치를 다 채울 수는 없어요. 나머지는 사람과 닿는 쪽에서 쌓여요.
-              </p>
               <p className="mb-2 font-semibold text-neutral-800">마음 친구의 원칙</p>
               <ul className="flex flex-col gap-1">
                 <li>공감과 경청에만 집중해요</li>
