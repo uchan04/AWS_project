@@ -202,7 +202,7 @@ export default function CosmeticList({
       <div className="pet-shop-head" style={{ marginBottom: "16px" }}>
         <h2 className="pet-shop-head__title">
           <span className="pet-shop-head__bar" aria-hidden="true" />
-          방 배경 아이템
+          방 배경
         </h2>
         <span className="pet-shop-head__count">{filtered.length}개</span>
       </div>
