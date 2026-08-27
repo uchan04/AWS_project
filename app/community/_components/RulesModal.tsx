@@ -96,7 +96,7 @@ export function RulesModal() {
         type="button"
         onClick={() => setOpen(true)}
         // 주 CTA("글 쓰기") 옆이라 조용하게 둔다. 채움 배경을 쓰지 않는다.
-        className="rounded-xl border border-rule px-4 py-2.5 text-sm font-semibold text-ink-2 transition duration-150 hover:bg-paper focus-visible:ring-2 focus-visible:ring-focus focus-visible:ring-offset-2 focus-visible:outline-none"
+        className="rounded-xl border border-rule px-4 py-2.5 text-base font-display text-ink-2 transition duration-150 hover:bg-paper focus-visible:ring-2 focus-visible:ring-focus focus-visible:ring-offset-2 focus-visible:outline-none"
       >
         이용 규칙
       </button>
@@ -116,7 +116,7 @@ export function RulesModal() {
             <div className="mb-5 flex items-start justify-between gap-3">
               <div>
                 {/* 경고가 아니라 환영이다. 규칙을 읽는 첫 문장이 겁을 주면 안 된다 */}
-                <h2 id="community-rules-title" className="text-base font-bold text-ink">
+                <h2 id="community-rules-title" className="font-display text-lg text-ink">
                   여기는 편하게 이야기하는 곳이에요
                 </h2>
                 <p className="mt-1 text-sm text-muted">함께 쓰는 공간이라 몇 가지만 약속해요.</p>
@@ -146,7 +146,7 @@ export function RulesModal() {
               <button
                 type="button"
                 onClick={close}
-                className="rounded-xl bg-accent px-6 py-2.5 text-sm font-bold text-accent-ink transition duration-150 hover:bg-accent-2"
+                className="rounded-xl bg-accent px-6 py-2.5 text-base font-display text-accent-ink transition duration-150 hover:bg-accent-2"
               >
                 확인
               </button>

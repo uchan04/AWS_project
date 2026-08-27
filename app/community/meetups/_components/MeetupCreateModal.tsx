@@ -215,7 +215,7 @@ export function MeetupCreateModal({ onCreated }: { onCreated: () => void }) {
       <button
         type="button"
         onClick={open}
-        className="rounded-xl border border-accent bg-accent px-5 py-2.5 text-sm font-semibold text-accent-ink shadow-sm transition duration-150 hover:shadow-lg focus-visible:ring-2 focus-visible:ring-focus focus-visible:ring-offset-2 focus-visible:outline-none motion-safe:hover:-translate-y-0.5"
+        className="rounded-xl border border-accent bg-accent px-5 py-2.5 text-base font-display text-accent-ink shadow-sm transition duration-150 hover:shadow-lg focus-visible:ring-2 focus-visible:ring-focus focus-visible:ring-offset-2 focus-visible:outline-none motion-safe:hover:-translate-y-0.5"
       >
         모임 개설
       </button>
@@ -234,7 +234,7 @@ export function MeetupCreateModal({ onCreated }: { onCreated: () => void }) {
             }
           >
             <div className="mb-5 flex items-center justify-between">
-              <h2 className="text-base font-bold text-ink">오프라인 모임 개설</h2>
+              <h2 className="font-display text-lg text-ink">오프라인 모임 개설</h2>
               <button
                 type="button"
                 onClick={close}
@@ -274,7 +274,7 @@ export function MeetupCreateModal({ onCreated }: { onCreated: () => void }) {
                 <button
                   type="button"
                   onClick={() => startsAtRef.current?.blur()}
-                  className="shrink-0 rounded-xl border border-rule bg-card px-4 py-2.5 text-sm font-medium text-ink-2 transition duration-150 hover:bg-paper-2"
+                  className="shrink-0 rounded-xl border border-rule bg-card px-4 py-2.5 text-base font-display text-ink-2 transition duration-150 hover:bg-paper-2"
                 >
                   완료
                 </button>
@@ -326,7 +326,7 @@ export function MeetupCreateModal({ onCreated }: { onCreated: () => void }) {
               <button
                 type="button"
                 onClick={close}
-                className="rounded-xl border border-rule bg-card px-5 py-2.5 text-sm font-medium text-ink-2 transition duration-150 hover:bg-paper-2"
+                className="rounded-xl border border-rule bg-card px-5 py-2.5 text-base font-display text-ink-2 transition duration-150 hover:bg-paper-2"
               >
                 취소
               </button>
@@ -334,7 +334,7 @@ export function MeetupCreateModal({ onCreated }: { onCreated: () => void }) {
                 type="button"
                 onClick={handleSubmit}
                 aria-busy={pending}
-                className="inline-flex items-center rounded-xl border border-accent bg-accent px-6 py-2.5 text-sm font-bold text-accent-ink transition duration-150"
+                className="inline-flex items-center rounded-xl border border-accent bg-accent px-6 py-2.5 text-base font-display text-accent-ink transition duration-150"
               >
                 {pending && <Spinner />}
                 개설하기

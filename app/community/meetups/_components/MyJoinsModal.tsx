@@ -21,7 +21,7 @@ import { CancelJoinConfirm } from "./CancelJoinConfirm"
 // 취소 확인 자체는 `CancelJoinConfirm`이 그린다. 카드(MeetupCard)와 같은 것을 쓴다 —
 // 문구와 버튼 배치를 두 벌로 두면 한쪽만 고쳐져 갈라진다(그 파일 주석 참고).
 const COMPACT_QUIET =
-  "inline-flex items-center rounded-xl border border-rule bg-card px-3 py-1.5 text-xs font-semibold text-ink-2 transition duration-150 hover:bg-paper disabled:cursor-not-allowed disabled:opacity-40"
+  "inline-flex items-center rounded-xl border border-rule bg-card px-3 py-1.5 text-sm font-display text-ink-2 transition duration-150 hover:bg-paper disabled:cursor-not-allowed disabled:opacity-40"
 
 // 지난 모임 배지의 회색. MeetupCard의 NEUTRAL_COLOR와 같은 값이다(그쪽도 export되지 않는다).
 const NEUTRAL_COLOR = "#9CA3AF"
@@ -76,7 +76,7 @@ export function MyJoinsModal({ joined, nowMs }: { joined: MeetupListItem[]; nowM
         type="button"
         onClick={() => setOpen(true)}
         // 주 동작이 아니라 확인하러 가는 길이라 조용하게 둔다(RulesModal 트리거와 같은 어휘).
-        className="rounded-xl border border-rule px-4 py-2.5 text-sm font-semibold text-ink-2 transition duration-150 hover:bg-paper focus-visible:ring-2 focus-visible:ring-focus focus-visible:ring-offset-2 focus-visible:outline-none"
+        className="rounded-xl border border-rule px-4 py-2.5 text-base font-display text-ink-2 transition duration-150 hover:bg-paper focus-visible:ring-2 focus-visible:ring-focus focus-visible:ring-offset-2 focus-visible:outline-none"
       >
         나의 신청 현황
       </button>
@@ -96,7 +96,7 @@ export function MyJoinsModal({ joined, nowMs }: { joined: MeetupListItem[]; nowM
             {/* 머리는 스크롤하지 않는다. 목록이 길어져도 제목과 닫기는 늘 같은 자리다(WriteModal과 같은 구조) */}
             <div className="flex items-start justify-between gap-3 px-8 pt-8 pb-5">
               <div>
-                <h2 id="my-joins-title" className="text-base font-bold text-ink">
+                <h2 id="my-joins-title" className="font-display text-lg text-ink">
                   나의 신청 현황
                 </h2>
                 <p className="mt-1 text-sm text-muted">신청해 둔 모임이에요.</p>

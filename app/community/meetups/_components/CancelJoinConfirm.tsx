@@ -27,7 +27,7 @@ const EXPAND_CLOSED = "max-h-0 opacity-0"
 
 // 버튼 규격은 MeetupCard와 같은 값이다. 같은 화면에서 두 벌이 되지 않게 맞춰 둔다.
 const BUTTON_BASE =
-  "inline-flex items-center rounded-xl px-4 py-2 text-sm font-semibold transition duration-150 disabled:cursor-not-allowed disabled:opacity-40"
+  "inline-flex items-center rounded-xl px-4 py-2 text-base font-display transition duration-150 disabled:cursor-not-allowed disabled:opacity-40"
 const QUIET_BUTTON = BUTTON_BASE + " border border-rule bg-card text-ink-2 hover:bg-paper"
 
 export function CancelJoinConfirm({

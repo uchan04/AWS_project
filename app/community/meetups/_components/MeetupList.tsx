@@ -148,7 +148,7 @@ export function MeetupList({
           모임이 열리면 여기에서 안내할게요.
         </p>
       ) : (
-        <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
+        <div className="grid grid-cols-1 items-stretch gap-4 sm:grid-cols-2">
           {meetups.map((meetup, index) => (
             <MeetupCard
               key={meetup.id}

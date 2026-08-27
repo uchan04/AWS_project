@@ -203,7 +203,7 @@ export function ChatPanel({ onClose }: { onClose?: () => void }) {
           <div className="flex items-center gap-3">
             <div className="h-10 w-10 shrink-0 rounded-full" style={{ backgroundColor: accentColor }} />
             <div className="min-w-0 flex-1">
-              <p className="text-sm font-bold text-ink">마음 친구</p>
+              <p className="font-display text-base text-ink">마음 친구</p>
               {/* 친밀도 문구는 여기 두지 않는다(2026-08-27). 게이지에서 12px과 버튼 두 개
                   건너에 있어 그 막대가 무엇을 재는지 읽히지 않았고, truncate가 걸려 있어
                   패널이 좁아지면 그 꼬리부터 잘렸다. 게이지 바로 아래로 내렸다 */}
@@ -270,7 +270,7 @@ export function ChatPanel({ onClose }: { onClose?: () => void }) {
           ) : unauthorized ? null : messages.length === 0 ? (
             <div className="flex flex-col gap-5 py-6">
               <div>
-                <p className="text-base font-bold text-ink">안녕하세요, {nickname}</p>
+                <p className="font-display text-base text-ink">안녕하세요, {nickname}</p>
                 <p className="mt-1 text-sm text-muted">오늘 어떤 하루를 보내셨나요?</p>
               </div>
               {typeCode && (

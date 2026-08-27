@@ -33,9 +33,9 @@ const EXPAND_PANEL = "flex flex-col gap-2 rounded-xl border border-rule bg-paper
  * 또는 흰 배경(보조)이다.
  */
 const BUTTON_BASE =
-  "inline-flex items-center rounded-xl px-4 py-2 text-sm font-semibold transition duration-150 disabled:cursor-not-allowed disabled:opacity-40"
+  "inline-flex items-center rounded-xl px-4 py-2 text-base font-display transition duration-150 disabled:cursor-not-allowed disabled:opacity-40"
 const BUTTON_COMPACT =
-  "inline-flex items-center rounded-xl px-3 py-1.5 text-xs font-semibold transition duration-150 disabled:cursor-not-allowed disabled:opacity-40"
+  "inline-flex items-center rounded-xl px-3 py-1.5 text-sm font-display transition duration-150 disabled:cursor-not-allowed disabled:opacity-40"
 
 const PRIMARY_BUTTON = BUTTON_BASE + " bg-accent text-accent-ink hover:bg-accent-2"
 const QUIET_BUTTON = BUTTON_BASE + " border border-rule bg-card text-ink-2 hover:bg-paper"
@@ -396,7 +396,7 @@ export function PostDetailModal({
             )}
 
             <div className="flex-1 overflow-y-auto px-7 py-6">
-              <h2 className="mb-2 text-lg font-bold break-words text-ink">{post.title}</h2>
+              <h2 className="font-display mb-2 text-lg break-words text-ink">{post.title}</h2>
               <p className="mb-6 text-[15px] leading-relaxed break-words whitespace-pre-wrap text-ink-2">{post.body}</p>
 
               {/* 상세에서는 원본 비율 그대로 본다. 목록 카드만 16:9로 자른다(PostCard 주석 참고).

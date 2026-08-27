@@ -146,7 +146,7 @@ export function MeetupCard({
   }
 
   const BUTTON_BASE =
-    "inline-flex items-center rounded-xl px-4 py-2 text-sm font-semibold transition duration-150 disabled:cursor-not-allowed disabled:opacity-40"
+    "inline-flex items-center rounded-xl px-4 py-2 text-base font-display transition duration-150 disabled:cursor-not-allowed disabled:opacity-40"
   const QUIET_BUTTON = BUTTON_BASE + " border border-rule bg-card text-ink-2 hover:bg-paper"
 
   return (
@@ -167,7 +167,7 @@ export function MeetupCard({
             문자열이 20자쯤 되어(8월 28일 (금) 오전 11:09) 아래 라벨 줄에 끼워 넣으면 어차피 줄이 넘친다 */}
         <div className="flex items-start justify-between gap-2">
           <div className="min-w-0">
-            <p className="text-base font-bold break-words text-ink">{meetup.title}</p>
+            <p className="font-display text-lg break-words text-ink">{meetup.title}</p>
             <p className="mt-1 text-sm font-semibold text-ink-2">{meetupDateTime(meetup.startsAt)}</p>
           </div>
 

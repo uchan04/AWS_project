@@ -259,7 +259,7 @@ export function WriteModal({ gallery, myTypeCode }: { gallery: GalleryTab; myTyp
         }}
         // 배경이 인라인 색(WRITE_ACCENT)이라 hover:bg-*로는 못 건드린다. 색과 무관한 그림자·이동·축소로 반응을 만든다.
         // 이동·확대만 motion-safe:로 감싼다 — prefers-reduced-motion에서도 그림자는 남아야 무엇을 누르는지 보인다.
-        className="rounded-xl px-5 py-2.5 text-sm font-semibold text-accent-ink shadow-sm transition duration-150 hover:shadow-lg focus-visible:shadow-lg focus-visible:ring-2 focus-visible:ring-focus focus-visible:ring-offset-2 focus-visible:outline-none active:shadow-sm motion-safe:hover:-translate-y-0.5 motion-safe:hover:scale-[1.02] motion-safe:focus-visible:-translate-y-0.5 motion-safe:active:translate-y-0 motion-safe:active:scale-[0.98]"
+        className="rounded-xl px-5 py-2.5 text-base font-display text-accent-ink shadow-sm transition duration-150 hover:shadow-lg focus-visible:shadow-lg focus-visible:ring-2 focus-visible:ring-focus focus-visible:ring-offset-2 focus-visible:outline-none active:shadow-sm motion-safe:hover:-translate-y-0.5 motion-safe:hover:scale-[1.02] motion-safe:focus-visible:-translate-y-0.5 motion-safe:active:translate-y-0 motion-safe:active:scale-[0.98]"
         style={{ backgroundColor: WRITE_ACCENT }}
       >
         ✏️ 글 쓰기
@@ -290,7 +290,7 @@ export function WriteModal({ gallery, myTypeCode }: { gallery: GalleryTab; myTyp
           >
             {/* 머리: 스크롤하지 않는다. pt-8·px-8은 예전 컨테이너 p-8, pb-5는 예전 mb-5다 */}
             <div className="flex items-center justify-between px-8 pt-8 pb-5">
-              <h2 id="write-modal-title" className="text-base font-bold text-ink">
+              <h2 id="write-modal-title" className="font-display text-lg text-ink">
                 {crisisNotice
                   ? crisisSaved
                     ? "글이 올라갔어요"
@@ -452,7 +452,7 @@ export function WriteModal({ gallery, myTypeCode }: { gallery: GalleryTab; myTyp
                 <button
                   type="button"
                   onClick={close}
-                  className="rounded-xl bg-accent px-6 py-2.5 text-sm font-bold text-accent-ink transition hover:bg-accent-2"
+                  className="rounded-xl bg-accent px-6 py-2.5 text-base font-display text-accent-ink transition hover:bg-accent-2"
                 >
                   닫기
                 </button>
@@ -465,7 +465,7 @@ export function WriteModal({ gallery, myTypeCode }: { gallery: GalleryTab; myTyp
                   type="button"
                   onClick={handleSubmit}
                   disabled={pending || uploading || !title.trim() || !body.trim()}
-                  className="rounded-xl px-6 py-2.5 text-sm font-bold text-accent-ink transition disabled:cursor-not-allowed disabled:opacity-40"
+                  className="rounded-xl px-6 py-2.5 text-base font-display text-accent-ink transition disabled:cursor-not-allowed disabled:opacity-40"
                   style={{ backgroundColor: tribeColor }}
                 >
                   {uploading ? "사진 올리는 중…" : checking ? "확인하는 중…" : "게시하기"}

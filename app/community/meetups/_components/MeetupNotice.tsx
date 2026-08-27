@@ -102,7 +102,7 @@ export function MeetupNotice({ notices }: { notices: MeetupNoticeItem[] }) {
           type="button"
           onClick={handleConfirm}
           disabled={pending}
-          className="inline-flex items-center rounded-xl border border-accent bg-accent px-5 py-2 text-sm font-semibold text-accent-ink transition duration-150 disabled:cursor-not-allowed disabled:opacity-40"
+          className="inline-flex items-center rounded-xl border border-accent bg-accent px-5 py-2 text-base font-display text-accent-ink transition duration-150 disabled:cursor-not-allowed disabled:opacity-40"
         >
           {pending && <Spinner />}
           확인

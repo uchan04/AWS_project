@@ -86,7 +86,7 @@ export function CurrencyInfoModal() {
             onClick={(event) => event.stopPropagation()}
           >
             <div className="mb-4 flex items-start justify-between gap-3">
-              <h2 id="currency-info-title" className="text-base font-bold text-ink">
+              <h2 id="currency-info-title" className="font-display text-lg text-ink">
                 재화는 이렇게 모여요
               </h2>
               <button

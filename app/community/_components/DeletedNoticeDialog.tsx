@@ -98,7 +98,7 @@ export function DeletedNoticeDialog() {
         tabIndex={-1}
         className="w-full max-w-lg rounded-3xl bg-card p-8 shadow-2xl"
       >
-        <h2 id="deleted-notice-title" className="text-base font-bold text-ink">
+        <h2 id="deleted-notice-title" className="font-display text-lg text-ink">
           작성하신 {what} 커뮤니티 이용규칙에 따라 삭제되었어요
         </h2>
 
@@ -134,7 +134,7 @@ export function DeletedNoticeDialog() {
             type="button"
             onClick={handleConfirm}
             disabled={pending}
-            className="inline-flex items-center rounded-xl bg-accent px-6 py-2.5 text-sm font-bold text-accent-ink transition duration-150 hover:bg-accent-2 disabled:cursor-not-allowed disabled:opacity-40"
+            className="inline-flex items-center rounded-xl bg-accent px-6 py-2.5 text-base font-display text-accent-ink transition duration-150 hover:bg-accent-2 disabled:cursor-not-allowed disabled:opacity-40"
           >
             확인
           </button>
