@@ -1200,6 +1200,13 @@
   --pet-char-sink: 0.02;
 }
 
+@media (max-height: 800px) {
+  .pet-room:has(.pet-char[data-stage="1"]) { --pet-char-size: 13.5rem; }
+  .pet-room:has(.pet-char[data-stage="2"]) { --pet-char-size: 17rem; }
+  .pet-room:has(.pet-char[data-stage="3"]) { --pet-char-size: 21rem; }
+  .pet-room:has(.pet-char[data-stage="4"]) { --pet-char-size: 24.5rem; }
+}
+
 .pet-welcome {
   position: absolute;
   /* 첫 항이 **말풍선 자리**, 둘째 항이 **방 위쪽 상한**이다.
@@ -4038,9 +4045,10 @@
   padding: var(--space-md) var(--space-sm) var(--space-sm);
   border-radius: 18px;
   background: var(--paper);
-  display: grid;
+  display: flex;
+  flex-direction: column;
   gap: var(--space-2xs);
-  max-height: min(92dvh, 46rem);
+  max-height: 100%;
   /* 겹친 종이. 뒤로 두 장이 살짝 삐져나온 것을 그림자 두 겹으로 만든다 —
      실제 요소를 두 개 더 두면 초점 순서와 스크린리더에 빈 칸이 생긴다 */
   box-shadow:
@@ -4048,6 +4056,7 @@
     10px 11px 0 -3px color-mix(in oklch, var(--paper) 78%, #000),
     0 32px 80px rgba(0, 0, 0, 0.28);
 }
+.pet-diary-pop__box--diary > * { flex-shrink: 0; }
 
 /* ── 종이 장식 ── */
 
@@ -4292,6 +4301,8 @@
   display: grid;
   gap: var(--space-2xs);
   overflow-y: auto;
+  flex: 1;
+  min-height: 0;
   font-size: var(--text-label);
   line-height: 1.85;
   color: var(--paper-ink);
