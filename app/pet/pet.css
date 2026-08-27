@@ -1231,7 +1231,7 @@
      22 − 7 − 0.5 = 14.5rem이 되어 4단 자리(그림이 세로 상한 17rem에 잡혀 13.8rem)와
      3단 자리(13.5rem)가 둘 다 들어온다 — 방이 19.5rem일 때는 상한이 12rem이라 3·4단
      말풍선이 20~24px 낮게 앉아 머리에 8~11px 겹쳤다. 그것이 이번 요청의 절반이었다 */
-  bottom: calc(var(--pet-char-w) * 0.555 - 0.375rem + 15px);
+  bottom: calc(var(--pet-char-w) * 0.7 - 0.375rem + 15px);
   left: 50%;
   transform: translateX(-50%);
   /* 펫(--z-raised)보다 **딱 하나** 위. 말풍선 꼬리가 캐릭터 쪽으로 내려가므로 겹칠 때
