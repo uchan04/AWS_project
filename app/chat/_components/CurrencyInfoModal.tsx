@@ -147,7 +147,7 @@ export function CurrencyInfoModal() {
             </div>
           </div>
         </div>
-      ), document.body)}
+      , document.body)}
     </>
   )
 }
