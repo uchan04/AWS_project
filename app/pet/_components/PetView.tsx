@@ -169,16 +169,7 @@ function stageRange(stage: number): string {
 // 누적 더하기로 바뀐 뒤로는 50을 두 번 눌러 100을 만들 수 있어 잃는 것도 없다
 const FEED_PRESETS = [1, 5, 10, 50]
 
-/**
- * 개수 버튼을 눌렀을 때 나올 값. 비활성 판정과 클릭이 **같은 식을 써야** 한다 —
- * 식이 갈리면 눌리는데 값이 안 바뀌거나(죽은 버튼), 막아야 할 때 눌린다.
- *
- * 최소값(1)에서 2 이상을 누르면 더하지 않고 그 값이 된다. 1 + 10 = 11이면 "10개"를
- * 눌렀는데 11이 돼 버튼 이름과 어긋난다. `preset > 1` 조건이 붙은 이유는 1개 버튼이다 —
- * 이 조건이 없으면 1에서 "1개"를 눌러도 1이라 아무 일도 안 일어난다.
- */
-const feedStep = (current: number, preset: number) =>
-  current <= 1 && preset > 1 ? preset : current + preset
+
 
 const ko = (n: number) => n.toLocaleString("ko-KR")
 
@@ -632,23 +623,22 @@ export default function PetView({ initial }: { initial: PetState }) {
     return () => clearTimeout(t)
   }, [reaction, burst])
 
-  useEffect(() => {
-    if (outing.state !== "RETURNED") {
-      setHasSeenReturnPopup(false)
-    }
-  }, [outing.state])
+
+
+  const isAnimHandling = useRef(false)
 
   function handleAnimEnded() {
+    if (isAnimHandling.current) return
+    isAnimHandling.current = true
     setIsAnimFadingOut(true)
     setTimeout(() => {
-      const anim = playingAnimation
-      setPlayingAnimation(null)
+      setPlayingAnimation((anim) => {
+        if (anim === "leave") setTimeout(sendOuting, 0)
+        else if (anim === "return") setTimeout(hearOuting, 0)
+        return null
+      })
       setIsAnimFadingOut(false)
-      if (anim === "leave") {
-        sendOuting()
-      } else if (anim === "return") {
-        hearOuting()
-      }
+      isAnimHandling.current = false
     }, 300)
   }
 
@@ -866,6 +856,7 @@ export default function PetView({ initial }: { initial: PetState }) {
         episode: [],
         reward: null,
       }))
+      setHasSeenReturnPopup(false)
       setOutingLeft(0)
       setPet((prev) => ({ ...prev, seeds: next.seeds, starShards: next.starShards }))
       // 반가움. 문구를 새로 만들지 않고 💗 파티클만 올린다 — 말풍선에 오는 문장은
@@ -1928,7 +1919,7 @@ export default function PetView({ initial }: { initial: PetState }) {
             autoPlay
             playsInline
             muted
-            src={cdnUrl(`pets/${pet.typeCode === "HEALTH_EMOTION" ? "fox" : pet.typeCode === "INDEPENDENT_LOW_INCOME" ? "cat" : "bear"}_${playingAnimation}.webm`) || undefined}
+            src={cdnUrl(`pets/${pet.typeCode === "HEALTH_EMOTION" ? "fox" : pet.typeCode === "INDEPENDENT_LOW_INCOME" ? "cat" : "bear"}_${playingAnimation}.mp4`) || undefined}
             onEnded={handleAnimEnded}
             onError={handleAnimEnded}
             style={{ maxWidth: "100%", maxHeight: "100%" }}

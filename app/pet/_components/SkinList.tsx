@@ -1,6 +1,6 @@
 "use client"
 
-import { useState, type SyntheticEvent } from "react"
+import { useState } from "react"
 import type { TypeCode } from "@prisma/client"
 import { animalEmoji } from "@/lib/pet"
 import { ArtImage } from "@/app/components/ArtImage"
@@ -68,14 +68,7 @@ const TABS: { key: Tab; label: string; icon: string; title: string }[] = [
   { key: "shop", label: "구매 가능", icon: "🛍️", title: "구매 가능한 외형" },
 ]
 
-// 그림이 실패하면 자기를 숨기고 바로 뒤 이모지 스팬을 켠다. 방의 캐릭터
-// (PetView의 .pet-char__img)와 같은 폴백이다 — 둘 다 aria-hidden이고 이름이 글자로
-// 따로 있으므로 스크린리더가 읽는 것은 이름 한 번이다
-function swapToEmoji(event: SyntheticEvent<HTMLImageElement>) {
-  event.currentTarget.style.display = "none"
-  const fallback = event.currentTarget.nextElementSibling as HTMLElement | null
-  if (fallback) fallback.style.display = "grid"
-}
+
 
 export default function SkinList({
   skins: initial,
@@ -127,7 +120,7 @@ export default function SkinList({
     }
   }
 
-  const active = skins.find((row) => row.active) ?? null
+
   const filtered =
     tab === "owned"
       ? skins.filter((row) => row.owned)

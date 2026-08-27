@@ -5,7 +5,6 @@
 // 탈퇴는 한 번 누르면 끝나지 않게 두 단계로 나눴다. 무엇이 지워지는지 먼저 보여주고,
 // 그다음에 비밀번호(또는 "탈퇴" 입력)를 받는다. 되돌릴 수 없는 동작이라 확인 없이 두지 않는다.
 
-import Link from "next/link"
 import { useState } from "react"
 import type { TypeCode } from "@prisma/client"
 import { NICKNAME_MAX, isValidNickname } from "@/lib/types"
