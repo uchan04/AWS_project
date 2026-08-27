@@ -631,14 +631,16 @@ export default function PetView({ initial }: { initial: PetState }) {
     if (isAnimHandling.current) return
     isAnimHandling.current = true
     setIsAnimFadingOut(true)
+    
+    const anim = playingAnimation
+    
     setTimeout(() => {
-      setPlayingAnimation((anim) => {
-        if (anim === "leave") setTimeout(sendOuting, 0)
-        else if (anim === "return") setTimeout(hearOuting, 0)
-        return null
-      })
+      setPlayingAnimation(null)
       setIsAnimFadingOut(false)
       isAnimHandling.current = false
+      
+      if (anim === "leave") sendOuting()
+      else if (anim === "return") hearOuting()
     }, 300)
   }
 
