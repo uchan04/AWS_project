@@ -625,7 +625,11 @@ export default function PetView({ initial }: { initial: PetState }) {
 
 
 
+  const isAnimHandling = useRef(false)
+
   function handleAnimEnded() {
+    if (isAnimHandling.current) return
+    isAnimHandling.current = true
     setIsAnimFadingOut(true)
     setTimeout(() => {
       setPlayingAnimation((anim) => {
@@ -634,6 +638,7 @@ export default function PetView({ initial }: { initial: PetState }) {
         return null
       })
       setIsAnimFadingOut(false)
+      isAnimHandling.current = false
     }, 300)
   }
 
