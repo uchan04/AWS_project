@@ -1200,6 +1200,13 @@
   --pet-char-sink: 0.02;
 }
 
+@media (max-height: 800px) {
+  .pet-room:has(.pet-char[data-stage="1"]) { --pet-char-size: 13.5rem; }
+  .pet-room:has(.pet-char[data-stage="2"]) { --pet-char-size: 17rem; }
+  .pet-room:has(.pet-char[data-stage="3"]) { --pet-char-size: 21rem; }
+  .pet-room:has(.pet-char[data-stage="4"]) { --pet-char-size: 24.5rem; }
+}
+
 .pet-welcome {
   position: absolute;
   /* 첫 항이 **말풍선 자리**, 둘째 항이 **방 위쪽 상한**이다.
@@ -1231,7 +1238,7 @@
      22 − 7 − 0.5 = 14.5rem이 되어 4단 자리(그림이 세로 상한 17rem에 잡혀 13.8rem)와
      3단 자리(13.5rem)가 둘 다 들어온다 — 방이 19.5rem일 때는 상한이 12rem이라 3·4단
      말풍선이 20~24px 낮게 앉아 머리에 8~11px 겹쳤다. 그것이 이번 요청의 절반이었다 */
-  bottom: calc(4.75rem + var(--pet-char-w) * 0.645 + 15px);
+  bottom: calc(4.75rem + var(--pet-char-w) * 0.7 + 15px);
   left: 50%;
   transform: translateX(-50%);
   /* 펫(--z-raised)보다 **딱 하나** 위. 말풍선 꼬리가 캐릭터 쪽으로 내려가므로 겹칠 때
@@ -3360,25 +3367,6 @@
 
 /* ── 토스트 ──────────────────────────────────────────────────────────────── */
 
-/* 쉬는 화면(/pet/rest) 입구. 상단 나무판을 걷으면서 유일한 입구가 사라져 여기로 내렸다.
-   각주 크기다 — 눈에 띄는 자리에서 쉬기를 권하면 "쉬어라"는 지시가 된다.
-   밑줄은 남긴다. 이 크기·이 색에서 밑줄까지 빼면 링크로 안 읽힌다 */
-.pet__rest {
-  margin: var(--space-xs) 0 0;
-  text-align: center;
-  font-size: var(--text-label);
-}
-
-.pet__rest a {
-  color: var(--color-muted);
-  text-decoration: underline;
-  text-underline-offset: 0.2em;
-}
-
-.pet__rest a:hover {
-  color: var(--tribe-cta);
-}
-
 .pet-toast {
   position: fixed;
   bottom: var(--space-lg);
@@ -4038,9 +4026,10 @@
   padding: var(--space-md) var(--space-sm) var(--space-sm);
   border-radius: 18px;
   background: var(--paper);
-  display: grid;
+  display: flex;
+  flex-direction: column;
   gap: var(--space-2xs);
-  max-height: min(92dvh, 46rem);
+  max-height: 100%;
   /* 겹친 종이. 뒤로 두 장이 살짝 삐져나온 것을 그림자 두 겹으로 만든다 —
      실제 요소를 두 개 더 두면 초점 순서와 스크린리더에 빈 칸이 생긴다 */
   box-shadow:
@@ -4048,6 +4037,7 @@
     10px 11px 0 -3px color-mix(in oklch, var(--paper) 78%, #000),
     0 32px 80px rgba(0, 0, 0, 0.28);
 }
+.pet-diary-pop__box--diary > * { flex-shrink: 0; }
 
 /* ── 종이 장식 ── */
 
@@ -4292,6 +4282,8 @@
   display: grid;
   gap: var(--space-2xs);
   overflow-y: auto;
+  flex: 1;
+  min-height: 0;
   font-size: var(--text-label);
   line-height: 1.85;
   color: var(--paper-ink);

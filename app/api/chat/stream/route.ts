@@ -6,8 +6,11 @@ import { fail } from "@/lib/api"
 import { buildSystemPrompt } from "@/app/chat/_lib/systemPrompt"
 import { isCrisis, CRISIS_REPLY } from "@/lib/safety"
 
-// 최근 대화 이력만 Bedrock에 보낸다. 전체를 매번 보내면 토큰 비용이 누적된다.
-const HISTORY_LIMIT = 20
+// 화면이 보여주는 개수(app/api/chat/messages GET의 take: 50)와 맞춘다.
+// 어긋나 있으면 사용자 눈에는 보이는 메시지를 모델만 못 봐서, 사용자가 스크롤해
+// 확인한 내용을 "아까 그거"로 지칭했을 때 모델이 모른다. 시스템 프롬프트의
+// "사용자가 이미 답한 것을 다시 묻지 않습니다" 지침도 이 범위 밖에서는 지킬 수 없다.
+const HISTORY_LIMIT = 50
 
 // 타임아웃·재시도 설정은 lib/bedrock.ts에 있다. 스트리밍은 청크 사이 유휴 기준이라 넉넉하다
 const client = bedrockClient(STREAM_TIMEOUT_MS)

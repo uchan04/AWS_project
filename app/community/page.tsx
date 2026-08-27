@@ -1,3 +1,4 @@
+import Link from "next/link"
 import { redirect } from "next/navigation"
 import type { TypeCode } from "@prisma/client"
 import { UnauthorizedError, getCurrentUser } from "@/lib/auth"
@@ -5,9 +6,12 @@ import { TRIBE } from "@/lib/types"
 import { GalleryTabs } from "./_components/GalleryTabs"
 import { HopeBanner } from "./_components/HopeBanner"
 import { PostList } from "./_components/PostList"
+import { Pagination } from "./_components/Pagination"
+import { SearchBar } from "./_components/SearchBar"
 import { WriteModal } from "./_components/WriteModal"
 import { RulesModal } from "./_components/RulesModal"
 import { resolveGallery, canAccessGallery, listGalleryPosts, type GalleryTab, type GalleryPost } from "./_lib/gallery"
+import { communityHref, parsePageParam, parseSearchQuery } from "./_lib/queryLink"
 import { MeetupNotice } from "./meetups/_components/MeetupNotice"
 import { pendingMeetupNotices, type MeetupNoticeItem } from "./meetups/_lib/notice"
 
@@ -18,12 +22,23 @@ export const dynamic = "force-dynamic"
 export default async function CommunityPage(props: PageProps<"/community">) {
   const searchParams = await props.searchParams
   const tab = typeof searchParams.tab === "string" ? searchParams.tab : undefined
+  // 화면 상태는 전부 URL에 있다. 다듬는 규칙은 _lib/queryLink.ts 한 곳에만 둔다 —
+  // 주소창에 직접 친 검색과 입력창에 친 검색이 같은 결과를 내야 한다.
+  const q = parseSearchQuery(typeof searchParams.q === "string" ? searchParams.q : undefined)
+  const requestedPage = parsePageParam(typeof searchParams.page === "string" ? searchParams.page : undefined)
 
   let myTypeCode: TypeCode | null
   let isAdmin: boolean
   let gallery: GalleryTab
   let posts: GalleryPost[]
+  let total: number
+  let page: number
+  let totalPages: number
   let notices: MeetupNoticeItem[]
+  // 검색·페이지 링크에 붙일 **원본 tab 문자열**이다. resolve된 gallery 값을 쓰면
+  // `?tab=mine`이 종족 코드로 치환돼 GalleryTabs의 링크와 주소가 갈린다(그 파일 80~81행 주석).
+  // 접근이 거부돼 ALL로 떨어진 경우에는 undefined다 — 볼 수 없는 탭을 링크에 달지 않는다.
+  let tabParam: string | undefined
 
   // 인증이나 DB가 실패해도 화면을 죽이지 않고 안내를 띄운다(C의 pet/page.tsx와 같은 패턴).
   try {
@@ -34,8 +49,10 @@ export default async function CommunityPage(props: PageProps<"/community">) {
     // 비관리자가 tab=<다른 종족>을 직접 붙이면 이 검사에서 전체 탭으로 떨어진다.
     // 라우트(GET /api/community/posts)도 같은 쌍을 쓴다.
     const requested = resolveGallery(tab, user.typeCode)
-    gallery = canAccessGallery(requested, user.typeCode, user.isAdmin) ? requested : "ALL"
-    posts = await listGalleryPosts(gallery)
+    const allowed = canAccessGallery(requested, user.typeCode, user.isAdmin)
+    gallery = allowed ? requested : "ALL"
+    tabParam = allowed ? tab : undefined
+    ;({ posts, total, page, totalPages } = await listGalleryPosts(gallery, { q, page: requestedPage }))
     // 모임 화면에 들르지 않아도 무산 사실은 알아야 한다. 커뮤니티 첫 화면에도 같은 배너를 띄운다.
     notices = await pendingMeetupNotices(user.id)
   } catch (error) {
@@ -81,20 +98,55 @@ export default async function CommunityPage(props: PageProps<"/community">) {
 
       <GalleryTabs active={gallery} myTypeCode={myTypeCode} isAdmin={isAdmin} />
 
+      {/* 탭 줄 바로 아래. 검색은 **지금 고른 갤러리 안에서만** 찾으므로 탭 다음에 온다 —
+          배너 아래에 두면 배너가 탭과 검색 사이를 끊어 둘의 관계가 안 읽힌다 */}
+      <SearchBar tab={tabParam} defaultQuery={q} />
+
       {/* 희망 문구 배너(SPEC 9절). 탭 아래에 둔다 — 배너 문구가 지금 고른 탭에 따라
           갈리므로("고양잇과족에게:"), 원인인 탭이 결과인 배너보다 위에 있어야 읽힌다.
           위에 두면 아래 탭을 눌러 위가 바뀌는 순서가 된다 */}
       <HopeBanner />
 
+      {/* 빈 화면이 두 가지다. **글이 없는 것과 못 찾은 것은 다르다** — 검색 실패에
+          "첫 번째 이야기를 들려주세요"를 띄우면 이미 글이 있는 갤러리에서 방금 쓴 사람에게
+          글이 사라진 것처럼 읽힌다. 반대로 빈 갤러리에 "검색 결과가 없어요"를 띄우면
+          쓸 수 있다는 것을 알려줄 자리를 잃는다 */}
       {posts.length === 0 ? (
-        <p className="py-24 text-center text-sm leading-relaxed text-muted">
-          아직 글이 없어요.
-          <br />
-          첫 번째 이야기를 들려주세요.
-        </p>
+        q ? (
+          <div className="flex flex-col items-center gap-3 py-24 text-center">
+            <p className="text-sm leading-relaxed text-muted">
+              ‘{q}’에 대한 검색 결과가 없어요
+              <br />
+              제목과 내용에서 찾았어요. 다른 말로 검색해 보세요.
+            </p>
+            <Link
+              href={communityHref({ tab: tabParam })}
+              className="rounded-xl border border-rule bg-card px-5 py-2.5 text-base font-display text-ink-2 transition duration-150 hover:bg-paper-2 focus-visible:ring-2 focus-visible:ring-focus focus-visible:ring-offset-2 focus-visible:outline-none"
+            >
+              전체 글 보기
+            </Link>
+          </div>
+        ) : (
+          <p className="py-24 text-center text-sm leading-relaxed text-muted">
+            아직 글이 없어요.
+            <br />
+            첫 번째 이야기를 들려주세요.
+          </p>
+        )
       ) : (
-        <PostList posts={posts} showTribeBadge={gallery === "ALL"} isAdmin={isAdmin} />
+        <>
+          {/* 검색했을 때만 알린다. 평소 목록에 총 개수를 붙이면 글 수가 성적표처럼 읽힌다
+              (랭킹·경쟁 지표를 두지 않는다는 SPEC 5절과 같은 결) */}
+          {q && (
+            <p className="text-sm text-muted" role="status" aria-live="polite">
+              제목·내용에 ‘{q}’가 들어간 글 {total}개
+            </p>
+          )}
+          <PostList posts={posts} showTribeBadge={gallery === "ALL"} isAdmin={isAdmin} />
+        </>
       )}
+
+      <Pagination tab={tabParam} query={q} page={page} totalPages={totalPages} />
     </main>
   )
 }

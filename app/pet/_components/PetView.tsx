@@ -1089,8 +1089,9 @@ export default function PetView({ initial }: { initial: PetState }) {
                 outing.available
                   ? { icon: <PetIcon name="diary" />, label: "여행일기", go: openHistory, on: modal === "history" }
                   : null,
-                { icon: <PetIcon name="chart" />, label: "오늘의 활동", go: () => setModal("today"), on: modal === "today" },
+                { icon: <PetIcon name="rest" />, label: "잠시 쉬어가기", go: () => router.push("/pet/rest"), on: false },
                 { icon: <PetIcon name="shop" />, label: "상점", go: () => router.push("/pet/shop"), on: false },
+                { icon: <PetIcon name="chart" />, label: "오늘의 활동", go: () => setModal("today"), on: modal === "today" },
                 { icon: <PetIcon name="info" />, label: "펫 정보", go: () => setModal("info"), on: modal === "info" },
               ]
                 // `filter` + 타입 술어였다. 아이콘이 이모지 문자열에서 JSX로 바뀌면서 술어에
@@ -1168,7 +1169,7 @@ export default function PetView({ initial }: { initial: PetState }) {
                     else setPlayingAnimation("leave")
                   }}
                 >
-                  <PetIcon name={outingCantYet ? "lock" : "outing"} /> {outingLabelShort}
+                  <PetIcon name={outingLocked ? "lock" : "outing"} /> {outingLabelShort}
                 </button>
               ) : null}
               <button
@@ -1569,13 +1570,6 @@ export default function PetView({ initial }: { initial: PetState }) {
               </span>
             </p>
 
-            {/* 쉬는 화면(/pet/rest) 입구. 상단 나무판을 걷으면서 유일한 입구가 사라졌다.
-                각주 크기로 화면 맨 아래에 둔다(2026-08-24 결정) — 홈·미션에서 링크하지 않는
-                이유와 같다. 쉬는 화면을 눈에 띄는 자리에서 권하면 "쉬어라"는 지시가 된다.
-                찾아온 사람만 닿으면 되고, 여기 있다는 사실만 남으면 된다 */}
-            <p className="pet__rest">
-              <Link href="/pet/rest">잠깐 쉬어 가기</Link>
-            </p>
           </PetModal>
         ) : null}
 
@@ -1903,7 +1897,7 @@ export default function PetView({ initial }: { initial: PetState }) {
       {playingAnimation ? (
         <div
           style={{
-            position: "fixed",
+            position: "absolute",
             top: 0,
             left: 0,
             right: 0,
@@ -1939,7 +1933,7 @@ export default function PetView({ initial }: { initial: PetState }) {
       {outing.state === "RETURNED" && !hasSeenReturnPopup ? (
         <div
           style={{
-            position: "fixed",
+            position: "absolute",
             top: 0,
             left: 0,
             right: 0,

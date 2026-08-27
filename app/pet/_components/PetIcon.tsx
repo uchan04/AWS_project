@@ -43,6 +43,7 @@ export type PetIconName =
   | "community"
   | "mission"
   | "meetup"
+  | "rest"
 
 export function PetIcon({ name }: { name: PetIconName }) {
   return (
@@ -67,13 +68,17 @@ function shapes(name: PetIconName) {
         </>
       )
 
-    // 외출. 시안 첫 묶음의 두 번째 그림(손잡이 달린 가방)이다 — 펫이 무언가를 들고 나간다
+    // 외출. 시안 첫 묶음의 N번째 그림 (손잡이 달린 가방).
+    // 원래의 사각형 가방 그림이 자물쇠와 너무 비슷하게 생겨서 사용자가 "변하지 않는다"고 오해했다.
+    // 확실히 배낭(Backpack)처럼 보이도록 위쪽이 둥글고 앞주머니가 있는 형태로 새로 그린다.
     case "outing":
       return (
         <>
-          <path data-f="stem" d="M9 8.5V7a3 3 0 0 1 6 0v1.5" />
-          <rect data-f="tan" x="3.6" y="8.5" width="16.8" height="11.4" rx="2.2" />
-          <rect data-f="latch" x="10.4" y="12.6" width="3.2" height="2.8" rx="0.8" />
+          <path data-f="stem" d="M9 7 C9 3.5 15 3.5 15 7" />
+          <path data-f="tan" d="M6 10 C6 5 18 5 18 10 Z" />
+          <rect data-f="tan" x="5.5" y="9" width="13" height="11" rx="2" />
+          <rect data-f="latch" x="8" y="13" width="8" height="5" rx="1.5" />
+          <path data-f="stem" d="M12 13 v 2" />
         </>
       )
 
@@ -174,6 +179,14 @@ function shapes(name: PetIconName) {
     // 점 셋을 갖고 있어서 26px에서 둘이 닮는다. 가운데 획만 짧아 목록으로 읽힌다
     case "menu":
       return <path data-f="stem" d="M4.6 7.6h14.8M4.6 12h10.4M4.6 16.4h14.8" />
+
+    // 잠시 쉬어가기 (초승달)
+    case "rest":
+      return (
+        <>
+          <path data-f="tan" d="M19.5 13.5A7 7 0 1 1 10.5 4.5A5.5 5.5 0 0 0 19.5 13.5Z" />
+        </>
+      )
 
     // 외출 잠김. 자물쇠다 — 몸통 한 칸 + 위로 걸린 고리 + 가운데 열쇠 구멍.
     // 🔒 이모지가 있던 자리다(외출 버튼이 1단계나 친밀도 부족일 때). 같은 줄에 SVG와

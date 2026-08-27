@@ -1,6 +1,7 @@
 "use client"
 
 import { useState } from "react"
+import { createPortal } from "react-dom"
 import { useModalA11y } from "@/app/components/useModalA11y"
 
 /**
@@ -62,7 +63,7 @@ export function CurrencyInfoModal() {
         ⓘ
       </button>
 
-      {open && (
+      {open && typeof document !== "undefined" && createPortal(
         <div
           style={{
             position: "fixed",
@@ -146,7 +147,7 @@ export function CurrencyInfoModal() {
             </div>
           </div>
         </div>
-      )}
+      , document.body)}
     </>
   )
 }

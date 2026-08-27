@@ -10,6 +10,44 @@ import {
 } from "@/app/community/_lib/affinity"
 import { completeMissionByCode } from "@/lib/missions/completion"
 
+// 유저당 보관하는 대화 메시지 상한. 화면 노출 50·모델 주입 50의 4배 여유이며,
+// 200개를 넘는 구간은 사용자가 화면에서 볼 수단 자체가 없다.
+//
+// 하드 삭제인 이유: 커뮤니티(Post·Comment)의 소프트 삭제는 친밀도 파밍 차단이
+// 목적이라 행을 남겨야 하지만, 여기는 보관 최소화가 목적이라 deletedAt만 찍으면
+// 아무 의미가 없다. 고립·은둔 청년이 털어놓은 감정 대화를 아무도 열람하지 않는
+// 채로 무한히 쌓아두지 않는다.
+//
+// 삭제해도 친밀도가 깨지지 않는 것은 확인했다 — 챗봇 몫은 User.affinityTodayChat에
+// 집계되고 메시지 수를 세지 않는다(아래 POST 주석 참고). 메시지 수로 유도하던
+// 예전 구현이었다면 이력 삭제가 곧 무한 파밍 구멍이었다.
+const MESSAGE_RETENTION = 200
+
+/**
+ * 유저의 대화 메시지를 최근 MESSAGE_RETENTION개로 줄인다.
+ *
+ * 배치가 아니라 요청 시점에 정리하는 이유: SPEC 10절 "채택하지 않은 것"에
+ * EventBridge·Lambda가 있어 주기 실행을 붙일 자리가 없다.
+ *
+ * count()를 먼저 부르지 않는다. skip으로 200번째 최신 메시지를 직접 찾아
+ * 없으면(=200개 미만) 쿼리 1번으로 끝난다.
+ */
+async function trimHistory(userId: string) {
+  const boundary = await prisma.chatMessage.findFirst({
+    where: { userId },
+    orderBy: { createdAt: "desc" },
+    skip: MESSAGE_RETENTION - 1,
+    select: { createdAt: true },
+  })
+  if (!boundary) return
+
+  // createdAt이 같은 행이 있으면 함께 남는다. 상한을 살짝 넘기는 쪽이
+  // 덜 지우는 실패라 안전한 방향이다.
+  await prisma.chatMessage.deleteMany({
+    where: { userId, createdAt: { lt: boundary.createdAt } },
+  })
+}
+
 export async function GET() {
   try {
     const user = await getCurrentUser()
@@ -75,6 +113,14 @@ export async function POST(request: NextRequest) {
       await completeMissionByCode({ actor: user, code: "DAILY_CHAT" })
     } catch (error) {
       console.error("[DAILY_CHAT] 미션 완료 처리 실패", error)
+    }
+
+    // 본 동작이 끝난 뒤 곁다리로 정리한다. 트랜잭션에 넣지 않고 별도 try/catch로
+    // 감싼다 — 정리 실패가 메시지 저장을 롤백시키면 안 된다(위 미션 블록과 같은 이유).
+    try {
+      await trimHistory(user.id)
+    } catch (error) {
+      console.error("대화 이력 정리 실패", error)
     }
 
     return ok({ message, granted, chatAffinityToday: await chatAffinityToday(user.id) })
