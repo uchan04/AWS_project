@@ -167,6 +167,7 @@ export default function SettingsForm({
               disabled={nickSubmitting || !nickValid || currentNickname === nickname}
               className="hm-btn hm-card__cta"
               aria-disabled={nickSubmitting || !nickValid || currentNickname === nickname}
+              style={{ backgroundColor: typeCode ? "var(--tribe)" : undefined, borderColor: typeCode ? "var(--tribe)" : undefined }}
             >
               {nickSubmitting ? "바꾸고 있어요…" : "이름 바꾸기"}
             </button>

@@ -13,6 +13,7 @@ import Link from "next/link"
 import { useEffect, useState } from "react"
 import { REDIAGNOSIS_ENABLED } from "@/lib/diagnosis/flags"
 import { EVOLUTION_LEVEL, NICKNAME_MAX, TRIBE, isValidNickname } from "@/lib/types"
+import { avatarUrl } from "@/lib/assets"
 import { useModalA11y } from "@/app/components/useModalA11y"
 import "@/styles/tokens.css"
 import { type DiagnosisView, fetchMe, fetchReason, saveNickname } from "../api"
@@ -148,7 +149,20 @@ export default function DiagnosisResultPage() {
           {/* 펫 이미지는 S3 업로드 전이다. 이모지 마스코트가 그 자리를 잡고 있다 */}
           <div className="hm-plate hm-plate--hero">
             <span className="hm-plate__disc hm-bounce" aria-hidden="true">
-              {tribe.emoji}
+              {/* eslint-disable-next-line @next/next/no-img-element */}
+              <img
+                src={avatarUrl(
+                  view.me.typeCode === "HEALTH_EMOTION"
+                    ? "fox_avatar"
+                    : view.me.typeCode === "INDEPENDENT_LOW_INCOME"
+                      ? "cat_avatar"
+                      : "bear_avatar"
+                )!}
+                alt=""
+                width={80}
+                height={80}
+                style={{ borderRadius: "50%", objectFit: "cover" }}
+              />
             </span>
             <span className="hm-plate__eyebrow">당신은</span>
             <span className="hm-plate__animal">
