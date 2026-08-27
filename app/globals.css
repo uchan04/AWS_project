@@ -1,4 +1,8 @@
 @import "tailwindcss";
+/* 정본 팔레트. CSS @import는 다른 규칙보다 앞서야 하므로 여기(tailwindcss 바로 뒤)에 둔다.
+   전에는 화면마다 각자 import했다(app/pet/shop/page.tsx 등) — 커뮤니티·챗봇이 빠져 있어
+   그 두 화면만 Tailwind 기본 팔레트를 쓰고 있었다. 여기서 한 번 실어 전 화면이 같은 값을 본다 */
+@import "../styles/tokens.css";
 
 /* 소유자: E. 전역 스타일. 화면별 어휘는 styles/tokens.css(.hm-*)와 app/pet/pet.css(.pet-*)에 있다.
  *
@@ -55,6 +59,32 @@
      실제 family 이름은 빌드마다 바뀌므로 이름을 직접 쓰지 않는다 */
   --font-sans: var(--font-korean-system, sans-serif);
   --font-display: var(--font-gowun-dodum), var(--font-korean-system, sans-serif);
+
+  /* tokens.css의 팔레트를 Tailwind 유틸리티로 노출한다.
+     bg-card / text-ink / text-muted / border-rule 형태로 쓴다.
+     값의 정본은 styles/tokens.css이며 여기서 값을 직접 쓰지 않는다. */
+  --color-paper: var(--color-paper);
+  --color-paper-2: var(--color-paper-2);
+  --color-card: var(--color-card);
+  --color-ink: var(--color-ink);
+  --color-ink-2: var(--color-ink-2);
+  --color-muted: var(--color-muted);
+  --color-rule: var(--color-rule);
+  --color-rule-2: var(--color-rule-2);
+  --color-rule-hover: var(--color-rule-hover);
+  --color-accent: var(--color-accent);
+  --color-accent-2: var(--color-accent-2);
+  --color-accent-ink: var(--color-accent-ink);
+  --color-strong: var(--color-strong);
+  --color-focus: var(--color-focus);
+  --color-error: var(--color-error);
+  --color-tribe: var(--tribe);
+
+  /* 모서리도 같은 방식으로 노출한다 — rounded-card / rounded-input / rounded-pill.
+     카드는 20px이 정본이다(Tailwind의 rounded-2xl은 16px이라 4px 작았다) */
+  --radius-card: var(--radius-card);
+  --radius-input: var(--radius-input);
+  --radius-pill: var(--radius-pill);
 }
 
 body {

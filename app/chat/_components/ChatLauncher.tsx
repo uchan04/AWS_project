@@ -97,7 +97,7 @@ export function ChatLauncher({ diagnosed }: { diagnosed: boolean }) {
         // 버튼 왼쪽에 붙는다. 나타날 때 버튼 쪽에서 밀려나오도록 오른쪽에서 들어온다.
         <div
           className={
-            "flex items-center gap-0.5 rounded-2xl bg-white py-1.5 pr-1.5 pl-3.5 shadow-lg transition duration-200 ease-out " +
+            "flex items-center gap-0.5 rounded-2xl bg-card py-1.5 pr-1.5 pl-3.5 shadow-lg transition duration-200 ease-out " +
             (bubbleShown ? "" : "motion-safe:translate-x-2 motion-safe:opacity-0")
           }
         >
@@ -106,7 +106,7 @@ export function ChatLauncher({ diagnosed }: { diagnosed: boolean }) {
           <button
             type="button"
             onClick={() => setOpen(true)}
-            className="text-sm whitespace-nowrap text-neutral-700 transition duration-150 hover:text-neutral-900"
+            className="text-sm whitespace-nowrap text-ink-2 transition duration-150 hover:text-ink"
           >
             {bubble}
           </button>
@@ -114,7 +114,7 @@ export function ChatLauncher({ diagnosed }: { diagnosed: boolean }) {
             type="button"
             onClick={() => setDismissed(true)}
             aria-label="말풍선 닫기"
-            className="flex h-6 w-6 shrink-0 items-center justify-center rounded-full text-xs text-neutral-400 transition duration-150 hover:bg-neutral-100 hover:text-neutral-600"
+            className="flex h-6 w-6 shrink-0 items-center justify-center rounded-full text-xs text-muted transition duration-150 hover:bg-paper-2 hover:text-ink-2"
           >
             ✕
           </button>
@@ -125,7 +125,7 @@ export function ChatLauncher({ diagnosed }: { diagnosed: boolean }) {
         type="button"
         onClick={() => setOpen(true)}
         aria-label="마음 친구 열기"
-        className="flex h-12 w-12 shrink-0 items-center justify-center rounded-full bg-white text-xl shadow-lg transition hover:bg-neutral-50"
+        className="flex h-12 w-12 shrink-0 items-center justify-center rounded-full bg-card text-xl shadow-lg transition hover:bg-paper"
       >
         💬
       </button>

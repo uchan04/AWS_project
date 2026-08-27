@@ -10,13 +10,12 @@ import { CancelJoinConfirm } from "./CancelJoinConfirm"
 // 전체 갤러리는 종족이 없어 TRIBE에 키가 없다. WriteModal이 같은 이유로 자기 파일에 둔 값을 그대로 쓴다.
 const NEUTRAL_COLOR = "#9CA3AF"
 
-// 신청 계열 주 버튼의 배경.
-// NEUTRAL_COLOR는 "종족색이 없음"을 뜻하는 부재 표시지 강조색이 아니다. 모든 모임이 ALL인 지금
-// galleryColor는 항상 이 회색으로 풀려서, 주 버튼이 눌리지 않는 버튼처럼 보였다.
-// 값을 lib/types.ts나 app/globals.css에 두지 않는다 — 둘 다 5인이 공유하는 파일이고(CLAUDE.md 1절)
-// 화면 하나 때문에 공유 색 토큰을 늘릴 이유가 없다. WriteModal.tsx가 NEUTRAL_COLOR를
-// 자기 파일에 둔 것과 같은 방식이다.
-// MeetupList의 결성 완료 표시가 같은 색을 쓴다. 값을 두 곳에 적어두면 한쪽만 바뀐다.
+// **알파 배지 전용. 채움은 bg-accent를 쓴다. 경로 교체 시 함께 제거** (2026-08-27).
+//
+// 이 teal은 프로젝트 팔레트에 없는 색이라 채움·글자 자리는 정본 강조색(--color-accent)으로
+// 옮겼다. 남은 것은 `${MEETUP_ACCENT}14`·`}22`·`}33` 꼴로 알파를 붙여 쓰는 세 자리뿐이다 —
+// JS 문자열 연결이라 유틸리티로 1:1 치환이 되지 않고, color-mix 경로로 갈아타야 사라진다.
+// 남은 사용처: 이 파일의 결성 배지, MeetupList의 결성 완료 표시, MyJoinsModal의 결성 배지.
 export const MEETUP_ACCENT = "#0F766E"
 
 // 카드 진입의 순차 지연. 상한을 두지 않으면 20번째 카드가 800ms 뒤에 떠서 화면이 느려 보인다.
@@ -31,7 +30,7 @@ const BUMP_MS = 300
 // reduced-motion에서는 즉시 열리고 닫히되 움직이지 않아야 한다.
 const EXPAND_BASE = "overflow-hidden motion-safe:transition-all motion-safe:duration-200 motion-safe:ease-out"
 const EXPAND_CLOSED = "max-h-0 opacity-0"
-const EXPAND_PANEL = "flex flex-col gap-2 rounded-xl border border-neutral-200 bg-neutral-50 p-3"
+const EXPAND_PANEL = "flex flex-col gap-2 rounded-xl border border-rule bg-paper p-3"
 
 export type MeetupListItem = {
   id: string
@@ -147,8 +146,8 @@ export function MeetupCard({
   }
 
   const BUTTON_BASE =
-    "inline-flex items-center rounded-xl px-4 py-2 text-sm font-semibold transition duration-150 disabled:cursor-not-allowed disabled:opacity-40"
-  const QUIET_BUTTON = BUTTON_BASE + " border border-neutral-300 bg-white text-neutral-600 hover:bg-neutral-50"
+    "inline-flex items-center rounded-xl px-4 py-2 text-base font-display transition duration-150 disabled:cursor-not-allowed disabled:opacity-40"
+  const QUIET_BUTTON = BUTTON_BASE + " border border-rule bg-card text-ink-2 hover:bg-paper"
 
   return (
     // 진입 전환은 바깥 겹에서 300ms로, hover 반응은 안쪽 카드에서 150ms로 나눠 건다.
@@ -160,7 +159,7 @@ export function MeetupCard({
       style={{ transitionDelay: `${Math.min(index * ENTER_STEP_MS, ENTER_MAX_DELAY_MS)}ms` }}
     >
       {/* 카드가 여러 개 나열되므로 scale은 쓰지 않는다(격자가 흔들린다). 그림자 한 단계 + 2px 부양만 — PostCard.tsx와 같다. */}
-      <div className="flex flex-col gap-3 rounded-2xl border border-neutral-200 bg-white p-5 transition duration-150 hover:border-neutral-300 hover:shadow-md motion-safe:hover:-translate-y-0.5">
+      <div className="flex flex-col gap-3 rounded-card border border-rule bg-card p-5 transition duration-150 hover:border-rule-hover hover:shadow-md motion-safe:hover:-translate-y-0.5">
         {/* 위계는 두 단계다(2026-08-27). 위: 제목과 일시 — 크고 진하게.
             아래: 설명과 장소·인원 — 작고 흐리게.
             예전에는 제목이 font-medium 기본 크기이고 일시·장소·인원이 전부 text-sm neutral-600이라
@@ -168,8 +167,8 @@ export function MeetupCard({
             문자열이 20자쯤 되어(8월 28일 (금) 오전 11:09) 아래 라벨 줄에 끼워 넣으면 어차피 줄이 넘친다 */}
         <div className="flex items-start justify-between gap-2">
           <div className="min-w-0">
-            <p className="text-base font-bold break-words text-neutral-900">{meetup.title}</p>
-            <p className="mt-1 text-sm font-semibold text-neutral-800">{meetupDateTime(meetup.startsAt)}</p>
+            <p className="font-display text-lg break-words text-ink">{meetup.title}</p>
+            <p className="mt-1 text-sm font-semibold text-ink-2">{meetupDateTime(meetup.startsAt)}</p>
           </div>
 
           {/* 배지 어휘는 카드에 있던 종족 배지와 같다 — 알약 모양에 22 알파 배경, 원색 글자.
@@ -194,7 +193,7 @@ export function MeetupCard({
             (whitespace-pre-line), 공백 없는 긴 문자열은 쪼갠다(break-words). 전문은 신청 확인에서
             읽는 것이 아니라 이 카드가 전부이므로 3줄은 남긴다 */}
         {meetup.body.trim() && (
-          <p className="line-clamp-3 text-sm leading-relaxed break-words whitespace-pre-line text-neutral-600">
+          <p className="line-clamp-3 text-sm leading-relaxed break-words whitespace-pre-line text-ink-2">
             {meetup.body}
           </p>
         )}
@@ -212,19 +211,19 @@ export function MeetupCard({
             지우려면 조회까지 함께 손봐야 해서 표시만 멈춘다 */}
         <div className="mt-1 flex flex-col gap-1.5 text-xs">
           <div className="flex gap-3">
-            <span className="w-8 shrink-0 text-neutral-400">장소</span>
-            <span className="min-w-0 break-words text-neutral-600">{meetup.place}</span>
+            <span className="w-8 shrink-0 text-muted">장소</span>
+            <span className="min-w-0 break-words text-ink-2">{meetup.place}</span>
           </div>
 
           <div className="flex gap-3">
-            <span className="w-8 shrink-0 text-neutral-400">인원</span>
+            <span className="w-8 shrink-0 text-muted">인원</span>
             {/* 강조는 inline-block 안에서만 일어난다. 줄 높이도 이웃 요소도 밀지 않는다.
                 글자 굵기는 건드리지 않는다 — 폭이 바뀌어 숫자가 흔들린다. */}
-            <span className="text-neutral-600">
+            <span className="text-ink-2">
               <span
                 className={
                   "inline-block transition duration-300 " +
-                  (bumped ? "text-neutral-900 motion-safe:scale-110" : "text-neutral-600")
+                  (bumped ? "text-ink motion-safe:scale-110" : "text-ink-2")
                 }
               >
                 {meetup.joinCount} / {meetup.capacity}명
@@ -234,7 +233,7 @@ export function MeetupCard({
         </div>
 
         {error && (
-          <FadeIn key={error} className="block text-xs text-red-500">
+          <FadeIn key={error} className="block text-xs text-error">
             {error}
           </FadeIn>
         )}
@@ -263,10 +262,11 @@ export function MeetupCard({
               type="button"
               onClick={() => setConfirmingJoin(true)}
               disabled={pending !== null || isFull || confirmingJoin}
-              className={BUTTON_BASE + " text-white"}
-              // 정원이 찬 버튼은 지금의 회색(galleryColor)을 그대로 둔다 — 거기서는 회색이 맞다.
+              // 정원이 찼을 때만 인라인 회색(galleryColor)이 남는다 — 거기서는 회색이 맞다.
               // galleryColor는 종족 모임을 되살릴 때 다시 쓸 값이라 남겨둔다.
-              style={{ backgroundColor: isFull ? galleryColor : MEETUP_ACCENT }}
+              // 열려 있을 때의 채움은 정본 강조색이다(2026-08-27, bg-accent). 인라인 teal을 걷었다.
+              className={BUTTON_BASE + " text-accent-ink" + (isFull ? "" : " bg-accent hover:bg-accent-2")}
+              style={isFull ? { backgroundColor: galleryColor } : undefined}
             >
               {pending === "join" && <Spinner />}
               <FadeIn key={isFull ? "full" : "join"}>{isFull ? "정원 마감" : "신청하기"}</FadeIn>
@@ -279,7 +279,7 @@ export function MeetupCard({
                 type="button"
                 onClick={() => run("confirm", `/api/community/meetups/${meetup.id}/confirm`, "POST")}
                 disabled={pending !== null || shortBy > 0}
-                className={BUTTON_BASE + " border border-neutral-900 bg-neutral-900 text-white"}
+                className={BUTTON_BASE + " border border-accent bg-accent text-accent-ink"}
               >
                 {pending === "confirm" && <Spinner />}
                 결성 확인
@@ -288,7 +288,7 @@ export function MeetupCard({
                 type="button"
                 onClick={() => setConfirmingCancel(true)}
                 disabled={pending !== null || confirmingCancel}
-                className={QUIET_BUTTON + " text-neutral-500"}
+                className={QUIET_BUTTON + " text-muted"}
               >
                 무산
               </button>
@@ -296,7 +296,7 @@ export function MeetupCard({
           )}
         </div>
 
-        {isAdmin && canAct && shortBy > 0 && <p className="text-xs text-neutral-400">{shortBy}명 더 모이면 결성돼요</p>}
+        {isAdmin && canAct && shortBy > 0 && <p className="text-xs text-muted">{shortBy}명 더 모이면 결성돼요</p>}
 
         {/* 신청 확인. 무게는 전하되 압박하지 않는다 — 오실 수 있는지 되묻거나 책임을 말하지 않는다.
             관리자에게는 여는 버튼이 없으므로 영역 자체를 렌더 트리에 넣지 않는다. */}
@@ -306,8 +306,8 @@ export function MeetupCard({
             className={EXPAND_BASE + " " + (confirmingJoin ? "max-h-96 opacity-100" : EXPAND_CLOSED)}
           >
             <div className={EXPAND_PANEL}>
-              <p className="text-sm font-semibold text-neutral-900">오프라인에서 만나는 약속이에요</p>
-              <p className="text-xs leading-relaxed text-neutral-600">
+              <p className="text-sm font-semibold text-ink">오프라인에서 만나는 약속이에요</p>
+              <p className="text-xs leading-relaxed text-ink-2">
                 서로 시간을 내어 같은 자리에 모이는 일이에요.
                 <br />
                 지금 정하지 않아도 괜찮으니, 갈 수 있을 때 신청해 주세요.
@@ -317,7 +317,7 @@ export function MeetupCard({
                   이미 있고, 펼침이 그것을 덮지도 않는다 — 같은 화면에서 두 번 읽히면 확인
                   영역이 길어지기만 한다 */}
 
-              <p className="text-xs text-neutral-400">신청한 뒤에도 언제든 취소할 수 있어요.</p>
+              <p className="text-xs text-muted">신청한 뒤에도 언제든 취소할 수 있어요.</p>
 
               {/* 왼쪽이 되돌리는 쪽, 오른쪽이 실행이다 — 취소 확인(CancelJoinConfirm)과 같은 순서를 쓴다.
                   뒤집으면 습관으로 누르던 사람이 뜻하지 않은 쪽을 누르게 된다 */}
@@ -336,8 +336,7 @@ export function MeetupCard({
                     run("join", `/api/community/meetups/${meetup.id}/join`, "POST", { grantsAffinity: true })
                   }
                   disabled={!confirmingJoin || pending !== null}
-                  className={BUTTON_BASE + " text-white"}
-                  style={{ backgroundColor: MEETUP_ACCENT }}
+                  className={BUTTON_BASE + " bg-accent text-accent-ink hover:bg-accent-2"}
                 >
                   {pending === "join" && <Spinner />}
                   신청할게요
@@ -367,7 +366,7 @@ export function MeetupCard({
             className={EXPAND_BASE + " " + (confirmingCancel ? "max-h-48 opacity-100" : EXPAND_CLOSED)}
           >
             <div className={EXPAND_PANEL}>
-              <p className="text-xs leading-relaxed text-neutral-600">
+              <p className="text-xs leading-relaxed text-ink-2">
                 {meetup.joinCount === 0
                   ? "신청자가 없는 모임입니다. 무산시키면 되돌릴 수 없어요."
                   : `${meetup.joinCount}명이 신청한 모임입니다. 무산시키면 되돌릴 수 없어요.`}
@@ -377,7 +376,7 @@ export function MeetupCard({
                   type="button"
                   onClick={() => run("cancel", `/api/community/meetups/${meetup.id}`, "DELETE")}
                   disabled={!confirmingCancel || pending !== null}
-                  className={BUTTON_BASE + " bg-red-500 text-white hover:bg-red-600"}
+                  className={BUTTON_BASE + " bg-red-500 text-accent-ink hover:bg-red-600"}
                 >
                   {pending === "cancel" && <Spinner />}
                   무산하기
