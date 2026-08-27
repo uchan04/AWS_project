@@ -1,7 +1,8 @@
 import { GalleryType } from "@prisma/client"
-import type { TypeCode } from "@prisma/client"
+import type { Prisma, TypeCode } from "@prisma/client"
 import { prisma } from "@/lib/prisma"
 import { cdnUrl } from "@/lib/assets"
+import { POST_LIST_LIMIT } from "./queryLink"
 
 /**
  * 갤러리 탭. 스키마의 `GalleryType`(TypeCode 3종 + ALL)과 값이 같아 그대로 쓴다.
@@ -9,8 +10,6 @@ import { cdnUrl } from "@/lib/assets"
  * "ALL" | TypeCode 합성 타입으로 화면 전용 개념을 표현해야 했다.
  */
 export type GalleryTab = GalleryType
-
-const POST_LIST_LIMIT = 20
 
 /**
  * tab 파라미터를 갤러리로 **해석만 한다.**
@@ -77,21 +76,81 @@ export function postImageUrl(imageKey: string | null): string | null {
   return imageKey ? cdnUrl(imageKey) : null
 }
 
-export async function listGalleryPosts(gallery: GalleryTab) {
-  // "ALL"도 galleryType 조건에 넣는다. 전체 탭은 "모든 글"이 아니라 "전체 커뮤니티
-  // 갤러리에 쓴 글"을 보여주는 곳이다. 조건을 빼면 종족 갤러리 글까지 전체 탭에 뜨는데,
-  // 종족 갤러리는 "그 종족만 볼 수 있다"고 약속하고 받은 글이라 다른 종족에 노출되면 안 된다.
-  const posts = await prisma.post.findMany({
-    where: { deletedAt: null, galleryType: gallery },
-    orderBy: { createdAt: "desc" },
-    take: POST_LIST_LIMIT,
-    // isAdmin은 작성자 표기용이다(_lib/author.ts). **필드를 더 늘리지 마라** —
-    // 이 select 절이 subTypeCode 같은 값이 목록 응답에 새는 것을 막는 자리다.
-    include: { user: { select: { nickname: true, typeCode: true, isAdmin: true } } },
-  })
+/**
+ * 갤러리 목록 조회. **목록을 읽는 유일한 진입점이다** — 서버 컴포넌트(`page.tsx`)와
+ * 라우트(`GET /api/community/posts`)가 이 함수 하나를 공유한다.
+ *
+ * **두 번째 조회 함수를 만들지 마라.** where 절이 두 곳에 생기면 한쪽만 고쳐졌을 때
+ * 전체 탭에 다른 종족 글이 새는 사고(8/22)가 그대로 재현된다. 검색·페이지도 그래서
+ * 새 함수가 아니라 이 함수의 옵션으로 들어와 있다.
+ */
+export async function listGalleryPosts(gallery: GalleryTab, opts?: { q?: string; page?: number }) {
+  const q = opts?.q ?? ""
+  const requestedPage = Math.max(1, opts?.page ?? 1)
+
+  /*
+   * where는 **지역 상수 하나**다. findMany와 count가 같은 객체를 봐야 목록과 총 개수가
+   * 어긋나지 않는다 — 따로 적으면 한쪽에만 조건이 붙어 "12개씩 3페이지인데 3페이지가 비는"
+   * 형태로 조용히 깨진다.
+   *
+   * "ALL"도 galleryType 조건에 넣는다. 전체 탭은 "모든 글"이 아니라 "전체 커뮤니티
+   * 갤러리에 쓴 글"을 보여주는 곳이다. 조건을 빼면 종족 갤러리 글까지 전체 탭에 뜨는데,
+   * 종족 갤러리는 "그 종족만 볼 수 있다"고 약속하고 받은 글이라 다른 종족에 노출되면 안 된다.
+   *
+   * **OR를 최상위로 올려 deletedAt·galleryType을 대체하지 마라. deletedAt을 OR 안에
+   * 넣지도 마라.** 형제 조건은 AND로 묶이므로 지금 형태는 "안 지워졌고 + 이 갤러리이고 +
+   * (제목이든 본문이든 검색어를 포함)"이다. OR가 위로 올라가면 조건이 통째로 대체돼
+   * 삭제된 글과 남의 종족 글이 검색 결과로 샌다 — 위 8/22 사고와 같은 모양이다.
+   * q는 **기존 조건 위에 얹히기만 한다.**
+   */
+  const where: Prisma.PostWhereInput = {
+    deletedAt: null,
+    galleryType: gallery,
+    ...(q
+      ? {
+          OR: [
+            { title: { contains: q, mode: "insensitive" } },
+            { body: { contains: q, mode: "insensitive" } },
+          ],
+        }
+      : {}),
+  }
+
+  // orderBy·include·take는 페이지가 바뀌어도 같아야 해서 한 곳에 둔다. skip만 다르다.
+  function fetchPage(page: number) {
+    return prisma.post.findMany({
+      where,
+      orderBy: { createdAt: "desc" },
+      skip: (page - 1) * POST_LIST_LIMIT,
+      take: POST_LIST_LIMIT,
+      // isAdmin은 작성자 표기용이다(_lib/author.ts). **필드를 더 늘리지 마라** —
+      // 이 select 절이 subTypeCode 같은 값이 목록 응답에 새는 것을 막는 자리다.
+      include: { user: { select: { nickname: true, typeCode: true, isAdmin: true } } },
+    })
+  }
+
+  // 목록과 총 개수는 서로의 결과를 쓰지 않는다. 순차로 두면 왕복이 두 배다(RDS가 us-east-1).
+  const [firstPage, total] = await Promise.all([fetchPage(requestedPage), prisma.post.count({ where })])
+
+  const totalPages = Math.max(1, Math.ceil(total / POST_LIST_LIMIT))
+  const page = Math.min(requestedPage, totalPages)
+
+  /*
+   * 범위를 넘은 페이지를 clamp해 한 번 더 읽는다. **주소를 손으로 고친 경우에만** 걸리는
+   * 드문 경로다(화면의 링크는 totalPages를 넘지 않는다).
+   *
+   * total이 0이면 다시 읽지 않는다 — 빈 갤러리·검색 결과 없음은 어느 페이지를 물어도
+   * 빈 배열이라 왕복이 헛돈다.
+   */
+  const posts = total > 0 && page !== requestedPage ? await fetchPage(page) : firstPage
 
   // imageKey는 include가 스칼라를 다 주므로 이미 들어 있다. URL만 얹는다.
-  return posts.map((post) => ({ ...post, imageUrl: postImageUrl(post.imageKey) }))
+  return {
+    posts: posts.map((post) => ({ ...post, imageUrl: postImageUrl(post.imageKey) })),
+    total,
+    page,
+    totalPages,
+  }
 }
 
-export type GalleryPost = Awaited<ReturnType<typeof listGalleryPosts>>[number]
+export type GalleryPost = Awaited<ReturnType<typeof listGalleryPosts>>["posts"][number]

@@ -4,6 +4,7 @@ import { prisma } from "@/lib/prisma"
 import { ok, fail } from "@/lib/api"
 import { GalleryType } from "@prisma/client"
 import { resolveGallery, canAccessGallery, listGalleryPosts } from "@/app/community/_lib/gallery"
+import { parsePageParam, parseSearchQuery } from "@/app/community/_lib/queryLink"
 import { TITLE_MAX, BODY_MAX, IMAGE_KEY_MAX } from "@/app/community/_lib/limits"
 import { isAttachableImageKey } from "@/app/community/_lib/imageKey"
 import { grantAffinity, POST_AFFINITY } from "@/app/community/_lib/affinity"
@@ -25,7 +26,8 @@ export async function GET(request: NextRequest) {
   try {
     const user = await getCurrentUser()
 
-    const tab = request.nextUrl.searchParams.get("tab") ?? undefined
+    const params = request.nextUrl.searchParams
+    const tab = params.get("tab") ?? undefined
     const gallery = resolveGallery(tab, user.typeCode)
 
     // 관리자는 모든 종족 갤러리를 본다(_lib/gallery.ts).
@@ -33,8 +35,13 @@ export async function GET(request: NextRequest) {
       return fail("FORBIDDEN", "다른 종족의 갤러리는 볼 수 없어요", 400)
     }
 
-    const posts = await listGalleryPosts(gallery)
-    return ok({ gallery, posts })
+    // 화면(app/community/page.tsx)과 **같은 파서**를 쓴다. 상한·공백 처리가 갈리면
+    // 같은 주소가 화면과 API에서 다른 결과를 낸다.
+    const q = parseSearchQuery(params.get("q") ?? undefined)
+    const requestedPage = parsePageParam(params.get("page") ?? undefined)
+
+    const { posts, total, page, totalPages } = await listGalleryPosts(gallery, { q, page: requestedPage })
+    return ok({ gallery, posts, page, totalPages, total })
   } catch (error) {
     if (error instanceof UnauthorizedError) return fail("UNAUTHORIZED", error.message, 401)
     throw error
