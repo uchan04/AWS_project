@@ -1,6 +1,7 @@
 import Link from "next/link"
 import type { TypeCode } from "@prisma/client"
 import { TRIBE } from "@/lib/types"
+import { avatarUrl } from "@/lib/assets"
 
 // 소유자: A. 진단 전 홈 = 시작 화면. Figma 인트로 구성(왼쪽 글, 오른쪽 안내 카드).
 //
@@ -10,6 +11,16 @@ import { TRIBE } from "@/lib/types"
 //
 // 유형명은 쓰지 않는다(SPEC 2절). 종족(동물)까지만 보여준다.
 const TRIBE_LIST = (Object.keys(TRIBE) as TypeCode[]).map((code) => ({ code, ...TRIBE[code] }))
+
+// 종족 타일의 얼굴 자리(2026-08-26 사용자 요청으로 이모지 → 프로필 사진).
+// 진단 전이라 특정 유저의 PetSkin이 없다 — 종족당 기본 아바타 1장(사이드바가 쓰는 것과
+// 같은 파일, PetSkin.avatarKey 시드값)을 그대로 쓴다. 북극 변종도 같은 아바타를 쓰므로
+// (아바타는 종족당 1장뿐) 종족 3개만 있으면 충분하다.
+const AVATAR_KEY_BY_TYPE: Record<TypeCode, string> = {
+  HEALTH_EMOTION: "fox_avatar",
+  INDEPENDENT_LOW_INCOME: "cat_avatar",
+  FAMILY_LIVING: "bear_avatar",
+}
 
 /**
  * @param authed 로그인은 했지만 진단만 안 한 사람도 이 화면을 본다.
@@ -33,11 +44,17 @@ export function Intro({ authed }: { authed: boolean }) {
           </p>
 
           <div className="hm-trio">
-            {TRIBE_LIST.map(({ code, animal, emoji }) => (
+            {TRIBE_LIST.map(({ code, animal }) => (
               <div key={code} className="hm-tile hm-tile--tribe" data-tribe={code}>
-                <span className="hm-tile__face" aria-hidden="true">
-                  {emoji}
-                </span>
+                {/* eslint-disable-next-line @next/next/no-img-element */}
+                <img
+                  className="hm-tile__face"
+                  src={avatarUrl(AVATAR_KEY_BY_TYPE[code])!}
+                  alt=""
+                  width={44}
+                  height={44}
+                  style={{ borderRadius: "50%", objectFit: "cover" }}
+                />
                 <span className="hm-tile__title">{animal}</span>
               </div>
             ))}

@@ -43,7 +43,9 @@ export async function POST(request: NextRequest, ctx: RouteContext<"/api/communi
     })
     if (!post) return fail("NOT_FOUND", "게시글을 찾을 수 없어요", 404)
 
-    if (!canAccessGallery(post.galleryType, user.typeCode)) {
+    // 글 작성과 같은 판정이다. 관리자는 모든 종족 갤러리에 댓글을 단다 —
+    // 자기 공지에 답글을 못 다는 상태가 되면 안 된다.
+    if (!canAccessGallery(post.galleryType, user.typeCode, user.isAdmin)) {
       return fail("FORBIDDEN", "다른 종족의 갤러리는 볼 수 없어요", 400)
     }
 
@@ -79,7 +81,10 @@ export async function POST(request: NextRequest, ctx: RouteContext<"/api/communi
     // 글 라우트와 같은 기준이다. isCrisis()가 아니라 blocksPosting()으로 막는다 —
     // 이유는 그쪽 주석과 _lib/crisis.ts에 있다.
 
-    const mod = await moderate(body, invokeBedrock)
+    // 위기 신호를 검열보다 먼저 재서 넘긴다. 근거는 글 라우트의 같은 자리 주석에 있다.
+    const crisis = isCrisis(body)
+
+    const mod = await moderate(body, invokeBedrock, { crisis })
     if (mod.verdict === "BLOCK") {
       return fail(BLOCK_CODE, mod.message, 400)
     }
@@ -87,7 +92,8 @@ export async function POST(request: NextRequest, ctx: RouteContext<"/api/communi
     const [comment] = await prisma.$transaction([
       prisma.comment.create({
         data: { postId: post.id, userId: user.id, body },
-        include: { user: { select: { nickname: true, typeCode: true } } },
+        // isAdmin은 작성자 표기용이다(_lib/author.ts). 필드를 더 늘리지 마라
+        include: { user: { select: { nickname: true, typeCode: true, isAdmin: true } } },
       }),
       prisma.post.update({ where: { id: post.id }, data: { commentCount: { increment: 1 } } }),
     ])
@@ -105,7 +111,7 @@ export async function POST(request: NextRequest, ctx: RouteContext<"/api/communi
       },
       granted,
       // 막지 않은 위기 신호(사별·보도·비유 등)에는 안내만 얹는다. 댓글은 실제로 달렸다
-      crisisNotice: isCrisis(body) ? CRISIS_POST_NOTICE : null,
+      crisisNotice: crisis ? CRISIS_POST_NOTICE : null,
     })
   } catch (error) {
     if (error instanceof UnauthorizedError) return fail("UNAUTHORIZED", error.message, 401)

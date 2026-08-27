@@ -50,16 +50,16 @@ const ANIM_CLASS: Record<string, string> = {
 }
 
 const ANIM_CAPTION: Record<string, string> = {
-  walk: "함께 걷고 있어요 🚶",
-  stretch: "기지개를 켜고 있어요 🤸",
-  drink: "홀짝홀짝 마시고 있어요 ☕",
-  eat: "맛있게 먹고 있어요 😋",
-  rest: "포근하게 쉬고 있어요 😴",
-  look: "두리번두리번 둘러보고 있어요 🌤️",
-  write: "열심히 적고 있어요 ✏️",
-  music: "신나게 음악을 즐기고 있어요 🎵",
-  photo: "찰칵! 찍고 있어요 📸",
-  default: "응원하고 있어요 💚",
+  walk: "함께 걷고 있어요",
+  stretch: "기지개를 켜고 있어요",
+  drink: "홀짝홀짝 마시고 있어요",
+  eat: "맛있게 먹고 있어요",
+  rest: "포근하게 쉬고 있어요",
+  look: "두리번두리번 둘러보고 있어요",
+  write: "열심히 적고 있어요",
+  music: "신나게 음악을 즐기고 있어요",
+  photo: "찰칵! 찍고 있어요",
+  default: "응원하고 있어요",
 }
 
 function getMissionAnimType(mission: { title: string }): string {
@@ -581,10 +581,12 @@ interface StepSectionProps {
    * `이번 주`·`연속 달성`과 3칸 한 세트라 하나만 빼면 격자가 어긋나기 때문이다.
    */
   progress?: string
+  /** 제목 바로 아래, 미션 그리드 위에 렌더할 집중 카드 (일일 미션 섹션 전용) */
+  focusCard?: React.ReactNode
   onSelect: (m: MissionDTO) => void
 }
 
-function StepSection({ title, subtitle, missions, color, bg, unlocked = true, progress, onSelect }: StepSectionProps) {
+function StepSection({ title, subtitle, missions, color, bg, unlocked = true, progress, focusCard, onSelect }: StepSectionProps) {
   return (
     <section style={{ marginBottom: 36 }}>
       <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: 14 }}>
@@ -616,6 +618,8 @@ function StepSection({ title, subtitle, missions, color, bg, unlocked = true, pr
           </span>
         )}
       </div>
+
+      {focusCard}
 
       {/* auto-fit이다. auto-fill이 아니다 (2026-08-24 제보).
           auto-fill은 컨테이너에 들어가는 트랙을 **개수와 무관하게** 다 만들어 둔다 —
@@ -1066,15 +1070,6 @@ export default function MissionDashboard({
 
         return (
           <>
-            {focus ? (
-              <DailyFocusCard
-                mission={focus}
-                color={color}
-                bg={bg}
-                remaining={undone.length - 1}
-                onSelect={setSelected}
-              />
-            ) : null}
             <StepSection
               title="일일 미션"
               subtitle={focus ? "나머지는 여기 있어요" : "오늘 다 했어요. 내일 또 만나요"}
@@ -1082,6 +1077,17 @@ export default function MissionDashboard({
               color={color}
               bg={bg}
               mascotEmoji={mascotEmoji}
+              focusCard={
+                focus ? (
+                  <DailyFocusCard
+                    mission={focus}
+                    color={color}
+                    bg={bg}
+                    remaining={undone.length - 1}
+                    onSelect={setSelected}
+                  />
+                ) : undefined
+              }
               onSelect={setSelected}
             />
           </>

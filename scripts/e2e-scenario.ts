@@ -492,6 +492,49 @@ async function main() {
         bereaved.status === 200 && !bereavedData?.crisisBlocked && Boolean(bereavedData?.comment),
         bereaved.body,
       )
+
+      /*
+       * 차단 30번 재발 방지 (2026-08-26 재확인).
+       *
+       * 위 사별 단정은 **욕설이 없어서** 통과한다. 그래서 `moderate()`에 `{ crisis }`가
+       * 빠져도 아무도 모른다 — 실제로 `ecfa05c`에서 조기 반환 판정을 `isCrisis()` →
+       * `blocksPosting()`으로 좁히면서 인자를 되돌리지 않아 구멍이 다시 열렸었다.
+       *
+       * `blocksPosting()`이 false인데 `isCrisis()`가 true인 글에 욕설이 섞인 경우가
+       * 그 구멍이다. `POLICY = "BLANKET"`의 사전 분기가 400을 내보내 상담 안내가 닿지
+       * 못한다. 사별·보도·회복 세 형태를 모두 단정한다 — `_lib/crisis.ts`의 제외 규칙이
+       * 서로 다른 정규식(THIRD_PERSON · REPORT · PAST_RECALL+RECOVERED)이라 하나만
+       * 단정하면 나머지 둘이 조용히 깨진다.
+       *
+       * 댓글 라우트에 둔다. 글 라우트는 POST_LIMIT = 5라 자리가 없다(위 주석 참고).
+       */
+      const crisisWithProfanity: [string, string][] = [
+        ["사별", "친구가 자살했다는 소식을 들었다. 씨발 아직도 안 믿긴다."],
+        ["보도", "자살률 기사를 봤다. 씨발 숫자가 너무 크더라."],
+        ["회복", "예전엔 죽고 싶었는데 지금은 괜찮다. 그때 생각하면 씨발 어떻게 버텼나 싶다."],
+      ]
+      for (const [label, text] of crisisWithProfanity) {
+        const res = await call("POST", `/api/community/posts/${postId}/comments`, { body: text })
+        const data = res.body.data as
+          | { crisisBlocked?: boolean; comment?: unknown; crisisNotice?: string | null }
+          | undefined
+        record(
+          `${label} 글 + 욕설도 막지 않고 상담 안내를 얹는다 (차단 30 재발 방지)`,
+          res.status === 200 && !data?.crisisBlocked && Boolean(data?.comment) && Boolean(data?.crisisNotice),
+          res.body,
+        )
+      }
+
+      // 반대쪽 못. 위기 신호가 없으면 대상 없는 욕설도 그대로 막힌다 —
+      // 위 단정만 있으면 `{ crisis: true }`를 무조건 넘겨도 통과해버린다
+      const profanityOnly = await call("POST", `/api/community/posts/${postId}/comments`, {
+        body: "씨발 오늘 진짜 별로였다",
+      })
+      record(
+        "위기 신호가 없으면 대상 없는 욕설은 그대로 400이다",
+        profanityOnly.body.error?.code === "BLOCKED_EXPRESSION",
+        profanityOnly.body,
+      )
     }
 
     const ghost = await call("GET", "/api/community/posts/does-not-exist")

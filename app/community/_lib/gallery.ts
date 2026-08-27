@@ -1,4 +1,5 @@
-import type { GalleryType, TypeCode } from "@prisma/client"
+import { GalleryType } from "@prisma/client"
+import type { TypeCode } from "@prisma/client"
 import { prisma } from "@/lib/prisma"
 import { cdnUrl } from "@/lib/assets"
 
@@ -11,25 +12,56 @@ export type GalleryTab = GalleryType
 
 const POST_LIST_LIMIT = 20
 
-/** tab=mine이고 진단을 마친 유저면 본인 종족, 그 외에는 전체. */
+/**
+ * tab 파라미터를 갤러리로 **해석만 한다.**
+ *
+ * `mine`이면 본인 종족, 종족 코드를 직접 준 경우 그 종족, 그 외에는 전체다.
+ *
+ * **여기서 권한을 보지 않는다.** 이 함수는 "무엇을 보려는가"를 읽을 뿐이고
+ * "볼 수 있는가"는 `canAccessGallery()`가 판정한다. 둘을 한 함수에 합치면 한쪽만
+ * 고쳤을 때 조용히 열린다 — 그래서 비관리자가 `tab=HEALTH_EMOTION`을 직접 붙여도
+ * 여기서는 그대로 통과하고 **접근 검사에서 막힌다.** 호출부는 반드시 둘을 함께 쓴다.
+ */
 export function resolveGallery(tabParam: string | undefined, myTypeCode: TypeCode | null): GalleryTab {
   if (tabParam === "mine" && myTypeCode) return myTypeCode
+  if (tabParam && (Object.values(GalleryType) as string[]).includes(tabParam)) {
+    return tabParam as GalleryTab
+  }
   return "ALL"
 }
 
-/** 종족 갤러리는 본인 종족만 접근할 수 있다. 전체 탭은 누구나 접근 가능. */
-export function canAccessGallery(gallery: GalleryTab, myTypeCode: TypeCode | null): boolean {
-  return gallery === "ALL" || gallery === myTypeCode
-}
+/*
+ * ── 읽기·쓰기를 나눴다가 **다시 합쳤다** (2026-08-26) ─────────────────────────
+ *
+ * 하루 사이에 두 번 바뀐 자리라 경위를 남긴다. 근거 없이 합쳐진 것처럼 보이면 다음
+ * 사람이 또 나눈다.
+ *
+ * **나눴던 이유**: 관리자에게 읽기만 열기로 했을 때, 우회를 `canAccessGallery()`
+ * 한 곳에 넣으면 읽기 3곳·쓰기 4곳이 같은 함수를 쓰고 있어서 **쓰기까지 함께 열렸다.**
+ * 관리자가 남의 종족 갤러리에 글·댓글·좋아요를 남기면 "이 갤러리는 이 종족만"이라는
+ * 약속이 운영자 손으로 깨진다. 그래서 `canViewGallery`/`canPostToGallery`로 갈랐고,
+ * 쓰기 쪽에는 우회할 인자조차 두지 않았다.
+ *
+ * **다시 합친 이유**: 쓰기도 열기로 결정하면서 두 함수가 **모든 입력에서 같은 값**을
+ * 돌려주게 됐다 — 비관리자는 둘 다 "ALL + 본인 종족", 관리자는 둘 다 전부다.
+ * 항상 같은 값을 주는 함수를 둘로 두면 나중에 한쪽만 고쳐져 조용히 갈라진다.
+ * 실제로 그렇게 갈라지면 "관리자가 글은 쓰는데 자기 공지에 답글은 못 다는" 형태의
+ * 고장이 된다.
+ *
+ * **다시 나눠야 하는 조건은 하나다** — 관리자의 읽기 권한과 쓰기 권한이 달라지는 날.
+ * 그날이 오면 위 "나눴던 이유"를 그대로 따르면 된다. 그전에는 나누지 마라.
+ * ─────────────────────────────────────────────────────────────────────────────
+ */
 
 /**
- * 모든 갤러리에 글을 쓸 수 있다.
- * 2026-08-20 해소: `Post.galleryType`이 `GalleryType` enum이 되면서 ALL도 저장할 수 있게 됐다
- * (마이그레이션 `20260820130000_post_gallery_type_all`, E). 그전에는 전체 탭 글쓰기를 막았다.
- * 종족 갤러리의 소속 검사는 이 함수가 아니라 canAccessGallery()가 한다.
+ * 이 갤러리를 읽고 쓸 수 있는가. 전체 탭은 누구나, 종족 갤러리는 본인 종족만,
+ * **관리자는 전부**.
+ *
+ * 읽기(목록·상세·서버 렌더)와 쓰기(글·댓글·좋아요·주제 추천) **7곳이 모두 이 함수를 쓴다.**
+ * 한 곳이라도 다른 판정을 쓰면 위 주석의 "조용히 갈라진다"가 그대로 일어난다.
  */
-export function canWriteToGallery(): boolean {
-  return true
+export function canAccessGallery(gallery: GalleryTab, myTypeCode: TypeCode | null, isAdmin: boolean): boolean {
+  return gallery === "ALL" || gallery === myTypeCode || isAdmin
 }
 
 /**
@@ -53,7 +85,9 @@ export async function listGalleryPosts(gallery: GalleryTab) {
     where: { deletedAt: null, galleryType: gallery },
     orderBy: { createdAt: "desc" },
     take: POST_LIST_LIMIT,
-    include: { user: { select: { nickname: true, typeCode: true } } },
+    // isAdmin은 작성자 표기용이다(_lib/author.ts). **필드를 더 늘리지 마라** —
+    // 이 select 절이 subTypeCode 같은 값이 목록 응답에 새는 것을 막는 자리다.
+    include: { user: { select: { nickname: true, typeCode: true, isAdmin: true } } },
   })
 
   // imageKey는 include가 스칼라를 다 주므로 이미 들어 있다. URL만 얹는다.
