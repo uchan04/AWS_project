@@ -6,6 +6,7 @@
 // 그다음에 비밀번호(또는 "탈퇴" 입력)를 받는다. 되돌릴 수 없는 동작이라 확인 없이 두지 않는다.
 
 import { useState } from "react"
+import { useRouter } from "next/navigation"
 import type { TypeCode } from "@prisma/client"
 import { NICKNAME_MAX, isValidNickname } from "@/lib/types"
 import "@/styles/tokens.css"
@@ -37,6 +38,7 @@ export default function SettingsForm({
   nickname: string
   typeCode: TypeCode | null
 }) {
+  const router = useRouter()
   const [currentNickname, setCurrentNickname] = useState(nickname)
   const [nickSubmitting, setNickSubmitting] = useState(false)
   const [nickError, setNickError] = useState<string | null>(null)
@@ -71,6 +73,7 @@ export default function SettingsForm({
         throw new Error(parsed?.error?.message ?? "잠시 후 다시 시도해 주세요")
       }
       setNickDone(true)
+      router.refresh()
     } catch (caught) {
       setNickError(caught instanceof Error ? caught.message : "잠시 후 다시 시도해 주세요")
     } finally {
